@@ -6,7 +6,7 @@ namespace DbDelta.Core.ObjectModel;
 /// <see cref="Table"/> — they are NOT duplicated here.
 ///
 /// Named <c>TableIndex</c> rather than <c>Index</c> to avoid clashing with
-/// <see cref="System.Index"/> (the BCL range-indexer type).
+/// <see cref="Index"/> (the BCL range-indexer type).
 /// </summary>
 public sealed record TableIndex(
     string Name,

@@ -99,7 +99,7 @@ public sealed class TableScriptEmitter : IScriptEmitter
         HashSet<string> colsWithNamedDefault =
             [.. newT.Constraints.OfType<DefaultConstraint>().Select(d => d.ColumnName)];
 
-        Dictionary<string, Column> existingColsByName =
+        var existingColsByName =
             oldT.Columns.ToDictionary(c => c.Name, StringComparer.Ordinal);
         foreach (Column newCol in newT.Columns)
         {
