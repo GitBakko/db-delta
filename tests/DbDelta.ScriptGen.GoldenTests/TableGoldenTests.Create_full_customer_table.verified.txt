@@ -1,0 +1,5 @@
+CREATE TABLE [dbo].[Customer] (
+    [Id] int IDENTITY NOT NULL,
+    [Name] nvarchar(100) NOT NULL,
+    [Email] nvarchar(200) NULL DEFAULT ('unknown')
+);

@@ -3,11 +3,14 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
+  <!--
+    This project uses Verify.Xunit for snapshot testing, which requires xunit v2.
+    xunit.v3 is intentionally excluded to avoid FactAttribute collision.
+    The xunit v2 runner comes transitively via Verify.Xunit's xunit.extensibility.execution dependency.
+  -->
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="xunit.v3" />
     <PackageReference Include="xunit.runner.visualstudio" />
-    <PackageReference Include="FluentAssertions" />
     <PackageReference Include="Verify.Xunit" />
   </ItemGroup>
   <ItemGroup>
