@@ -19,4 +19,9 @@
     <ProjectReference Include="..\DbDelta.Shared\DbDelta.Shared.csproj" />
     <ProjectReference Include="..\DbDelta.Providers.LiveDb\DbDelta.Providers.LiveDb.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Update="wwwroot\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 </Project>

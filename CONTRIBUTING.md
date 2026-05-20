@@ -42,3 +42,13 @@ CI re-runs the same set on `windows-latest` and additionally runs the integratio
 ## Commit Style
 
 Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`, `build:`, `test:`, `refactor:`.
+
+### Design System Sync Rule
+
+The App copies the design system from `docs/design-system/project/assets/` into `src/DbDelta.App/wwwroot/assets/`. When the design system changes:
+
+1. Edit files under `docs/design-system/project/`.
+2. Re-run the copy command (see Task T1.11a in plan M0/M1).
+3. Commit both the docs change and the asset copy in a single commit so the App build stays in sync.
+
+Do NOT hand-edit `src/DbDelta.App/wwwroot/assets/*` — they are generated. Edits will be overwritten on the next sync.
