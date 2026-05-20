@@ -17,7 +17,7 @@ internal static class SerilogBootstrap
 
         if (!string.IsNullOrWhiteSpace(logFile))
         {
-            System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(logFile)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(logFile)!);
             configuration = configuration.WriteTo.File(
                 path: logFile,
                 rollingInterval: RollingInterval.Day,
