@@ -25,11 +25,14 @@ public class ModuleTests
     }
 
     [Fact]
-    public void Encrypted_module_has_null_body_and_IsEncrypted_true()
+    public void Encrypted_module_has_null_body_and_IsEncrypted_true_but_identity_still_resolves()
     {
         View view = new("dbo", "vSecret", Body: null, IsEncrypted: true);
         view.Body.Should().BeNull();
         view.IsEncrypted.Should().BeTrue();
+        view.Identity.SchemaName.Should().Be("dbo");
+        view.Identity.ObjectName.Should().Be("vSecret");
+        view.Identity.Kind.Should().Be("View");
     }
 
     [Fact]
