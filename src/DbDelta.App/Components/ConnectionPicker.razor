@@ -1,0 +1,82 @@
+@inject DbDelta.App.State.AppState AppState
+
+@*
+   Design System refs:
+   .connection-bar              wraps the two endpoint cards
+   .connection-endpoint--source violet-tinted left card
+   .connection-endpoint--target cobalt-tinted right card
+   .connection-tag              "SOURCE" / "TARGET" eyebrow label
+   .connection-name             the editable connection string (rendered as input here)
+   .input                       generic input styling
+   .btn .btn--primary           primary action button
+   .alert .alert--danger        error region
+*@
+
+<section class="stack gap-8" style="padding: var(--space-12) 0;">
+    <h2 class="t-h3">Connections</h2>
+
+    <div class="connection-bar">
+        <div class="connection-endpoint connection-endpoint--source">
+            <span class="connection-tag t-eyebrow">Source</span>
+            <input
+                class="input connection-name t-mono"
+                type="text"
+                @bind="AppState.SourceConnectionString"
+                @bind:event="oninput"
+                placeholder="Server=.;Database=Dev;Trusted_Connection=True;TrustServerCertificate=True" />
+        </div>
+
+        <button type="button" class="connection-swap btn btn--ghost btn--icon-only" title="Swap source and target" @onclick="Swap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4l4 4-4 4M20 8H8M8 20l-4-4 4-4M4 16h12"/></svg>
+        </button>
+
+        <div class="connection-endpoint connection-endpoint--target">
+            <span class="connection-tag t-eyebrow">Target</span>
+            <input
+                class="input connection-name t-mono"
+                type="text"
+                @bind="AppState.TargetConnectionString"
+                @bind:event="oninput"
+                placeholder="Server=.;Database=Prod;Trusted_Connection=True;TrustServerCertificate=True" />
+        </div>
+    </div>
+
+    <div class="row gap-4">
+        <button class="btn btn--primary btn--lg" @onclick="CompareAsync" disabled="@AppState.IsBusy">
+            @if (AppState.IsBusy)
+            {
+                <span class="spinner" aria-hidden="true"></span>
+                <span>Comparing…</span>
+            }
+            else
+            {
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                <span>Compare</span>
+            }
+        </button>
+    </div>
+
+    @if (AppState.LastError is not null)
+    {
+        <div class="alert alert--danger" role="alert">
+            <svg class="alert-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16h.01"/></svg>
+            <div class="alert-body">
+                <strong>Comparison failed.</strong>
+                <p class="t-body-sm">@AppState.LastError</p>
+            </div>
+        </div>
+    }
+</section>
+
+@code {
+    private async Task CompareAsync() =>
+        await AppState.RunComparisonAsync(System.Threading.CancellationToken.None);
+
+    private void Swap()
+    {
+        (AppState.SourceConnectionString, AppState.TargetConnectionString) =
+            (AppState.TargetConnectionString, AppState.SourceConnectionString);
+    }
+
+    protected override void OnInitialized() => AppState.OnChange += StateHasChanged;
+}
