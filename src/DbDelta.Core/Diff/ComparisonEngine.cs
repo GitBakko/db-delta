@@ -59,17 +59,15 @@ public sealed class ComparisonEngine
 
     private static DifferenceStatus ClassifyModule(Module? a, Module? b)
     {
-        if (a is null && b is not null)
+        // After CompareModules' union-of-keys iteration at least one side is non-null;
+        // the both-null case is unreachable in practice but treated as Identical for safety.
+        if (a is null)
         {
-            return DifferenceStatus.OnlyInB;
+            return b is null ? DifferenceStatus.Identical : DifferenceStatus.OnlyInB;
         }
-        if (a is not null && b is null)
+        if (b is null)
         {
             return DifferenceStatus.OnlyInA;
-        }
-        if (a is null || b is null)
-        {
-            return DifferenceStatus.Identical;
         }
 
         // Encrypted bodies are opaque — we cannot prove equality, so we err on the side

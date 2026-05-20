@@ -8,6 +8,10 @@ namespace DbDelta.Core.UnitTests.Diff;
 
 public class ModuleDiffTests
 {
+    // Module diff tests pass ComparisonOptions.None on purpose: BodyNormalizer
+    // is invoked unconditionally inside ClassifyModule (any future IgnoreWhitespace
+    // flag must therefore not gate the whitespace test below). Sibling table-diff
+    // tests use ComparisonOptions.Default — that divergence is intentional.
     private static Database Db(params View[] views) =>
         new("Db", Schemas: [new Schema("dbo")], Tables: [], Views: views, Procedures: []);
 
