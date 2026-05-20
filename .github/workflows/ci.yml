@@ -45,7 +45,6 @@ jobs:
           dotnet test tests/DbDelta.Core.UnitTests --no-build --configuration Release --logger "trx;LogFileName=core.trx"
           dotnet test tests/DbDelta.Architecture.Tests --no-build --configuration Release --logger "trx;LogFileName=arch.trx"
           dotnet test tests/DbDelta.ScriptGen.GoldenTests --no-build --configuration Release --logger "trx;LogFileName=golden.trx"
-          dotnet test tests/DbDelta.App.ComponentTests --no-build --configuration Release --logger "trx;LogFileName=app.trx"
 
       - name: Upload Windows test results
         if: always()

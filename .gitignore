@@ -53,3 +53,6 @@ coverage/
 .env
 .env.*
 *.local
+
+# Local scratch (draft outputs from subagents, etc.)
+tmp/

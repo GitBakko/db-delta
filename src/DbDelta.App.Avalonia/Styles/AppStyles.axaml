@@ -1,0 +1,154 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Domain control styles for DbDelta — mirror the design system. -->
+
+  <!-- ===== Border surfaces ===== -->
+
+  <Style Selector="Border.endpoint">
+    <Setter Property="Background" Value="{StaticResource BgRaisedBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="8" />
+  </Style>
+  <Style Selector="Border.endpoint.endpoint-source">
+    <Setter Property="BorderBrush" Value="{StaticResource SecondaryBrush}" />
+  </Style>
+  <Style Selector="Border.endpoint.endpoint-target">
+    <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}" />
+  </Style>
+
+  <Style Selector="Border.surface-raised">
+    <Setter Property="Background" Value="{StaticResource BgRaisedBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="8" />
+  </Style>
+
+  <Style Selector="Border.surface-subtle">
+    <Setter Property="Background" Value="{StaticResource BgSubtleBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderSubtleBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="8" />
+  </Style>
+
+  <!-- ===== Buttons ===== -->
+
+  <Style Selector="Button.primary">
+    <Setter Property="Background" Value="{StaticResource PrimaryBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource PrimaryFgBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="14,8" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Cursor" Value="Hand" />
+  </Style>
+  <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource PrimaryHoverBrush}" />
+  </Style>
+  <Style Selector="Button.primary:pressed /template/ ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource PrimaryActiveBrush}" />
+  </Style>
+  <Style Selector="Button.primary:disabled /template/ ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource PrimaryBrush}" />
+    <Setter Property="Opacity" Value="0.6" />
+  </Style>
+
+  <Style Selector="Button.lg">
+    <Setter Property="Padding" Value="18,10" />
+    <Setter Property="FontSize" Value="14" />
+  </Style>
+
+  <Style Selector="Button.ghost">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{StaticResource FgMutedBrush}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="6" />
+    <Setter Property="Cursor" Value="Hand" />
+  </Style>
+  <Style Selector="Button.ghost:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource BgSubtleBrush}" />
+  </Style>
+
+  <Style Selector="Button.swap">
+    <Setter Property="Background" Value="{StaticResource BgRaisedBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource FgMutedBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="20" />
+    <Setter Property="Width" Value="36" />
+    <Setter Property="Height" Value="36" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Padding" Value="0" />
+  </Style>
+  <Style Selector="Button.swap:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource BgSubtleBrush}" />
+  </Style>
+
+  <!-- ===== TextBox ===== -->
+
+  <Style Selector="TextBox.connection-input">
+    <Setter Property="Padding" Value="10,8" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+  </Style>
+
+  <!-- ===== Badges ===== -->
+
+  <Style Selector="Border.badge">
+    <Setter Property="CornerRadius" Value="999" />
+    <Setter Property="Background" Value="{StaticResource BgSubtleBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <Style Selector="Border.badge.badge-outline">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Border.badge.modified">
+    <Setter Property="Background" Value="{StaticResource PrimarySoftBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}" />
+  </Style>
+  <Style Selector="Border.badge.modified TextBlock">
+    <Setter Property="Foreground" Value="{StaticResource PrimarySoftFgBrush}" />
+  </Style>
+  <Style Selector="Border.badge.only-source">
+    <Setter Property="Background" Value="{StaticResource SecondarySoftBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource SecondaryBrush}" />
+  </Style>
+  <Style Selector="Border.badge.only-source TextBlock">
+    <Setter Property="Foreground" Value="{StaticResource SecondarySoftFgBrush}" />
+  </Style>
+  <Style Selector="Border.badge.only-target">
+    <Setter Property="Background" Value="{StaticResource WarningSoftBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource WarningBrush}" />
+  </Style>
+  <Style Selector="Border.badge.only-target TextBlock">
+    <Setter Property="Foreground" Value="{StaticResource WarningFgBrush}" />
+  </Style>
+  <Style Selector="Border.badge.identical">
+    <Setter Property="Background" Value="{StaticResource BgSubtleBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+  </Style>
+  <Style Selector="Border.badge.identical TextBlock">
+    <Setter Property="Foreground" Value="{StaticResource FgSubtleBrush}" />
+  </Style>
+
+  <!-- ===== Alerts ===== -->
+
+  <Style Selector="Border.alert">
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Background" Value="{StaticResource BgSubtleBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <Style Selector="Border.alert.alert-danger">
+    <Setter Property="Background" Value="{StaticResource DangerSoftBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}" />
+  </Style>
+
+</Styles>

@@ -1,0 +1,287 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ================================================================
+         DbDelta Design System v1.0 — Avalonia 11 ResourceDictionary
+         Auto-generated from docs/design-system/project/assets/tokens.css
+         oklch() values converted to sRGB hex via OKLab intermediate.
+         Alpha-blended tokens: #AARRGGBB  |  Opaque: #RRGGBB
+         ================================================================ -->
+
+    <!-- ===== Palette ramp — Neutral ===== -->
+    <Color x:Key="Neutral0">#FEFDFB</Color>
+    <SolidColorBrush x:Key="Neutral0Brush" Color="{StaticResource Neutral0}" />
+    <Color x:Key="Neutral25">#FAF9F6</Color>
+    <SolidColorBrush x:Key="Neutral25Brush" Color="{StaticResource Neutral25}" />
+    <Color x:Key="Neutral50">#F5F3F0</Color>
+    <SolidColorBrush x:Key="Neutral50Brush" Color="{StaticResource Neutral50}" />
+    <Color x:Key="Neutral100">#EDEBE7</Color>
+    <SolidColorBrush x:Key="Neutral100Brush" Color="{StaticResource Neutral100}" />
+    <Color x:Key="Neutral150">#E2DFDB</Color>
+    <SolidColorBrush x:Key="Neutral150Brush" Color="{StaticResource Neutral150}" />
+    <Color x:Key="Neutral200">#D4D0CB</Color>
+    <SolidColorBrush x:Key="Neutral200Brush" Color="{StaticResource Neutral200}" />
+    <Color x:Key="Neutral300">#BAB7B1</Color>
+    <SolidColorBrush x:Key="Neutral300Brush" Color="{StaticResource Neutral300}" />
+    <Color x:Key="Neutral400">#98958E</Color>
+    <SolidColorBrush x:Key="Neutral400Brush" Color="{StaticResource Neutral400}" />
+    <Color x:Key="Neutral500">#78746D</Color>
+    <SolidColorBrush x:Key="Neutral500Brush" Color="{StaticResource Neutral500}" />
+    <Color x:Key="Neutral600">#59554E</Color>
+    <SolidColorBrush x:Key="Neutral600Brush" Color="{StaticResource Neutral600}" />
+    <Color x:Key="Neutral700">#363B41</Color>
+    <SolidColorBrush x:Key="Neutral700Brush" Color="{StaticResource Neutral700}" />
+    <Color x:Key="Neutral750">#262A31</Color>
+    <SolidColorBrush x:Key="Neutral750Brush" Color="{StaticResource Neutral750}" />
+    <Color x:Key="Neutral800">#181C22</Color>
+    <SolidColorBrush x:Key="Neutral800Brush" Color="{StaticResource Neutral800}" />
+    <Color x:Key="Neutral850">#0E1218</Color>
+    <SolidColorBrush x:Key="Neutral850Brush" Color="{StaticResource Neutral850}" />
+    <Color x:Key="Neutral900">#06090F</Color>
+    <SolidColorBrush x:Key="Neutral900Brush" Color="{StaticResource Neutral900}" />
+    <Color x:Key="Neutral950">#020306</Color>
+    <SolidColorBrush x:Key="Neutral950Brush" Color="{StaticResource Neutral950}" />
+    <Color x:Key="Neutral975">#010103</Color>
+    <SolidColorBrush x:Key="Neutral975Brush" Color="{StaticResource Neutral975}" />
+
+    <!-- ===== Palette ramp — Cobalt ===== -->
+    <Color x:Key="Cobalt100">#DDECFF</Color>
+    <SolidColorBrush x:Key="Cobalt100Brush" Color="{StaticResource Cobalt100}" />
+    <Color x:Key="Cobalt200">#B3D3FF</Color>
+    <SolidColorBrush x:Key="Cobalt200Brush" Color="{StaticResource Cobalt200}" />
+    <Color x:Key="Cobalt300">#80B3FD</Color>
+    <SolidColorBrush x:Key="Cobalt300Brush" Color="{StaticResource Cobalt300}" />
+    <Color x:Key="Cobalt400">#4F91F2</Color>
+    <SolidColorBrush x:Key="Cobalt400Brush" Color="{StaticResource Cobalt400}" />
+    <Color x:Key="Cobalt500">#1B6CDB</Color>
+    <SolidColorBrush x:Key="Cobalt500Brush" Color="{StaticResource Cobalt500}" />
+    <Color x:Key="Cobalt600">#0054BD</Color>
+    <SolidColorBrush x:Key="Cobalt600Brush" Color="{StaticResource Cobalt600}" />
+    <Color x:Key="Cobalt700">#003F93</Color>
+    <SolidColorBrush x:Key="Cobalt700Brush" Color="{StaticResource Cobalt700}" />
+    <Color x:Key="Cobalt800">#002A66</Color>
+    <SolidColorBrush x:Key="Cobalt800Brush" Color="{StaticResource Cobalt800}" />
+    <Color x:Key="Cobalt900">#00183F</Color>
+    <SolidColorBrush x:Key="Cobalt900Brush" Color="{StaticResource Cobalt900}" />
+
+    <!-- ===== Palette ramp — Violet ===== -->
+    <Color x:Key="Violet100">#EAE8FF</Color>
+    <SolidColorBrush x:Key="Violet100Brush" Color="{StaticResource Violet100}" />
+    <Color x:Key="Violet200">#D0CAFD</Color>
+    <SolidColorBrush x:Key="Violet200Brush" Color="{StaticResource Violet200}" />
+    <Color x:Key="Violet300">#B0A4F5</Color>
+    <SolidColorBrush x:Key="Violet300Brush" Color="{StaticResource Violet300}" />
+    <Color x:Key="Violet400">#927FE9</Color>
+    <SolidColorBrush x:Key="Violet400Brush" Color="{StaticResource Violet400}" />
+    <Color x:Key="Violet500">#7C60DB</Color>
+    <SolidColorBrush x:Key="Violet500Brush" Color="{StaticResource Violet500}" />
+    <Color x:Key="Violet600">#6649BE</Color>
+    <SolidColorBrush x:Key="Violet600Brush" Color="{StaticResource Violet600}" />
+    <Color x:Key="Violet700">#4A328E</Color>
+    <SolidColorBrush x:Key="Violet700Brush" Color="{StaticResource Violet700}" />
+    <Color x:Key="Violet800">#2F1F60</Color>
+    <SolidColorBrush x:Key="Violet800Brush" Color="{StaticResource Violet800}" />
+    <Color x:Key="Violet900">#1B123A</Color>
+    <SolidColorBrush x:Key="Violet900Brush" Color="{StaticResource Violet900}" />
+
+    <!-- ===== Palette ramp — Emerald ===== -->
+    <Color x:Key="Emerald100">#DAF3E1</Color>
+    <SolidColorBrush x:Key="Emerald100Brush" Color="{StaticResource Emerald100}" />
+    <Color x:Key="Emerald200">#ADDFBD</Color>
+    <SolidColorBrush x:Key="Emerald200Brush" Color="{StaticResource Emerald200}" />
+    <Color x:Key="Emerald300">#71C791</Color>
+    <SolidColorBrush x:Key="Emerald300Brush" Color="{StaticResource Emerald300}" />
+    <Color x:Key="Emerald400">#35AF6D</Color>
+    <SolidColorBrush x:Key="Emerald400Brush" Color="{StaticResource Emerald400}" />
+    <Color x:Key="Emerald500">#009351</Color>
+    <SolidColorBrush x:Key="Emerald500Brush" Color="{StaticResource Emerald500}" />
+    <Color x:Key="Emerald600">#007339</Color>
+    <SolidColorBrush x:Key="Emerald600Brush" Color="{StaticResource Emerald600}" />
+    <Color x:Key="Emerald700">#005226</Color>
+    <SolidColorBrush x:Key="Emerald700Brush" Color="{StaticResource Emerald700}" />
+    <Color x:Key="Emerald800">#003717</Color>
+    <SolidColorBrush x:Key="Emerald800Brush" Color="{StaticResource Emerald800}" />
+    <Color x:Key="Emerald900">#00200B</Color>
+    <SolidColorBrush x:Key="Emerald900Brush" Color="{StaticResource Emerald900}" />
+
+    <!-- ===== Palette ramp — Amber ===== -->
+    <Color x:Key="Amber100">#FDECD5</Color>
+    <SolidColorBrush x:Key="Amber100Brush" Color="{StaticResource Amber100}" />
+    <Color x:Key="Amber200">#FAD4A0</Color>
+    <SolidColorBrush x:Key="Amber200Brush" Color="{StaticResource Amber200}" />
+    <Color x:Key="Amber300">#F2B458</Color>
+    <SolidColorBrush x:Key="Amber300Brush" Color="{StaticResource Amber300}" />
+    <Color x:Key="Amber400">#E49E22</Color>
+    <SolidColorBrush x:Key="Amber400Brush" Color="{StaticResource Amber400}" />
+    <Color x:Key="Amber500">#CD8800</Color>
+    <SolidColorBrush x:Key="Amber500Brush" Color="{StaticResource Amber500}" />
+    <Color x:Key="Amber600">#AE5C00</Color>
+    <SolidColorBrush x:Key="Amber600Brush" Color="{StaticResource Amber600}" />
+    <Color x:Key="Amber700">#883C00</Color>
+    <SolidColorBrush x:Key="Amber700Brush" Color="{StaticResource Amber700}" />
+    <Color x:Key="Amber800">#5C2507</Color>
+    <SolidColorBrush x:Key="Amber800Brush" Color="{StaticResource Amber800}" />
+    <Color x:Key="Amber900">#371302</Color>
+    <SolidColorBrush x:Key="Amber900Brush" Color="{StaticResource Amber900}" />
+
+    <!-- ===== Palette ramp — Crimson ===== -->
+    <Color x:Key="Crimson100">#FFE4E1</Color>
+    <SolidColorBrush x:Key="Crimson100Brush" Color="{StaticResource Crimson100}" />
+    <Color x:Key="Crimson200">#FFBFB8</Color>
+    <SolidColorBrush x:Key="Crimson200Brush" Color="{StaticResource Crimson200}" />
+    <Color x:Key="Crimson300">#F58B84</Color>
+    <SolidColorBrush x:Key="Crimson300Brush" Color="{StaticResource Crimson300}" />
+    <Color x:Key="Crimson400">#E65A56</Color>
+    <SolidColorBrush x:Key="Crimson400Brush" Color="{StaticResource Crimson400}" />
+    <Color x:Key="Crimson500">#D73337</Color>
+    <SolidColorBrush x:Key="Crimson500Brush" Color="{StaticResource Crimson500}" />
+    <Color x:Key="Crimson600">#B31220</Color>
+    <SolidColorBrush x:Key="Crimson600Brush" Color="{StaticResource Crimson600}" />
+    <Color x:Key="Crimson700">#850513</Color>
+    <SolidColorBrush x:Key="Crimson700Brush" Color="{StaticResource Crimson700}" />
+    <Color x:Key="Crimson800">#570209</Color>
+    <SolidColorBrush x:Key="Crimson800Brush" Color="{StaticResource Crimson800}" />
+    <Color x:Key="Crimson900">#350204</Color>
+    <SolidColorBrush x:Key="Crimson900Brush" Color="{StaticResource Crimson900}" />
+
+    <!-- ===== Semantic tokens — Light theme ===== -->
+    <Color x:Key="Bg">#FEFDFB</Color>
+    <SolidColorBrush x:Key="BgBrush" Color="{StaticResource Bg}" />
+    <Color x:Key="BgSubtle">#FAF9F6</Color>
+    <SolidColorBrush x:Key="BgSubtleBrush" Color="{StaticResource BgSubtle}" />
+    <Color x:Key="BgMuted">#F5F3F0</Color>
+    <SolidColorBrush x:Key="BgMutedBrush" Color="{StaticResource BgMuted}" />
+    <Color x:Key="BgRaised">#FEFDFB</Color>
+    <SolidColorBrush x:Key="BgRaisedBrush" Color="{StaticResource BgRaised}" />
+    <Color x:Key="BgOverlay">#DBFEFDFB</Color>
+    <SolidColorBrush x:Key="BgOverlayBrush" Color="{StaticResource BgOverlay}" />
+    <Color x:Key="BgInverse">#06090F</Color>
+    <SolidColorBrush x:Key="BgInverseBrush" Color="{StaticResource BgInverse}" />
+    <Color x:Key="BgCode">#FAF9F6</Color>
+    <SolidColorBrush x:Key="BgCodeBrush" Color="{StaticResource BgCode}" />
+    <Color x:Key="BgSelection">#73B3D3FF</Color>
+    <SolidColorBrush x:Key="BgSelectionBrush" Color="{StaticResource BgSelection}" />
+    <Color x:Key="Fg">#06090F</Color>
+    <SolidColorBrush x:Key="FgBrush" Color="{StaticResource Fg}" />
+    <Color x:Key="FgStrong">#020306</Color>
+    <SolidColorBrush x:Key="FgStrongBrush" Color="{StaticResource FgStrong}" />
+    <Color x:Key="FgMuted">#363B41</Color>
+    <SolidColorBrush x:Key="FgMutedBrush" Color="{StaticResource FgMuted}" />
+    <Color x:Key="FgSubtle">#78746D</Color>
+    <SolidColorBrush x:Key="FgSubtleBrush" Color="{StaticResource FgSubtle}" />
+    <Color x:Key="FgFaint">#98958E</Color>
+    <SolidColorBrush x:Key="FgFaintBrush" Color="{StaticResource FgFaint}" />
+    <Color x:Key="FgInverse">#FEFDFB</Color>
+    <SolidColorBrush x:Key="FgInverseBrush" Color="{StaticResource FgInverse}" />
+    <Color x:Key="FgOnAccent">#FEFDFB</Color>
+    <SolidColorBrush x:Key="FgOnAccentBrush" Color="{StaticResource FgOnAccent}" />
+    <Color x:Key="Border">#E2DFDB</Color>
+    <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource Border}" />
+    <Color x:Key="BorderSubtle">#EDEBE7</Color>
+    <SolidColorBrush x:Key="BorderSubtleBrush" Color="{StaticResource BorderSubtle}" />
+    <Color x:Key="BorderStrong">#BAB7B1</Color>
+    <SolidColorBrush x:Key="BorderStrongBrush" Color="{StaticResource BorderStrong}" />
+    <Color x:Key="BorderFocus">#1B6CDB</Color>
+    <SolidColorBrush x:Key="BorderFocusBrush" Color="{StaticResource BorderFocus}" />
+    <Color x:Key="Primary">#0054BD</Color>
+    <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource Primary}" />
+    <Color x:Key="PrimaryHover">#003F93</Color>
+    <SolidColorBrush x:Key="PrimaryHoverBrush" Color="{StaticResource PrimaryHover}" />
+    <Color x:Key="PrimaryActive">#002A66</Color>
+    <SolidColorBrush x:Key="PrimaryActiveBrush" Color="{StaticResource PrimaryActive}" />
+    <Color x:Key="PrimaryFg">#FEFDFB</Color>
+    <SolidColorBrush x:Key="PrimaryFgBrush" Color="{StaticResource PrimaryFg}" />
+    <Color x:Key="PrimarySoft">#DDECFF</Color>
+    <SolidColorBrush x:Key="PrimarySoftBrush" Color="{StaticResource PrimarySoft}" />
+    <Color x:Key="PrimarySoftFg">#003F93</Color>
+    <SolidColorBrush x:Key="PrimarySoftFgBrush" Color="{StaticResource PrimarySoftFg}" />
+    <Color x:Key="Secondary">#6649BE</Color>
+    <SolidColorBrush x:Key="SecondaryBrush" Color="{StaticResource Secondary}" />
+    <Color x:Key="SecondaryHover">#4A328E</Color>
+    <SolidColorBrush x:Key="SecondaryHoverBrush" Color="{StaticResource SecondaryHover}" />
+    <Color x:Key="SecondaryFg">#FEFDFB</Color>
+    <SolidColorBrush x:Key="SecondaryFgBrush" Color="{StaticResource SecondaryFg}" />
+    <Color x:Key="SecondarySoft">#EAE8FF</Color>
+    <SolidColorBrush x:Key="SecondarySoftBrush" Color="{StaticResource SecondarySoft}" />
+    <Color x:Key="SecondarySoftFg">#4A328E</Color>
+    <SolidColorBrush x:Key="SecondarySoftFgBrush" Color="{StaticResource SecondarySoftFg}" />
+    <Color x:Key="Info">#0054BD</Color>
+    <SolidColorBrush x:Key="InfoBrush" Color="{StaticResource Info}" />
+    <Color x:Key="InfoSoft">#DDECFF</Color>
+    <SolidColorBrush x:Key="InfoSoftBrush" Color="{StaticResource InfoSoft}" />
+    <Color x:Key="InfoFg">#003F93</Color>
+    <SolidColorBrush x:Key="InfoFgBrush" Color="{StaticResource InfoFg}" />
+    <Color x:Key="Success">#007339</Color>
+    <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource Success}" />
+    <Color x:Key="SuccessSoft">#DAF3E1</Color>
+    <SolidColorBrush x:Key="SuccessSoftBrush" Color="{StaticResource SuccessSoft}" />
+    <Color x:Key="SuccessFg">#005226</Color>
+    <SolidColorBrush x:Key="SuccessFgBrush" Color="{StaticResource SuccessFg}" />
+    <Color x:Key="Warning">#AE5C00</Color>
+    <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource Warning}" />
+    <Color x:Key="WarningSoft">#FDECD5</Color>
+    <SolidColorBrush x:Key="WarningSoftBrush" Color="{StaticResource WarningSoft}" />
+    <Color x:Key="WarningFg">#883C00</Color>
+    <SolidColorBrush x:Key="WarningFgBrush" Color="{StaticResource WarningFg}" />
+    <Color x:Key="Danger">#B31220</Color>
+    <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource Danger}" />
+    <Color x:Key="DangerSoft">#FFE4E1</Color>
+    <SolidColorBrush x:Key="DangerSoftBrush" Color="{StaticResource DangerSoft}" />
+    <Color x:Key="DangerFg">#850513</Color>
+    <SolidColorBrush x:Key="DangerFgBrush" Color="{StaticResource DangerFg}" />
+
+    <!-- ===== Diff status tokens (theme-invariant) ===== -->
+    <Color x:Key="DiffIdentical">#98958E</Color>
+    <SolidColorBrush x:Key="DiffIdenticalBrush" Color="{StaticResource DiffIdentical}" />
+    <Color x:Key="DiffModified">#1B6CDB</Color>
+    <SolidColorBrush x:Key="DiffModifiedBrush" Color="{StaticResource DiffModified}" />
+    <Color x:Key="DiffOnlySource">#7C60DB</Color>
+    <SolidColorBrush x:Key="DiffOnlySourceBrush" Color="{StaticResource DiffOnlySource}" />
+    <Color x:Key="DiffOnlyTarget">#AE5C00</Color>
+    <SolidColorBrush x:Key="DiffOnlyTargetBrush" Color="{StaticResource DiffOnlyTarget}" />
+    <Color x:Key="DiffWarning">#CD8800</Color>
+    <SolidColorBrush x:Key="DiffWarningBrush" Color="{StaticResource DiffWarning}" />
+    <Color x:Key="DiffDestructive">#D73337</Color>
+    <SolidColorBrush x:Key="DiffDestructiveBrush" Color="{StaticResource DiffDestructive}" />
+    <Color x:Key="DiffBgModified">#80DDECFF</Color>
+    <SolidColorBrush x:Key="DiffBgModifiedBrush" Color="{StaticResource DiffBgModified}" />
+    <Color x:Key="DiffBgAdded">#99DAF3E1</Color>
+    <SolidColorBrush x:Key="DiffBgAddedBrush" Color="{StaticResource DiffBgAdded}" />
+    <Color x:Key="DiffBgRemoved">#73FFE4E1</Color>
+    <SolidColorBrush x:Key="DiffBgRemovedBrush" Color="{StaticResource DiffBgRemoved}" />
+    <Color x:Key="DiffBgOnlySource">#73EAE8FF</Color>
+    <SolidColorBrush x:Key="DiffBgOnlySourceBrush" Color="{StaticResource DiffBgOnlySource}" />
+    <Color x:Key="DiffBgOnlyTarget">#8CFDECD5</Color>
+    <SolidColorBrush x:Key="DiffBgOnlyTargetBrush" Color="{StaticResource DiffBgOnlyTarget}" />
+
+    <!-- ===== Spacing (4px base grid, values in device-independent pixels) ===== -->
+    <x:Double x:Key="Space0">0</x:Double>
+    <x:Double x:Key="Space1">2</x:Double>
+    <x:Double x:Key="Space2">4</x:Double>
+    <x:Double x:Key="Space3">6</x:Double>
+    <x:Double x:Key="Space4">8</x:Double>
+    <x:Double x:Key="Space5">10</x:Double>
+    <x:Double x:Key="Space6">12</x:Double>
+    <x:Double x:Key="Space7">14</x:Double>
+    <x:Double x:Key="Space8">16</x:Double>
+    <x:Double x:Key="Space10">20</x:Double>
+    <x:Double x:Key="Space12">24</x:Double>
+    <x:Double x:Key="Space14">28</x:Double>
+    <x:Double x:Key="Space16">32</x:Double>
+    <x:Double x:Key="Space20">40</x:Double>
+    <x:Double x:Key="Space24">48</x:Double>
+    <x:Double x:Key="Space32">64</x:Double>
+    <x:Double x:Key="Space40">80</x:Double>
+    <x:Double x:Key="Space48">96</x:Double>
+    <x:Double x:Key="Space64">128</x:Double>
+
+    <!-- ===== Radii ===== -->
+    <x:Double x:Key="RadiusNone">0</x:Double>
+    <x:Double x:Key="RadiusXs">3</x:Double>
+    <x:Double x:Key="RadiusSm">5</x:Double>
+    <x:Double x:Key="RadiusMd">7</x:Double>
+    <x:Double x:Key="RadiusLg">10</x:Double>
+    <x:Double x:Key="RadiusXl">14</x:Double>
+    <x:Double x:Key="RadiusPill">9999</x:Double>
+
+</ResourceDictionary>

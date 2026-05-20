@@ -14,9 +14,14 @@
     <PackageVersion Include="System.CommandLine" Version="2.0.0-beta5.25277.114" />
     <PackageVersion Include="Spectre.Console" Version="0.49.1" />
   </ItemGroup>
-  <ItemGroup Label="App / Blazor Hybrid">
-    <PackageVersion Include="Microsoft.AspNetCore.Components.WebView.WindowsForms" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Web.WebView2" Version="1.0.3179.45" />
+  <ItemGroup Label="App / Avalonia UI">
+    <PackageVersion Include="Avalonia" Version="12.0.3" />
+    <PackageVersion Include="Avalonia.Desktop" Version="12.0.3" />
+    <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.0.3" />
+    <PackageVersion Include="Avalonia.Controls.DataGrid" Version="12.0.0" />
+    <PackageVersion Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.1" />
+    <PackageVersion Include="Avalonia.Headless.XUnit" Version="12.0.3" />
+    <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
   </ItemGroup>
   <ItemGroup Label="Persistence">
     <PackageVersion Include="Meziantou.Framework.Win32.CredentialManager" Version="1.6.1" />

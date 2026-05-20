@@ -1,0 +1,107 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DbDelta.App.ViewModels"
+        xmlns:v="using:DbDelta.App.Views"
+        x:Class="DbDelta.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="DbDelta"
+        Width="1280" Height="800"
+        MinWidth="900" MinHeight="600"
+        Background="{StaticResource BgBrush}">
+
+  <!-- App shell: 44px topbar / flex middle / 24px statusbar -->
+  <Grid RowDefinitions="44,*,24">
+
+    <!-- Topbar -->
+    <Border Grid.Row="0"
+            Background="{StaticResource BgMutedBrush}"
+            BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="0,0,0,1">
+      <Grid ColumnDefinitions="*,Auto" Margin="16,0">
+        <StackPanel Grid.Column="0"
+                    Orientation="Horizontal"
+                    Spacing="10"
+                    VerticalAlignment="Center">
+          <!-- Brand glyph: triangle + center mark -->
+          <Border Width="22" Height="22"
+                  Background="{StaticResource PrimaryBrush}"
+                  CornerRadius="5">
+            <Path Stroke="{StaticResource PrimaryFgBrush}"
+                  StrokeThickness="1.6"
+                  StrokeLineCap="Round"
+                  StrokeJoin="Round"
+                  Data="M 6,16 L 11,5 L 16,16 Z M 8.5,16 L 8.5,10"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center" />
+          </Border>
+          <TextBlock Text="DbDelta"
+                     FontSize="14"
+                     FontWeight="SemiBold"
+                     Foreground="{StaticResource FgStrongBrush}"
+                     VerticalAlignment="Center" />
+          <TextBlock Text="{Binding Version}"
+                     FontSize="11"
+                     Foreground="{StaticResource FgSubtleBrush}"
+                     VerticalAlignment="Center" />
+        </StackPanel>
+
+        <Button Grid.Column="1"
+                Classes="ghost"
+                Command="{Binding ToggleThemeCommand}"
+                ToolTip.Tip="Toggle light/dark theme"
+                VerticalAlignment="Center">
+          <Path Width="16" Height="16"
+                Stretch="Uniform"
+                Stroke="{Binding $parent[Button].Foreground}"
+                StrokeThickness="1.6"
+                Data="M 12,4 A 8,8 0 1 0 20,12 A 6,6 0 0 1 12,4 Z" />
+        </Button>
+      </Grid>
+    </Border>
+
+    <!-- Middle: 240px sidebar + 1fr main -->
+    <Grid Grid.Row="1" ColumnDefinitions="240,*">
+      <Border Grid.Column="0"
+              Background="{StaticResource BgSubtleBrush}"
+              BorderBrush="{StaticResource BorderBrush}"
+              BorderThickness="0,0,1,0">
+        <!-- M1: sidebar placeholder; later milestones populate -->
+      </Border>
+
+      <ScrollViewer Grid.Column="1" Padding="24" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="16">
+          <v:ConnectionPickerView DataContext="{Binding AppState}" />
+          <v:ResultsTreeView DataContext="{Binding AppState}" />
+        </StackPanel>
+      </ScrollViewer>
+    </Grid>
+
+    <!-- Status bar -->
+    <Border Grid.Row="2"
+            Background="{StaticResource BgMutedBrush}"
+            BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="0,1,0,0">
+      <StackPanel Orientation="Horizontal" Spacing="8" Margin="12,0" VerticalAlignment="Center">
+        <TextBlock Text="{Binding AppState.StatusText}"
+                   FontSize="11"
+                   Foreground="{StaticResource FgSubtleBrush}" />
+        <TextBlock Text="·" Foreground="{StaticResource BorderStrongBrush}" FontSize="11" />
+        <TextBlock Text="{Binding AppState.SourceConnectionString}"
+                   FontSize="11"
+                   FontFamily="Cascadia Mono,Consolas,monospace"
+                   Foreground="{StaticResource FgSubtleBrush}"
+                   TextTrimming="CharacterEllipsis"
+                   MaxWidth="500" />
+        <TextBlock Text="→" Foreground="{StaticResource FgFaintBrush}" FontSize="11" />
+        <TextBlock Text="{Binding AppState.TargetConnectionString}"
+                   FontSize="11"
+                   FontFamily="Cascadia Mono,Consolas,monospace"
+                   Foreground="{StaticResource FgSubtleBrush}"
+                   TextTrimming="CharacterEllipsis"
+                   MaxWidth="500" />
+      </StackPanel>
+    </Border>
+
+  </Grid>
+
+</Window>
