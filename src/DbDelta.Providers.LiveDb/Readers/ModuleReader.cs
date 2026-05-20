@@ -10,13 +10,20 @@ namespace DbDelta.Providers.LiveDb.Readers;
 /// <c>IsEncrypted = true</c> so the comparison engine can flag them without
 /// attempting a body diff.
 /// </summary>
+/// <remarks>
+/// SQL Server does not expose an <c>is_encrypted</c> column on
+/// <c>sys.sql_modules</c>; the canonical signal that a module was created
+/// <c>WITH ENCRYPTION</c> is <c>definition IS NULL</c>. We therefore project
+/// only the definition and coerce <c>IsEncrypted = true</c> when the body is
+/// NULL. The same coercion also captures the rare permission edge case where
+/// the caller can see the object metadata but cannot read the module text.
+/// </remarks>
 internal sealed class ModuleReader
 {
     private const string ViewQuery = """
         SELECT s.name AS SchemaName,
                v.name AS Name,
-               sm.definition AS Body,
-               CAST(sm.is_encrypted AS BIT) AS IsEncrypted
+               sm.definition AS Body
         FROM sys.views AS v
         INNER JOIN sys.schemas AS s ON s.schema_id = v.schema_id
         LEFT JOIN sys.sql_modules AS sm ON sm.object_id = v.object_id
@@ -27,8 +34,7 @@ internal sealed class ModuleReader
     private const string ProcQuery = """
         SELECT s.name AS SchemaName,
                p.name AS Name,
-               sm.definition AS Body,
-               CAST(sm.is_encrypted AS BIT) AS IsEncrypted
+               sm.definition AS Body
         FROM sys.procedures AS p
         INNER JOIN sys.schemas AS s ON s.schema_id = p.schema_id
         LEFT JOIN sys.sql_modules AS sm ON sm.object_id = p.object_id
@@ -52,7 +58,7 @@ internal sealed class ModuleReader
             string schema = r.GetString(0);
             string name = r.GetString(1);
             string? body = r.IsDBNull(2) ? null : r.GetString(2);
-            bool encrypted = (!r.IsDBNull(3) && r.GetBoolean(3)) || body is null;
+            bool encrypted = body is null;
             views.Add(new View(schema, name, body, encrypted));
         }
         return views;
@@ -73,7 +79,7 @@ internal sealed class ModuleReader
             string schema = r.GetString(0);
             string name = r.GetString(1);
             string? body = r.IsDBNull(2) ? null : r.GetString(2);
-            bool encrypted = (!r.IsDBNull(3) && r.GetBoolean(3)) || body is null;
+            bool encrypted = body is null;
             procs.Add(new StoredProcedure(schema, name, body, encrypted));
         }
         return procs;
