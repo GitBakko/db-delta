@@ -1,0 +1,2 @@
+﻿ALTER TABLE [dbo].[Customer] ADD CONSTRAINT [PK_Customer] PRIMARY KEY CLUSTERED ([Id]);
+ALTER TABLE [dbo].[Customer] ADD CONSTRAINT [UQ_Customer_Email] UNIQUE NONCLUSTERED ([Email]);

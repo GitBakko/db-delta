@@ -1,0 +1,7 @@
+﻿CREATE TABLE [dbo].[Person] (
+    [Id] int IDENTITY(1,1) NOT NULL,
+    [FirstName] nvarchar(50) NOT NULL,
+    [LastName] nvarchar(50) NOT NULL,
+    [FullName] AS ([FirstName]+N' '+[LastName]) PERSISTED NOT NULL,
+    CONSTRAINT [PK_Person] PRIMARY KEY CLUSTERED ([Id])
+);
