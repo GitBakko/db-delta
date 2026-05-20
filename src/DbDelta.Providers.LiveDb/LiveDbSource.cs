@@ -56,8 +56,13 @@ public sealed class LiveDbSource : ISchemaSource
                 tables.Add(t with { Constraints = cons, Indexes = idx });
             }
 
+            // M3: views + stored procedures
+            ModuleReader moduleReader = new();
+            IReadOnlyList<View> views = await moduleReader.ReadViewsAsync(connection, cancellationToken);
+            IReadOnlyList<StoredProcedure> procs = await moduleReader.ReadProceduresAsync(connection, cancellationToken);
+
             string dbName = new SqlConnectionStringBuilder(_connectionString).InitialCatalog;
-            return Result<Database>.Success(new Database(dbName, schemas, tables));
+            return Result<Database>.Success(new Database(dbName, schemas, tables, views, procs));
         }
         catch (SqlException ex) when (ex.Number is 4060 or 18456)
         {
