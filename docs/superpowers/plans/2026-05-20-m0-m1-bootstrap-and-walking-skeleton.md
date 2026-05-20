@@ -211,19 +211,19 @@ git commit -m "build: pin .NET 10 SDK via global.json"
   </PropertyGroup>
   <ItemGroup Label="Core runtime">
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="6.0.1" />
-    <PackageVersion Include="Microsoft.SqlServer.TransactSql.ScriptDom" Version="180.0.0" />
+    <PackageVersion Include="Microsoft.SqlServer.TransactSql.ScriptDom" Version="180.6.0" />
     <PackageVersion Include="Serilog" Version="4.2.0" />
     <PackageVersion Include="Serilog.Sinks.Console" Version="6.0.0" />
     <PackageVersion Include="Serilog.Sinks.File" Version="6.0.0" />
     <PackageVersion Include="Polly" Version="8.5.0" />
   </ItemGroup>
   <ItemGroup Label="CLI">
-    <PackageVersion Include="System.CommandLine" Version="2.0.0-beta5" />
+    <PackageVersion Include="System.CommandLine" Version="2.0.0-beta5.25277.114" />
     <PackageVersion Include="Spectre.Console" Version="0.49.1" />
   </ItemGroup>
   <ItemGroup Label="App / Blazor Hybrid">
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebView.WindowsForms" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Web.WebView2" Version="1.0.2792.45" />
+    <PackageVersion Include="Microsoft.Web.WebView2" Version="1.0.3179.45" />
   </ItemGroup>
   <ItemGroup Label="Persistence">
     <PackageVersion Include="Meziantou.Framework.Win32.CredentialManager" Version="1.6.1" />
@@ -407,13 +407,35 @@ For `DbDelta.ScriptGen.GoldenTests.csproj` add: `<PackageReference Include="Veri
 
 For `DbDelta.App.ComponentTests.csproj` change SDK to `Microsoft.NET.Sdk.Razor`, target `net10.0-windows`, add `<PackageReference Include="bunit" />`, and `ProjectReference` to `DbDelta.App`.
 
-For `DbDelta.Cli.AcceptanceTests.csproj` add `<PackageReference Include="Testcontainers.MsSql" />`, and reference `DbDelta.Cli` plus a `<None Include="..\..\src\DbDelta.Cli\$(OutDir)\dbdelta.exe">` so tests can spawn the CLI binary.
+For `DbDelta.Cli.AcceptanceTests.csproj` add `<PackageReference Include="Testcontainers.MsSql" />`, and a `ProjectReference` to `DbDelta.Cli`. The acceptance tests resolve the CLI exe at runtime via path math in their test code (see T1.10) — no build-time `<None Include>` is needed.
+
+> **Note:** `DbDelta.Architecture.Tests` must target `net10.0-windows` (not the inherited `net10.0`) because it project-references `DbDelta.App` which targets Windows. Likewise, `<MSBuildWarningsAsMessages>MSB3277</MSBuildWarningsAsMessages>` is required on `DbDelta.App.csproj`, `DbDelta.App.ComponentTests.csproj`, and `DbDelta.Architecture.Tests.csproj` to suppress a benign WindowsBase assembly conflict surfaced by Microsoft.Web.WebView2's WPF shims.
+
+> **Note:** `DbDelta.App.ComponentTests.csproj` requires `<StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>` to prevent the Razor SDK from attempting static asset manifest generation in a test context that has no `wwwroot`.
+
+> **Note:** the .NET 10 SDK defaults `dotnet new sln` to the new `.slnx` XML format. Pass `--format sln` to get the classic `DbDelta.sln` that the rest of the plan assumes.
 
 - [ ] **Step 7: Add all projects to the solution**
 
 ```bash
 dotnet sln DbDelta.sln add src/**/*.csproj tests/**/*.csproj
 ```
+
+- [ ] **Step 7.5: Add NuGet.config to neutralize machine-level sources**
+
+Create `NuGet.config` at the repo root:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <clear />
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+  </packageSources>
+</configuration>
+```
+
+This ensures CI and dev machines resolve packages exclusively from nuget.org regardless of machine-level NuGet config.
 
 - [ ] **Step 8: Verify build**
 
