@@ -191,7 +191,6 @@ git commit -m "build: pin .NET 10 SDK via global.json"
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
-    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
     <Authors>DbDelta contributors</Authors>
     <Company>DbDelta</Company>
