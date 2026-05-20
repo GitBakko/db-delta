@@ -1,0 +1,1 @@
+﻿CREATE NONCLUSTERED INDEX [IX_Order_Active] ON [dbo].[Order] ([CustomerId] ASC, [OrderDate] DESC) INCLUDE ([TotalAmount]) WHERE ([IsDeleted]=(0));
