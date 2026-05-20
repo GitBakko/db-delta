@@ -4,8 +4,8 @@ using DbDelta.Core.Options;
 namespace DbDelta.Core.Diff;
 
 /// <summary>
-/// Pure comparison engine: pair tables by identity, then within each pair
-/// compare columns, constraints, and indexes per options. Pure → no I/O.
+/// Pure comparison engine: pair tables + modules by identity, then within each pair
+/// compare per options. Pure → no I/O.
 /// </summary>
 public sealed class ComparisonEngine
 {
@@ -14,21 +14,76 @@ public sealed class ComparisonEngine
         ArgumentNullException.ThrowIfNull(a);
         ArgumentNullException.ThrowIfNull(b);
 
+        List<DifferencePair> pairs = [];
+        pairs.AddRange(CompareTables(a, b, options));
+        pairs.AddRange(CompareModules(a.Views, b.Views));
+        pairs.AddRange(CompareModules(a.Procedures, b.Procedures));
+
+        return new ComparisonResult(pairs);
+    }
+
+    private static IEnumerable<DifferencePair> CompareTables(Database a, Database b, ComparisonOptions options)
+    {
         var aByIdentity = a.Tables.ToDictionary(t => t.Identity);
         var bByIdentity = b.Tables.ToDictionary(t => t.Identity);
         HashSet<ObjectIdentity> allIdentities = [.. aByIdentity.Keys];
         allIdentities.UnionWith(bByIdentity.Keys);
 
-        List<DifferencePair> pairs = [];
         foreach (ObjectIdentity id in allIdentities.OrderBy(i => i.SchemaName).ThenBy(i => i.ObjectName))
         {
             aByIdentity.TryGetValue(id, out Table? sideA);
             bByIdentity.TryGetValue(id, out Table? sideB);
             DifferenceStatus status = ClassifyTable(sideA, sideB, options);
-            pairs.Add(new DifferencePair(id, status, sideA, sideB));
+            yield return new DifferencePair(id, status, sideA, sideB);
+        }
+    }
+
+    private static IEnumerable<DifferencePair> CompareModules<TModule>(
+        IReadOnlyList<TModule> ax,
+        IReadOnlyList<TModule> bx)
+        where TModule : Module
+    {
+        var aByIdentity = ax.ToDictionary(m => m.Identity);
+        var bByIdentity = bx.ToDictionary(m => m.Identity);
+        HashSet<ObjectIdentity> allIdentities = [.. aByIdentity.Keys];
+        allIdentities.UnionWith(bByIdentity.Keys);
+
+        foreach (ObjectIdentity id in allIdentities.OrderBy(i => i.SchemaName).ThenBy(i => i.ObjectName))
+        {
+            aByIdentity.TryGetValue(id, out TModule? sideA);
+            bByIdentity.TryGetValue(id, out TModule? sideB);
+            DifferenceStatus status = ClassifyModule(sideA, sideB);
+            yield return new DifferencePair(id, status, sideA, sideB);
+        }
+    }
+
+    private static DifferenceStatus ClassifyModule(Module? a, Module? b)
+    {
+        if (a is null && b is not null)
+        {
+            return DifferenceStatus.OnlyInB;
+        }
+        if (a is not null && b is null)
+        {
+            return DifferenceStatus.OnlyInA;
+        }
+        if (a is null || b is null)
+        {
+            return DifferenceStatus.Identical;
         }
 
-        return new ComparisonResult(pairs);
+        // Encrypted bodies are opaque — we cannot prove equality, so we err on the side
+        // of Different. Same when only one side is encrypted.
+        if (a.IsEncrypted || b.IsEncrypted)
+        {
+            return DifferenceStatus.Different;
+        }
+
+        string? na = BodyNormalizer.Normalize(a.Body);
+        string? nb = BodyNormalizer.Normalize(b.Body);
+        return string.Equals(na, nb, StringComparison.Ordinal)
+            ? DifferenceStatus.Identical
+            : DifferenceStatus.Different;
     }
 
     private static DifferenceStatus ClassifyTable(Table? a, Table? b, ComparisonOptions options)
