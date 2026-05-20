@@ -7,34 +7,19 @@ namespace DbDelta.Core.UnitTests.Diff;
 public class BodyNormalizerTests
 {
     [Fact]
-    public void Null_input_returns_null()
-    {
-        BodyNormalizer.Normalize(null).Should().BeNull();
-    }
+    public void Null_input_returns_null() => BodyNormalizer.Normalize(null).Should().BeNull();
 
     [Fact]
-    public void Trims_outer_whitespace()
-    {
-        BodyNormalizer.Normalize("   SELECT 1   ").Should().Be("SELECT 1");
-    }
+    public void Trims_outer_whitespace() => BodyNormalizer.Normalize("   SELECT 1   ").Should().Be("SELECT 1");
 
     [Fact]
-    public void Collapses_runs_of_whitespace_to_single_space()
-    {
-        BodyNormalizer.Normalize("SELECT     1\t\t  ,\n\n2").Should().Be("SELECT 1 , 2");
-    }
+    public void Collapses_runs_of_whitespace_to_single_space() => BodyNormalizer.Normalize("SELECT     1\t\t  ,\n\n2").Should().Be("SELECT 1 , 2");
 
     [Fact]
-    public void Normalizes_CRLF_to_LF_before_collapsing()
-    {
-        BodyNormalizer.Normalize("a\r\nb\r\nc").Should().Be("a b c");
-    }
+    public void Normalizes_CRLF_to_LF_before_collapsing() => BodyNormalizer.Normalize("a\r\nb\r\nc").Should().Be("a b c");
 
     [Fact]
-    public void Preserves_case_by_default()
-    {
-        BodyNormalizer.Normalize("Select x From dbo.T").Should().Be("Select x From dbo.T");
-    }
+    public void Preserves_case_by_default() => BodyNormalizer.Normalize("Select x From dbo.T").Should().Be("Select x From dbo.T");
 
     [Fact]
     public void Two_bodies_only_differing_in_whitespace_compare_equal_after_normalize()
