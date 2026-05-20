@@ -10,7 +10,8 @@ permissions:
   contents: read
 
 jobs:
-  build-and-test:
+  windows-build:
+    name: build + non-DB tests (windows)
     runs-on: windows-latest
     timeout-minutes: 30
 
@@ -46,14 +47,47 @@ jobs:
           dotnet test tests/DbDelta.ScriptGen.GoldenTests --no-build --configuration Release --logger "trx;LogFileName=golden.trx"
           dotnet test tests/DbDelta.App.ComponentTests --no-build --configuration Release --logger "trx;LogFileName=app.trx"
 
-      - name: Run integration tests (Testcontainers MS SQL)
-        run: |
-          dotnet test tests/DbDelta.Providers.LiveDb.IntegrationTests --no-build --configuration Release --logger "trx;LogFileName=providers.trx"
-          dotnet test tests/DbDelta.Cli.AcceptanceTests --no-build --configuration Release --logger "trx;LogFileName=cli.trx"
-
-      - name: Upload test results
+      - name: Upload Windows test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: windows-test-results
+          path: '**/TestResults/*.trx'
+
+  linux-integration-tests:
+    name: integration tests (linux + testcontainers MSSQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/Directory.Packages.props') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Build cross-platform test projects (skip App + Architecture)
+        run: |
+          dotnet build tests/DbDelta.Providers.LiveDb.IntegrationTests/DbDelta.Providers.LiveDb.IntegrationTests.csproj --configuration Release
+          dotnet build tests/DbDelta.Cli.AcceptanceTests/DbDelta.Cli.AcceptanceTests.csproj --configuration Release
+
+      - name: Run integration tests (Testcontainers MS SQL)
+        run: |
+          dotnet test tests/DbDelta.Providers.LiveDb.IntegrationTests/DbDelta.Providers.LiveDb.IntegrationTests.csproj --no-build --configuration Release --logger "trx;LogFileName=providers.trx"
+          dotnet test tests/DbDelta.Cli.AcceptanceTests/DbDelta.Cli.AcceptanceTests.csproj --no-build --configuration Release --logger "trx;LogFileName=cli.trx"
+
+      - name: Upload Linux test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-test-results
           path: '**/TestResults/*.trx'
