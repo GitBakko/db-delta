@@ -1,0 +1,20 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>14</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    <Authors>DbDelta contributors</Authors>
+    <Company>DbDelta</Company>
+    <Product>DbDelta</Product>
+    <Copyright>Copyright (c) DbDelta contributors. Licensed under Apache 2.0.</Copyright>
+    <RepositoryUrl>https://github.com/GitBakko/db-delta</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+</Project>
