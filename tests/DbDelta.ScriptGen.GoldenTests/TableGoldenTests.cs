@@ -17,6 +17,6 @@ public class TableGoldenTests
         ]);
         var pair = new DifferencePair(table.Identity, DifferenceStatus.OnlyInA, table, null);
         string sql = new TableScriptEmitter().Emit(pair);
-        return Verifier.Verify(sql);
+        return Verify(sql);
     }
 }

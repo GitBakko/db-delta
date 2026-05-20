@@ -43,7 +43,7 @@ internal sealed class TableReader
     {
         // 1. Build a map of objectId -> (schema, name)
         Dictionary<int, (string Schema, string Name)> tableShells = [];
-        await using (SqlCommand tablesCmd = new SqlCommand(TablesQuery, connection))
+        await using (var tablesCmd = new SqlCommand(TablesQuery, connection))
         await using (SqlDataReader tablesReader = await tablesCmd.ExecuteReaderAsync(ct).ConfigureAwait(false))
         {
             while (await tablesReader.ReadAsync(ct).ConfigureAwait(false))
@@ -57,7 +57,7 @@ internal sealed class TableReader
 
         // 2. Fetch all columns and group by object id
         Dictionary<int, List<Column>> columnsByObjectId = [];
-        await using (SqlCommand columnsCmd = new SqlCommand(ColumnsQuery, connection))
+        await using (var columnsCmd = new SqlCommand(ColumnsQuery, connection))
         await using (SqlDataReader columnsReader = await columnsCmd.ExecuteReaderAsync(ct).ConfigureAwait(false))
         {
             while (await columnsReader.ReadAsync(ct).ConfigureAwait(false))
@@ -94,7 +94,7 @@ internal sealed class TableReader
         }
 
         // 3. Build the table list
-        List<Table> tables = new List<Table>(tableShells.Count);
+        var tables = new List<Table>(tableShells.Count);
         foreach (KeyValuePair<int, (string Schema, string Name)> kv in tableShells)
         {
             columnsByObjectId.TryGetValue(kv.Key, out List<Column>? cols);

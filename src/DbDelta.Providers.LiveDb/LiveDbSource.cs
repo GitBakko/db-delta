@@ -15,7 +15,7 @@ public sealed class LiveDbSource : ISchemaSource
     public LiveDbSource(string connectionString, string? displayName = null)
     {
         _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
-        SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder(connectionString);
+        var builder = new SqlConnectionStringBuilder(connectionString);
         DisplayName = displayName ?? $"{builder.DataSource}/{builder.InitialCatalog}";
     }
 

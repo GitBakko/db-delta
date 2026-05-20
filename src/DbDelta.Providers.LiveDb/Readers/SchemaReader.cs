@@ -20,7 +20,7 @@ internal sealed class SchemaReader
     public async Task<IReadOnlyList<Schema>> ReadAsync(SqlConnection connection, CancellationToken ct)
     {
         List<Schema> schemas = [];
-        await using SqlCommand command = new SqlCommand(Query, connection);
+        await using var command = new SqlCommand(Query, connection);
         await using SqlDataReader reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
         while (await reader.ReadAsync(ct).ConfigureAwait(false))
         {

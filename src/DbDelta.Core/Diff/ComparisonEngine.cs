@@ -13,8 +13,8 @@ public sealed class ComparisonEngine
         ArgumentNullException.ThrowIfNull(a);
         ArgumentNullException.ThrowIfNull(b);
 
-        Dictionary<ObjectIdentity, Table> aByIdentity = a.Tables.ToDictionary(t => t.Identity);
-        Dictionary<ObjectIdentity, Table> bByIdentity = b.Tables.ToDictionary(t => t.Identity);
+        var aByIdentity = a.Tables.ToDictionary(t => t.Identity);
+        var bByIdentity = b.Tables.ToDictionary(t => t.Identity);
         HashSet<ObjectIdentity> allIdentities = [.. aByIdentity.Keys];
         allIdentities.UnionWith(bByIdentity.Keys);
 
@@ -62,7 +62,7 @@ public sealed class ComparisonEngine
             return false;
         }
 
-        Dictionary<string, Column> bByName = bx.ToDictionary(c => c.Name);
+        var bByName = bx.ToDictionary(c => c.Name);
         foreach (Column col in ax)
         {
             if (!bByName.TryGetValue(col.Name, out Column? other))
