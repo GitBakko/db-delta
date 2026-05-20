@@ -76,4 +76,37 @@ public class ModuleDiffTests
         result.Differences.Single(p => p.Identity.Kind == "View")
             .Status.Should().Be(DifferenceStatus.Different);
     }
+
+    private static Database DbWithProcs(params StoredProcedure[] procs) =>
+        new("Db", Schemas: [new Schema("dbo")], Tables: [], Views: [], Procedures: procs);
+
+    [Fact]
+    public void Procedure_only_in_A_is_OnlyInA()
+    {
+        Database a = DbWithProcs(new StoredProcedure("dbo", "uspGet", "BODY", IsEncrypted: false));
+        Database b = DbWithProcs();
+        DifferencePair pair = new ComparisonEngine().Compare(a, b, ComparisonOptions.None)
+            .Differences.Single(p => p.Identity.Kind == "Procedure");
+        pair.Status.Should().Be(DifferenceStatus.OnlyInA);
+    }
+
+    [Fact]
+    public void Procedure_with_identical_bodies_is_Identical()
+    {
+        Database a = DbWithProcs(new StoredProcedure("dbo", "u", "SELECT 1", IsEncrypted: false));
+        Database b = DbWithProcs(new StoredProcedure("dbo", "u", "SELECT 1", IsEncrypted: false));
+        new ComparisonEngine().Compare(a, b, ComparisonOptions.None)
+            .Differences.Single(p => p.Identity.Kind == "Procedure")
+            .Status.Should().Be(DifferenceStatus.Identical);
+    }
+
+    [Fact]
+    public void Procedure_with_substantively_different_bodies_is_Different()
+    {
+        Database a = DbWithProcs(new StoredProcedure("dbo", "u", "SELECT 1", IsEncrypted: false));
+        Database b = DbWithProcs(new StoredProcedure("dbo", "u", "SELECT 2", IsEncrypted: false));
+        new ComparisonEngine().Compare(a, b, ComparisonOptions.None)
+            .Differences.Single(p => p.Identity.Kind == "Procedure")
+            .Status.Should().Be(DifferenceStatus.Different);
+    }
 }
