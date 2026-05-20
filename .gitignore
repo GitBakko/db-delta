@@ -1,0 +1,55 @@
+# DbDelta — .gitignore
+
+# Node / npm (from claude-flow tooling)
+node_modules/
+package-lock.json
+
+# Claude Code + ruflo local state
+.claude/
+.claude-flow/
+.swarm/
+.planning/
+ruvector.db
+ruvector.db-*
+
+# Logs
+logs/
+*.log
+
+# OS / editor
+Thumbs.db
+.DS_Store
+*.swp
+*~
+
+# .NET build artifacts (future)
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+out/
+publish/
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# NuGet
+*.nupkg
+*.snupkg
+
+# Rider / VS Code
+.idea/
+.vscode/
+
+# WiX / installers
+*.wixobj
+*.wixpdb
+
+# Local environment
+.env
+.env.*
+*.local
