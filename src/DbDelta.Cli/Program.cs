@@ -1,4 +1,9 @@
-using DbDelta.Cli;
+using System.CommandLine;
+using DbDelta.Cli.Commands;
 
-// Real CLI is wired in T1.8 (CompareCommand). Until then return success.
-return ExitCodes.SuccessNoDifferences;
+RootCommand root = new("DbDelta — open-source SQL Server schema compare and deployment tool")
+{
+    CompareCommand.Build()
+};
+
+return await root.Parse(args).InvokeAsync();
