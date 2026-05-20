@@ -137,18 +137,23 @@ public class CompareCommandTests(CliFixture fixture)
 
     private static async Task<int> RunCli(string[] args, CancellationToken ct)
     {
-        string exe = Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory,
-            "..", "..", "..", "..", "..",
-            "src", "DbDelta.Cli", "bin", "Debug", "net10.0", "dbdelta.exe"));
+        // AppContext.BaseDirectory => <repo>/tests/DbDelta.Cli.AcceptanceTests/bin/<Config>/net10.0/
+        // Walk up to repo root, then locate the CLI DLL under the SAME configuration.
+        string testBin = AppContext.BaseDirectory;
+        string configuration = new DirectoryInfo(testBin).Parent!.Name; // Debug or Release
+        string repoRoot = Path.GetFullPath(Path.Combine(testBin, "..", "..", "..", "..", ".."));
+        string cliDll = Path.Combine(repoRoot, "src", "DbDelta.Cli", "bin", configuration, "net10.0", "dbdelta.dll");
 
-        ProcessStartInfo psi = new(exe)
+        // Invoke via `dotnet <dll>` so the same code path works on Windows (.exe apphost)
+        // and Linux/macOS (no .exe; apphost name has no extension).
+        ProcessStartInfo psi = new("dotnet")
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true,
         };
+        psi.ArgumentList.Add(cliDll);
         foreach (string a in args)
         {
             psi.ArgumentList.Add(a);
