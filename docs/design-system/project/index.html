@@ -1,0 +1,2761 @@
+<!DOCTYPE html>
+<html lang="it" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DbDelta — Design System</title>
+<meta name="description" content="Design system completo per DbDelta — schema comparison tool per SQL Server. Tokens, componenti, pattern, esempi applicativi." />
+
+<!-- Google Fonts: Geist + Geist Mono -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+<!-- Design tokens & base -->
+<link rel="stylesheet" href="assets/tokens.css" />
+<link rel="stylesheet" href="assets/base.css" />
+<link rel="stylesheet" href="assets/components-ui.css" />
+<link rel="stylesheet" href="assets/components-domain.css" />
+<link rel="stylesheet" href="assets/docs.css" />
+</head>
+
+<body>
+
+<!-- ============================================================
+     SVG icon symbol library — referenced via <svg><use href="#i-name"/></svg>
+     Stroke icons, 24x24 viewBox, currentColor.
+     ============================================================ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-database" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/>
+    </symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/>
+    </symbol>
+    <symbol id="i-snapshot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3.5"/><path d="M9 5l1.5-2h3L15 5"/>
+    </symbol>
+    <symbol id="i-backup" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01M11 7h6M11 17h6"/>
+    </symbol>
+    <symbol id="i-git" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="8" r="2.5"/><path d="M6 8.5v7"/><path d="M18 10.5v1.5a4 4 0 0 1-4 4H8.5"/>
+    </symbol>
+    <symbol id="i-table" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 10h18M3 15h18M9 4v16M15 4v16"/>
+    </symbol>
+    <symbol id="i-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="7.5" cy="15.5" r="3.5"/><path d="M10 13l8-8M14 5h5v5"/>
+    </symbol>
+    <symbol id="i-code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 6l-6 6 6 6M16 6l6 6-6 6M14 4l-4 16"/>
+    </symbol>
+    <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
+    </symbol>
+    <symbol id="i-filter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 4h16l-6 8v6l-4 2v-8L4 4Z"/>
+    </symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-warning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l10 17H2L12 4Z"/><path d="M12 10v5M12 18h.01"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16h.01"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 10v6M12 7h.01"/></symbol>
+    <symbol id="i-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-arrow-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></symbol>
+    <symbol id="i-arrow-swap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4l4 4-4 4M20 8H8M8 20l-4-4 4-4M4 16h12"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12M6 12l6 6 6-6M4 20h16"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V8M6 12l6-6 6 6M4 20h16"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M7 5v14l12-7z"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11A8 8 0 0 0 6 6"/><path d="M20 4v6h-6"/><path d="M4 13a8 8 0 0 0 14 5"/><path d="M4 20v-6h6"/></symbol>
+    <symbol id="i-terminal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M13 15h4"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.65 1.65 0 0 0-1.8-.3 1.65 1.65 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.65 1.65 0 0 0-1-1.5 1.65 1.65 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.65 1.65 0 0 0 .3-1.8 1.65 1.65 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.65 1.65 0 0 0 1.5-1 1.65 1.65 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.65 1.65 0 0 0 1.8.3h0a1.65 1.65 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.65 1.65 0 0 0 1 1.5h0a1.65 1.65 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.65 1.65 0 0 0-.3 1.8v0a1.65 1.65 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.65 1.65 0 0 0-1.5 1Z"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></symbol>
+    <symbol id="i-columns" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M12 4v16"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3Z"/></symbol>
+    <symbol id="i-delta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20L12 4l8 16H4Z"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1.5-1.5"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3L4 14h7l-1 7 9-11h-7l1-7Z"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 8v5l3 2"/></symbol>
+    <symbol id="i-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l9-5 9 5v8l-9 5-9-5V8Z"/><path d="M3 8l9 5 9-5M12 13v9"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0v5l2 3H4l2-3V8Z"/><path d="M10 19a2 2 0 0 0 4 0"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 4M12 17h.01"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></symbol>
+
+    <!-- Brand mark: "Δ" stylized -->
+    <symbol id="brand-mark" viewBox="0 0 64 64">
+      <rect x="2" y="2" width="60" height="60" rx="14" fill="currentColor"/>
+      <path d="M16 47 L32 16 L48 47 Z" fill="none" stroke="var(--brand-mark-inset, #fff)" stroke-width="3.2" stroke-linejoin="round"/>
+      <path d="M24 47 L24 31" stroke="var(--brand-mark-inset, #fff)" stroke-width="3.2" stroke-linecap="round"/>
+      <circle cx="48" cy="16" r="4" fill="var(--brand-mark-accent, #fff)"/>
+    </symbol>
+    <symbol id="brand-mark-mono" viewBox="0 0 64 64">
+      <path d="M14 49 L32 14 L50 49 Z" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round"/>
+      <path d="M22 49 L22 33" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="ds-page">
+
+  <!-- ===========================================================
+       SIDEBAR — sticky navigation
+       =========================================================== -->
+  <aside class="ds-sidebar">
+    <div class="ds-brand">
+      <svg class="ds-brand-logo" aria-hidden="true"><use href="#brand-mark"/></svg>
+      <div class="ds-brand-text">
+        <span class="ds-brand-name">DbDelta</span>
+        <span class="ds-brand-sub">Design System</span>
+      </div>
+      <span class="ds-brand-version">v1.0</span>
+    </div>
+
+    <nav class="ds-toc" aria-label="Indice del design system">
+      <div class="ds-toc-group">Brand</div>
+      <a class="ds-toc-link" href="#brand"><span class="num">01</span> Identità</a>
+      <a class="ds-toc-link" href="#voice"><span class="num">02</span> Voce &amp; tono</a>
+
+      <div class="ds-toc-group">Fondamenta</div>
+      <a class="ds-toc-link" href="#color"><span class="num">03</span> Colore</a>
+      <a class="ds-toc-link" href="#typography"><span class="num">04</span> Tipografia</a>
+      <a class="ds-toc-link" href="#spacing"><span class="num">05</span> Spaziatura</a>
+      <a class="ds-toc-link" href="#radii"><span class="num">06</span> Raggi</a>
+      <a class="ds-toc-link" href="#shadow"><span class="num">07</span> Ombre</a>
+      <a class="ds-toc-link" href="#motion"><span class="num">08</span> Movimento</a>
+      <a class="ds-toc-link" href="#icons"><span class="num">09</span> Iconografia</a>
+
+      <div class="ds-toc-group">Componenti UI</div>
+      <a class="ds-toc-link" href="#buttons"><span class="num">10</span> Pulsanti</a>
+      <a class="ds-toc-link" href="#forms"><span class="num">11</span> Form &amp; input</a>
+      <a class="ds-toc-link" href="#selection"><span class="num">12</span> Selezione</a>
+      <a class="ds-toc-link" href="#nav-ui"><span class="num">13</span> Tabs &amp; menu</a>
+      <a class="ds-toc-link" href="#feedback"><span class="num">14</span> Feedback</a>
+      <a class="ds-toc-link" href="#overlays"><span class="num">15</span> Overlay</a>
+
+      <div class="ds-toc-group">Dominio</div>
+      <a class="ds-toc-link" href="#connection"><span class="num">16</span> Data source</a>
+      <a class="ds-toc-link" href="#diff-grid"><span class="num">17</span> Object Diff Grid</a>
+      <a class="ds-toc-link" href="#diff-viewer"><span class="num">18</span> T-SQL Diff Viewer</a>
+      <a class="ds-toc-link" href="#options"><span class="num">19</span> Comparison Options</a>
+      <a class="ds-toc-link" href="#wizard"><span class="num">20</span> Deployment Wizard</a>
+      <a class="ds-toc-link" href="#warnings"><span class="num">21</span> Warnings</a>
+      <a class="ds-toc-link" href="#snapshot"><span class="num">22</span> Snapshot</a>
+      <a class="ds-toc-link" href="#filter-ed"><span class="num">23</span> Filter editor</a>
+      <a class="ds-toc-link" href="#cli"><span class="num">24</span> CLI output</a>
+      <a class="ds-toc-link" href="#tree"><span class="num">25</span> Tree view</a>
+
+      <div class="ds-toc-group">Pattern</div>
+      <a class="ds-toc-link" href="#shell"><span class="num">26</span> App shell</a>
+      <a class="ds-toc-link" href="#states"><span class="num">27</span> Stati &amp; vuoti</a>
+
+      <div class="ds-toc-group">Esempi</div>
+      <a class="ds-toc-link" href="#example-compare"><span class="num">28</span> Comparison view</a>
+      <a class="ds-toc-link" href="#example-deploy"><span class="num">29</span> Deploy Wizard</a>
+
+      <div class="ds-toc-group">Riferimenti</div>
+      <a class="ds-toc-link" href="#usage"><span class="num">30</span> Uso con Claude Code</a>
+    </nav>
+
+    <div class="ds-sidebar-foot">
+      <div class="ds-theme-toggle" role="tablist" aria-label="Tema">
+        <button data-theme-set="light" role="tab">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-2px"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          Light
+        </button>
+        <button data-theme-set="dark" role="tab">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:-2px"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+          Dark
+        </button>
+      </div>
+      <div class="t-meta" style="padding: 0 var(--space-3)">
+        Built for <span class="t-mono">github.com/GitBakko/db-delta</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===========================================================
+       MAIN CONTENT
+       =========================================================== -->
+  <main class="ds-main">
+
+    <!-- ============ HERO ============ -->
+    <header class="ds-hero" id="intro">
+      <div class="ds-hero-eyebrow"><span class="dot"></span> DbDelta Design System · v1.0 · Maggio 2026</div>
+      <h1>Differenze <span class="accent">strutturali,</span><br/>presentate con precisione.</h1>
+      <p class="ds-hero-lead">
+        Sistema di design completo per <strong>DbDelta</strong> — strumento open-source di schema comparison
+        per SQL Server. Tokens, componenti, pattern e schermate applicative pensati per uno strumento tecnico
+        che <em>tocca produzione</em>: chiaro, denso, affidabile.
+      </p>
+      <div class="ds-hero-meta">
+        <div class="item"><span class="k">Audience</span><span class="v">DBA · Dev · DevOps · QA</span></div>
+        <div class="item"><span class="k">Stack</span><span class="v">.NET 8 · Avalonia · CLI</span></div>
+        <div class="item"><span class="k">Type</span><span class="v">Geist · Geist Mono</span></div>
+        <div class="item"><span class="k">Tokens</span><span class="v">oklch + CSS vars</span></div>
+        <div class="item"><span class="k">Tema</span><span class="v">Light + Dark (pari livello)</span></div>
+      </div>
+    </header>
+
+    <!-- ============ 01 — BRAND IDENTITY ============ -->
+    <section class="ds-section" id="brand">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">01 — BRAND</span>
+          <h2>Identità visiva</h2>
+        </div>
+        <span class="badge badge--outline">Logo · Wordmark · Naming</span>
+      </div>
+      <p class="ds-section-lede">
+        Il nome <strong>DbDelta</strong> esprime il cuore del prodotto: <span class="t-mono">db</span> = database,
+        <span class="t-mono">delta</span> = la differenza misurabile fra due stati. Il monogramma è una <strong>Δ</strong>
+        (delta maiuscolo greco) stilizzata, con una piccola asta interna che evoca la riga di codice modificata
+        e un punto accent che simboleggia il singolo oggetto cambiato.
+      </p>
+
+      <div class="brand-display">
+        <div class="brand-mark-big">
+          <svg aria-label="Logo DbDelta" style="--brand-mark-inset: #fff; --brand-mark-accent: oklch(76% 0.115 258);">
+            <use href="#brand-mark"/>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-wordmark">Db<span class="accent">Delta</span></div>
+          <p class="brand-tagline">
+            Schema comparison and deployment for SQL Server — open, scriptable, transparent.
+          </p>
+          <div class="row gap-6" style="margin-top: var(--space-12); flex-wrap: wrap;">
+            <span class="badge badge--primary"><span class="dot"></span> Open source · Apache 2.0</span>
+            <span class="badge badge--violet">.NET 8 · Avalonia</span>
+            <span class="badge">CLI · GUI · SDK</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>Varianti del logo</h3>
+      <div class="logo-variants">
+        <div class="logo-variant">
+          <div class="logo-variant-preview" style="background: var(--bg-raised);">
+            <svg style="color: var(--primary); --brand-mark-inset: var(--bg-raised); --brand-mark-accent: var(--secondary);"><use href="#brand-mark"/></svg>
+          </div>
+          <div class="logo-variant-info">primary · on light</div>
+        </div>
+        <div class="logo-variant">
+          <div class="logo-variant-preview" style="background: var(--neutral-950);">
+            <svg style="color: var(--primary); --brand-mark-inset: var(--neutral-950); --brand-mark-accent: var(--secondary);"><use href="#brand-mark"/></svg>
+          </div>
+          <div class="logo-variant-info">primary · on dark</div>
+        </div>
+        <div class="logo-variant">
+          <div class="logo-variant-preview" style="background: var(--bg-raised);">
+            <svg style="color: var(--fg-strong);"><use href="#brand-mark-mono"/></svg>
+          </div>
+          <div class="logo-variant-info">mono · light</div>
+        </div>
+        <div class="logo-variant">
+          <div class="logo-variant-preview" style="background: var(--neutral-950);">
+            <svg style="color: var(--neutral-50);"><use href="#brand-mark-mono"/></svg>
+          </div>
+          <div class="logo-variant-info">mono · dark</div>
+        </div>
+      </div>
+
+      <h3>Wordmark</h3>
+      <p>Geist Semibold, tracking <span class="t-mono">-0.04em</span>. La <strong>D</strong> di <em>Delta</em> è in colore accent
+      per legarsi al monogramma. Quando il monogramma è già presente accanto, il wordmark torna in colore neutro pieno.</p>
+
+      <div class="ds-sample">
+        <div class="ds-sample-head"><span>WORDMARK · LIGHT &amp; DARK</span></div>
+        <div class="ds-sample-body--flush ds-split">
+          <div class="ds-split-pane" data-theme="light">
+            <span class="label">Light</span>
+            <div style="font-family: var(--font-sans); font-size: 64px; font-weight: 600; letter-spacing: -0.04em; line-height: 1; color: var(--fg-strong);">
+              Db<span style="color: var(--primary)">Delta</span>
+            </div>
+            <div class="t-meta" style="margin-top:8px;">geist · 600 · tracking -0.04em</div>
+          </div>
+          <div class="ds-split-pane" data-theme="dark">
+            <span class="label">Dark</span>
+            <div style="font-family: var(--font-sans); font-size: 64px; font-weight: 600; letter-spacing: -0.04em; line-height: 1; color: var(--fg-strong);">
+              Db<span style="color: var(--primary)">Delta</span>
+            </div>
+            <div class="t-meta" style="margin-top:8px;">geist · 600 · tracking -0.04em</div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Naming &amp; capitalization</h3>
+      <ul>
+        <li>Nome ufficiale: <strong>DbDelta</strong> (CamelCase, una sola parola, due capitali).</li>
+        <li>Comando CLI: <code>dbdelta</code> (tutto minuscolo).</li>
+        <li>Repository / package id: <code>db-delta</code>.</li>
+        <li>Classe namespace: <code>DbDelta.*</code> (PascalCase).</li>
+        <li>Mai: <em>Db Delta</em>, <em>DBDelta</em>, <em>db_delta</em>, <em>dbdelta</em> nel copy.</li>
+      </ul>
+    </section>
+
+    <!-- ============ 02 — VOICE & TONE ============ -->
+    <section class="ds-section" id="voice">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">02 — BRAND</span>
+          <h2>Voce &amp; tono</h2>
+        </div>
+      </div>
+      <p class="ds-section-lede">
+        DbDelta parla come un buon DBA senior: <strong>tecnico, preciso, calmo</strong>. Mai paternalistico,
+        mai marketing, mai emoji. Quando descrive un'azione distruttiva, lo fa in modo netto ma non drammatico.
+        La voce è in <strong>italiano nella documentazione di prodotto</strong> e <strong>inglese nei messaggi UI</strong>
+        (in linea con la convenzione SQL Server tooling).
+      </p>
+
+      <h3>Principi</h3>
+      <div class="ds-sample-grid ds-sample-grid--3" style="margin-top: var(--space-8);">
+        <div class="panel">
+          <div class="panel-body">
+            <div class="t-eyebrow" style="color: var(--primary);">01 · Diretto</div>
+            <h4 style="margin: 4px 0 6px;">Verbo, oggetto, fine.</h4>
+            <p class="t-body-sm">Niente preamboli. "Compare", "Deploy", "Snapshot". Le label sono imperativi.</p>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-body">
+            <div class="t-eyebrow" style="color: var(--primary);">02 · Cauto</div>
+            <h4 style="margin: 4px 0 6px;">Conta gli oggetti.</h4>
+            <p class="t-body-sm">Le conferme citano sempre numeri esatti: "Drop 3 tables, alter 12 columns".</p>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-body">
+            <div class="t-eyebrow" style="color: var(--primary);">03 · Trasparente</div>
+            <h4 style="margin: 4px 0 6px;">Mostra l'SQL.</h4>
+            <p class="t-body-sm">Mai eseguire qualcosa che l'utente non possa rivedere. Lo script è sempre visibile.</p>
+          </div>
+        </div>
+      </div>
+
+      <h3>Do &amp; Don't</h3>
+      <div class="voice-grid">
+        <div class="voice-card">
+          <div class="v-label do">✓ Usa</div>
+          <p class="v-text">"Deploy will drop <span class="t-mono">3 tables</span> and alter <span class="t-mono">12 columns</span>. Review the script before continuing."</p>
+          <p class="v-text">"<span class="t-mono">5 objects</span> only in source, <span class="t-mono">2 modified</span>, <span class="t-mono">847 identical</span>."</p>
+          <p class="v-text">"Snapshot <span class="t-mono">prod-2026-05-20.snap</span> created (12.4 MB)."</p>
+        </div>
+        <div class="voice-card">
+          <div class="v-label dont">✗ Evita</div>
+          <p class="v-text">"Oops! Looks like something might be a bit off here 🤔"</p>
+          <p class="v-text">"Are you really sure you want to do this? This is a serious operation!!!"</p>
+          <p class="v-text">"Great job! Your deployment was a smashing success! 🎉"</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 03 — COLOR ============ -->
+    <section class="ds-section" id="color">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">03 — FONDAMENTA</span>
+          <h2>Colore</h2>
+        </div>
+        <span class="badge"><span class="t-mono">oklch</span> · perceptually uniform</span>
+      </div>
+      <p class="ds-section-lede">
+        Tutte le scale sono definite in <span class="t-mono">oklch()</span> con chroma controllato per restare leggibili
+        in light e dark. I neutri hanno una sottile inclinazione calda (hue&nbsp;80°) per evitare la sterilità del grigio puro;
+        gli scuri virano leggermente al blu (hue&nbsp;256°) per legarsi al primary cobalt.
+      </p>
+
+      <h3>Brand · Cobalt (primary)</h3>
+      <div class="ds-sample">
+        <div class="ds-sample-head"><span>--cobalt-{100..900}</span><span>oklch(L 0.18 258)</span></div>
+        <div class="ds-sample-body">
+          <div class="swatch-grid">
+            <div class="swatch"><div class="swatch-color" style="background: var(--cobalt-100)"></div><div class="swatch-info"><span class="swatch-name">cobalt-100</span><span class="swatch-value">L 94%</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--cobalt-200)"></div><div class="swatch-info"><span class="swatch-name">cobalt-200</span><span class="swatch-value">L 86%</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--cobalt-300)"></div><div class="swatch-info"><span class="swatch-name">cobalt-300</span><span class="swatch-value">L 76%</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--cobalt-400)"></div><div class="swatch-info"><span class="swatch-name">cobalt-400</span><span class="swatch-value">L 66%</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--cobalt-500)"></div><div class="swatch-info"><span class="swatch-name">cobalt-500</span><span class="swatch-value">L 55% · base</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--cobalt-600)"></div><div class="swatch-info"><span class="swatch-name">cobalt-600</span><span class="swatch-value">L 47%</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--cobalt-700)"></div><div class="swatch-info"><span class="swatch-name">cobalt-700</span><span class="swatch-value">L 39%</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--cobalt-800)"></div><div class="swatch-info"><span class="swatch-name">cobalt-800</span><span class="swatch-value">L 30%</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--cobalt-900)"></div><div class="swatch-info"><span class="swatch-name">cobalt-900</span><span class="swatch-value">L 22%</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Accent · Violet (secondary — source/target)</h3>
+      <div class="ds-sample">
+        <div class="ds-sample-head"><span>--violet-{100..900}</span><span>oklch(L 0.18 290)</span></div>
+        <div class="ds-sample-body">
+          <div class="swatch-grid">
+            <div class="swatch"><div class="swatch-color" style="background: var(--violet-100)"></div><div class="swatch-info"><span class="swatch-name">violet-100</span><span class="swatch-value">L 94%</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--violet-200)"></div><div class="swatch-info"><span class="swatch-name">violet-200</span><span class="swatch-value">L 86%</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--violet-300)"></div><div class="swatch-info"><span class="swatch-name">violet-300</span><span class="swatch-value">L 76%</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--violet-400)"></div><div class="swatch-info"><span class="swatch-name">violet-400</span><span class="swatch-value">L 66%</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--violet-500)"></div><div class="swatch-info"><span class="swatch-name">violet-500</span><span class="swatch-value">L 58% · base</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--violet-600)"></div><div class="swatch-info"><span class="swatch-name">violet-600</span><span class="swatch-value">L 50%</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--violet-700)"></div><div class="swatch-info"><span class="swatch-name">violet-700</span><span class="swatch-value">L 40%</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--violet-800)"></div><div class="swatch-info"><span class="swatch-name">violet-800</span><span class="swatch-value">L 30%</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--violet-900)"></div><div class="swatch-info"><span class="swatch-name">violet-900</span><span class="swatch-value">L 22%</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Neutri caldi</h3>
+      <div class="ds-sample">
+        <div class="ds-sample-head"><span>--neutral-{0..975}</span><span>oklch warm 80° / cool 256°</span></div>
+        <div class="ds-sample-body">
+          <div class="swatch-grid">
+            <div class="swatch"><div class="swatch-color" style="background: var(--neutral-0)"></div><div class="swatch-info"><span class="swatch-name">neutral-0</span><span class="swatch-value">paper</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--neutral-50)"></div><div class="swatch-info"><span class="swatch-name">neutral-50</span><span class="swatch-value">L 97%</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--neutral-100)"></div><div class="swatch-info"><span class="swatch-name">neutral-100</span><span class="swatch-value">L 94%</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--neutral-200)"></div><div class="swatch-info"><span class="swatch-name">neutral-200</span><span class="swatch-value">L 86%</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--neutral-300)"></div><div class="swatch-info"><span class="swatch-name">neutral-300</span><span class="swatch-value">L 78%</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--neutral-400)"></div><div class="swatch-info"><span class="swatch-name">neutral-400</span><span class="swatch-value">L 67%</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--neutral-500)"></div><div class="swatch-info"><span class="swatch-name">neutral-500</span><span class="swatch-value">L 56%</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--neutral-700)"></div><div class="swatch-info"><span class="swatch-name">neutral-700</span><span class="swatch-value">L 35% · cool</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--neutral-800)"></div><div class="swatch-info"><span class="swatch-name">neutral-800</span><span class="swatch-value">L 23%</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--neutral-900)"></div><div class="swatch-info"><span class="swatch-name">neutral-900</span><span class="swatch-value">L 14%</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--neutral-950)"></div><div class="swatch-info"><span class="swatch-name">neutral-950</span><span class="swatch-value">L 10%</span></div></div>
+            <div class="swatch"><div class="swatch-color" style="background: var(--neutral-975)"></div><div class="swatch-info"><span class="swatch-name">neutral-975</span><span class="swatch-value">ink</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Semantici</h3>
+      <p>Le scale semantiche partono da hue calibrati per sembrare equilibrati alla stessa luminosità:
+      <strong>emerald 155°</strong>, <strong>amber 75°</strong>, <strong>crimson 25°</strong>.
+      Lo step 500 è la base di ciascuna; 600/700 per fondi pieni; 100/200 per soft fills.</p>
+      <div class="ds-sample">
+        <div class="ds-sample-body">
+          <div class="ds-sample-grid ds-sample-grid--3">
+            <div>
+              <div class="t-eyebrow" style="color: var(--success-fg); margin-bottom: 6px;">Emerald — added</div>
+              <div class="swatch-grid">
+                <div class="swatch"><div class="swatch-color" style="background: var(--emerald-300)"></div><div class="swatch-info"><span class="swatch-name">emerald-300</span></div></div>
+                <div class="swatch"><div class="swatch-color" style="background: var(--emerald-500)"></div><div class="swatch-info"><span class="swatch-name">emerald-500</span></div></div>
+                <div class="swatch"><div class="swatch-color" style="background: var(--emerald-700)"></div><div class="swatch-info"><span class="swatch-name">emerald-700</span></div></div>
+              </div>
+            </div>
+            <div>
+              <div class="t-eyebrow" style="color: var(--warning-fg); margin-bottom: 6px;">Amber — warning</div>
+              <div class="swatch-grid">
+                <div class="swatch"><div class="swatch-color" style="background: var(--amber-300)"></div><div class="swatch-info"><span class="swatch-name">amber-300</span></div></div>
+                <div class="swatch"><div class="swatch-color" style="background: var(--amber-500)"></div><div class="swatch-info"><span class="swatch-name">amber-500</span></div></div>
+                <div class="swatch"><div class="swatch-color" style="background: var(--amber-700)"></div><div class="swatch-info"><span class="swatch-name">amber-700</span></div></div>
+              </div>
+            </div>
+            <div>
+              <div class="t-eyebrow" style="color: var(--danger-fg); margin-bottom: 6px;">Crimson — destructive</div>
+              <div class="swatch-grid">
+                <div class="swatch"><div class="swatch-color" style="background: var(--crimson-300)"></div><div class="swatch-info"><span class="swatch-name">crimson-300</span></div></div>
+                <div class="swatch"><div class="swatch-color" style="background: var(--crimson-500)"></div><div class="swatch-info"><span class="swatch-name">crimson-500</span></div></div>
+                <div class="swatch"><div class="swatch-color" style="background: var(--crimson-700)"></div><div class="swatch-info"><span class="swatch-name">crimson-700</span></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Token semantici — light vs dark</h3>
+      <p>I componenti non usano <strong>mai</strong> direttamente le scale primitive. Si referenziano sempre i token semantici
+      così il theme switch è gratuito. Tabella di tutte le coppie:</p>
+
+      <div class="ds-sample">
+        <div class="ds-sample-head"><span>SEMANTIC TOKENS · LIGHT ↔ DARK</span></div>
+        <div class="ds-sample-body--flush ds-split">
+          <div class="ds-split-pane" data-theme="light">
+            <span class="label">Light</span>
+            <div class="semantic-grid">
+              <div class="semantic-cell"><div class="semantic-preview" style="background: var(--bg); color: var(--fg);">--bg</div><div class="semantic-info"><div class="semantic-name">--bg</div><div class="semantic-desc">page background</div></div></div>
+              <div class="semantic-cell"><div class="semantic-preview" style="background: var(--bg-subtle); color: var(--fg);">--bg-subtle</div><div class="semantic-info"><div class="semantic-name">--bg-subtle</div><div class="semantic-desc">recessed surface</div></div></div>
+              <div class="semantic-cell"><div class="semantic-preview" style="background: var(--bg-raised); color: var(--fg); box-shadow: var(--shadow-sm);">--bg-raised</div><div class="semantic-info"><div class="semantic-name">--bg-raised</div><div class="semantic-desc">cards, popovers</div></div></div>
+              <div class="semantic-cell"><div class="semantic-preview" style="background: var(--primary); color: var(--primary-fg);">--primary</div><div class="semantic-info"><div class="semantic-name">--primary</div><div class="semantic-desc">brand solid</div></div></div>
+              <div class="semantic-cell"><div class="semantic-preview" style="background: var(--success); color: var(--neutral-0);">--success</div><div class="semantic-info"><div class="semantic-name">--success</div><div class="semantic-desc">added / ok</div></div></div>
+              <div class="semantic-cell"><div class="semantic-preview" style="background: var(--warning); color: var(--neutral-0);">--warning</div><div class="semantic-info"><div class="semantic-name">--warning</div><div class="semantic-desc">cautions</div></div></div>
+              <div class="semantic-cell"><div class="semantic-preview" style="background: var(--danger); color: var(--neutral-0);">--danger</div><div class="semantic-info"><div class="semantic-name">--danger</div><div class="semantic-desc">destructive only</div></div></div>
+              <div class="semantic-cell"><div class="semantic-preview" style="background: var(--border); color: var(--fg);">--border</div><div class="semantic-info"><div class="semantic-name">--border</div><div class="semantic-desc">dividers</div></div></div>
+            </div>
+          </div>
+          <div class="ds-split-pane" data-theme="dark">
+            <span class="label">Dark</span>
+            <div class="semantic-grid">
+              <div class="semantic-cell"><div class="semantic-preview" style="background: var(--bg); color: var(--fg);">--bg</div><div class="semantic-info"><div class="semantic-name">--bg</div><div class="semantic-desc">page background</div></div></div>
+              <div class="semantic-cell"><div class="semantic-preview" style="background: var(--bg-subtle); color: var(--fg);">--bg-subtle</div><div class="semantic-info"><div class="semantic-name">--bg-subtle</div><div class="semantic-desc">recessed surface</div></div></div>
+              <div class="semantic-cell"><div class="semantic-preview" style="background: var(--bg-raised); color: var(--fg); box-shadow: var(--shadow-sm);">--bg-raised</div><div class="semantic-info"><div class="semantic-name">--bg-raised</div><div class="semantic-desc">cards, popovers</div></div></div>
+              <div class="semantic-cell"><div class="semantic-preview" style="background: var(--primary); color: var(--primary-fg);">--primary</div><div class="semantic-info"><div class="semantic-name">--primary</div><div class="semantic-desc">brand solid</div></div></div>
+              <div class="semantic-cell"><div class="semantic-preview" style="background: var(--success); color: var(--neutral-0);">--success</div><div class="semantic-info"><div class="semantic-name">--success</div><div class="semantic-desc">added / ok</div></div></div>
+              <div class="semantic-cell"><div class="semantic-preview" style="background: var(--warning); color: var(--neutral-0);">--warning</div><div class="semantic-info"><div class="semantic-name">--warning</div><div class="semantic-desc">cautions</div></div></div>
+              <div class="semantic-cell"><div class="semantic-preview" style="background: var(--danger); color: var(--neutral-0);">--danger</div><div class="semantic-info"><div class="semantic-name">--danger</div><div class="semantic-desc">destructive only</div></div></div>
+              <div class="semantic-cell"><div class="semantic-preview" style="background: var(--border); color: var(--fg);">--border</div><div class="semantic-info"><div class="semantic-name">--border</div><div class="semantic-desc">dividers</div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Codici colore per i diff</h3>
+      <p>Convenzione fissata — usata in tutta la UI per comunicare lo stato di confronto:</p>
+      <div class="ds-sample">
+        <div class="ds-sample-body">
+          <div class="row gap-6 wrap">
+            <span class="diff-pill diff-pill--identical"><span class="dot"></span>Identical</span>
+            <span class="diff-pill diff-pill--modified"><span class="dot"></span>Modified</span>
+            <span class="diff-pill diff-pill--added"><span class="dot"></span>Added</span>
+            <span class="diff-pill diff-pill--only-source"><span class="dot"></span>Only in source</span>
+            <span class="diff-pill diff-pill--only-target"><span class="dot"></span>Only in target</span>
+            <span class="diff-pill diff-pill--destructive"><span class="dot"></span>Destructive</span>
+          </div>
+          <div class="t-caption" style="margin-top: var(--space-8)">
+            <strong>Regola d'oro</strong>: <span class="t-mono">--danger</span> è riservato a <em>operazioni distruttive</em>
+            (DROP, TRUNCATE, ALTER COLUMN su tabelle popolate). Mai usato per "errore di validazione UI" o "form invalido" —
+            quelli usano un sottile <span class="t-mono">--border</span> rosso senza fill pieno.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 04 — TYPOGRAPHY ============ -->
+    <section class="ds-section" id="typography">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">04 — FONDAMENTA</span>
+          <h2>Tipografia</h2>
+        </div>
+        <span class="badge">Geist + Geist Mono</span>
+      </div>
+      <p class="ds-section-lede">
+        Una sans con un po' di carattere (<strong>Geist</strong>) e un monospace caratteristico
+        (<strong>Geist Mono</strong>) — la stessa famiglia che Vercel usa per la sua console: moderne,
+        leggibili, con numerali tabulari attivati di default. Niente Inter, niente Helvetica.
+      </p>
+
+      <h3>Scala</h3>
+      <p>Base 14px, scala calibrata per UI desktop dense. La gerarchia è data dal <strong>weight</strong>
+      e dal <strong>tracking</strong>, non dalla sola taglia: le differenze fra step sono sottili di proposito.</p>
+
+      <div class="ds-sample">
+        <div class="ds-sample-head"><span>SCALE · GEIST</span><span class="t-mono">var(--text-*)</span></div>
+        <div class="ds-sample-body">
+          <div class="type-grid">
+            <div class="type-row">
+              <span class="type-meta">--text-6xl</span>
+              <span class="type-meta">64px</span>
+              <span class="type-meta">600 · -0.03em</span>
+              <span class="type-sample" style="font-size: 64px; font-weight: 600; letter-spacing: -0.03em; line-height: 1;">Schema, settled.</span>
+            </div>
+            <div class="type-row">
+              <span class="type-meta">--text-5xl</span>
+              <span class="type-meta">44px</span>
+              <span class="type-meta">600 · -0.025em</span>
+              <span class="type-sample" style="font-size: 44px; font-weight: 600; letter-spacing: -0.025em; line-height: 1.1;">Schema, settled.</span>
+            </div>
+            <div class="type-row">
+              <span class="type-meta">--text-4xl</span>
+              <span class="type-meta">32px</span>
+              <span class="type-meta">600 · -0.02em</span>
+              <span class="type-sample" style="font-size: 32px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15;">Schema, settled.</span>
+            </div>
+            <div class="type-row">
+              <span class="type-meta">--text-3xl</span>
+              <span class="type-meta">24px</span>
+              <span class="type-meta">600 · -0.015em</span>
+              <span class="type-sample" style="font-size: 24px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.3;">Compare &amp; deploy</span>
+            </div>
+            <div class="type-row">
+              <span class="type-meta">--text-2xl</span>
+              <span class="type-meta">20px</span>
+              <span class="type-meta">600</span>
+              <span class="type-sample" style="font-size: 20px; font-weight: 600; line-height: 1.3;">Compare &amp; deploy</span>
+            </div>
+            <div class="type-row">
+              <span class="type-meta">--text-xl</span>
+              <span class="type-meta">17px</span>
+              <span class="type-meta">600</span>
+              <span class="type-sample" style="font-size: 17px; font-weight: 600;">Section heading</span>
+            </div>
+            <div class="type-row">
+              <span class="type-meta">--text-lg</span>
+              <span class="type-meta">15px</span>
+              <span class="type-meta">500</span>
+              <span class="type-sample" style="font-size: 15px; font-weight: 500;">Emphasized body</span>
+            </div>
+            <div class="type-row">
+              <span class="type-meta">--text-md</span>
+              <span class="type-meta">14px</span>
+              <span class="type-meta">400 · default</span>
+              <span class="type-sample" style="font-size: 14px;">Default UI body — for descriptions, paragraphs, table cells.</span>
+            </div>
+            <div class="type-row">
+              <span class="type-meta">--text-sm</span>
+              <span class="type-meta">13px</span>
+              <span class="type-meta">400</span>
+              <span class="type-sample" style="font-size: 13px;">Secondary UI — buttons, fields, menu items, side panes.</span>
+            </div>
+            <div class="type-row">
+              <span class="type-meta">--text-xs</span>
+              <span class="type-meta">12px</span>
+              <span class="type-meta">400/500</span>
+              <span class="type-sample" style="font-size: 12px;">Captions, table headers, helper text.</span>
+            </div>
+            <div class="type-row">
+              <span class="type-meta">--text-2xs</span>
+              <span class="type-meta">11px</span>
+              <span class="type-meta">500/600</span>
+              <span class="type-sample" style="font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-subtle);">EYEBROW · METADATA</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Geist Mono — codice &amp; identificatori</h3>
+      <p>Usato per: SQL, identificatori (schema, tabella, colonna), valori (path, hash, dimensioni), comandi CLI,
+      numeri tabulari nelle griglie. Mai per copy generico.</p>
+      <div class="ds-sample">
+        <div class="ds-sample-head"><span>GEIST MONO</span></div>
+        <div class="ds-sample-body">
+          <div class="t-mono" style="font-size: 17px; line-height: 1.7; color: var(--fg-strong);">
+            ALTER TABLE dbo.Customer ADD PreferredContactMethod NVARCHAR(20) NULL;<br/>
+            <span style="color: var(--syn-comment)">-- 0123456789 · l1Il oO0 · ===&gt; != &lt;=</span><br/>
+            <span style="color: var(--syn-keyword)">CREATE</span> <span style="color: var(--syn-keyword)">PROCEDURE</span> <span style="color: var(--syn-function)">dbo.usp_GetActiveOrders</span> <span style="color: var(--syn-keyword)">AS</span><br/>
+            &nbsp;&nbsp;<span style="color: var(--syn-keyword)">SELECT</span> Id, CustomerId, CreatedAt
+          </div>
+        </div>
+      </div>
+
+      <h3>Conventions</h3>
+      <ul>
+        <li><strong>Numeric features sempre attivi</strong>: <span class="t-mono">font-feature-settings: "tnum" 1, "cv11" 1;</span> sul body. Le cifre stanno in colonna nelle tabelle senza configurazione extra.</li>
+        <li><strong>Text-wrap pretty</strong> di default sui titoli; <strong>text-wrap balance</strong> sugli hero.</li>
+        <li><strong>Tracking negativo</strong> sopra i 20px; neutro fra 12-18px; <strong>wide tracking</strong> (<span class="t-mono">0.06em</span>) per eyebrow/uppercase.</li>
+        <li><strong>Mai</strong> sotto i 11px nell'app; mai sotto i 12px nelle docs.</li>
+      </ul>
+    </section>
+
+    <!-- ============ 05 — SPACING ============ -->
+    <section class="ds-section" id="spacing">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">05 — FONDAMENTA</span>
+          <h2>Spaziatura</h2>
+        </div>
+        <span class="badge">Base 4px · scala denser</span>
+      </div>
+      <p class="ds-section-lede">
+        Sistema basato su <strong>multipli di 2px</strong>, non sui canonici 8px. Una UI desktop densa
+        (data grid, diff viewer) ha bisogno di step più fini per restare leggibile senza essere sciatta.
+      </p>
+
+      <div class="ds-sample">
+        <div class="ds-sample-head"><span>SPACING SCALE</span><span class="t-mono">--space-{0..64}</span></div>
+        <div class="ds-sample-body">
+          <div class="spec-list">
+            <div class="spec-row"><span class="spec-token">--space-1</span><span class="spec-value">2px</span><div class="spec-bar" style="width: 2px;"></div></div>
+            <div class="spec-row"><span class="spec-token">--space-2</span><span class="spec-value">4px</span><div class="spec-bar" style="width: 4px;"></div></div>
+            <div class="spec-row"><span class="spec-token">--space-3</span><span class="spec-value">6px</span><div class="spec-bar" style="width: 6px;"></div></div>
+            <div class="spec-row"><span class="spec-token">--space-4</span><span class="spec-value">8px</span><div class="spec-bar" style="width: 8px;"></div></div>
+            <div class="spec-row"><span class="spec-token">--space-5</span><span class="spec-value">10px</span><div class="spec-bar" style="width: 10px;"></div></div>
+            <div class="spec-row"><span class="spec-token">--space-6</span><span class="spec-value">12px</span><div class="spec-bar" style="width: 12px;"></div></div>
+            <div class="spec-row"><span class="spec-token">--space-8</span><span class="spec-value">16px</span><div class="spec-bar" style="width: 16px;"></div></div>
+            <div class="spec-row"><span class="spec-token">--space-10</span><span class="spec-value">20px</span><div class="spec-bar" style="width: 20px;"></div></div>
+            <div class="spec-row"><span class="spec-token">--space-12</span><span class="spec-value">24px</span><div class="spec-bar" style="width: 24px;"></div></div>
+            <div class="spec-row"><span class="spec-token">--space-16</span><span class="spec-value">32px</span><div class="spec-bar" style="width: 32px;"></div></div>
+            <div class="spec-row"><span class="spec-token">--space-20</span><span class="spec-value">40px</span><div class="spec-bar" style="width: 40px;"></div></div>
+            <div class="spec-row"><span class="spec-token">--space-24</span><span class="spec-value">48px</span><div class="spec-bar" style="width: 48px;"></div></div>
+            <div class="spec-row"><span class="spec-token">--space-32</span><span class="spec-value">64px</span><div class="spec-bar" style="width: 64px;"></div></div>
+            <div class="spec-row"><span class="spec-token">--space-48</span><span class="spec-value">96px</span><div class="spec-bar" style="width: 96px;"></div></div>
+            <div class="spec-row"><span class="spec-token">--space-64</span><span class="spec-value">128px</span><div class="spec-bar" style="width: 128px;"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Quando usare cosa</h3>
+      <ul>
+        <li><strong>2-4px</strong>: gap fra icona e label inline.</li>
+        <li><strong>6-8px</strong>: padding interno di controlli compatti (pill, badge, chip), gap fra elementi di una toolbar.</li>
+        <li><strong>10-12px</strong>: padding di card/panel, gap fra sezioni di un form.</li>
+        <li><strong>16-24px</strong>: padding di superfici larghe, distanza fra panel.</li>
+        <li><strong>32-64px</strong>: separazione fra sezioni di pagina.</li>
+        <li>I controlli hanno <strong>altezze fisse</strong> definite: <span class="t-mono">--control-h-sm</span> 24, <span class="t-mono">-md</span> 30, <span class="t-mono">-lg</span> 36, <span class="t-mono">-xl</span> 44.</li>
+      </ul>
+    </section>
+
+    <!-- ============ 06 — RADII ============ -->
+    <section class="ds-section" id="radii">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">06 — FONDAMENTA</span>
+          <h2>Raggi</h2>
+        </div>
+      </div>
+      <p class="ds-section-lede">
+        Raggi piccoli e progressivi — non l'iperbole "tutto pill" dei consumer apps. La forma evoca
+        precisione tecnica. Pill riservato a chip e badge.
+      </p>
+      <div class="ds-sample">
+        <div class="ds-sample-body">
+          <div class="ds-sample-grid ds-sample-grid--3">
+            <div class="row gap-12 items-center"><div class="spec-radius-box" style="border-radius: var(--radius-xs);"></div><div><div class="spec-token">--radius-xs</div><div class="spec-value">3px · badges, pills</div></div></div>
+            <div class="row gap-12 items-center"><div class="spec-radius-box" style="border-radius: var(--radius-sm);"></div><div><div class="spec-token">--radius-sm</div><div class="spec-value">5px · buttons, inputs</div></div></div>
+            <div class="row gap-12 items-center"><div class="spec-radius-box" style="border-radius: var(--radius-md);"></div><div><div class="spec-token">--radius-md</div><div class="spec-value">7px · cards, popovers</div></div></div>
+            <div class="row gap-12 items-center"><div class="spec-radius-box" style="border-radius: var(--radius-lg);"></div><div><div class="spec-token">--radius-lg</div><div class="spec-value">10px · modals</div></div></div>
+            <div class="row gap-12 items-center"><div class="spec-radius-box" style="border-radius: var(--radius-xl);"></div><div><div class="spec-token">--radius-xl</div><div class="spec-value">14px · features</div></div></div>
+            <div class="row gap-12 items-center"><div class="spec-radius-box" style="border-radius: var(--radius-pill);"></div><div><div class="spec-token">--radius-pill</div><div class="spec-value">9999px · chips</div></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 07 — SHADOW ============ -->
+    <section class="ds-section" id="shadow">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">07 — FONDAMENTA</span>
+          <h2>Ombre &amp; elevazione</h2>
+        </div>
+      </div>
+      <p class="ds-section-lede">
+        Cinque step. Ombre warm-tinted in light, più profonde e più scure in dark. Mai usate per "decorazione" —
+        solo per comunicare separazione gerarchica.
+      </p>
+      <div class="ds-sample">
+        <div class="ds-sample-body bg-subtle">
+          <div class="ds-sample-grid ds-sample-grid--3">
+            <div class="row gap-12 items-center"><div class="spec-shadow-box" style="box-shadow: var(--shadow-xs);"></div><div><div class="spec-token">--shadow-xs</div><div class="spec-value">flat lift</div></div></div>
+            <div class="row gap-12 items-center"><div class="spec-shadow-box" style="box-shadow: var(--shadow-sm);"></div><div><div class="spec-token">--shadow-sm</div><div class="spec-value">resting card</div></div></div>
+            <div class="row gap-12 items-center"><div class="spec-shadow-box" style="box-shadow: var(--shadow-md);"></div><div><div class="spec-token">--shadow-md</div><div class="spec-value">hover, dropdown</div></div></div>
+            <div class="row gap-12 items-center"><div class="spec-shadow-box" style="box-shadow: var(--shadow-lg);"></div><div><div class="spec-token">--shadow-lg</div><div class="spec-value">popover, toast</div></div></div>
+            <div class="row gap-12 items-center"><div class="spec-shadow-box" style="box-shadow: var(--shadow-xl);"></div><div><div class="spec-token">--shadow-xl</div><div class="spec-value">modal</div></div></div>
+            <div class="row gap-12 items-center"><div class="spec-shadow-box" style="box-shadow: var(--shadow-focus);"></div><div><div class="spec-token">--shadow-focus</div><div class="spec-value">focus ring (3px)</div></div></div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Z-index scale</h3>
+      <p>Non aggiungere mai z-index "magici". Usare la scala:</p>
+      <div class="ds-sample">
+        <div class="ds-sample-body">
+          <div class="spec-list">
+            <div class="spec-row"><span class="spec-token">--z-base</span><span class="spec-value">0</span><span class="t-body-sm">flusso normale</span></div>
+            <div class="spec-row"><span class="spec-token">--z-raised</span><span class="spec-value">10</span><span class="t-body-sm">cards che scrollano sopra altro</span></div>
+            <div class="spec-row"><span class="spec-token">--z-sticky</span><span class="spec-value">100</span><span class="t-body-sm">topbar, header tabelle</span></div>
+            <div class="spec-row"><span class="spec-token">--z-overlay</span><span class="spec-value">1000</span><span class="t-body-sm">backdrop modal, drawer</span></div>
+            <div class="spec-row"><span class="spec-token">--z-modal</span><span class="spec-value">1100</span><span class="t-body-sm">contenuto modal</span></div>
+            <div class="spec-row"><span class="spec-token">--z-toast</span><span class="spec-value">1200</span><span class="t-body-sm">notifiche</span></div>
+            <div class="spec-row"><span class="spec-token">--z-tooltip</span><span class="spec-value">1300</span><span class="t-body-sm">sempre in cima</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 08 — MOTION ============ -->
+    <section class="ds-section" id="motion">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">08 — FONDAMENTA</span>
+          <h2>Movimento</h2>
+        </div>
+      </div>
+      <p class="ds-section-lede">
+        Animazioni <strong>brevi e funzionali</strong>. DbDelta è un tool di produttività: la motion serve
+        a comunicare causa-effetto, mai a "deliziare". Default <span class="t-mono">200ms ease-out</span>.
+        Rispetta <span class="t-mono">prefers-reduced-motion</span> azzerando tutto.
+      </p>
+      <div class="ds-sample">
+        <div class="ds-sample-body bg-subtle">
+          <div class="spec-list">
+            <div class="spec-row"><span class="spec-token">--duration-instant</span><span class="spec-value">80ms</span><span class="t-body-sm">toggle, ripple immediati</span></div>
+            <div class="spec-row"><span class="spec-token">--duration-fast</span><span class="spec-value">140ms</span><span class="t-body-sm">hover, focus, color shift</span></div>
+            <div class="spec-row"><span class="spec-token">--duration-base</span><span class="spec-value">200ms</span><span class="t-body-sm">default · most transitions</span></div>
+            <div class="spec-row"><span class="spec-token">--duration-slow</span><span class="spec-value">320ms</span><span class="t-body-sm">modal/drawer reveal</span></div>
+            <div class="spec-row"><span class="spec-token">--duration-slower</span><span class="spec-value">500ms</span><span class="t-body-sm">page-level, progress shift</span></div>
+          </div>
+          <div class="row gap-20 items-center" style="margin-top: var(--space-12); padding: var(--space-12); background: var(--bg-raised); border-radius: var(--radius-sm);">
+            <div class="spec-motion-box"></div>
+            <div>
+              <div class="t-body-sm fg-strong">ease-out · default</div>
+              <div class="t-meta">cubic-bezier(0.16, 1, 0.30, 1)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 09 — ICONS ============ -->
+    <section class="ds-section" id="icons">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">09 — FONDAMENTA</span>
+          <h2>Iconografia</h2>
+        </div>
+        <span class="badge">Stroke · 1.6 · 24×24 viewBox</span>
+      </div>
+      <p class="ds-section-lede">
+        Set custom in stile <strong>Lucide</strong>: line icons, stroke <span class="t-mono">1.6</span> a 24px viewBox,
+        rendering <span class="t-mono">currentColor</span>. Niente icone piene; niente icone colorate inline (il colore
+        arriva sempre dal contesto). Tutte definite come <code>&lt;symbol&gt;</code> riusabile via <code>&lt;use href&gt;</code>.
+      </p>
+
+      <div class="ds-sample">
+        <div class="ds-sample-head"><span>ICON SET</span><span>40 simboli core</span></div>
+        <div class="ds-sample-body">
+          <div class="icon-grid">
+            <div class="icon-cell"><svg><use href="#i-database"/></svg><span class="name">database</span></div>
+            <div class="icon-cell"><svg><use href="#i-folder"/></svg><span class="name">folder</span></div>
+            <div class="icon-cell"><svg><use href="#i-snapshot"/></svg><span class="name">snapshot</span></div>
+            <div class="icon-cell"><svg><use href="#i-backup"/></svg><span class="name">backup</span></div>
+            <div class="icon-cell"><svg><use href="#i-git"/></svg><span class="name">git</span></div>
+            <div class="icon-cell"><svg><use href="#i-table"/></svg><span class="name">table</span></div>
+            <div class="icon-cell"><svg><use href="#i-key"/></svg><span class="name">key</span></div>
+            <div class="icon-cell"><svg><use href="#i-code"/></svg><span class="name">code</span></div>
+            <div class="icon-cell"><svg><use href="#i-search"/></svg><span class="name">search</span></div>
+            <div class="icon-cell"><svg><use href="#i-filter"/></svg><span class="name">filter</span></div>
+            <div class="icon-cell"><svg><use href="#i-plus"/></svg><span class="name">plus</span></div>
+            <div class="icon-cell"><svg><use href="#i-minus"/></svg><span class="name">minus</span></div>
+            <div class="icon-cell"><svg><use href="#i-check"/></svg><span class="name">check</span></div>
+            <div class="icon-cell"><svg><use href="#i-x"/></svg><span class="name">x</span></div>
+            <div class="icon-cell"><svg><use href="#i-warning"/></svg><span class="name">warning</span></div>
+            <div class="icon-cell"><svg><use href="#i-alert"/></svg><span class="name">alert</span></div>
+            <div class="icon-cell"><svg><use href="#i-info"/></svg><span class="name">info</span></div>
+            <div class="icon-cell"><svg><use href="#i-arrow-right"/></svg><span class="name">arrow-right</span></div>
+            <div class="icon-cell"><svg><use href="#i-arrow-left"/></svg><span class="name">arrow-left</span></div>
+            <div class="icon-cell"><svg><use href="#i-arrow-swap"/></svg><span class="name">arrow-swap</span></div>
+            <div class="icon-cell"><svg><use href="#i-chevron-right"/></svg><span class="name">chevron-right</span></div>
+            <div class="icon-cell"><svg><use href="#i-chevron-down"/></svg><span class="name">chevron-down</span></div>
+            <div class="icon-cell"><svg><use href="#i-copy"/></svg><span class="name">copy</span></div>
+            <div class="icon-cell"><svg><use href="#i-download"/></svg><span class="name">download</span></div>
+            <div class="icon-cell"><svg><use href="#i-upload"/></svg><span class="name">upload</span></div>
+            <div class="icon-cell"><svg><use href="#i-play"/></svg><span class="name">play</span></div>
+            <div class="icon-cell"><svg><use href="#i-refresh"/></svg><span class="name">refresh</span></div>
+            <div class="icon-cell"><svg><use href="#i-terminal"/></svg><span class="name">terminal</span></div>
+            <div class="icon-cell"><svg><use href="#i-settings"/></svg><span class="name">settings</span></div>
+            <div class="icon-cell"><svg><use href="#i-more"/></svg><span class="name">more</span></div>
+            <div class="icon-cell"><svg><use href="#i-columns"/></svg><span class="name">columns</span></div>
+            <div class="icon-cell"><svg><use href="#i-shield"/></svg><span class="name">shield</span></div>
+            <div class="icon-cell"><svg><use href="#i-link"/></svg><span class="name">link</span></div>
+            <div class="icon-cell"><svg><use href="#i-eye"/></svg><span class="name">eye</span></div>
+            <div class="icon-cell"><svg><use href="#i-lock"/></svg><span class="name">lock</span></div>
+            <div class="icon-cell"><svg><use href="#i-bolt"/></svg><span class="name">bolt</span></div>
+            <div class="icon-cell"><svg><use href="#i-clock"/></svg><span class="name">clock</span></div>
+            <div class="icon-cell"><svg><use href="#i-history"/></svg><span class="name">history</span></div>
+            <div class="icon-cell"><svg><use href="#i-box"/></svg><span class="name">box</span></div>
+            <div class="icon-cell"><svg><use href="#i-bell"/></svg><span class="name">bell</span></div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Sizing</h3>
+      <ul>
+        <li><strong>12px</strong> (<span class="t-mono">--icon-xs</span>) — dentro chip e badge.</li>
+        <li><strong>14px</strong> (<span class="t-mono">--icon-sm</span>) — default in button, menu, nav item.</li>
+        <li><strong>16px</strong> (<span class="t-mono">--icon-md</span>) — toolbar, side panel header.</li>
+        <li><strong>20-24px</strong> — empty state, hero, source card.</li>
+      </ul>
+    </section>
+
+    <!-- ============ 10 — BUTTONS ============ -->
+    <section class="ds-section" id="buttons">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">10 — UI</span>
+          <h2>Pulsanti</h2>
+        </div>
+        <span class="badge"><span class="t-mono">.btn</span> + variants</span>
+      </div>
+      <p class="ds-section-lede">
+        Sei varianti, quattro taglie. <strong>Primary</strong> per l'azione principale (una sola per schermata),
+        <strong>secondary</strong> per azioni alternative, <strong>ghost</strong> per azioni terziarie/icon-only,
+        <strong>danger</strong> esclusivamente per <em>azioni distruttive confermate</em>.
+      </p>
+
+      <h3>Varianti</h3>
+      <div class="ds-sample">
+        <div class="ds-sample-head"><span>VARIANTS</span></div>
+        <div class="ds-sample-body">
+          <div class="ds-sample-row">
+            <button class="btn btn--primary">Compare</button>
+            <button class="btn btn--secondary">Cancel</button>
+            <button class="btn btn--outline">Save filter</button>
+            <button class="btn btn--ghost">Reset</button>
+            <button class="btn btn--soft">Preview script</button>
+            <button class="btn btn--danger">Drop tables</button>
+            <button class="btn btn--success">Confirm deploy</button>
+          </div>
+          <div class="ds-sample-row" style="margin-top: var(--space-8);">
+            <button class="btn btn--primary"><svg class="icon"><use href="#i-play"/></svg>Deploy</button>
+            <button class="btn btn--secondary"><svg class="icon"><use href="#i-snapshot"/></svg>Create snapshot</button>
+            <button class="btn btn--outline"><svg class="icon"><use href="#i-download"/></svg>Export script</button>
+            <button class="btn btn--ghost">View report <svg class="icon"><use href="#i-arrow-right"/></svg></button>
+          </div>
+        </div>
+      </div>
+
+      <h3>Taglie</h3>
+      <div class="ds-sample">
+        <div class="ds-sample-body">
+          <div class="ds-sample-row">
+            <button class="btn btn--primary btn--xl">Deploy now</button>
+            <button class="btn btn--primary btn--lg">Deploy now</button>
+            <button class="btn btn--primary">Deploy now</button>
+            <button class="btn btn--primary btn--sm">Deploy</button>
+          </div>
+        </div>
+      </div>
+
+      <h3>Icon-only &amp; Button group</h3>
+      <div class="ds-sample">
+        <div class="ds-sample-body">
+          <div class="ds-sample-row">
+            <button class="btn btn--secondary btn--icon-only" aria-label="Refresh"><svg class="icon"><use href="#i-refresh"/></svg></button>
+            <button class="btn btn--ghost btn--icon-only" aria-label="More"><svg class="icon"><use href="#i-more"/></svg></button>
+            <button class="btn btn--outline btn--icon-only btn--sm" aria-label="Copy"><svg class="icon"><use href="#i-copy"/></svg></button>
+
+            <div class="btn-group" style="margin-left: var(--space-12);">
+              <button class="btn btn--secondary btn--sm" aria-pressed="true">All</button>
+              <button class="btn btn--secondary btn--sm">Modified</button>
+              <button class="btn btn--secondary btn--sm">Only source</button>
+              <button class="btn btn--secondary btn--sm">Only target</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Stati</h3>
+      <div class="ds-sample">
+        <div class="ds-sample-body">
+          <div class="ds-sample-row">
+            <button class="btn btn--primary">Default</button>
+            <button class="btn btn--primary" style="background: var(--primary-hover); border-color: var(--primary-hover);">Hover</button>
+            <button class="btn btn--primary" style="box-shadow: var(--shadow-focus); outline: 0;">Focus</button>
+            <button class="btn btn--primary" disabled>Disabled</button>
+            <button class="btn btn--primary"><span class="spinner spinner--sm" style="border-top-color: var(--primary-fg);"></span> Loading</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 11 — FORMS ============ -->
+    <section class="ds-section" id="forms">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">11 — UI</span>
+          <h2>Form &amp; input</h2>
+        </div>
+      </div>
+      <p class="ds-section-lede">Field con label, helper, validazione. Densità adatta a desktop dense.</p>
+
+      <div class="ds-sample">
+        <div class="ds-sample-body">
+          <div class="ds-sample-grid ds-sample-grid--2">
+            <div class="field">
+              <label class="field-label">Server</label>
+              <div class="input-wrap">
+                <svg class="input-icon"><use href="#i-database"/></svg>
+                <input class="input" placeholder="prod-sql.east.ruflo.io,1433" />
+              </div>
+              <span class="field-help">FQDN or IP with optional port.</span>
+            </div>
+            <div class="field">
+              <label class="field-label">Database</label>
+              <select class="select">
+                <option>WidgetProduction</option>
+                <option>WidgetStaging</option>
+                <option>WidgetDev</option>
+              </select>
+              <span class="field-help">All accessible DBs on the server.</span>
+            </div>
+            <div class="field">
+              <label class="field-label">Username</label>
+              <input class="input" value="dba.bakko" />
+            </div>
+            <div class="field">
+              <label class="field-label">Password</label>
+              <div class="input-wrap input-wrap--suffix">
+                <input class="input" type="password" value="•••••••••••" />
+                <svg class="input-icon"><use href="#i-eye"/></svg>
+              </div>
+              <span class="field-error">Authentication failed for user 'dba.bakko'.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Stati di input</h3>
+      <div class="ds-sample">
+        <div class="ds-sample-body">
+          <div class="ds-sample-grid ds-sample-grid--4">
+            <div class="field"><label class="field-label">Default</label><input class="input" placeholder="placeholder" /></div>
+            <div class="field"><label class="field-label">Focus</label><input class="input" value="focused" style="border-color: var(--border-focus); box-shadow: var(--shadow-focus);" /></div>
+            <div class="field"><label class="field-label">Valid</label><input class="input is-valid" value="OK" /></div>
+            <div class="field"><label class="field-label">Invalid</label><input class="input is-invalid" value="bad value" /></div>
+            <div class="field"><label class="field-label">Disabled</label><input class="input" disabled value="locked" /></div>
+            <div class="field"><label class="field-label">Small</label><input class="input input--sm" placeholder="sm" /></div>
+            <div class="field"><label class="field-label">Large</label><input class="input input--lg" placeholder="lg" /></div>
+            <div class="field"><label class="field-label">With icon</label>
+              <div class="input-wrap"><svg class="input-icon"><use href="#i-search"/></svg><input class="input" placeholder="Find object…" /></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Textarea</h3>
+      <div class="ds-sample">
+        <div class="ds-sample-body">
+          <div class="field" style="max-width: 520px;">
+            <label class="field-label">Migration script (Pre-Deployment)</label>
+            <textarea class="textarea t-mono" style="font-size: 12.5px;">-- Stage table for Customer.PreferredContactMethod migration
+CREATE TABLE #stage_pcm (CustomerId INT, NewValue NVARCHAR(20));
+INSERT INTO #stage_pcm SELECT Id, COALESCE(LegacyContact, 'Email') FROM dbo.Customer;</textarea>
+            <span class="field-help">Runs before the comparison-generated deploy script.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 12 — SELECTION ============ -->
+    <section class="ds-section" id="selection">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">12 — UI</span>
+          <h2>Selezione</h2>
+        </div>
+      </div>
+      <p class="ds-section-lede">Checkbox, radio, switch, segmented — densità calibrata per liste lunghe.</p>
+
+      <div class="ds-sample">
+        <div class="ds-sample-body">
+          <div class="ds-sample-grid ds-sample-grid--2">
+            <div class="stack gap-6">
+              <label class="choice"><span class="checkbox" aria-checked="true" data-toggle-check role="checkbox"></span> Include dependencies <span class="choice-meta">incd</span></label>
+              <label class="choice"><span class="checkbox" aria-checked="true" data-toggle-check role="checkbox"></span> Ignore white space <span class="choice-meta">iw</span></label>
+              <label class="choice"><span class="checkbox" aria-checked="false" data-toggle-check role="checkbox"></span> Ignore comments <span class="choice-meta">icm</span></label>
+              <label class="choice"><span class="checkbox" aria-checked="mixed" data-toggle-check role="checkbox"></span> Ignore fill factor <span class="choice-meta">indeterminate</span></label>
+              <label class="choice"><span class="checkbox" aria-checked="false" aria-disabled="true" role="checkbox" style="opacity:0.5"></span> Force column order <span class="choice-meta">disabled</span></label>
+            </div>
+            <div class="stack gap-6">
+              <label class="choice"><span class="radio" aria-checked="true" role="radio"></span> Create deployment script</label>
+              <label class="choice"><span class="radio" aria-checked="false" role="radio"></span> Deploy using DbDelta</label>
+              <label class="choice"><span class="radio" aria-checked="false" role="radio"></span> Update scripts folder</label>
+
+              <div class="row gap-12" style="margin-top: var(--space-8);">
+                <label class="choice"><span class="switch" aria-checked="true" data-toggle-check role="switch"></span> Make backup before deploy</label>
+              </div>
+              <div class="row gap-12">
+                <label class="choice"><span class="switch" aria-checked="false" data-toggle-check role="switch"></span> Wrap in transaction</label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Segmented control</h3>
+      <div class="ds-sample">
+        <div class="ds-sample-body">
+          <div class="ds-sample-row">
+            <div class="segmented" role="tablist">
+              <button class="segmented-item" aria-pressed="true">All</button>
+              <button class="segmented-item" aria-pressed="false">Different</button>
+              <button class="segmented-item" aria-pressed="false">Identical</button>
+            </div>
+            <div class="segmented" role="tablist">
+              <button class="segmented-item" aria-pressed="false"><svg width="12" height="12"><use href="#i-list"/></svg> List</button>
+              <button class="segmented-item" aria-pressed="true"><svg width="12" height="12"><use href="#i-columns"/></svg> Side-by-side</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 13 — TABS & MENU ============ -->
+    <section class="ds-section" id="nav-ui">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">13 — UI</span>
+          <h2>Tabs &amp; menu</h2>
+        </div>
+      </div>
+
+      <h3>Tabs</h3>
+      <div class="ds-sample">
+        <div class="ds-sample-body">
+          <div class="tabs">
+            <button class="tab" aria-selected="false">Summary</button>
+            <button class="tab" aria-selected="true">Objects <span class="badge badge--primary">847</span></button>
+            <button class="tab" aria-selected="false">Warnings <span class="badge badge--warning">3</span></button>
+            <button class="tab" aria-selected="false">Script</button>
+            <button class="tab" aria-selected="false">Report</button>
+          </div>
+        </div>
+      </div>
+      <div class="ds-sample">
+        <div class="ds-sample-body">
+          <div class="tabs tabs--pill">
+            <button class="tab" aria-selected="true">Source</button>
+            <button class="tab" aria-selected="false">Target</button>
+            <button class="tab" aria-selected="false">Diff</button>
+          </div>
+        </div>
+      </div>
+
+      <h3>Dropdown menu</h3>
+      <div class="ds-sample">
+        <div class="ds-sample-body bg-subtle">
+          <div class="ds-sample-row" style="gap: var(--space-20); align-items: flex-start;">
+            <div class="menu">
+              <div class="menu-label">Comparison</div>
+              <button class="menu-item"><svg class="icon"><use href="#i-refresh"/></svg> Re-run compare <span class="kbd-hint"><kbd>⌘</kbd><kbd>R</kbd></span></button>
+              <button class="menu-item"><svg class="icon"><use href="#i-arrow-swap"/></svg> Swap source &amp; target <span class="kbd-hint"><kbd>⌘</kbd><kbd>S</kbd></span></button>
+              <button class="menu-item"><svg class="icon"><use href="#i-filter"/></svg> Apply filter…</button>
+              <div class="menu-separator"></div>
+              <div class="menu-label">Export</div>
+              <button class="menu-item"><svg class="icon"><use href="#i-download"/></svg> Save deployment script…</button>
+              <button class="menu-item"><svg class="icon"><use href="#i-snapshot"/></svg> Create snapshot…</button>
+              <button class="menu-item"><svg class="icon"><use href="#i-code"/></svg> Export to scripts folder…</button>
+              <div class="menu-separator"></div>
+              <button class="menu-item menu-item--danger"><svg class="icon"><use href="#i-x"/></svg> Discard changes</button>
+            </div>
+
+            <div class="stack gap-6" style="flex: 1;">
+              <p class="t-body-sm">
+                Menu in stile macOS / VS Code: sezioni con eyebrow label, keyboard hint a destra,
+                icone allineate a sinistra. Item destructive in fondo, separato.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 14 — FEEDBACK ============ -->
+    <section class="ds-section" id="feedback">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">14 — UI</span>
+          <h2>Feedback</h2>
+        </div>
+      </div>
+
+      <h3>Badge &amp; chip</h3>
+      <div class="ds-sample">
+        <div class="ds-sample-body">
+          <div class="ds-sample-row wrap">
+            <span class="badge">Default</span>
+            <span class="badge badge--primary"><span class="dot"></span> Connected</span>
+            <span class="badge badge--info"><span class="dot"></span> Modified</span>
+            <span class="badge badge--success"><span class="dot"></span> Identical</span>
+            <span class="badge badge--warning"><span class="dot"></span> Warning</span>
+            <span class="badge badge--danger"><span class="dot"></span> Drop</span>
+            <span class="badge badge--violet"><span class="dot"></span> Only in source</span>
+            <span class="badge badge--solid">v16.0</span>
+            <span class="badge badge--outline">draft</span>
+          </div>
+          <div class="ds-sample-row wrap" style="margin-top: var(--space-8)">
+            <span class="chip">stored_procedure <button class="chip-x" aria-label="Remove"><svg width="10" height="10"><use href="#i-x"/></svg></button></span>
+            <span class="chip">schema = dbo <button class="chip-x" aria-label="Remove"><svg width="10" height="10"><use href="#i-x"/></svg></button></span>
+            <span class="chip">name LIKE 'usp_%' <button class="chip-x" aria-label="Remove"><svg width="10" height="10"><use href="#i-x"/></svg></button></span>
+          </div>
+        </div>
+      </div>
+
+      <h3>Alert</h3>
+      <div class="ds-sample">
+        <div class="ds-sample-body">
+          <div class="stack gap-6">
+            <div class="alert alert--info">
+              <svg class="alert-icon"><use href="#i-info"/></svg>
+              <div class="alert-body">
+                <div class="alert-title alert-strong-title">Comparison complete</div>
+                <div class="alert-msg">847 objects scanned · 12 modified · 3 only in source · 5 only in target.</div>
+              </div>
+            </div>
+            <div class="alert alert--success">
+              <svg class="alert-icon"><use href="#i-check"/></svg>
+              <div class="alert-body">
+                <div class="alert-title alert-strong-title">Deployment succeeded</div>
+                <div class="alert-msg">All 20 changes committed in a single transaction. Duration: 4.2s.</div>
+              </div>
+            </div>
+            <div class="alert alert--warning">
+              <svg class="alert-icon"><use href="#i-warning"/></svg>
+              <div class="alert-body">
+                <div class="alert-title alert-strong-title">Potentially destructive change</div>
+                <div class="alert-msg">Column <span class="t-mono">Customer.LegacyId</span> will be dropped. The column contains data. Consider a migration script.</div>
+              </div>
+            </div>
+            <div class="alert alert--danger">
+              <svg class="alert-icon"><use href="#i-alert"/></svg>
+              <div class="alert-body">
+                <div class="alert-title alert-strong-title">Deployment aborted</div>
+                <div class="alert-msg">Foreign key <span class="t-mono">FK_Order_Customer</span> references a column that no longer exists in source. Transaction rolled back.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Toast</h3>
+      <div class="ds-sample">
+        <div class="ds-sample-body bg-subtle">
+          <div class="ds-sample-grid ds-sample-grid--2" style="align-items: start;">
+            <div class="toast">
+              <svg class="toast-icon" style="color: var(--success);"><use href="#i-check"/></svg>
+              <div class="toast-body">
+                <div class="toast-title">Snapshot created</div>
+                <div class="toast-msg t-mono">prod-2026-05-20.snap · 12.4 MB</div>
+              </div>
+              <button class="btn btn--ghost btn--icon-only btn--sm" aria-label="Dismiss"><svg class="icon"><use href="#i-x"/></svg></button>
+            </div>
+            <div class="toast">
+              <svg class="toast-icon" style="color: var(--warning);"><use href="#i-warning"/></svg>
+              <div class="toast-body">
+                <div class="toast-title">3 warnings need review</div>
+                <div class="toast-msg">Before deploying to production, verify the DROP operations.</div>
+              </div>
+              <button class="btn btn--ghost btn--sm" style="height: 24px;">Review</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Progress &amp; spinner</h3>
+      <div class="ds-sample">
+        <div class="ds-sample-body">
+          <div class="stack gap-12" style="max-width: 480px;">
+            <div>
+              <div class="row justify-between" style="margin-bottom: 4px;"><span class="t-body-sm">Reading schema metadata</span><span class="t-meta t-mono t-num">432 / 847</span></div>
+              <div class="progress"><div class="progress-bar" style="width: 51%;"></div></div>
+            </div>
+            <div>
+              <div class="row justify-between" style="margin-bottom: 4px;"><span class="t-body-sm">Generating deployment script</span><span class="t-meta">Indeterminate</span></div>
+              <div class="progress progress--indeterminate"><div class="progress-bar"></div></div>
+            </div>
+            <div>
+              <div class="row justify-between" style="margin-bottom: 4px;"><span class="t-body-sm">Snapshot upload</span><span class="t-meta">Failed</span></div>
+              <div class="progress progress--danger"><div class="progress-bar" style="width: 32%;"></div></div>
+            </div>
+            <div class="row gap-12">
+              <span class="spinner spinner--sm"></span>
+              <span class="spinner"></span>
+              <span class="spinner spinner--lg"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 15 — OVERLAYS ============ -->
+    <section class="ds-section" id="overlays">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">15 — UI</span>
+          <h2>Overlay</h2>
+        </div>
+      </div>
+
+      <h3>Modal · destructive confirmation</h3>
+      <div class="ds-sample">
+        <div class="ds-sample-body bg-subtle" style="padding: var(--space-20);">
+          <div class="modal" style="position: relative; max-width: 480px;">
+            <div class="modal-header">
+              <div class="row gap-6 items-center">
+                <svg width="18" height="18" style="color: var(--danger);"><use href="#i-warning"/></svg>
+                <span class="modal-title">Confirm destructive deployment</span>
+              </div>
+              <button class="btn btn--ghost btn--icon-only btn--sm" aria-label="Close"><svg class="icon"><use href="#i-x"/></svg></button>
+            </div>
+            <div class="modal-body">
+              <p class="t-body-sm" style="margin-bottom: var(--space-8);">
+                This deployment will drop <strong>3 tables</strong> and alter <strong>2 columns</strong> on populated tables.
+                The transaction will roll back automatically if any statement fails.
+              </p>
+              <div class="alert alert--warning" style="margin-bottom: var(--space-8);">
+                <svg class="alert-icon"><use href="#i-warning"/></svg>
+                <div class="alert-body">
+                  <div class="alert-title alert-strong-title">Snapshot before deploy?</div>
+                  <div class="alert-msg">A pre-deployment snapshot enables one-click rollback. Recommended.</div>
+                </div>
+              </div>
+              <label class="choice"><span class="checkbox" aria-checked="true" data-toggle-check role="checkbox"></span> Create snapshot <span class="t-mono choice-meta">prod-2026-05-20.snap</span></label>
+              <label class="choice" style="margin-top: var(--space-4);"><span class="checkbox" aria-checked="false" data-toggle-check role="checkbox"></span> I understand the impact</label>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn--ghost">Cancel</button>
+              <button class="btn btn--danger">Deploy &amp; drop</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Tooltip</h3>
+      <div class="ds-sample">
+        <div class="ds-sample-body bg-subtle">
+          <div class="ds-sample-row" style="gap: var(--space-20);">
+            <div class="stack gap-3 items-center">
+              <span class="tooltip">Re-run comparison · <kbd>⌘R</kbd></span>
+              <button class="btn btn--secondary btn--icon-only"><svg class="icon"><use href="#i-refresh"/></svg></button>
+            </div>
+            <div class="stack gap-3 items-center">
+              <span class="tooltip">Force column order rebuilds the table</span>
+              <button class="btn btn--ghost btn--icon-only btn--sm"><svg class="icon"><use href="#i-help"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 16 — DATA SOURCE ============ -->
+    <section class="ds-section" id="connection">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">16 — DOMINIO</span>
+          <h2>Data source picker</h2>
+        </div>
+      </div>
+      <p class="ds-section-lede">
+        Sei tipi di sorgente: <strong>Live DB</strong>, <strong>Scripts folder</strong>, <strong>Snapshot</strong>,
+        <strong>Backup</strong>, <strong>Source Control</strong>, <strong>SQL Clone</strong>. Layout a card uniforme,
+        cambia solo icona + descrizione.
+      </p>
+
+      <div class="ds-sample">
+        <div class="ds-sample-head"><span>SOURCE TYPE PICKER</span></div>
+        <div class="ds-sample-body bg-subtle">
+          <div class="ds-sample-grid ds-sample-grid--3">
+            <div class="source-card is-selected">
+              <div class="source-card-head">
+                <span class="source-card-icon"><svg class="icon"><use href="#i-database"/></svg></span>
+                <span class="source-card-title">Live database</span>
+              </div>
+              <p class="source-card-desc">A running SQL Server instance — on-prem, Azure SQL, or RDS.</p>
+            </div>
+            <div class="source-card">
+              <div class="source-card-head">
+                <span class="source-card-icon"><svg class="icon"><use href="#i-folder"/></svg></span>
+                <span class="source-card-title">Scripts folder</span>
+              </div>
+              <p class="source-card-desc">A directory of <span class="t-mono">.sql</span> files organized by object type.</p>
+            </div>
+            <div class="source-card">
+              <div class="source-card-head">
+                <span class="source-card-icon"><svg class="icon"><use href="#i-snapshot"/></svg></span>
+                <span class="source-card-title">Snapshot</span>
+              </div>
+              <p class="source-card-desc">Binary <span class="t-mono">.snap</span> file — schema-only, immutable.</p>
+            </div>
+            <div class="source-card">
+              <div class="source-card-head">
+                <span class="source-card-icon"><svg class="icon"><use href="#i-backup"/></svg></span>
+                <span class="source-card-title">Native backup</span>
+              </div>
+              <p class="source-card-desc"><span class="t-mono">.bak</span> file read directly — no restore needed.</p>
+            </div>
+            <div class="source-card">
+              <div class="source-card-head">
+                <span class="source-card-icon"><svg class="icon"><use href="#i-git"/></svg></span>
+                <span class="source-card-title">Source control</span>
+              </div>
+              <p class="source-card-desc">Git/SVN-versioned scripts folder. Compare any revision.</p>
+            </div>
+            <div class="source-card">
+              <div class="source-card-head">
+                <span class="source-card-icon"><svg class="icon"><use href="#i-box"/></svg></span>
+                <span class="source-card-title">SQL Clone</span>
+              </div>
+              <p class="source-card-desc">Virtual database copy via Redgate SQL Clone.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Connection bar (source/target paired)</h3>
+      <p>Mostrato in cima alle viste di confronto. <strong>Source</strong> a sinistra (violet), <strong>target</strong>
+      a destra (cobalt). Lo swap è una sola azione.</p>
+      <div class="ds-sample">
+        <div class="ds-sample-body">
+          <div class="connection-bar">
+            <div class="connection-endpoint connection-endpoint--source">
+              <svg class="icon" style="color: var(--secondary); width: 16px; height: 16px;"><use href="#i-database"/></svg>
+              <span class="connection-tag">SOURCE</span>
+              <span class="connection-name">WidgetDev</span>
+              <span class="connection-meta">dev-sql.local · dba.bakko</span>
+              <span class="status-dot status-dot--live" style="margin-left:auto"></span>
+            </div>
+            <button class="connection-swap" aria-label="Swap source and target"><svg class="icon" style="width: 14px; height: 14px;"><use href="#i-arrow-swap"/></svg></button>
+            <div class="connection-endpoint connection-endpoint--target">
+              <svg class="icon" style="color: var(--primary); width: 16px; height: 16px;"><use href="#i-database"/></svg>
+              <span class="connection-tag">TARGET</span>
+              <span class="connection-name">WidgetProduction</span>
+              <span class="connection-meta">prod-sql.east · readonly</span>
+              <span class="status-dot status-dot--live" style="margin-left:auto"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 17 — OBJECT DIFF GRID ============ -->
+    <section class="ds-section" id="diff-grid">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">17 — DOMINIO</span>
+          <h2>Object Diff Grid</h2>
+        </div>
+      </div>
+      <p class="ds-section-lede">
+        Il cuore di DbDelta. Una riga per oggetto SQL Server confrontato. Densità calcolata a <strong>30px row height</strong>
+        per mostrare 20+ righe contemporaneamente su un MacBook 13". Status comunicato da una <em>strip color</em> a sinistra
+        + pill testuale; ordinamento, selezione multipla, deploy toggle.
+      </p>
+
+      <div class="ds-sample">
+        <div class="ds-sample-head"><span>OBJECT DIFF GRID</span><span class="t-mono">--dgrid</span></div>
+        <div class="ds-sample-body--flush">
+          <table class="dgrid">
+            <thead>
+              <tr>
+                <th class="cell-check"><span class="checkbox" aria-checked="mixed" data-toggle-check role="checkbox"></span></th>
+                <th>Status</th>
+                <th class="is-sorted">Name <svg class="sort-arrow" width="10" height="10"><use href="#i-chevron-down"/></svg></th>
+                <th>Type</th>
+                <th>Schema</th>
+                <th>Action</th>
+                <th style="text-align:right; padding-right: var(--space-12)">Δ Lines</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="diff-row" data-diff="modified">
+                <td class="cell-check"><span class="checkbox" aria-checked="true" data-toggle-check role="checkbox"></span></td>
+                <td><span class="diff-pill diff-pill--modified"><span class="dot"></span>Modified</span></td>
+                <td class="cell-name"><span class="dgrid-status-strip"></span>Customer</td>
+                <td class="cell-type">Table</td>
+                <td class="cell-schema">dbo</td>
+                <td class="cell-action">ALTER · 2 cols</td>
+                <td class="cell-meta">+12 −4</td>
+              </tr>
+              <tr class="diff-row" data-diff="modified">
+                <td class="cell-check"><span class="checkbox" aria-checked="true" data-toggle-check role="checkbox"></span></td>
+                <td><span class="diff-pill diff-pill--modified"><span class="dot"></span>Modified</span></td>
+                <td class="cell-name"><span class="dgrid-status-strip"></span>usp_GetActiveOrders</td>
+                <td class="cell-type">Stored Procedure</td>
+                <td class="cell-schema">dbo</td>
+                <td class="cell-action">CREATE OR ALTER</td>
+                <td class="cell-meta">+18 −6</td>
+              </tr>
+              <tr class="diff-row" data-diff="only-source">
+                <td class="cell-check"><span class="checkbox" aria-checked="true" data-toggle-check role="checkbox"></span></td>
+                <td><span class="diff-pill diff-pill--only-source"><span class="dot"></span>Only in source</span></td>
+                <td class="cell-name"><span class="dgrid-status-strip"></span>OrderNote</td>
+                <td class="cell-type">Table</td>
+                <td class="cell-schema">dbo</td>
+                <td class="cell-action">CREATE</td>
+                <td class="cell-meta">+47</td>
+              </tr>
+              <tr class="diff-row" data-diff="only-source">
+                <td class="cell-check"><span class="checkbox" aria-checked="true" data-toggle-check role="checkbox"></span></td>
+                <td><span class="diff-pill diff-pill--only-source"><span class="dot"></span>Only in source</span></td>
+                <td class="cell-name"><span class="dgrid-status-strip"></span>IX_Order_Customer_Created</td>
+                <td class="cell-type">Index</td>
+                <td class="cell-schema">dbo</td>
+                <td class="cell-action">CREATE</td>
+                <td class="cell-meta">+3</td>
+              </tr>
+              <tr class="diff-row" data-diff="only-target">
+                <td class="cell-check"><span class="checkbox" aria-checked="false" data-toggle-check role="checkbox"></span></td>
+                <td><span class="diff-pill diff-pill--only-target"><span class="dot"></span>Only in target</span></td>
+                <td class="cell-name"><span class="dgrid-status-strip"></span>LegacyMigrationLog</td>
+                <td class="cell-type">Table</td>
+                <td class="cell-schema">dbo</td>
+                <td class="cell-action">DROP</td>
+                <td class="cell-meta">−28</td>
+              </tr>
+              <tr class="diff-row" data-diff="destructive">
+                <td class="cell-check"><span class="checkbox" aria-checked="false" data-toggle-check role="checkbox"></span></td>
+                <td><span class="diff-pill diff-pill--destructive"><span class="dot"></span>Destructive</span></td>
+                <td class="cell-name"><span class="dgrid-status-strip"></span>Customer.LegacyId</td>
+                <td class="cell-type">Column</td>
+                <td class="cell-schema">dbo</td>
+                <td class="cell-action">DROP · populated</td>
+                <td class="cell-meta">−1</td>
+              </tr>
+              <tr class="diff-row" data-diff="modified">
+                <td class="cell-check"><span class="checkbox" aria-checked="true" data-toggle-check role="checkbox"></span></td>
+                <td><span class="diff-pill diff-pill--modified"><span class="dot"></span>Modified</span></td>
+                <td class="cell-name"><span class="dgrid-status-strip"></span>vw_CustomerSummary</td>
+                <td class="cell-type">View</td>
+                <td class="cell-schema">dbo</td>
+                <td class="cell-action">CREATE OR ALTER</td>
+                <td class="cell-meta">+5 −2</td>
+              </tr>
+              <tr class="diff-row" data-diff="identical">
+                <td class="cell-check"><span class="checkbox" aria-checked="false" aria-disabled="true" role="checkbox" style="opacity: 0.5"></span></td>
+                <td><span class="diff-pill diff-pill--identical"><span class="dot"></span>Identical</span></td>
+                <td class="cell-name"><span class="dgrid-status-strip"></span>Order</td>
+                <td class="cell-type">Table</td>
+                <td class="cell-schema">dbo</td>
+                <td class="cell-action">—</td>
+                <td class="cell-meta">—</td>
+              </tr>
+              <tr class="diff-row" data-diff="modified">
+                <td class="cell-check"><span class="checkbox" aria-checked="false" data-toggle-check role="checkbox"></span></td>
+                <td><span class="diff-pill diff-pill--modified"><span class="dot"></span>Modified</span></td>
+                <td class="cell-name"><span class="dgrid-status-strip"></span>fn_FormatAddress</td>
+                <td class="cell-type">Function</td>
+                <td class="cell-schema">dbo</td>
+                <td class="cell-action">CREATE OR ALTER</td>
+                <td class="cell-meta">+8 −0</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="dgrid-summary">
+            <span class="stat"><span class="status-dot status-dot--live"></span><span class="stat-count">847</span> total</span>
+            <span class="stat" style="color: var(--info-fg)"><span class="status-dot" style="background: var(--diff-modified)"></span><span class="stat-count">12</span> modified</span>
+            <span class="stat" style="color: var(--secondary-soft-fg)"><span class="status-dot" style="background: var(--diff-only-source)"></span><span class="stat-count">3</span> only in source</span>
+            <span class="stat" style="color: var(--warning-fg)"><span class="status-dot" style="background: var(--diff-only-target)"></span><span class="stat-count">5</span> only in target</span>
+            <span class="stat" style="color: var(--danger-fg)"><span class="status-dot" style="background: var(--diff-destructive)"></span><span class="stat-count">1</span> destructive</span>
+            <span class="stat" style="margin-left: auto;"><span class="stat-count">21</span> selected · ready to deploy</span>
+          </div>
+        </div>
+      </div>
+
+      <h3>Anatomia di una riga</h3>
+      <ul>
+        <li><strong>Cell-check</strong> (28px) — selettore di deploy. Header in stato <em>mixed</em> per select-all parziale.</li>
+        <li><strong>Status pill</strong> — comunica il tipo di diff in forma testuale, con dot colorato.</li>
+        <li><strong>Status strip</strong> (3px verticale a sx del name) — ridondanza visiva: scrollando rapidamente, il colore è sufficiente.</li>
+        <li><strong>Name</strong> — sempre in <em>monospace</em>: gli identificatori SQL sono codice.</li>
+        <li><strong>Type · Schema · Action</strong> — metadata, colore <span class="t-mono">--fg-muted</span>.</li>
+        <li><strong>Δ Lines</strong> — colonna a destra, allineata a destra, numerali tabulari. Verde +, rosso −.</li>
+      </ul>
+    </section>
+
+    <!-- ============ 18 — T-SQL DIFF VIEWER ============ -->
+    <section class="ds-section" id="diff-viewer">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">18 — DOMINIO</span>
+          <h2>T-SQL Diff Viewer</h2>
+        </div>
+      </div>
+      <p class="ds-section-lede">
+        Side-by-side T-SQL diff con syntax highlighting. <strong>Source</strong> a sinistra (violet header),
+        <strong>target</strong> a destra (cobalt header). Righe modificate, aggiunte, rimosse hanno background subtle.
+        Line numbers indipendenti per ciascun pane. Hunk separator come in <span class="t-mono">git diff</span>.
+      </p>
+
+      <div class="ds-sample">
+        <div class="ds-sample-head"><span>SIDE-BY-SIDE DIFF · dbo.Customer</span><span class="t-mono">+12 −4</span></div>
+        <div class="ds-sample-body--flush">
+          <div class="diff-viewer">
+            <div class="diff-pane diff-pane--source">
+              <div class="diff-pane-header">
+                <span class="label">SOURCE</span>
+                <span class="endpoint">WidgetDev · dev-sql.local</span>
+              </div>
+              <div class="diff-line diff-line--ctx"><span class="ln">14</span><span class="mk"> </span><span class="code"><span class="tok-kw">CREATE</span> <span class="tok-kw">TABLE</span> <span class="tok-fn">dbo.Customer</span> (</span></div>
+              <div class="diff-line diff-line--ctx"><span class="ln">15</span><span class="mk"> </span><span class="code">    Id <span class="tok-ty">INT</span> <span class="tok-kw">IDENTITY</span>(<span class="tok-nm">1</span>,<span class="tok-nm">1</span>) <span class="tok-kw">NOT NULL</span>,</span></div>
+              <div class="diff-line diff-line--ctx"><span class="ln">16</span><span class="mk"> </span><span class="code">    FullName <span class="tok-ty">NVARCHAR</span>(<span class="tok-nm">200</span>) <span class="tok-kw">NOT NULL</span>,</span></div>
+              <div class="diff-line diff-line--ctx"><span class="ln">17</span><span class="mk"> </span><span class="code">    Email <span class="tok-ty">NVARCHAR</span>(<span class="tok-nm">255</span>) <span class="tok-kw">NULL</span>,</span></div>
+              <div class="diff-line diff-line--add"><span class="ln">18</span><span class="mk">+</span><span class="code">    PreferredContactMethod <span class="tok-ty">NVARCHAR</span>(<span class="tok-nm">20</span>) <span class="tok-kw">NOT NULL</span></span></div>
+              <div class="diff-line diff-line--add"><span class="ln">19</span><span class="mk">+</span><span class="code">        <span class="tok-kw">CONSTRAINT</span> DF_Customer_PCM <span class="tok-kw">DEFAULT</span> <span class="tok-st">'Email'</span>,</span></div>
+              <div class="diff-line diff-line--mod"><span class="ln">20</span><span class="mk">~</span><span class="code">    Phone <span class="tok-ty">NVARCHAR</span>(<span class="diff-inline-add">32</span>) <span class="tok-kw">NULL</span>,</span></div>
+              <div class="diff-line diff-line--ctx"><span class="ln">21</span><span class="mk"> </span><span class="code">    CreatedAt <span class="tok-ty">DATETIME2</span>(<span class="tok-nm">3</span>) <span class="tok-kw">NOT NULL</span></span></div>
+              <div class="diff-line diff-line--ctx"><span class="ln">22</span><span class="mk"> </span><span class="code">        <span class="tok-kw">CONSTRAINT</span> DF_Customer_CreatedAt <span class="tok-kw">DEFAULT</span> <span class="tok-fn">SYSUTCDATETIME</span>(),</span></div>
+              <div class="diff-hunk">@@ −36,5 +36,3 @@ CONSTRAINTS</div>
+              <div class="diff-line diff-line--ctx"><span class="ln">37</span><span class="mk"> </span><span class="code">    <span class="tok-kw">CONSTRAINT</span> PK_Customer <span class="tok-kw">PRIMARY KEY</span>(Id),</span></div>
+              <div class="diff-line diff-line--ctx"><span class="ln">38</span><span class="mk"> </span><span class="code">    <span class="tok-kw">CONSTRAINT</span> UQ_Customer_Email <span class="tok-kw">UNIQUE</span>(Email)</span></div>
+              <div class="diff-line diff-line--ctx"><span class="ln">39</span><span class="mk"> </span><span class="code">);</span></div>
+            </div>
+            <div class="diff-pane diff-pane--target">
+              <div class="diff-pane-header">
+                <span class="label">TARGET</span>
+                <span class="endpoint">WidgetProduction · prod-sql.east</span>
+              </div>
+              <div class="diff-line diff-line--ctx"><span class="ln">14</span><span class="mk"> </span><span class="code"><span class="tok-kw">CREATE</span> <span class="tok-kw">TABLE</span> <span class="tok-fn">dbo.Customer</span> (</span></div>
+              <div class="diff-line diff-line--ctx"><span class="ln">15</span><span class="mk"> </span><span class="code">    Id <span class="tok-ty">INT</span> <span class="tok-kw">IDENTITY</span>(<span class="tok-nm">1</span>,<span class="tok-nm">1</span>) <span class="tok-kw">NOT NULL</span>,</span></div>
+              <div class="diff-line diff-line--ctx"><span class="ln">16</span><span class="mk"> </span><span class="code">    FullName <span class="tok-ty">NVARCHAR</span>(<span class="tok-nm">200</span>) <span class="tok-kw">NOT NULL</span>,</span></div>
+              <div class="diff-line diff-line--ctx"><span class="ln">17</span><span class="mk"> </span><span class="code">    Email <span class="tok-ty">NVARCHAR</span>(<span class="tok-nm">255</span>) <span class="tok-kw">NULL</span>,</span></div>
+              <div class="diff-line diff-line--mod"><span class="ln">18</span><span class="mk">~</span><span class="code">    Phone <span class="tok-ty">NVARCHAR</span>(<span class="diff-inline-rem">16</span>) <span class="tok-kw">NULL</span>,</span></div>
+              <div class="diff-line diff-line--rem"><span class="ln">19</span><span class="mk">−</span><span class="code">    LegacyId <span class="tok-ty">INT</span> <span class="tok-kw">NULL</span>, <span class="tok-co">-- to be removed in v1.3</span></span></div>
+              <div class="diff-line diff-line--ctx"><span class="ln">20</span><span class="mk"> </span><span class="code">    CreatedAt <span class="tok-ty">DATETIME2</span>(<span class="tok-nm">3</span>) <span class="tok-kw">NOT NULL</span></span></div>
+              <div class="diff-line diff-line--ctx"><span class="ln">21</span><span class="mk"> </span><span class="code">        <span class="tok-kw">CONSTRAINT</span> DF_Customer_CreatedAt <span class="tok-kw">DEFAULT</span> <span class="tok-fn">SYSUTCDATETIME</span>(),</span></div>
+              <div class="diff-line diff-line--ctx"><span class="ln">22</span><span class="mk"> </span><span class="code"></span></div>
+              <div class="diff-hunk">@@ −36,5 +36,3 @@ CONSTRAINTS</div>
+              <div class="diff-line diff-line--ctx"><span class="ln">35</span><span class="mk"> </span><span class="code">    <span class="tok-kw">CONSTRAINT</span> PK_Customer <span class="tok-kw">PRIMARY KEY</span>(Id),</span></div>
+              <div class="diff-line diff-line--ctx"><span class="ln">36</span><span class="mk"> </span><span class="code">    <span class="tok-kw">CONSTRAINT</span> UQ_Customer_Email <span class="tok-kw">UNIQUE</span>(Email)</span></div>
+              <div class="diff-line diff-line--ctx"><span class="ln">37</span><span class="mk"> </span><span class="code">);</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Token colors di syntax highlighting</h3>
+      <div class="ds-sample">
+        <div class="ds-sample-body">
+          <div class="ds-sample-grid ds-sample-grid--4">
+            <div class="t-body-sm"><span class="t-mono" style="color: var(--syn-keyword)">SELECT</span> <span class="t-meta">tok-kw · keyword</span></div>
+            <div class="t-body-sm"><span class="t-mono" style="color: var(--syn-function)">dbo.Customer</span> <span class="t-meta">tok-fn · function/identifier</span></div>
+            <div class="t-body-sm"><span class="t-mono" style="color: var(--syn-type)">NVARCHAR</span> <span class="t-meta">tok-ty · type</span></div>
+            <div class="t-body-sm"><span class="t-mono" style="color: var(--syn-string)">'Email'</span> <span class="t-meta">tok-st · string</span></div>
+            <div class="t-body-sm"><span class="t-mono" style="color: var(--syn-number)">255</span> <span class="t-meta">tok-nm · number</span></div>
+            <div class="t-body-sm"><span class="t-mono" style="color: var(--syn-comment)">-- comment</span> <span class="t-meta">tok-co · comment</span></div>
+            <div class="t-body-sm"><span class="t-mono" style="color: var(--syn-operator)">=</span> <span class="t-meta">tok-op · operator</span></div>
+            <div class="t-body-sm"><span class="t-mono" style="color: var(--syn-punct)">(),;</span> <span class="t-meta">tok-pn · punct</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 19 — COMPARISON OPTIONS ============ -->
+    <section class="ds-section" id="options">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">19 — DOMINIO</span>
+          <h2>Comparison Options panel</h2>
+        </div>
+      </div>
+      <p class="ds-section-lede">
+        Le opzioni di comparazione sono <strong>tante</strong> (50+ tra ignore, deployment, behavior). Raggruppate per
+        macro-area, ogni riga mostra nome leggibile, descrizione, identificatore CLI. Toggle on/off via checkbox.
+      </p>
+
+      <div class="ds-sample">
+        <div class="ds-sample-head"><span>OPTIONS PANEL</span><span class="t-mono">opts-panel</span></div>
+        <div class="ds-sample-body bg-subtle">
+          <div class="opts-panel">
+            <div class="opts-group">
+              <div class="opts-group-head">
+                <svg width="14" height="14" style="color: var(--primary)"><use href="#i-bolt"/></svg>
+                <span class="opts-group-title">Default-on options</span>
+                <span class="opts-group-count">8 · 8 active</span>
+              </div>
+              <div class="opts-group-body">
+                <label class="opt-row">
+                  <span class="checkbox" aria-checked="true" data-toggle-check role="checkbox"></span>
+                  <span class="opt-text">
+                    <span class="opt-name">Ignore white space</span>
+                    <span class="opt-desc">Disregards whitespace differences (newlines, tabs, spaces) in object bodies.</span>
+                  </span>
+                  <span class="opt-cli">iw</span>
+                </label>
+                <label class="opt-row">
+                  <span class="checkbox" aria-checked="true" data-toggle-check role="checkbox"></span>
+                  <span class="opt-text">
+                    <span class="opt-name">Include dependencies</span>
+                    <span class="opt-desc">Automatically include dependent objects when selecting for deployment.</span>
+                  </span>
+                  <span class="opt-cli">incd</span>
+                </label>
+                <label class="opt-row">
+                  <span class="checkbox" aria-checked="true" data-toggle-check role="checkbox"></span>
+                  <span class="opt-text">
+                    <span class="opt-name">Ignore fill factor</span>
+                    <span class="opt-desc">Ignores fill factor and padding settings on indexes.</span>
+                  </span>
+                  <span class="opt-cli">if</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="opts-group">
+              <div class="opts-group-head">
+                <svg width="14" height="14" style="color: var(--secondary)"><use href="#i-eye"/></svg>
+                <span class="opts-group-title">Ignore — schema &amp; structure</span>
+                <span class="opts-group-count">17 · 3 active</span>
+              </div>
+              <div class="opts-group-body">
+                <label class="opt-row">
+                  <span class="checkbox" aria-checked="false" data-toggle-check role="checkbox"></span>
+                  <span class="opt-text">
+                    <span class="opt-name">Ignore foreign keys</span>
+                    <span class="opt-desc">Excludes foreign key constraints from comparison.</span>
+                  </span>
+                  <span class="opt-cli">ifk</span>
+                </label>
+                <label class="opt-row">
+                  <span class="checkbox" aria-checked="true" data-toggle-check role="checkbox"></span>
+                  <span class="opt-text">
+                    <span class="opt-name">Ignore system-named constraints &amp; indexes</span>
+                    <span class="opt-desc">Ignores names auto-generated by SQL Server for constraints and indexes.</span>
+                  </span>
+                  <span class="opt-cli">iscn</span>
+                </label>
+                <label class="opt-row">
+                  <span class="checkbox" aria-checked="false" data-toggle-check role="checkbox"></span>
+                  <span class="opt-text">
+                    <span class="opt-name">Ignore extended properties</span>
+                    <span class="opt-desc">Ignores documentation metadata attached to objects.</span>
+                  </span>
+                  <span class="opt-cli">ie</span>
+                </label>
+                <label class="opt-row">
+                  <span class="checkbox" aria-checked="false" data-toggle-check role="checkbox"></span>
+                  <span class="opt-text">
+                    <span class="opt-name">Ignore permissions</span>
+                    <span class="opt-desc">Ignores object-level GRANT / DENY / REVOKE.</span>
+                  </span>
+                  <span class="opt-cli">ip</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="opts-group">
+              <div class="opts-group-head">
+                <svg width="14" height="14" style="color: var(--warning)"><use href="#i-play"/></svg>
+                <span class="opts-group-title">Deployment script generation</span>
+                <span class="opts-group-count">13 · 2 active</span>
+              </div>
+              <div class="opts-group-body">
+                <label class="opt-row">
+                  <span class="checkbox" aria-checked="true" data-toggle-check role="checkbox"></span>
+                  <span class="opt-text">
+                    <span class="opt-name">Add database use statement</span>
+                    <span class="opt-desc">Prepends <span class="t-mono">USE [DatabaseName]</span> to prevent execution against the wrong DB.</span>
+                  </span>
+                  <span class="opt-cli">adus</span>
+                </label>
+                <label class="opt-row">
+                  <span class="checkbox" aria-checked="true" data-toggle-check role="checkbox"></span>
+                  <span class="opt-text">
+                    <span class="opt-name">Create or alter for re-runnable scripts</span>
+                    <span class="opt-desc">Use <span class="t-mono">CREATE OR ALTER</span> instead of <span class="t-mono">ALTER</span> (SQL Server 2016+).</span>
+                  </span>
+                  <span class="opt-cli">coa</span>
+                </label>
+                <label class="opt-row">
+                  <span class="checkbox" aria-checked="false" data-toggle-check role="checkbox"></span>
+                  <span class="opt-text">
+                    <span class="opt-name">No transactions</span>
+                    <span class="opt-desc">Removes transaction wrappers. <strong style="color: var(--danger-fg)">Dangerous in production.</strong></span>
+                  </span>
+                  <span class="opt-cli">nt</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 20 — DEPLOYMENT WIZARD ============ -->
+    <section class="ds-section" id="wizard">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">20 — DOMINIO</span>
+          <h2>Deployment Wizard</h2>
+        </div>
+      </div>
+      <p class="ds-section-lede">
+        Multi-step pattern: <strong>Review → Warnings → Script → Snapshot → Deploy → Done</strong>. Step indicator
+        sticky in alto, ogni step ha titolo, descrizione e azioni primarie nel footer.
+      </p>
+
+      <div class="ds-sample">
+        <div class="ds-sample-head"><span>WIZARD STEP HEADER</span></div>
+        <div class="ds-sample-body--flush">
+          <div class="wizard-steps">
+            <span class="wizard-step is-done"><span class="wizard-step-num"><span>1</span></span> Review</span>
+            <svg class="wizard-arrow" width="14" height="14"><use href="#i-chevron-right"/></svg>
+            <span class="wizard-step is-done"><span class="wizard-step-num"><span>2</span></span> Warnings</span>
+            <svg class="wizard-arrow" width="14" height="14"><use href="#i-chevron-right"/></svg>
+            <span class="wizard-step is-active"><span class="wizard-step-num"><span>3</span></span> Script</span>
+            <svg class="wizard-arrow" width="14" height="14"><use href="#i-chevron-right"/></svg>
+            <span class="wizard-step"><span class="wizard-step-num"><span>4</span></span> Snapshot</span>
+            <svg class="wizard-arrow" width="14" height="14"><use href="#i-chevron-right"/></svg>
+            <span class="wizard-step"><span class="wizard-step-num"><span>5</span></span> Deploy</span>
+            <svg class="wizard-arrow" width="14" height="14"><use href="#i-chevron-right"/></svg>
+            <span class="wizard-step"><span class="wizard-step-num"><span>6</span></span> Done</span>
+          </div>
+
+          <div style="padding: var(--space-16) var(--space-16) var(--space-12);">
+            <div class="row gap-12 items-start" style="margin-bottom: var(--space-12);">
+              <div style="flex: 1;">
+                <h4 style="margin: 0 0 4px;">Review the deployment script</h4>
+                <p class="t-body-sm" style="margin: 0;">
+                  21 objects · 12 modified · 3 new · 5 dropped · 1 destructive operation. Review the generated SQL
+                  before continuing.
+                </p>
+              </div>
+              <div class="row gap-3">
+                <button class="btn btn--ghost btn--sm"><svg class="icon"><use href="#i-copy"/></svg> Copy</button>
+                <button class="btn btn--secondary btn--sm"><svg class="icon"><use href="#i-download"/></svg> Save .sql</button>
+              </div>
+            </div>
+
+            <div class="script-preview">
+              <div class="script-preview-head">
+                <span class="script-preview-title">deploy_2026-05-20_WidgetProd.sql</span>
+                <span class="t-meta">187 lines · 4.2 KB</span>
+              </div>
+<pre><span class="tok-co">/* DbDelta — generated deployment script
+   Source: WidgetDev · Target: WidgetProduction
+   Generated: 2026-05-20 14:32:11 UTC */</span>
+
+<span class="tok-kw">USE</span> [WidgetProduction];
+<span class="tok-kw">SET</span> <span class="tok-kw">XACT_ABORT</span> <span class="tok-kw">ON</span>;
+<span class="tok-kw">BEGIN TRANSACTION</span>;
+
+<span class="tok-kw">PRINT</span> <span class="tok-st">N'Altering [dbo].[Customer]'</span>;
+<span class="tok-kw">ALTER TABLE</span> [dbo].[Customer]
+    <span class="tok-kw">ADD</span> PreferredContactMethod <span class="tok-ty">NVARCHAR</span>(<span class="tok-nm">20</span>) <span class="tok-kw">NOT NULL</span>
+        <span class="tok-kw">CONSTRAINT</span> DF_Customer_PCM <span class="tok-kw">DEFAULT</span> <span class="tok-st">'Email'</span>;
+<span class="tok-kw">ALTER TABLE</span> [dbo].[Customer] <span class="tok-kw">ALTER COLUMN</span> Phone <span class="tok-ty">NVARCHAR</span>(<span class="tok-nm">32</span>) <span class="tok-kw">NULL</span>;
+<span class="tok-kw">ALTER TABLE</span> [dbo].[Customer] <span class="tok-kw">DROP COLUMN</span> LegacyId;  <span class="tok-co">-- destructive</span>
+
+<span class="tok-kw">PRINT</span> <span class="tok-st">N'Creating [dbo].[OrderNote]'</span>;
+<span class="tok-kw">CREATE TABLE</span> [dbo].[OrderNote] (
+    Id <span class="tok-ty">INT</span> <span class="tok-kw">IDENTITY</span>(<span class="tok-nm">1</span>,<span class="tok-nm">1</span>) <span class="tok-kw">NOT NULL</span>,
+    OrderId <span class="tok-ty">INT</span> <span class="tok-kw">NOT NULL</span>,
+    Note <span class="tok-ty">NVARCHAR</span>(<span class="tok-nm">2000</span>) <span class="tok-kw">NULL</span>,
+    <span class="tok-kw">CONSTRAINT</span> PK_OrderNote <span class="tok-kw">PRIMARY KEY</span>(Id)
+);
+
+<span class="tok-kw">COMMIT TRANSACTION</span>;
+<span class="tok-kw">PRINT</span> <span class="tok-st">N'Deployment complete: 21 objects updated.'</span>;</pre>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; gap: var(--space-6); padding: var(--space-10) var(--space-12); border-top: 1px solid var(--border-subtle); background: var(--bg-subtle);">
+            <button class="btn btn--ghost"><svg class="icon"><use href="#i-arrow-left"/></svg> Back to warnings</button>
+            <div class="row gap-6">
+              <button class="btn btn--outline">Save &amp; close</button>
+              <button class="btn btn--primary">Continue <svg class="icon"><use href="#i-arrow-right"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 21 — WARNINGS ============ -->
+    <section class="ds-section" id="warnings">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">21 — DOMINIO</span>
+          <h2>Warnings panel</h2>
+        </div>
+      </div>
+      <p class="ds-section-lede">
+        Tre livelli di severità: <strong>High</strong> (data loss imminente), <strong>Medium</strong> (cambiamento
+        rischioso), <strong>Low</strong> (info). Stripe colorata a sinistra, icona, target oggetto in monospace,
+        descrizione del rischio.
+      </p>
+
+      <div class="ds-sample">
+        <div class="ds-sample-head"><span>WARNINGS LIST</span></div>
+        <div class="ds-sample-body--flush">
+          <div class="warn-list">
+            <div class="warn-item warn-item--high">
+              <svg class="warn-item-icon"><use href="#i-alert"/></svg>
+              <div>
+                <div class="warn-title">Column drop on populated table</div>
+                <div class="warn-target">dbo.Customer.LegacyId · 18,432 rows affected</div>
+                <div class="warn-detail">Dropping this column will permanently delete data. Consider exporting the column or adding a pre-deployment migration script.</div>
+              </div>
+              <span class="warn-severity">High</span>
+            </div>
+            <div class="warn-item warn-item--high">
+              <svg class="warn-item-icon"><use href="#i-alert"/></svg>
+              <div>
+                <div class="warn-title">Table drop</div>
+                <div class="warn-target">dbo.LegacyMigrationLog · 4,217 rows</div>
+                <div class="warn-detail">The entire table will be dropped. This action cannot be undone without a snapshot.</div>
+              </div>
+              <span class="warn-severity">High</span>
+            </div>
+            <div class="warn-item warn-item--medium">
+              <svg class="warn-item-icon"><use href="#i-warning"/></svg>
+              <div>
+                <div class="warn-title">Column data type change</div>
+                <div class="warn-target">dbo.Customer.Phone · NVARCHAR(16) → NVARCHAR(32)</div>
+                <div class="warn-detail">Widening a string column is safe but rebuilds the column. Brief table lock expected.</div>
+              </div>
+              <span class="warn-severity">Medium</span>
+            </div>
+            <div class="warn-item warn-item--medium">
+              <svg class="warn-item-icon"><use href="#i-warning"/></svg>
+              <div>
+                <div class="warn-title">Foreign key recreation</div>
+                <div class="warn-target">FK_Order_Customer</div>
+                <div class="warn-detail">Constraint will be dropped and recreated. Briefly disables referential integrity during deploy.</div>
+              </div>
+              <span class="warn-severity">Medium</span>
+            </div>
+            <div class="warn-item warn-item--low">
+              <svg class="warn-item-icon"><use href="#i-info"/></svg>
+              <div>
+                <div class="warn-title">Index online build</div>
+                <div class="warn-target">IX_Order_Customer_Created</div>
+                <div class="warn-detail">Index will be built with <span class="t-mono">ONLINE = ON</span>. No downtime expected.</div>
+              </div>
+              <span class="warn-severity">Low</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 22 — SNAPSHOT ============ -->
+    <section class="ds-section" id="snapshot">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">22 — DOMINIO</span>
+          <h2>Snapshot card</h2>
+        </div>
+      </div>
+      <p class="ds-section-lede">
+        Snapshot = file binario immutabile dello schema. UI a card con nome (mono), metadata (data, size, source, SQL Server version)
+        e azioni: <em>Compare to live</em>, <em>Restore</em>, <em>Export to JSON</em>.
+      </p>
+
+      <div class="ds-sample">
+        <div class="ds-sample-body bg-subtle">
+          <div class="ds-sample-grid ds-sample-grid--2">
+            <div class="snapshot-card">
+              <div class="snapshot-head">
+                <span class="snapshot-icon"><svg width="16" height="16"><use href="#i-snapshot"/></svg></span>
+                <span class="snapshot-name">prod-2026-05-20.snap</span>
+                <span class="badge badge--success" style="margin-left:auto"><span class="dot"></span> Verified</span>
+              </div>
+              <div class="snapshot-meta">
+                <span><span class="k">created</span><span class="v">2026-05-20 14:30 UTC</span></span>
+                <span><span class="k">size</span><span class="v">12.4 MB</span></span>
+                <span><span class="k">objects</span><span class="v">847</span></span>
+                <span><span class="k">server</span><span class="v">SQL 2022 (16.0.4115)</span></span>
+              </div>
+              <p class="t-body-sm" style="margin-top: 4px;">Baseline before v1.2 release. Captured from WidgetProduction.</p>
+              <div class="row gap-3" style="margin-top: var(--space-6);">
+                <button class="btn btn--secondary btn--sm">Compare to live</button>
+                <button class="btn btn--ghost btn--sm">Restore</button>
+                <button class="btn btn--ghost btn--icon-only btn--sm"><svg class="icon"><use href="#i-more"/></svg></button>
+              </div>
+            </div>
+
+            <div class="snapshot-card">
+              <div class="snapshot-head">
+                <span class="snapshot-icon"><svg width="16" height="16"><use href="#i-snapshot"/></svg></span>
+                <span class="snapshot-name">staging-2026-05-19.snap</span>
+                <span class="badge" style="margin-left:auto"><span class="dot" style="background: var(--fg-faint);"></span> Archived</span>
+              </div>
+              <div class="snapshot-meta">
+                <span><span class="k">created</span><span class="v">2026-05-19 09:12 UTC</span></span>
+                <span><span class="k">size</span><span class="v">11.8 MB</span></span>
+                <span><span class="k">objects</span><span class="v">843</span></span>
+                <span><span class="k">server</span><span class="v">SQL 2022 (16.0.4115)</span></span>
+              </div>
+              <p class="t-body-sm" style="margin-top: 4px;">Pre-staging sync. Used as rollback target for the v1.1.3 patch.</p>
+              <div class="row gap-3" style="margin-top: var(--space-6);">
+                <button class="btn btn--secondary btn--sm">Compare to live</button>
+                <button class="btn btn--ghost btn--sm">Restore</button>
+                <button class="btn btn--ghost btn--icon-only btn--sm"><svg class="icon"><use href="#i-more"/></svg></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 23 — FILTER EDITOR ============ -->
+    <section class="ds-section" id="filter-ed">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">23 — DOMINIO</span>
+          <h2>Filter editor</h2>
+        </div>
+      </div>
+      <p class="ds-section-lede">
+        Editor visuale per file filtro <span class="t-mono">.scpf</span>. Una regola per riga: tipo oggetto + operatore +
+        valore. Composizione con AND/OR. Anteprima della query risultante in basso.
+      </p>
+
+      <div class="ds-sample">
+        <div class="ds-sample-head"><span>FILTER EDITOR · ExcludeLegacy.scpf</span></div>
+        <div class="ds-sample-body bg-subtle">
+          <div class="filter-editor">
+            <div class="panel-header" style="background: transparent;">
+              <span style="font-weight: 600; color: var(--fg-strong); font-size: var(--text-sm);">Rules</span>
+              <button class="btn btn--ghost btn--sm"><svg class="icon"><use href="#i-plus"/></svg> Add rule</button>
+            </div>
+            <div class="filter-rules">
+              <div class="filter-rule">
+                <select class="select select--sm"><option>StoredProc</option><option>Table</option><option>View</option><option>Function</option></select>
+                <select class="select select--sm"><option>name LIKE</option><option>name =</option><option>name NOT LIKE</option><option>schema =</option></select>
+                <input class="input input--sm t-mono" value="usp_Legacy_%"/>
+                <button class="btn btn--ghost btn--icon-only btn--sm"><svg class="icon"><use href="#i-x"/></svg></button>
+              </div>
+              <div class="filter-conj">AND</div>
+              <div class="filter-rule">
+                <select class="select select--sm"><option>Table</option><option>StoredProc</option></select>
+                <select class="select select--sm"><option>schema =</option><option>name LIKE</option></select>
+                <input class="input input--sm t-mono" value="legacy"/>
+                <button class="btn btn--ghost btn--icon-only btn--sm"><svg class="icon"><use href="#i-x"/></svg></button>
+              </div>
+              <div class="filter-conj">OR</div>
+              <div class="filter-rule">
+                <select class="select select--sm"><option>Any</option></select>
+                <select class="select select--sm"><option>name =</option></select>
+                <input class="input input--sm t-mono" value="IGNORE_ME"/>
+                <button class="btn btn--ghost btn--icon-only btn--sm"><svg class="icon"><use href="#i-x"/></svg></button>
+              </div>
+            </div>
+            <div style="padding: var(--space-8) var(--space-12); border-top: 1px solid var(--border-subtle); background: var(--bg-code);">
+              <div class="t-eyebrow" style="margin-bottom: 4px;">Resulting expression</div>
+              <code class="t-mono" style="background: transparent; border: 0; padding: 0; color: var(--fg-strong); font-size: 12.5px; white-space: pre-wrap;">
+(StoredProc.@NAME LIKE 'usp_Legacy_%' AND Table.@SCHEMA = 'legacy') OR (@NAME = 'IGNORE_ME')
+              </code>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 24 — CLI OUTPUT ============ -->
+    <section class="ds-section" id="cli">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">24 — DOMINIO</span>
+          <h2>CLI output</h2>
+        </div>
+      </div>
+      <p class="ds-section-lede">
+        Lo styling per <span class="t-mono">dbdelta</span> CLI. Sempre su sfondo <span class="t-mono">neutral-950</span>
+        anche in light mode — il terminale è scuro per convenzione. Cobalt per il prompt, emerald/amber/crimson per i
+        livelli di log, violet per le evidenziazioni.
+      </p>
+
+      <div class="ds-sample">
+        <div class="ds-sample-body bg-subtle">
+          <div class="cli">
+            <div class="cli-header">
+              <span class="cli-traffic"><span></span><span></span><span></span></span>
+              <span class="cli-title">~ dbdelta compare</span>
+            </div>
+            <div class="cli-body">
+              <div class="cli-line"><span class="cli-prompt">$</span><span class="cli-cmd">dbdelta compare \</span></div>
+              <div class="cli-line"><span class="cli-prompt"> </span><span class="cli-cmd">  --source 'Server=dev-sql;Database=WidgetDev;Trusted_Connection=true' \</span></div>
+              <div class="cli-line"><span class="cli-prompt"> </span><span class="cli-cmd">  --target 'Server=prod-sql;Database=WidgetProduction' \</span></div>
+              <div class="cli-line"><span class="cli-prompt"> </span><span class="cli-cmd">  --options coa,iscn,if --filter ./excludeLegacy.scpf --report ./out.html</span></div>
+              <div class="cli-line"><span class="cli-out">&nbsp;</span></div>
+              <div class="cli-line"><span class="cli-mark">▸</span><span class="cli-out">&nbsp;Connecting to source       <span class="cli-ok">OK</span>  <span class="cli-dim">(WidgetDev · 847 objects)</span></span></div>
+              <div class="cli-line"><span class="cli-mark">▸</span><span class="cli-out">&nbsp;Connecting to target       <span class="cli-ok">OK</span>  <span class="cli-dim">(WidgetProduction · 845 objects)</span></span></div>
+              <div class="cli-line"><span class="cli-mark">▸</span><span class="cli-out">&nbsp;Reading schemas            <span class="cli-ok">OK</span>  <span class="cli-dim">(parallel · 2.3s)</span></span></div>
+              <div class="cli-line"><span class="cli-mark">▸</span><span class="cli-out">&nbsp;Computing diff             <span class="cli-ok">OK</span>  <span class="cli-dim">(0.8s)</span></span></div>
+              <div class="cli-line"><span class="cli-out">&nbsp;</span></div>
+              <div class="cli-line"><span class="cli-out"><span class="cli-mark">Δ</span> 12 modified · 3 only-source · 5 only-target · 1 destructive · 826 identical</span></div>
+              <div class="cli-line"><span class="cli-out">&nbsp;</span></div>
+              <div class="cli-line"><span class="cli-warn">!&nbsp;</span><span class="cli-out">Destructive: dbo.Customer.LegacyId (DROP COLUMN, 18,432 rows)</span></div>
+              <div class="cli-line"><span class="cli-warn">!&nbsp;</span><span class="cli-out">Destructive: dbo.LegacyMigrationLog (DROP TABLE, 4,217 rows)</span></div>
+              <div class="cli-line"><span class="cli-out">&nbsp;</span></div>
+              <div class="cli-line"><span class="cli-ok">✓&nbsp;</span><span class="cli-out">Report written to <span class="cli-mark">./out.html</span></span></div>
+              <div class="cli-line"><span class="cli-prompt">$</span><span class="cli-cmd">_</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ds-sample" style="margin-top: var(--space-8);">
+        <div class="ds-sample-head"><span>EXIT CODES &amp; SEVERITY GLYPHS</span></div>
+        <div class="ds-sample-body">
+          <div class="spec-list">
+            <div class="spec-row"><span class="spec-token" style="color: var(--success-fg)">✓</span><span class="spec-value">0 / 63</span><span class="t-body-sm">success / identical</span></div>
+            <div class="spec-row"><span class="spec-token" style="color: var(--info-fg)">▸</span><span class="spec-value">progress</span><span class="t-body-sm">step indicator</span></div>
+            <div class="spec-row"><span class="spec-token" style="color: var(--secondary-soft-fg)">Δ</span><span class="spec-value">summary</span><span class="t-body-sm">diff summary line</span></div>
+            <div class="spec-row"><span class="spec-token" style="color: var(--warning-fg)">!</span><span class="spec-value">61 / 79</span><span class="t-body-sm">warnings / assert-failed</span></div>
+            <div class="spec-row"><span class="spec-token" style="color: var(--danger-fg)">✗</span><span class="spec-value">≥1</span><span class="t-body-sm">errors</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 25 — TREE VIEW ============ -->
+    <section class="ds-section" id="tree">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">25 — DOMINIO</span>
+          <h2>Tree view</h2>
+        </div>
+      </div>
+      <p class="ds-section-lede">
+        Gerarchia degli oggetti per object type. Ogni nodo: chevron, icona, label (monospace), count a destra.
+        Indentazione minima (12px), riga 24px alta.
+      </p>
+
+      <div class="ds-sample">
+        <div class="ds-sample-body bg-subtle">
+          <div style="max-width: 380px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-4);">
+            <div class="tree">
+              <div class="tree-node" aria-expanded="true">
+                <svg class="twist"><use href="#i-chevron-right"/></svg>
+                <svg class="icon"><use href="#i-database"/></svg>
+                <span class="label">WidgetDev</span>
+                <span class="count">847</span>
+              </div>
+              <div class="tree-children">
+                <div class="tree-node" aria-expanded="true">
+                  <svg class="twist"><use href="#i-chevron-right"/></svg>
+                  <svg class="icon"><use href="#i-table"/></svg>
+                  <span class="label">Tables</span>
+                  <span class="count">142</span>
+                </div>
+                <div class="tree-children">
+                  <div class="tree-node is-selected">
+                    <span style="width:14px"></span>
+                    <svg class="icon" style="color: var(--primary)"><use href="#i-table"/></svg>
+                    <span class="label">dbo.Customer</span>
+                    <span class="badge badge--info" style="margin-left:auto"><span class="dot"></span>12</span>
+                  </div>
+                  <div class="tree-node">
+                    <span style="width:14px"></span>
+                    <svg class="icon"><use href="#i-table"/></svg>
+                    <span class="label">dbo.Order</span>
+                    <span class="count">—</span>
+                  </div>
+                  <div class="tree-node">
+                    <span style="width:14px"></span>
+                    <svg class="icon"><use href="#i-table"/></svg>
+                    <span class="label">dbo.OrderNote</span>
+                    <span class="badge badge--violet" style="margin-left:auto"><span class="dot"></span>new</span>
+                  </div>
+                </div>
+                <div class="tree-node" aria-expanded="false">
+                  <svg class="twist"><use href="#i-chevron-right"/></svg>
+                  <svg class="icon"><use href="#i-code"/></svg>
+                  <span class="label">Stored Procedures</span>
+                  <span class="count">312</span>
+                </div>
+                <div class="tree-node" aria-expanded="false">
+                  <svg class="twist"><use href="#i-chevron-right"/></svg>
+                  <svg class="icon"><use href="#i-eye"/></svg>
+                  <span class="label">Views</span>
+                  <span class="count">48</span>
+                </div>
+                <div class="tree-node" aria-expanded="false">
+                  <svg class="twist"><use href="#i-chevron-right"/></svg>
+                  <svg class="icon"><use href="#i-key"/></svg>
+                  <span class="label">Indexes</span>
+                  <span class="count">231</span>
+                </div>
+                <div class="tree-node" aria-expanded="false">
+                  <svg class="twist"><use href="#i-chevron-right"/></svg>
+                  <svg class="icon"><use href="#i-link"/></svg>
+                  <span class="label">Foreign Keys</span>
+                  <span class="count">114</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 26 — APP SHELL ============ -->
+    <section class="ds-section" id="shell">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">26 — PATTERN</span>
+          <h2>App shell</h2>
+        </div>
+      </div>
+      <p class="ds-section-lede">
+        Layout standard dell'app: <strong>topbar 44px</strong> (brand + comparison switcher + actions),
+        <strong>sidebar 240px</strong> (nav per area), <strong>main</strong> (contenuto), <strong>status bar 24px</strong>
+        (connection state, conteggi, version).
+      </p>
+
+      <div class="ds-sample">
+        <div class="ds-sample-head"><span>APP SHELL · LAYOUT</span></div>
+        <div class="ds-sample-body--flush" style="height: 360px;">
+          <div class="app-shell" style="height: 100%;">
+            <div class="app-topbar">
+              <div class="brandmark">
+                <svg class="brandmark-glyph"><use href="#brand-mark-mono"/></svg>
+                DbDelta
+              </div>
+              <span class="divider-vertical" style="height: 20px;"></span>
+              <div class="row gap-4">
+                <span class="badge badge--violet" style="height: 22px;"><span class="dot"></span> WidgetDev</span>
+                <svg width="14" height="14" style="color: var(--fg-faint)"><use href="#i-arrow-right"/></svg>
+                <span class="badge badge--primary" style="height: 22px;"><span class="dot"></span> WidgetProduction</span>
+              </div>
+              <div class="row gap-3" style="margin-left: auto;">
+                <button class="btn btn--ghost btn--icon-only btn--sm"><svg class="icon"><use href="#i-refresh"/></svg></button>
+                <button class="btn btn--ghost btn--icon-only btn--sm"><svg class="icon"><use href="#i-settings"/></svg></button>
+                <button class="btn btn--primary btn--sm"><svg class="icon"><use href="#i-play"/></svg> Compare</button>
+              </div>
+            </div>
+            <div class="app-sidebar">
+              <div class="nav-section">
+                <div class="nav-section-title">Workspace</div>
+              </div>
+              <div class="nav-item is-active"><svg class="icon"><use href="#i-columns"/></svg> Comparison <span class="meta">12</span></div>
+              <div class="nav-item"><svg class="icon"><use href="#i-warning"/></svg> Warnings <span class="meta">3</span></div>
+              <div class="nav-item"><svg class="icon"><use href="#i-code"/></svg> Deploy script</div>
+              <div class="nav-section">
+                <div class="nav-section-title">Library</div>
+              </div>
+              <div class="nav-item"><svg class="icon"><use href="#i-snapshot"/></svg> Snapshots <span class="meta">8</span></div>
+              <div class="nav-item"><svg class="icon"><use href="#i-filter"/></svg> Filters <span class="meta">4</span></div>
+              <div class="nav-item"><svg class="icon"><use href="#i-history"/></svg> History</div>
+              <div class="nav-section">
+                <div class="nav-section-title">Settings</div>
+              </div>
+              <div class="nav-item"><svg class="icon"><use href="#i-database"/></svg> Connections</div>
+              <div class="nav-item"><svg class="icon"><use href="#i-settings"/></svg> Preferences</div>
+            </div>
+            <div class="app-main" style="padding: var(--space-12); display: flex; align-items: center; justify-content: center;">
+              <div class="empty" style="padding: var(--space-12);">
+                <span class="empty-icon"><svg width="24" height="24"><use href="#i-columns"/></svg></span>
+                <div class="empty-title">Main content area</div>
+                <p class="empty-desc">Object Diff Grid, Diff Viewer, Wizard — qualunque vista contestuale alla nav.</p>
+              </div>
+            </div>
+            <div class="app-status">
+              <span><span class="status-dot status-dot--live"></span> Connected · 2 sources</span>
+              <span class="sep">·</span>
+              <span>847 / 845 objects</span>
+              <span class="sep">·</span>
+              <span>21 selected · 1 destructive</span>
+              <span style="margin-left: auto;">DbDelta 1.0.0 · SQL 16.0.4115</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 27 — STATES ============ -->
+    <section class="ds-section" id="states">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">27 — PATTERN</span>
+          <h2>Stati &amp; empty states</h2>
+        </div>
+      </div>
+      <p class="ds-section-lede">
+        Quattro stati canonici per ogni vista che carica dati: <strong>loading</strong>, <strong>empty</strong>,
+        <strong>error</strong>, <strong>success</strong>. Empty state mai con illustrazioni complesse — un'icona
+        riassuntiva e una CTA.
+      </p>
+
+      <div class="ds-sample">
+        <div class="ds-sample-body">
+          <div class="ds-sample-grid ds-sample-grid--2">
+            <div class="panel" style="min-height: 240px;">
+              <div class="empty">
+                <span class="empty-icon"><svg width="24" height="24"><use href="#i-columns"/></svg></span>
+                <div class="empty-title">No comparison yet</div>
+                <p class="empty-desc">Select a source and target data source to start comparing schemas.</p>
+                <button class="btn btn--primary btn--sm"><svg class="icon"><use href="#i-plus"/></svg> New comparison</button>
+              </div>
+            </div>
+            <div class="panel" style="min-height: 240px;">
+              <div class="empty">
+                <span class="empty-icon" style="background: var(--success-soft); color: var(--success-fg);"><svg width="24" height="24"><use href="#i-check"/></svg></span>
+                <div class="empty-title">Databases are identical</div>
+                <p class="empty-desc">847 objects compared · 0 differences found. The target matches the source exactly.</p>
+                <div class="row gap-3"><button class="btn btn--secondary btn--sm">Re-run</button><button class="btn btn--ghost btn--sm">View report</button></div>
+              </div>
+            </div>
+            <div class="panel" style="min-height: 240px;">
+              <div class="empty">
+                <span class="empty-icon" style="background: var(--bg-code);"><span class="spinner spinner--lg"></span></span>
+                <div class="empty-title">Reading schema metadata…</div>
+                <p class="empty-desc t-mono">432 / 847 objects · parallel reads · ~1.8s remaining</p>
+                <div class="progress" style="max-width: 280px;"><div class="progress-bar" style="width: 51%;"></div></div>
+              </div>
+            </div>
+            <div class="panel" style="min-height: 240px;">
+              <div class="empty">
+                <span class="empty-icon" style="background: var(--danger-soft); color: var(--danger-fg);"><svg width="24" height="24"><use href="#i-alert"/></svg></span>
+                <div class="empty-title">Connection failed</div>
+                <p class="empty-desc">Could not reach <span class="t-mono">prod-sql.east.ruflo.io,1433</span>. Check VPN and credentials.</p>
+                <div class="row gap-3"><button class="btn btn--secondary btn--sm"><svg class="icon"><use href="#i-refresh"/></svg> Retry</button><button class="btn btn--ghost btn--sm">Edit connection</button></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 28 — EXAMPLE: COMPARISON VIEW ============ -->
+    <section class="ds-section" id="example-compare">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">28 — ESEMPI</span>
+          <h2>Comparison view</h2>
+        </div>
+        <span class="badge badge--primary">Light + dark</span>
+      </div>
+      <p class="ds-section-lede">
+        L'esempio applicativo completo della <strong>vista principale</strong>: app shell + connection bar +
+        tabs + Object Diff Grid in alto, Diff Viewer in basso. Mostrato in entrambi i temi.
+      </p>
+
+      <div class="ds-sample">
+        <div class="ds-sample-head"><span>COMPARISON VIEW — LIGHT</span></div>
+        <div class="ds-sample-body--flush" data-theme="light" style="background: var(--bg);">
+          <div class="app-shell" style="height: 680px;">
+            <div class="app-topbar">
+              <div class="brandmark"><svg class="brandmark-glyph"><use href="#brand-mark-mono"/></svg> DbDelta</div>
+              <span class="divider-vertical" style="height: 20px; margin: 0 var(--space-3);"></span>
+              <div class="connection-bar" style="padding: 4px 6px; min-width: 0; max-width: 560px;">
+                <div class="connection-endpoint connection-endpoint--source" style="padding: 2px 6px; gap: 4px;">
+                  <span class="connection-tag" style="font-size: 9px;">SRC</span>
+                  <span class="connection-name" style="font-size: 12px;">WidgetDev</span>
+                </div>
+                <button class="connection-swap" style="width: 22px; height: 22px;"><svg class="icon" style="width: 12px; height: 12px;"><use href="#i-arrow-swap"/></svg></button>
+                <div class="connection-endpoint connection-endpoint--target" style="padding: 2px 6px; gap: 4px;">
+                  <span class="connection-tag" style="font-size: 9px;">TGT</span>
+                  <span class="connection-name" style="font-size: 12px;">WidgetProduction</span>
+                </div>
+              </div>
+              <div class="row gap-3" style="margin-left: auto;">
+                <button class="btn btn--ghost btn--sm"><svg class="icon"><use href="#i-filter"/></svg> Filter</button>
+                <button class="btn btn--ghost btn--sm"><svg class="icon"><use href="#i-settings"/></svg> Options</button>
+                <button class="btn btn--secondary btn--sm"><svg class="icon"><use href="#i-refresh"/></svg> Re-compare</button>
+                <button class="btn btn--primary btn--sm">Deploy <svg class="icon"><use href="#i-arrow-right"/></svg></button>
+              </div>
+            </div>
+            <div class="app-sidebar">
+              <div class="nav-section"><div class="nav-section-title">Comparison</div></div>
+              <div class="nav-item is-active"><svg class="icon"><use href="#i-columns"/></svg> Objects <span class="meta">847</span></div>
+              <div class="nav-item"><svg class="icon"><use href="#i-warning"/></svg> Warnings <span class="meta">3</span></div>
+              <div class="nav-item"><svg class="icon"><use href="#i-code"/></svg> Script</div>
+              <div class="nav-item"><svg class="icon"><use href="#i-list"/></svg> Report</div>
+              <div class="nav-section"><div class="nav-section-title">Filter</div></div>
+              <div class="nav-item" style="font-size: 12px;"><span class="t-mono">ExcludeLegacy.scpf</span></div>
+              <div class="nav-section"><div class="nav-section-title">Summary</div></div>
+              <div style="padding: 0 var(--space-7); display: flex; flex-direction: column; gap: 4px; font-size: var(--text-xs);">
+                <div class="row justify-between"><span style="color: var(--info-fg)">● Modified</span><span class="t-mono">12</span></div>
+                <div class="row justify-between"><span style="color: var(--secondary-soft-fg)">● Only source</span><span class="t-mono">3</span></div>
+                <div class="row justify-between"><span style="color: var(--warning-fg)">● Only target</span><span class="t-mono">5</span></div>
+                <div class="row justify-between"><span style="color: var(--danger-fg)">● Destructive</span><span class="t-mono">1</span></div>
+                <div class="row justify-between fg-subtle"><span>Identical</span><span class="t-mono">826</span></div>
+              </div>
+            </div>
+            <div class="app-main" style="display: grid; grid-template-rows: 38px 220px 1fr; min-height: 0;">
+              <div class="tabs" style="padding: 0 var(--space-12); background: var(--bg-subtle);">
+                <button class="tab" aria-selected="true">Differences <span class="badge badge--info">21</span></button>
+                <button class="tab">Identical <span class="badge">826</span></button>
+                <button class="tab">Excluded <span class="badge">12</span></button>
+                <div style="margin-left: auto; align-self: center;">
+                  <div class="input-wrap" style="width: 220px;">
+                    <svg class="input-icon"><use href="#i-search"/></svg>
+                    <input class="input input--sm" placeholder="Find object…" style="background: var(--bg-raised);"/>
+                  </div>
+                </div>
+              </div>
+              <div style="overflow: auto;">
+                <table class="dgrid">
+                  <thead>
+                    <tr>
+                      <th class="cell-check"><span class="checkbox" aria-checked="mixed" data-toggle-check role="checkbox"></span></th>
+                      <th>Status</th>
+                      <th class="is-sorted">Name <svg class="sort-arrow" width="10" height="10"><use href="#i-chevron-down"/></svg></th>
+                      <th>Type</th>
+                      <th>Schema</th>
+                      <th>Action</th>
+                      <th style="text-align:right; padding-right: var(--space-12)">Δ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr class="diff-row is-selected" data-diff="modified">
+                      <td class="cell-check"><span class="checkbox" aria-checked="true" data-toggle-check role="checkbox"></span></td>
+                      <td><span class="diff-pill diff-pill--modified"><span class="dot"></span>Modified</span></td>
+                      <td class="cell-name"><span class="dgrid-status-strip"></span>Customer</td>
+                      <td class="cell-type">Table</td><td class="cell-schema">dbo</td>
+                      <td class="cell-action">ALTER · 2 cols</td><td class="cell-meta">+12 −4</td>
+                    </tr>
+                    <tr class="diff-row" data-diff="modified">
+                      <td class="cell-check"><span class="checkbox" aria-checked="true" data-toggle-check role="checkbox"></span></td>
+                      <td><span class="diff-pill diff-pill--modified"><span class="dot"></span>Modified</span></td>
+                      <td class="cell-name"><span class="dgrid-status-strip"></span>usp_GetActiveOrders</td>
+                      <td class="cell-type">Stored Procedure</td><td class="cell-schema">dbo</td>
+                      <td class="cell-action">CREATE OR ALTER</td><td class="cell-meta">+18 −6</td>
+                    </tr>
+                    <tr class="diff-row" data-diff="only-source">
+                      <td class="cell-check"><span class="checkbox" aria-checked="true" data-toggle-check role="checkbox"></span></td>
+                      <td><span class="diff-pill diff-pill--only-source"><span class="dot"></span>Only in source</span></td>
+                      <td class="cell-name"><span class="dgrid-status-strip"></span>OrderNote</td>
+                      <td class="cell-type">Table</td><td class="cell-schema">dbo</td>
+                      <td class="cell-action">CREATE</td><td class="cell-meta">+47</td>
+                    </tr>
+                    <tr class="diff-row" data-diff="only-target">
+                      <td class="cell-check"><span class="checkbox" aria-checked="false" data-toggle-check role="checkbox"></span></td>
+                      <td><span class="diff-pill diff-pill--only-target"><span class="dot"></span>Only in target</span></td>
+                      <td class="cell-name"><span class="dgrid-status-strip"></span>LegacyMigrationLog</td>
+                      <td class="cell-type">Table</td><td class="cell-schema">dbo</td>
+                      <td class="cell-action">DROP</td><td class="cell-meta">−28</td>
+                    </tr>
+                    <tr class="diff-row" data-diff="destructive">
+                      <td class="cell-check"><span class="checkbox" aria-checked="false" data-toggle-check role="checkbox"></span></td>
+                      <td><span class="diff-pill diff-pill--destructive"><span class="dot"></span>Destructive</span></td>
+                      <td class="cell-name"><span class="dgrid-status-strip"></span>Customer.LegacyId</td>
+                      <td class="cell-type">Column</td><td class="cell-schema">dbo</td>
+                      <td class="cell-action">DROP · 18k rows</td><td class="cell-meta">−1</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div style="border-top: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column;">
+                <div style="padding: var(--space-4) var(--space-12); background: var(--bg-subtle); display: flex; align-items: center; gap: var(--space-6); border-bottom: 1px solid var(--border-subtle);">
+                  <svg width="14" height="14" style="color: var(--primary)"><use href="#i-columns"/></svg>
+                  <span class="t-eyebrow" style="color: var(--fg-strong)">DIFF · dbo.Customer</span>
+                  <span class="badge badge--info" style="margin-left: var(--space-4)">+12 −4</span>
+                  <div class="row gap-3" style="margin-left: auto;">
+                    <div class="segmented" style="padding: 2px;">
+                      <button class="segmented-item" aria-pressed="true" style="height: 20px; font-size: 10px;">Side-by-side</button>
+                      <button class="segmented-item" style="height: 20px; font-size: 10px;">Unified</button>
+                    </div>
+                    <button class="btn btn--ghost btn--icon-only btn--sm"><svg class="icon"><use href="#i-copy"/></svg></button>
+                  </div>
+                </div>
+                <div class="diff-viewer" style="flex:1; border: 0; border-radius: 0; overflow: auto;">
+                  <div class="diff-pane diff-pane--source">
+                    <div class="diff-pane-header"><span class="label">SOURCE</span><span class="endpoint">WidgetDev</span></div>
+                    <div class="diff-line diff-line--ctx"><span class="ln">16</span><span class="mk"> </span><span class="code">    FullName <span class="tok-ty">NVARCHAR</span>(<span class="tok-nm">200</span>) <span class="tok-kw">NOT NULL</span>,</span></div>
+                    <div class="diff-line diff-line--ctx"><span class="ln">17</span><span class="mk"> </span><span class="code">    Email <span class="tok-ty">NVARCHAR</span>(<span class="tok-nm">255</span>) <span class="tok-kw">NULL</span>,</span></div>
+                    <div class="diff-line diff-line--add"><span class="ln">18</span><span class="mk">+</span><span class="code">    PreferredContactMethod <span class="tok-ty">NVARCHAR</span>(<span class="tok-nm">20</span>) <span class="tok-kw">NOT NULL</span></span></div>
+                    <div class="diff-line diff-line--add"><span class="ln">19</span><span class="mk">+</span><span class="code">        <span class="tok-kw">CONSTRAINT</span> DF_Customer_PCM <span class="tok-kw">DEFAULT</span> <span class="tok-st">'Email'</span>,</span></div>
+                    <div class="diff-line diff-line--mod"><span class="ln">20</span><span class="mk">~</span><span class="code">    Phone <span class="tok-ty">NVARCHAR</span>(<span class="diff-inline-add">32</span>) <span class="tok-kw">NULL</span>,</span></div>
+                    <div class="diff-line diff-line--ctx"><span class="ln">21</span><span class="mk"> </span><span class="code">    CreatedAt <span class="tok-ty">DATETIME2</span>(<span class="tok-nm">3</span>),</span></div>
+                  </div>
+                  <div class="diff-pane diff-pane--target">
+                    <div class="diff-pane-header"><span class="label">TARGET</span><span class="endpoint">WidgetProduction</span></div>
+                    <div class="diff-line diff-line--ctx"><span class="ln">16</span><span class="mk"> </span><span class="code">    FullName <span class="tok-ty">NVARCHAR</span>(<span class="tok-nm">200</span>) <span class="tok-kw">NOT NULL</span>,</span></div>
+                    <div class="diff-line diff-line--ctx"><span class="ln">17</span><span class="mk"> </span><span class="code">    Email <span class="tok-ty">NVARCHAR</span>(<span class="tok-nm">255</span>) <span class="tok-kw">NULL</span>,</span></div>
+                    <div class="diff-line diff-line--mod"><span class="ln">18</span><span class="mk">~</span><span class="code">    Phone <span class="tok-ty">NVARCHAR</span>(<span class="diff-inline-rem">16</span>) <span class="tok-kw">NULL</span>,</span></div>
+                    <div class="diff-line diff-line--rem"><span class="ln">19</span><span class="mk">−</span><span class="code">    LegacyId <span class="tok-ty">INT</span> <span class="tok-kw">NULL</span>,</span></div>
+                    <div class="diff-line diff-line--ctx"><span class="ln">20</span><span class="mk"> </span><span class="code">    CreatedAt <span class="tok-ty">DATETIME2</span>(<span class="tok-nm">3</span>),</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="app-status">
+              <span><span class="status-dot status-dot--live"></span> Connected · 2 sources</span>
+              <span class="sep">·</span>
+              <span>21 selected · <span style="color: var(--danger-fg)">1 destructive</span></span>
+              <span style="margin-left: auto;">DbDelta 1.0.0 · SQL 16.0.4115 · 14:32 UTC</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ds-sample">
+        <div class="ds-sample-head"><span>COMPARISON VIEW — DARK</span></div>
+        <div class="ds-sample-body--flush" data-theme="dark" style="background: var(--bg);">
+          <div class="app-shell" style="height: 680px;">
+            <div class="app-topbar">
+              <div class="brandmark"><svg class="brandmark-glyph"><use href="#brand-mark-mono"/></svg> DbDelta</div>
+              <span class="divider-vertical" style="height: 20px; margin: 0 var(--space-3);"></span>
+              <div class="connection-bar" style="padding: 4px 6px; min-width: 0; max-width: 560px;">
+                <div class="connection-endpoint connection-endpoint--source" style="padding: 2px 6px; gap: 4px;">
+                  <span class="connection-tag" style="font-size: 9px;">SRC</span>
+                  <span class="connection-name" style="font-size: 12px;">WidgetDev</span>
+                </div>
+                <button class="connection-swap" style="width: 22px; height: 22px;"><svg class="icon" style="width: 12px; height: 12px;"><use href="#i-arrow-swap"/></svg></button>
+                <div class="connection-endpoint connection-endpoint--target" style="padding: 2px 6px; gap: 4px;">
+                  <span class="connection-tag" style="font-size: 9px;">TGT</span>
+                  <span class="connection-name" style="font-size: 12px;">WidgetProduction</span>
+                </div>
+              </div>
+              <div class="row gap-3" style="margin-left: auto;">
+                <button class="btn btn--ghost btn--sm"><svg class="icon"><use href="#i-filter"/></svg> Filter</button>
+                <button class="btn btn--ghost btn--sm"><svg class="icon"><use href="#i-settings"/></svg> Options</button>
+                <button class="btn btn--secondary btn--sm"><svg class="icon"><use href="#i-refresh"/></svg> Re-compare</button>
+                <button class="btn btn--primary btn--sm">Deploy <svg class="icon"><use href="#i-arrow-right"/></svg></button>
+              </div>
+            </div>
+            <div class="app-sidebar">
+              <div class="nav-section"><div class="nav-section-title">Comparison</div></div>
+              <div class="nav-item is-active"><svg class="icon"><use href="#i-columns"/></svg> Objects <span class="meta">847</span></div>
+              <div class="nav-item"><svg class="icon"><use href="#i-warning"/></svg> Warnings <span class="meta">3</span></div>
+              <div class="nav-item"><svg class="icon"><use href="#i-code"/></svg> Script</div>
+              <div class="nav-section"><div class="nav-section-title">Summary</div></div>
+              <div style="padding: 0 var(--space-7); display: flex; flex-direction: column; gap: 4px; font-size: var(--text-xs);">
+                <div class="row justify-between"><span style="color: var(--info-fg)">● Modified</span><span class="t-mono">12</span></div>
+                <div class="row justify-between"><span style="color: var(--secondary-soft-fg)">● Only source</span><span class="t-mono">3</span></div>
+                <div class="row justify-between"><span style="color: var(--warning-fg)">● Only target</span><span class="t-mono">5</span></div>
+                <div class="row justify-between"><span style="color: var(--danger-fg)">● Destructive</span><span class="t-mono">1</span></div>
+              </div>
+            </div>
+            <div class="app-main" style="display: grid; grid-template-rows: 38px 220px 1fr; min-height: 0;">
+              <div class="tabs" style="padding: 0 var(--space-12); background: var(--bg-subtle);">
+                <button class="tab" aria-selected="true">Differences <span class="badge badge--info">21</span></button>
+                <button class="tab">Identical <span class="badge">826</span></button>
+                <button class="tab">Excluded <span class="badge">12</span></button>
+              </div>
+              <div style="overflow: auto;">
+                <table class="dgrid">
+                  <thead>
+                    <tr>
+                      <th class="cell-check"><span class="checkbox" aria-checked="mixed" data-toggle-check role="checkbox"></span></th>
+                      <th>Status</th><th class="is-sorted">Name</th><th>Type</th><th>Schema</th><th>Action</th><th style="text-align:right; padding-right: var(--space-12)">Δ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr class="diff-row is-selected" data-diff="modified">
+                      <td class="cell-check"><span class="checkbox" aria-checked="true" role="checkbox"></span></td>
+                      <td><span class="diff-pill diff-pill--modified"><span class="dot"></span>Modified</span></td>
+                      <td class="cell-name"><span class="dgrid-status-strip"></span>Customer</td>
+                      <td class="cell-type">Table</td><td class="cell-schema">dbo</td>
+                      <td class="cell-action">ALTER · 2 cols</td><td class="cell-meta">+12 −4</td>
+                    </tr>
+                    <tr class="diff-row" data-diff="only-source">
+                      <td class="cell-check"><span class="checkbox" aria-checked="true" role="checkbox"></span></td>
+                      <td><span class="diff-pill diff-pill--only-source"><span class="dot"></span>Only in source</span></td>
+                      <td class="cell-name"><span class="dgrid-status-strip"></span>OrderNote</td>
+                      <td class="cell-type">Table</td><td class="cell-schema">dbo</td>
+                      <td class="cell-action">CREATE</td><td class="cell-meta">+47</td>
+                    </tr>
+                    <tr class="diff-row" data-diff="only-target">
+                      <td class="cell-check"><span class="checkbox" aria-checked="false" role="checkbox"></span></td>
+                      <td><span class="diff-pill diff-pill--only-target"><span class="dot"></span>Only in target</span></td>
+                      <td class="cell-name"><span class="dgrid-status-strip"></span>LegacyMigrationLog</td>
+                      <td class="cell-type">Table</td><td class="cell-schema">dbo</td>
+                      <td class="cell-action">DROP</td><td class="cell-meta">−28</td>
+                    </tr>
+                    <tr class="diff-row" data-diff="destructive">
+                      <td class="cell-check"><span class="checkbox" aria-checked="false" role="checkbox"></span></td>
+                      <td><span class="diff-pill diff-pill--destructive"><span class="dot"></span>Destructive</span></td>
+                      <td class="cell-name"><span class="dgrid-status-strip"></span>Customer.LegacyId</td>
+                      <td class="cell-type">Column</td><td class="cell-schema">dbo</td>
+                      <td class="cell-action">DROP · 18k rows</td><td class="cell-meta">−1</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div style="border-top: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column;">
+                <div style="padding: var(--space-4) var(--space-12); background: var(--bg-subtle); display: flex; align-items: center; gap: var(--space-6); border-bottom: 1px solid var(--border-subtle);">
+                  <svg width="14" height="14" style="color: var(--primary)"><use href="#i-columns"/></svg>
+                  <span class="t-eyebrow" style="color: var(--fg-strong)">DIFF · dbo.Customer</span>
+                  <span class="badge badge--info" style="margin-left: var(--space-4)">+12 −4</span>
+                </div>
+                <div class="diff-viewer" style="flex:1; border: 0; border-radius: 0; overflow: auto;">
+                  <div class="diff-pane diff-pane--source">
+                    <div class="diff-pane-header"><span class="label">SOURCE</span><span class="endpoint">WidgetDev</span></div>
+                    <div class="diff-line diff-line--ctx"><span class="ln">16</span><span class="mk"> </span><span class="code">    FullName <span class="tok-ty">NVARCHAR</span>(<span class="tok-nm">200</span>) <span class="tok-kw">NOT NULL</span>,</span></div>
+                    <div class="diff-line diff-line--add"><span class="ln">18</span><span class="mk">+</span><span class="code">    PreferredContactMethod <span class="tok-ty">NVARCHAR</span>(<span class="tok-nm">20</span>) <span class="tok-kw">NOT NULL</span></span></div>
+                    <div class="diff-line diff-line--mod"><span class="ln">20</span><span class="mk">~</span><span class="code">    Phone <span class="tok-ty">NVARCHAR</span>(<span class="diff-inline-add">32</span>) <span class="tok-kw">NULL</span>,</span></div>
+                  </div>
+                  <div class="diff-pane diff-pane--target">
+                    <div class="diff-pane-header"><span class="label">TARGET</span><span class="endpoint">WidgetProduction</span></div>
+                    <div class="diff-line diff-line--ctx"><span class="ln">16</span><span class="mk"> </span><span class="code">    FullName <span class="tok-ty">NVARCHAR</span>(<span class="tok-nm">200</span>) <span class="tok-kw">NOT NULL</span>,</span></div>
+                    <div class="diff-line diff-line--mod"><span class="ln">18</span><span class="mk">~</span><span class="code">    Phone <span class="tok-ty">NVARCHAR</span>(<span class="diff-inline-rem">16</span>) <span class="tok-kw">NULL</span>,</span></div>
+                    <div class="diff-line diff-line--rem"><span class="ln">19</span><span class="mk">−</span><span class="code">    LegacyId <span class="tok-ty">INT</span> <span class="tok-kw">NULL</span>,</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="app-status">
+              <span><span class="status-dot status-dot--live"></span> Connected</span>
+              <span class="sep">·</span>
+              <span>21 selected · <span style="color: var(--danger-fg)">1 destructive</span></span>
+              <span style="margin-left: auto;">DbDelta 1.0.0 · 14:32 UTC</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 29 — EXAMPLE: DEPLOY WIZARD ============ -->
+    <section class="ds-section" id="example-deploy">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">29 — ESEMPI</span>
+          <h2>Deploy Wizard — Warnings step</h2>
+        </div>
+      </div>
+      <p class="ds-section-lede">
+        Lo step più critico del wizard: presentare i warning prima di chiedere conferma. La schermata ha sempre un footer
+        "<em>Back</em> / <em>Continue</em>" e l'azione primaria è disabilitata se ci sono warning High non acknowledged.
+      </p>
+
+      <div class="ds-sample">
+        <div class="ds-sample-head"><span>DEPLOY WIZARD · STEP 2/6 — WARNINGS</span></div>
+        <div class="ds-sample-body--flush" data-theme="light">
+          <div class="wizard-steps">
+            <span class="wizard-step is-done"><span class="wizard-step-num"><span>1</span></span> Review</span>
+            <svg class="wizard-arrow" width="14" height="14"><use href="#i-chevron-right"/></svg>
+            <span class="wizard-step is-active"><span class="wizard-step-num"><span>2</span></span> Warnings</span>
+            <svg class="wizard-arrow" width="14" height="14"><use href="#i-chevron-right"/></svg>
+            <span class="wizard-step"><span class="wizard-step-num"><span>3</span></span> Script</span>
+            <svg class="wizard-arrow" width="14" height="14"><use href="#i-chevron-right"/></svg>
+            <span class="wizard-step"><span class="wizard-step-num"><span>4</span></span> Snapshot</span>
+            <svg class="wizard-arrow" width="14" height="14"><use href="#i-chevron-right"/></svg>
+            <span class="wizard-step"><span class="wizard-step-num"><span>5</span></span> Deploy</span>
+            <svg class="wizard-arrow" width="14" height="14"><use href="#i-chevron-right"/></svg>
+            <span class="wizard-step"><span class="wizard-step-num"><span>6</span></span> Done</span>
+          </div>
+          <div style="padding: var(--space-16) var(--space-16) var(--space-8); background: var(--bg);">
+            <div class="row gap-12 items-start" style="margin-bottom: var(--space-12);">
+              <div style="flex: 1;">
+                <h4 style="margin: 0 0 4px;">Review warnings</h4>
+                <p class="t-body-sm" style="margin: 0;">
+                  This deployment includes <strong style="color: var(--danger-fg)">2 high-severity</strong>,
+                  <strong style="color: var(--warning-fg)">2 medium</strong>, and
+                  <strong style="color: var(--info-fg)">1 low</strong> warning. Acknowledge each high-severity
+                  warning to continue.
+                </p>
+              </div>
+              <span class="badge badge--warning"><span class="dot"></span> 5 warnings</span>
+            </div>
+
+            <div class="warn-list" style="margin-bottom: var(--space-12);">
+              <div class="warn-item warn-item--high">
+                <svg class="warn-item-icon"><use href="#i-alert"/></svg>
+                <div>
+                  <div class="warn-title">Column drop on populated table</div>
+                  <div class="warn-target">dbo.Customer.LegacyId · 18,432 rows affected</div>
+                  <div class="warn-detail">Dropping this column will permanently delete data. Consider adding a pre-deployment migration script.</div>
+                  <label class="choice" style="margin-top: var(--space-4); font-size: var(--text-xs);"><span class="checkbox" aria-checked="true" data-toggle-check role="checkbox"></span> I acknowledge — proceed with DROP</label>
+                </div>
+                <span class="warn-severity">High</span>
+              </div>
+              <div class="warn-item warn-item--high">
+                <svg class="warn-item-icon"><use href="#i-alert"/></svg>
+                <div>
+                  <div class="warn-title">Table drop</div>
+                  <div class="warn-target">dbo.LegacyMigrationLog · 4,217 rows</div>
+                  <div class="warn-detail">The entire table will be dropped. This action cannot be undone without a snapshot.</div>
+                  <label class="choice" style="margin-top: var(--space-4); font-size: var(--text-xs);"><span class="checkbox" aria-checked="false" data-toggle-check role="checkbox"></span> I acknowledge — proceed with DROP</label>
+                </div>
+                <span class="warn-severity">High</span>
+              </div>
+              <div class="warn-item warn-item--medium">
+                <svg class="warn-item-icon"><use href="#i-warning"/></svg>
+                <div>
+                  <div class="warn-title">Column data type change</div>
+                  <div class="warn-target">dbo.Customer.Phone · NVARCHAR(16) → NVARCHAR(32)</div>
+                  <div class="warn-detail">Widening a string column is safe but rebuilds the column. Brief table lock expected.</div>
+                </div>
+                <span class="warn-severity">Medium</span>
+              </div>
+              <div class="warn-item warn-item--medium">
+                <svg class="warn-item-icon"><use href="#i-warning"/></svg>
+                <div>
+                  <div class="warn-title">Foreign key recreation</div>
+                  <div class="warn-target">FK_Order_Customer</div>
+                  <div class="warn-detail">Briefly disables referential integrity during deploy.</div>
+                </div>
+                <span class="warn-severity">Medium</span>
+              </div>
+              <div class="warn-item warn-item--low">
+                <svg class="warn-item-icon"><use href="#i-info"/></svg>
+                <div>
+                  <div class="warn-title">Index online build</div>
+                  <div class="warn-target">IX_Order_Customer_Created</div>
+                  <div class="warn-detail">Built with <span class="t-mono">ONLINE = ON</span>. No downtime expected.</div>
+                </div>
+                <span class="warn-severity">Low</span>
+              </div>
+            </div>
+
+            <div class="alert alert--info">
+              <svg class="alert-icon"><use href="#i-info"/></svg>
+              <div class="alert-body">
+                <div class="alert-title alert-strong-title">Snapshot recommended</div>
+                <div class="alert-msg">With destructive operations queued, a pre-deployment snapshot enables one-click rollback. You can configure it in step 4.</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; gap: var(--space-6); padding: var(--space-10) var(--space-12); border-top: 1px solid var(--border-subtle); background: var(--bg-subtle);">
+            <button class="btn btn--ghost"><svg class="icon"><use href="#i-arrow-left"/></svg> Back to review</button>
+            <div class="row gap-6">
+              <button class="btn btn--outline">Save &amp; close</button>
+              <button class="btn btn--primary" disabled>1 acknowledgment pending <svg class="icon"><use href="#i-arrow-right"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 30 — USAGE WITH CLAUDE CODE ============ -->
+    <section class="ds-section" id="usage">
+      <div class="ds-section-head">
+        <div>
+          <span class="ds-section-num">30 — RIFERIMENTI</span>
+          <h2>Uso con Claude Code</h2>
+        </div>
+      </div>
+      <p class="ds-section-lede">
+        Questo design system è la <strong>source of truth</strong> per qualsiasi UI di DbDelta — sia GUI (Avalonia)
+        che web/docs. Quando Claude Code lavora sul progetto, deve:
+      </p>
+
+      <ol style="counter-reset: step; list-style: none; padding-left: 0; max-width: 720px;">
+        <li style="counter-increment: step; position: relative; padding-left: var(--space-20); margin-bottom: var(--space-12);">
+          <span style="position: absolute; left: 0; top: 0; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; background: var(--primary); color: var(--primary-fg); border-radius: var(--radius-pill); font-size: var(--text-xs); font-weight: 600;">1</span>
+          <strong>Leggere <code>assets/tokens.css</code> prima di toccare lo stile.</strong>
+          <p class="t-body-sm" style="margin-top: 4px;">Tutti i valori (colore, type, spacing, radius, shadow) hanno un token semantico. Mai hardcodare valori — sempre <code>var(--token)</code>.</p>
+        </li>
+        <li style="counter-increment: step; position: relative; padding-left: var(--space-20); margin-bottom: var(--space-12);">
+          <span style="position: absolute; left: 0; top: 0; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; background: var(--primary); color: var(--primary-fg); border-radius: var(--radius-pill); font-size: var(--text-xs); font-weight: 600;">2</span>
+          <strong>Usare i componenti esistenti come riferimento.</strong>
+          <p class="t-body-sm" style="margin-top: 4px;">Il file <code>components-ui.css</code> definisce i building block (btn, input, badge, ecc.); <code>components-domain.css</code> il vocabolario di dominio (Object Diff Grid, Diff Viewer, ecc.). Riusa, non duplicare.</p>
+        </li>
+        <li style="counter-increment: step; position: relative; padding-left: var(--space-20); margin-bottom: var(--space-12);">
+          <span style="position: absolute; left: 0; top: 0; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; background: var(--primary); color: var(--primary-fg); border-radius: var(--radius-pill); font-size: var(--text-xs); font-weight: 600;">3</span>
+          <strong>Rispettare le convenzioni di colore semantico per i diff.</strong>
+          <p class="t-body-sm" style="margin-top: 4px;">Modified = cobalt, only-source = violet, only-target = amber, destructive = crimson. Mai inventare nuovi colori — se serve un nuovo stato, parlarne prima.</p>
+        </li>
+        <li style="counter-increment: step; position: relative; padding-left: var(--space-20); margin-bottom: var(--space-12);">
+          <span style="position: absolute; left: 0; top: 0; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; background: var(--primary); color: var(--primary-fg); border-radius: var(--radius-pill); font-size: var(--text-xs); font-weight: 600;">4</span>
+          <strong>Test light + dark insieme.</strong>
+          <p class="t-body-sm" style="margin-top: 4px;">I componenti devono funzionare in entrambi — i token semantici sono già configurati. Verificare visivamente le tinte dei diff (in dark sono attenuate al 30-40% di opacità).</p>
+        </li>
+        <li style="counter-increment: step; position: relative; padding-left: var(--space-20); margin-bottom: var(--space-12);">
+          <span style="position: absolute; left: 0; top: 0; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; background: var(--primary); color: var(--primary-fg); border-radius: var(--radius-pill); font-size: var(--text-xs); font-weight: 600;">5</span>
+          <strong>Mapping Avalonia.</strong>
+          <p class="t-body-sm" style="margin-top: 4px;">In Avalonia, esportare i token come <code>StaticResource</code> dentro <code>App.axaml</code>; usare la stessa nomenclatura (<code>{StaticResource Primary}</code>, <code>{StaticResource BgRaised}</code>). Il theme switch via <code>RequestedThemeVariant</code>.</p>
+        </li>
+      </ol>
+
+      <h3>Struttura dei file</h3>
+      <pre class="t-mono"><span class="tok-co">design-system/</span>
+├── <span class="tok-fn">index.html</span>              <span class="tok-co"># questa documentazione navigabile</span>
+└── assets/
+    ├── <span class="tok-fn">tokens.css</span>          <span class="tok-co"># 🔑 source of truth — modifica qui</span>
+    ├── <span class="tok-fn">base.css</span>            <span class="tok-co"># reset, typography, utility classes</span>
+    ├── <span class="tok-fn">components-ui.css</span>   <span class="tok-co"># btn, input, badge, modal, ecc.</span>
+    ├── <span class="tok-fn">components-domain.css</span> <span class="tok-co"># object grid, diff viewer, wizard, cli</span>
+    ├── <span class="tok-fn">docs.css</span>            <span class="tok-co"># layout di questa pagina (non parte del DS)</span>
+    ├── <span class="tok-fn">app.js</span>              <span class="tok-co"># theme toggle, copy buttons (solo docs)</span>
+    └── <span class="tok-fn">logo.svg</span>            <span class="tok-co"># standalone monogram</span></pre>
+
+      <h3>Aggiungere un componente</h3>
+      <ol class="t-body-sm" style="max-width: 720px;">
+        <li>Aggiungere le regole CSS in <code>components-ui.css</code> (generico) o <code>components-domain.css</code> (specifico di DbDelta).</li>
+        <li>Usare <strong>solo</strong> token (<code>var(--*)</code>) — nessun valore raw.</li>
+        <li>Aggiungere una sezione di esempio in <code>index.html</code> dentro un <code>&lt;div class="ds-sample"&gt;</code>.</li>
+        <li>Linkare nella TOC <code>.ds-toc</code>.</li>
+        <li>Testare il toggle light/dark.</li>
+      </ol>
+    </section>
+
+    <footer class="ds-footer">
+      <div class="ds-footer-text">
+        <strong>DbDelta Design System v1.0</strong> — costruito per il progetto open source
+        <span class="t-mono">github.com/GitBakko/db-delta</span>. Apache 2.0.
+        I token, i componenti e gli esempi qui dentro sono la base condivisa fra GUI Avalonia, CLI e documentazione.
+      </div>
+      <div class="ds-footer-meta">
+        Generated 2026-05-20<br/>
+        oklch · CSS custom properties · Geist
+      </div>
+    </footer>
+
+  </main>
+</div>
+
+<script src="assets/app.js"></script>
+</body>
+</html>

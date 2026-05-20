@@ -8,6 +8,8 @@
 
 **Tech Stack:** .NET 10, C# 14, Central Package Management, xUnit v3, FluentAssertions, AutoFixture, Verify.Xunit, Testcontainers.MsSql, bUnit, FsCheck, NetArchTest.Rules, Microsoft.Data.SqlClient 6.x, Microsoft.SqlServer.TransactSql.ScriptDom 180.x, System.CommandLine 2.x, Spectre.Console 0.49.x, Microsoft.AspNetCore.Components.WebView.WindowsForms 10.x, Microsoft.Web.WebView2, Serilog 4.x, GitHub Actions (windows-latest runner).
 
+**Design System:** The App's UI is built on the **DbDelta Design System v1.0** that lives at `docs/design-system/`. The system ships its own `tokens.css` (oklch palette: Cobalt primary, Violet secondary, warm-neutral grays, light + dark themes), `base.css` (reset + typography + utilities), `components-ui.css` (`.btn`, `.input`, `.badge`, `.alert`, …), and `components-domain.css` (`.app-shell`, `.connection-bar`, `.dgrid`, `.source-card`, …). The App copies these assets into `src/DbDelta.App/wwwroot/assets/` and consumes them from `wwwroot/index.html`. Razor components use the design system's class names; do **not** invent new style classes — extend the system in `docs/design-system/` and copy forward instead.
+
 ---
 
 ## Reference: Spec Sections This Plan Implements
@@ -23,6 +25,7 @@
 | §4 Error model — Result<T, Error> | T1.3 |
 | §5.1 Test pyramid (Core unit + Provider integration) | T1.4, T1.7, T1.9 |
 | §5.4 CI gates | T0.10–T0.12 |
+| DbDelta Design System v1.0 — tokens + components | T1.11a, T1.12, T1.13 |
 
 ---
 
@@ -87,13 +90,20 @@ DbDelta/                                            (repo root, already has LICE
 │  │  │  └─ JsonFormatter.cs                        T1.10
 │  │  └─ ExitCodes.cs                               T1.8
 │  └─ DbDelta.App/
-│     ├─ DbDelta.App.csproj                         T0.3
+│     ├─ DbDelta.App.csproj                         T0.3 (asset import: T1.11a)
 │     ├─ Program.cs                                 T1.12
 │     ├─ MainForm.cs                                T1.12
-│     ├─ App.razor                             T1.12
+│     ├─ App.razor                                  T1.12
 │     ├─ _Imports.razor                             T1.12
 │     ├─ wwwroot/
-│     │  └─ index.html                              T1.12
+│     │  ├─ index.html                              T1.12
+│     │  └─ assets/                                 T1.11a
+│     │     ├─ tokens.css                           (copied from docs/design-system)
+│     │     ├─ base.css                             (copied)
+│     │     ├─ components-ui.css                    (copied)
+│     │     ├─ components-domain.css                (copied)
+│     │     ├─ app.js                               (copied)
+│     │     └─ logo.svg                             (copied)
 │     ├─ Components/
 │     │  ├─ ConnectionPicker.razor                  T1.13
 │     │  └─ ResultsTree.razor                       T1.13
@@ -2681,6 +2691,82 @@ git commit -m "feat(shared): add ComparisonResultDto + DifferenceDto + Mapper fo
 
 ---
 
+### Task T1.11a: Import the DbDelta Design System assets into the App project
+
+**Files:**
+- Create: `src/DbDelta.App/wwwroot/assets/tokens.css` (copied from `docs/design-system/project/assets/tokens.css`)
+- Create: `src/DbDelta.App/wwwroot/assets/base.css` (copied)
+- Create: `src/DbDelta.App/wwwroot/assets/components-ui.css` (copied)
+- Create: `src/DbDelta.App/wwwroot/assets/components-domain.css` (copied)
+- Create: `src/DbDelta.App/wwwroot/assets/app.js` (copied)
+- Create: `src/DbDelta.App/wwwroot/assets/logo.svg` (copied)
+- Modify: `src/DbDelta.App/DbDelta.App.csproj` (mark assets as Content / CopyToOutputDirectory)
+
+Rationale: the DbDelta Design System v1.0 lives canonically at `docs/design-system/` and is the source-of-truth for visual decisions. The App consumes a **copy** of the production assets — never the docs path — so the docs system can evolve independently and the App build is hermetic.
+
+- [ ] **Step 1: Copy the six asset files**
+
+PowerShell (run from repo root):
+
+```powershell
+$src = "docs/design-system/project/assets"
+$dst = "src/DbDelta.App/wwwroot/assets"
+New-Item -ItemType Directory -Force -Path $dst | Out-Null
+Copy-Item "$src/tokens.css"            "$dst/tokens.css"            -Force
+Copy-Item "$src/base.css"              "$dst/base.css"              -Force
+Copy-Item "$src/components-ui.css"     "$dst/components-ui.css"     -Force
+Copy-Item "$src/components-domain.css" "$dst/components-domain.css" -Force
+Copy-Item "$src/app.js"                "$dst/app.js"                -Force
+Copy-Item "$src/logo.svg"              "$dst/logo.svg"              -Force
+```
+
+(bash equivalent: `cp docs/design-system/project/assets/{tokens,base,components-ui,components-domain}.css src/DbDelta.App/wwwroot/assets/ && cp docs/design-system/project/assets/{app.js,logo.svg} src/DbDelta.App/wwwroot/assets/`)
+
+- [ ] **Step 2: Ensure assets are picked up by the build**
+
+Open `src/DbDelta.App/DbDelta.App.csproj` and add this ItemGroup if not already present (Razor SDK includes `wwwroot/**` automatically, but make `Content / CopyToOutputDirectory` explicit so the assets land next to the .exe):
+
+```xml
+<ItemGroup>
+  <Content Include="wwwroot\**">
+    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+  </Content>
+</ItemGroup>
+```
+
+- [ ] **Step 3: Sanity build**
+
+```bash
+dotnet build src/DbDelta.App/DbDelta.App.csproj
+```
+
+Expected: build green. After build, verify the assets exist at `src/DbDelta.App/bin/Debug/net10.0-windows/wwwroot/assets/tokens.css`.
+
+- [ ] **Step 4: Document the sync rule**
+
+Append to `CONTRIBUTING.md`:
+
+```markdown
+### Design System Sync Rule
+
+The App copies the design system from `docs/design-system/project/assets/` into `src/DbDelta.App/wwwroot/assets/`. When the design system changes:
+
+1. Edit files under `docs/design-system/project/`.
+2. Re-run the copy command (see Task T1.11a in plan M0/M1).
+3. Commit both the docs change and the asset copy in a single commit so the App build stays in sync.
+
+Do NOT hand-edit `src/DbDelta.App/wwwroot/assets/*` — they are generated. Edits will be overwritten on the next sync.
+```
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/DbDelta.App/wwwroot/assets src/DbDelta.App/DbDelta.App.csproj CONTRIBUTING.md
+git commit -m "feat(app): import DbDelta Design System v1.0 assets into wwwroot"
+```
+
+---
+
 ### Task T1.12: App — WinForms shell hosting BlazorWebView
 
 **Files:**
@@ -2748,7 +2834,7 @@ public partial class MainForm : Form
 }
 ```
 
-- [ ] **Step 3: Write the root Razor file**
+- [ ] **Step 3: Write the root Razor file (uses Design System app-shell)**
 
 `src/DbDelta.App/App.razor`:
 
@@ -2758,10 +2844,55 @@ public partial class MainForm : Form
 @using DbDelta.App.State
 @inject AppState AppState
 
-<div class="container">
-    <h1>DbDelta</h1>
-    <ConnectionPicker />
-    <ResultsTree Result="@AppState.LastComparison" />
+@*
+   The DbDelta Design System defines a 3-row app shell:
+   .app-shell        — grid container
+   .app-topbar       — brand + global actions
+   .app-sidebar      — navigation (empty in M1, populated in later milestones)
+   .app-main         — primary content
+   .app-status       — footer status strip
+
+   v1 of the walking skeleton fills .app-main with the comparison flow only.
+*@
+
+<div class="app-shell">
+
+    <header class="app-topbar">
+        <div class="brandmark">
+            @* Inline brand mark — logo.svg is a standalone file, not a symbol library *@
+            <svg class="brandmark-glyph" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+                <rect x="2" y="2" width="60" height="60" rx="14" fill="currentColor"></rect>
+                <path d="M19 46 L32 18 L45 46 Z" fill="none" stroke="var(--logo-bg, white)" stroke-width="3.2" stroke-linejoin="round"></path>
+                <path d="M25 46 L25 28" stroke="var(--logo-bg, white)" stroke-width="3.2" stroke-linecap="round"></path>
+            </svg>
+            <span class="brandmark-text">DbDelta</span>
+            <span class="t-meta">v0.1 alpha</span>
+        </div>
+
+        <div class="row gap-2 flex-1 justify-end">
+            <button class="btn btn--ghost btn--icon-only" data-theme-toggle title="Toggle theme">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+            </button>
+        </div>
+    </header>
+
+    <aside class="app-sidebar" aria-label="Primary navigation">
+        @* M1: navigation will be populated by later milestones (snapshots, history, settings). *@
+    </aside>
+
+    <main class="app-main">
+        <ConnectionPicker />
+        <ResultsTree Result="@AppState.LastComparison" />
+    </main>
+
+    <footer class="app-status">
+        <span>@(AppState.IsBusy ? "Working…" : "Ready")</span>
+        <span class="sep">·</span>
+        <span class="t-mono">@AppState.SourceConnectionString</span>
+        <span class="sep">→</span>
+        <span class="t-mono">@AppState.TargetConnectionString</span>
+    </footer>
+
 </div>
 ```
 
@@ -2774,31 +2905,41 @@ public partial class MainForm : Form
 @using DbDelta.Shared.Dtos
 ```
 
-The Razor SDK compiles `App.razor` into a class named `App` in the `DbDelta.App` namespace, which is referenced from `MainForm.cs` as `<App>` in `RootComponents.Add<App>("#app")`.
+The Razor SDK compiles `App.razor` into a class named `App` in the `DbDelta.App` namespace, referenced from `MainForm.cs` as `<App>` in `RootComponents.Add<App>("#app")`.
 
-- [ ] **Step 4: Write the host page**
+- [ ] **Step 4: Write the host page (loads Design System assets)**
 
 `src/DbDelta.App/wwwroot/index.html`:
 
 ```html
 <!DOCTYPE html>
-<html>
+<html lang="en" data-theme="light" data-accent="cobalt">
 <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>DbDelta</title>
     <base href="/" />
-    <style>
-        body { font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 16px; }
-        h1 { font-weight: 300; }
-        .container { max-width: 1200px; margin: 0 auto; }
-    </style>
+
+    <!-- Geist + Geist Mono — design-system fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <!-- Design System v1.0 — ordered: tokens first, then base, then components -->
+    <link rel="stylesheet" href="assets/tokens.css" />
+    <link rel="stylesheet" href="assets/base.css" />
+    <link rel="stylesheet" href="assets/components-ui.css" />
+    <link rel="stylesheet" href="assets/components-domain.css" />
 </head>
 <body>
-<div id="app">Loading…</div>
-<script src="_framework/blazor.webview.js" autostart="false"></script>
+    <div id="app"></div>
+    <script src="_framework/blazor.webview.js" autostart="false"></script>
+    <script src="assets/app.js" defer></script>
 </body>
 </html>
 ```
+
+> **Note:** the `data-theme` attribute on `<html>` switches between light/dark; the design system's `app.js` wires the `[data-theme-toggle]` button in the topbar to flip it and persist the choice to `localStorage`. No additional JS is needed in M1.
 
 - [ ] **Step 5: Build**
 
@@ -2812,7 +2953,7 @@ Expected: build green. Skip running the app until T1.13 adds the components.
 
 ```bash
 git add src/DbDelta.App
-git commit -m "feat(app): WinForms shell hosting BlazorWebView with App.razor root"
+git commit -m "feat(app): WinForms shell + BlazorWebView + Design System app-shell layout"
 ```
 
 ---
@@ -2879,47 +3020,98 @@ public sealed class AppState
 }
 ```
 
-- [ ] **Step 2: Write `ConnectionPicker.razor`**
+- [ ] **Step 2: Write `ConnectionPicker.razor` (uses Design System `connection-bar` + `btn`)**
 
 `src/DbDelta.App/Components/ConnectionPicker.razor`:
 
 ```razor
 @inject DbDelta.App.State.AppState AppState
 
-<section>
-    <h2>Connections</h2>
-    <label>
-        Source:
-        <input type="text" @bind="AppState.SourceConnectionString"
-               placeholder="Server=.;Database=Dev;Trusted_Connection=True;TrustServerCertificate=True" size="80" />
-    </label>
-    <br />
-    <label>
-        Target:
-        <input type="text" @bind="AppState.TargetConnectionString"
-               placeholder="Server=.;Database=Prod;Trusted_Connection=True;TrustServerCertificate=True" size="80" />
-    </label>
-    <br />
-    <button @onclick="CompareAsync" disabled="@AppState.IsBusy">
-        @(AppState.IsBusy ? "Comparing…" : "Compare")
-    </button>
+@*
+   Design System refs:
+   .connection-bar              wraps the two endpoint cards
+   .connection-endpoint--source violet-tinted left card
+   .connection-endpoint--target cobalt-tinted right card
+   .connection-tag              "SOURCE" / "TARGET" eyebrow label
+   .connection-name             the editable connection string (rendered as input here)
+   .input                       generic input styling
+   .btn .btn--primary           primary action button
+   .alert .alert--danger        error region
+*@
+
+<section class="stack gap-8" style="padding: var(--space-12) 0;">
+    <h2 class="t-h3">Connections</h2>
+
+    <div class="connection-bar">
+        <div class="connection-endpoint connection-endpoint--source">
+            <span class="connection-tag t-eyebrow">Source</span>
+            <input
+                class="input connection-name t-mono"
+                type="text"
+                @bind="AppState.SourceConnectionString"
+                @bind:event="oninput"
+                placeholder="Server=.;Database=Dev;Trusted_Connection=True;TrustServerCertificate=True" />
+        </div>
+
+        <button type="button" class="connection-swap btn btn--ghost btn--icon-only" title="Swap source and target" @onclick="Swap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4l4 4-4 4M20 8H8M8 20l-4-4 4-4M4 16h12"/></svg>
+        </button>
+
+        <div class="connection-endpoint connection-endpoint--target">
+            <span class="connection-tag t-eyebrow">Target</span>
+            <input
+                class="input connection-name t-mono"
+                type="text"
+                @bind="AppState.TargetConnectionString"
+                @bind:event="oninput"
+                placeholder="Server=.;Database=Prod;Trusted_Connection=True;TrustServerCertificate=True" />
+        </div>
+    </div>
+
+    <div class="row gap-4">
+        <button class="btn btn--primary btn--lg" @onclick="CompareAsync" disabled="@AppState.IsBusy">
+            @if (AppState.IsBusy)
+            {
+                <span class="spinner" aria-hidden="true"></span>
+                <span>Comparing…</span>
+            }
+            else
+            {
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                <span>Compare</span>
+            }
+        </button>
+    </div>
+
     @if (AppState.LastError is not null)
     {
-        <p class="error" style="color: crimson">@AppState.LastError</p>
+        <div class="alert alert--danger" role="alert">
+            <svg class="alert-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16h.01"/></svg>
+            <div class="alert-body">
+                <strong>Comparison failed.</strong>
+                <p class="t-body-sm">@AppState.LastError</p>
+            </div>
+        </div>
     }
 </section>
 
 @code {
-    private async Task CompareAsync()
-    {
+    private async Task CompareAsync() =>
         await AppState.RunComparisonAsync(System.Threading.CancellationToken.None);
+
+    private void Swap()
+    {
+        (AppState.SourceConnectionString, AppState.TargetConnectionString) =
+            (AppState.TargetConnectionString, AppState.SourceConnectionString);
     }
 
     protected override void OnInitialized() => AppState.OnChange += StateHasChanged;
 }
 ```
 
-- [ ] **Step 3: Write `ResultsTree.razor`**
+> **Note:** `.connection-bar`, `.connection-endpoint`, `.connection-tag`, `.connection-swap`, `.connection-name`, `.alert--danger`, `.spinner`, and `.input` all come from the Design System CSS imported in T1.11a. If any of these class names are missing or behave unexpectedly, fix them in `docs/design-system/` and re-run T1.11a (do not hand-patch the App).
+
+- [ ] **Step 3: Write `ResultsTree.razor` (uses Design System `dgrid` + `badge` + `surface-raised`)**
 
 `src/DbDelta.App/Components/ResultsTree.razor`:
 
@@ -2927,33 +3119,84 @@ public sealed class AppState
 @using System.Linq
 @using DbDelta.Shared.Dtos
 
+@*
+   Design System refs:
+   .surface-raised   panel container
+   .dgrid            Object Diff Grid (table)
+   .dgrid-status-strip 4px left strip whose color is driven by data-diff attribute
+   .badge .badge--*  pill labels (success/info/warning/danger soft variants)
+   data-diff         row attribute drives status strip: modified|added|removed|only-source|only-target
+*@
+
 @if (Result is null)
 {
-    <p><em>No comparison run yet.</em></p>
+    <div class="surface-subtle" style="padding: var(--space-16); text-align: center;">
+        <p class="t-body fg-subtle"><em>No comparison run yet. Enter two connection strings and click Compare.</em></p>
+    </div>
 }
 else if (Result.Differences.Count == 0)
 {
-    <p>No tables found in either database.</p>
+    <div class="surface-subtle" style="padding: var(--space-16); text-align: center;">
+        <p class="t-body fg-subtle">No tables found in either database.</p>
+    </div>
 }
 else
 {
-    <section>
-        <h2>Results (@Result.Differences.Count)</h2>
-        @foreach (var group in Result.Differences.GroupBy(d => d.Status).OrderBy(g => g.Key))
-        {
-            <h3>@group.Key (@group.Count())</h3>
-            <ul>
-                @foreach (var d in group.OrderBy(d => d.SchemaName).ThenBy(d => d.ObjectName))
+    <section class="surface-raised" style="padding: var(--space-12); overflow: hidden;">
+        <header class="row justify-between" style="margin-bottom: var(--space-8);">
+            <h2 class="t-h3">Results</h2>
+            <span class="badge badge--outline t-num">@Result.Differences.Count @(Result.Differences.Count == 1 ? "object" : "objects")</span>
+        </header>
+
+        <table class="dgrid">
+            <thead>
+                <tr>
+                    <th style="width: 28px;"></th>
+                    <th>Kind</th>
+                    <th>Schema</th>
+                    <th>Name</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var d in Result.Differences
+                                         .OrderBy(d => d.Status)
+                                         .ThenBy(d => d.SchemaName)
+                                         .ThenBy(d => d.ObjectName))
                 {
-                    <li>[@d.Kind] @d.SchemaName.@d.ObjectName</li>
+                    <tr class="diff-row" data-diff="@MapDiff(d.Status)">
+                        <td class="dgrid-status-strip" aria-hidden="true"></td>
+                        <td class="t-mono">@d.Kind</td>
+                        <td>@d.SchemaName</td>
+                        <td><strong>@d.ObjectName</strong></td>
+                        <td>
+                            <span class="badge @BadgeClass(d.Status)">@d.Status</span>
+                        </td>
+                    </tr>
                 }
-            </ul>
-        }
+            </tbody>
+        </table>
     </section>
 }
 
 @code {
     [Parameter] public ComparisonResultDto? Result { get; set; }
+
+    private static string MapDiff(string status) => status switch
+    {
+        "Different"  => "modified",
+        "OnlyInA"    => "only-source",
+        "OnlyInB"    => "only-target",
+        _            => "identical",
+    };
+
+    private static string BadgeClass(string status) => status switch
+    {
+        "Different"  => "badge--info",
+        "OnlyInA"    => "badge--violet",
+        "OnlyInB"    => "badge--warning",
+        _            => "badge--outline",
+    };
 }
 ```
 
@@ -3009,7 +3252,7 @@ public class ResultsTreeTests : TestContext
     }
 
     [Fact]
-    public void Renders_groups_by_status()
+    public void Renders_dgrid_rows_with_design_system_classes()
     {
         var dto = new ComparisonResultDto(new[]
         {
@@ -3021,13 +3264,22 @@ public class ResultsTreeTests : TestContext
 
         var cut = RenderComponent<ResultsTree>(p => p.Add(p2 => p2.Result, dto));
 
-        cut.Markup.Should().Contain("OnlyInA (1)");
-        cut.Markup.Should().Contain("OnlyInB (1)");
-        cut.Markup.Should().Contain("Different (1)");
-        cut.Markup.Should().Contain("Identical (1)");
+        // Object names rendered
         cut.Markup.Should().Contain("Customer");
         cut.Markup.Should().Contain("Order");
         cut.Markup.Should().Contain("Legacy");
+        cut.Markup.Should().Contain("Identical1");
+
+        // Design System classes wired correctly
+        cut.Markup.Should().Contain("class=\"dgrid\"");
+        cut.Markup.Should().Contain("data-diff=\"only-source\"");
+        cut.Markup.Should().Contain("data-diff=\"modified\"");
+        cut.Markup.Should().Contain("data-diff=\"only-target\"");
+        cut.Markup.Should().Contain("data-diff=\"identical\"");
+
+        // Badge variants
+        cut.Markup.Should().Contain("badge--info");
+        cut.Markup.Should().Contain("badge--warning");
     }
 }
 ```
@@ -3059,6 +3311,8 @@ At the end of this plan, all of the following must be true:
 - [ ] `dotnet test tests/DbDelta.Architecture.Tests` confirms Core has no I/O dependencies.
 - [ ] `dotnet run --project src/DbDelta.Cli -- compare --source <connA> --target <connB> --format text` prints a grouped diff and exits 0 (identical) or 1 (differences found).
 - [ ] `dotnet run --project src/DbDelta.App` opens a Blazor window with a Compare button that populates the results tree from two real connections.
+- [ ] App renders the DbDelta Design System v1.0: Cobalt-blue primary, Geist typography, light theme by default, `.app-shell` layout, `.connection-bar` for endpoints, `.dgrid` for results.
+- [ ] Light/dark theme toggle in the topbar flips `<html data-theme>` and persists to localStorage (provided by design system's `app.js`).
 - [ ] CI workflow on `windows-latest` is green on `main`.
 - [ ] All commits land on `main` and `git push` succeeds.
 
