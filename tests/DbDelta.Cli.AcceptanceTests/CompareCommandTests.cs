@@ -163,6 +163,61 @@ public class CompareCommandTests(CliFixture fixture)
         await p.WaitForExitAsync(ct);
         return p.ExitCode;
     }
+
+    [Fact]
+    public async Task Returns_exit_code_1_when_source_has_an_extra_view()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        const string srcDb = "DbDeltaViewSrc";
+        const string tgtDb = "DbDeltaViewTgt";
+        await CreateDb(srcDb, ct);
+        await CreateDb(tgtDb, ct);
+        await CreateViewSrcOnly(srcDb, ct);
+
+        int exit = await RunCli(["compare",
+            "--source", ConnectionFor(srcDb),
+            "--target", ConnectionFor(tgtDb),
+            "--format", "json"], ct);
+
+        exit.Should().Be(ExpectedExitCodes.SuccessDifferencesFound);
+    }
+
+    [Fact]
+    public async Task Returns_exit_code_1_when_a_procedure_body_differs()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        const string srcDb = "DbDeltaProcSrc";
+        const string tgtDb = "DbDeltaProcTgt";
+        await CreateDb(srcDb, ct);
+        await CreateDb(tgtDb, ct);
+        await CreateProcWithBody(srcDb, "SELECT 1 AS Id;", ct);
+        await CreateProcWithBody(tgtDb, "SELECT 2 AS Id;", ct);
+
+        int exit = await RunCli(["compare",
+            "--source", ConnectionFor(srcDb),
+            "--target", ConnectionFor(tgtDb),
+            "--format", "json"], ct);
+
+        exit.Should().Be(ExpectedExitCodes.SuccessDifferencesFound);
+    }
+
+    private async Task CreateViewSrcOnly(string db, CancellationToken ct)
+    {
+        await using SqlConnection c = new(ConnectionFor(db));
+        await c.OpenAsync(ct);
+        await using SqlCommand cmd = new(
+            "IF OBJECT_ID('dbo.vReport') IS NULL EXEC('CREATE VIEW dbo.vReport AS SELECT 1 AS Id;');", c);
+        await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+    private async Task CreateProcWithBody(string db, string innerSql, CancellationToken ct)
+    {
+        await using SqlConnection c = new(ConnectionFor(db));
+        await c.OpenAsync(ct);
+        await using SqlCommand cmd = new(
+            $"IF OBJECT_ID('dbo.uspGet') IS NULL EXEC('CREATE PROCEDURE dbo.uspGet AS {innerSql}');", c);
+        await cmd.ExecuteNonQueryAsync(ct);
+    }
 }
 
 /// <summary>
