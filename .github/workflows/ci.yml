@@ -1,0 +1,59 @@
+name: ci
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/Directory.Packages.props') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Verify formatting
+        run: dotnet format --verify-no-changes
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Run non-DB tests
+        run: |
+          dotnet test tests/DbDelta.Core.UnitTests --no-build --configuration Release --logger "trx;LogFileName=core.trx"
+          dotnet test tests/DbDelta.Architecture.Tests --no-build --configuration Release --logger "trx;LogFileName=arch.trx"
+          dotnet test tests/DbDelta.ScriptGen.GoldenTests --no-build --configuration Release --logger "trx;LogFileName=golden.trx"
+          dotnet test tests/DbDelta.App.ComponentTests --no-build --configuration Release --logger "trx;LogFileName=app.trx"
+
+      - name: Run integration tests (Testcontainers MS SQL)
+        run: |
+          dotnet test tests/DbDelta.Providers.LiveDb.IntegrationTests --no-build --configuration Release --logger "trx;LogFileName=providers.trx"
+          dotnet test tests/DbDelta.Cli.AcceptanceTests --no-build --configuration Release --logger "trx;LogFileName=cli.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: '**/TestResults/*.trx'
