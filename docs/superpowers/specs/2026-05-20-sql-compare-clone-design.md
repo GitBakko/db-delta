@@ -11,7 +11,7 @@ A faithful, open-source clone of Redgate SQL Compare, scoped to a deliverable v1
 
 ## 0. TL;DR
 
-DbDelta v1 is a **Windows-only schema comparison and deployment tool for SQL Server 2016+ and Azure SQL DB**, built on **.NET 10** with a **Blazor Hybrid + WebView2** GUI and a **System.CommandLine** CLI, distributed as a single self-contained `.exe` under **MIT license**. It compares two live databases, computes a structural diff across 13 object kinds (Tier 1 + Tier 2), generates a dependency-ordered T-SQL deployment script, and optionally executes it in a transactional batch. Built using a **hexagonal architecture** with a pure `Core` library and adapters for live DB I/O, CLI, and GUI hosting. Walking-skeleton-first delivery: end-to-end Table comparison in M1, then horizontal expansion to remaining object kinds over ~6 months.
+DbDelta v1 is a **Windows-only schema comparison and deployment tool for SQL Server 2016+ and Azure SQL DB**, built on **.NET 10** with a **Blazor Hybrid + WebView2** GUI and a **System.CommandLine** CLI, distributed as a single self-contained `.exe` under **Apache License 2.0**. It compares two live databases, computes a structural diff across 13 object kinds (Tier 1 + Tier 2), generates a dependency-ordered T-SQL deployment script, and optionally executes it in a transactional batch. Built using a **hexagonal architecture** with a pure `Core` library and adapters for live DB I/O, CLI, and GUI hosting. Walking-skeleton-first delivery: end-to-end Table comparison in M1, then horizontal expansion to remaining object kinds over ~6 months.
 
 ---
 
@@ -485,7 +485,7 @@ M13 v1.0 RC                              Weeks 23-24
 | 4 | SQL Server version target | 2016+ including Azure SQL DB |
 | 5 | OS / platform | Windows-only; .NET 10 CLI + GUI |
 | 6 | GUI host | Blazor Hybrid + WebView2 (C# everywhere, no JS SPA) |
-| 7 | Distribution + license | OSS (MIT / Apache 2.0) |
+| 7 | Distribution + license | OSS — Apache License 2.0 (locked 2026-05-20) |
 | 8 | Architecture | Hexagonal + walking-skeleton delivery (Approach A) |
 | 9 | Dependency mandate | Latest stable only; Renovate weekly |
 | 10 | Implementation runtime | ruflo swarm, hierarchical topology, memory-as-bus |
@@ -494,10 +494,9 @@ M13 v1.0 RC                              Weeks 23-24
 
 ## 8. Open Questions (To Resolve During Implementation)
 
-1. Exact license: MIT or Apache 2.0? (Apache 2.0 has explicit patent grant; recommended.)
-2. Code style: edition of `.editorconfig` and Roslyn analyzer ruleset.
-3. Whether to enable `<PublishAot>true</PublishAot>` for CLI (stretch perf goal).
-4. Whether GUI ships its own embedded Monaco editor or relies on WebView2's bundled Edge.
+1. Code style: edition of `.editorconfig` and Roslyn analyzer ruleset.
+2. Whether to enable `<PublishAot>true</PublishAot>` for CLI (stretch perf goal).
+3. Whether GUI ships its own embedded Monaco editor or relies on WebView2's bundled Edge.
 
 ---
 
