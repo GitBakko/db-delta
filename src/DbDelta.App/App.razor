@@ -1,0 +1,55 @@
+@namespace DbDelta.App
+@using DbDelta.App.Components
+@using DbDelta.App.State
+@inject AppState AppState
+
+@*
+   The DbDelta Design System defines a 3-row app shell:
+   .app-shell        — grid container
+   .app-topbar       — brand + global actions
+   .app-sidebar      — navigation (empty in M1, populated in later milestones)
+   .app-main         — primary content
+   .app-status       — footer status strip
+
+   v1 of the walking skeleton fills .app-main with the comparison flow only.
+*@
+
+<div class="app-shell">
+
+    <header class="app-topbar">
+        <div class="brandmark">
+            @* Inline brand mark — logo.svg is a standalone file, not a symbol library *@
+            <svg class="brandmark-glyph" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+                <rect x="2" y="2" width="60" height="60" rx="14" fill="currentColor"></rect>
+                <path d="M19 46 L32 18 L45 46 Z" fill="none" stroke="var(--logo-bg, white)" stroke-width="3.2" stroke-linejoin="round"></path>
+                <path d="M25 46 L25 28" stroke="var(--logo-bg, white)" stroke-width="3.2" stroke-linecap="round"></path>
+            </svg>
+            <span class="brandmark-text">DbDelta</span>
+            <span class="t-meta">v0.1 alpha</span>
+        </div>
+
+        <div class="row gap-2 flex-1 justify-end">
+            <button class="btn btn--ghost btn--icon-only" data-theme-toggle title="Toggle theme">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+            </button>
+        </div>
+    </header>
+
+    <aside class="app-sidebar" aria-label="Primary navigation">
+        @* M1: navigation will be populated by later milestones (snapshots, history, settings). *@
+    </aside>
+
+    <main class="app-main">
+        <ConnectionPicker />
+        <ResultsTree Result="@AppState.LastComparison" />
+    </main>
+
+    <footer class="app-status">
+        <span>@(AppState.IsBusy ? "Working…" : "Ready")</span>
+        <span class="sep">·</span>
+        <span class="t-mono">@AppState.SourceConnectionString</span>
+        <span class="sep">→</span>
+        <span class="t-mono">@AppState.TargetConnectionString</span>
+    </footer>
+
+</div>
