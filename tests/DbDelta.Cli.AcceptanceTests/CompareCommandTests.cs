@@ -86,6 +86,55 @@ public class CompareCommandTests(CliFixture fixture)
         await cmd.ExecuteNonQueryAsync(ct);
     }
 
+    [Fact]
+    public async Task Returns_exit_code_1_when_target_is_missing_a_primary_key()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        const string srcDb = "DbDeltaPkSrc";
+        const string tgtDb = "DbDeltaPkTgt";
+        await CreateDb(srcDb, ct);
+        await CreateDb(tgtDb, ct);
+        await CreateCustomerWithPk(srcDb, ct);
+        await CreateCustomerWithoutPk(tgtDb, ct);
+
+        string srcConn = ConnectionFor(srcDb);
+        string tgtConn = ConnectionFor(tgtDb);
+
+        int exit = await RunCli(["compare", "--source", srcConn, "--target", tgtConn, "--format", "json"], ct);
+
+        exit.Should().Be(ExpectedExitCodes.SuccessDifferencesFound);
+    }
+
+    private async Task CreateCustomerWithPk(string db, CancellationToken ct)
+    {
+        await using SqlConnection c = new(ConnectionFor(db));
+        await c.OpenAsync(ct);
+        await using SqlCommand cmd = new(
+            """
+            IF OBJECT_ID('dbo.Customer') IS NULL
+                CREATE TABLE dbo.Customer (
+                    Id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_Customer PRIMARY KEY,
+                    Name nvarchar(100) NOT NULL
+                );
+            """, c);
+        await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+    private async Task CreateCustomerWithoutPk(string db, CancellationToken ct)
+    {
+        await using SqlConnection c = new(ConnectionFor(db));
+        await c.OpenAsync(ct);
+        await using SqlCommand cmd = new(
+            """
+            IF OBJECT_ID('dbo.Customer') IS NULL
+                CREATE TABLE dbo.Customer (
+                    Id int IDENTITY(1,1) NOT NULL,
+                    Name nvarchar(100) NOT NULL
+                );
+            """, c);
+        await cmd.ExecuteNonQueryAsync(ct);
+    }
+
     private static async Task<int> RunCli(string[] args, CancellationToken ct)
     {
         string exe = Path.GetFullPath(Path.Combine(
