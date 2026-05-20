@@ -1,0 +1,1 @@
+﻿-- WARNING: view [dbo].[vSecret] is encrypted (WITH ENCRYPTION); body cannot be scripted.
