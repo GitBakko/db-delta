@@ -10,9 +10,9 @@ namespace DbDelta.Providers.LiveDb.Readers;
 /// <c>IsEncrypted = true</c> so the comparison engine can flag them without
 /// attempting a body diff.
 /// </summary>
-public sealed class ModuleReader
+internal sealed class ModuleReader
 {
-    private const string ViewSql = """
+    private const string ViewQuery = """
         SELECT s.name AS SchemaName,
                v.name AS Name,
                sm.definition AS Body,
@@ -24,7 +24,7 @@ public sealed class ModuleReader
         ORDER BY s.name, v.name;
         """;
 
-    private const string ProcSql = """
+    private const string ProcQuery = """
         SELECT s.name AS SchemaName,
                p.name AS Name,
                sm.definition AS Body,
@@ -45,7 +45,7 @@ public sealed class ModuleReader
     {
         ArgumentNullException.ThrowIfNull(connection);
         List<View> views = [];
-        await using SqlCommand cmd = new(ViewSql, connection);
+        await using SqlCommand cmd = new(ViewQuery, connection);
         await using SqlDataReader r = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
         while (await r.ReadAsync(ct).ConfigureAwait(false))
         {
@@ -66,7 +66,7 @@ public sealed class ModuleReader
     {
         ArgumentNullException.ThrowIfNull(connection);
         List<StoredProcedure> procs = [];
-        await using SqlCommand cmd = new(ProcSql, connection);
+        await using SqlCommand cmd = new(ProcQuery, connection);
         await using SqlDataReader r = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
         while (await r.ReadAsync(ct).ConfigureAwait(false))
         {
