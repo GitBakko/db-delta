@@ -1,0 +1,1 @@
+﻿CREATE OR ALTER PROCEDURE dbo.uspGetCustomer @Id int AS SELECT * FROM dbo.Customer WHERE Id = @Id;
