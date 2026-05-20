@@ -42,4 +42,24 @@ public class ModuleTests
         View b = new("dbo", "vA", "BODY", IsEncrypted: false);
         a.Should().Be(b);
     }
+
+    [Fact]
+    public void Database_carries_views_and_procedures_collections()
+    {
+        Schema dbo = new("dbo");
+        View v = new("dbo", "vA", "BODY", IsEncrypted: false);
+        StoredProcedure p = new("dbo", "uspA", "BODY", IsEncrypted: false);
+        Database db = new("MyDb", Schemas: [dbo], Tables: [], Views: [v], Procedures: [p]);
+        db.Views.Should().ContainSingle().Which.Should().Be(v);
+        db.Procedures.Should().ContainSingle().Which.Should().Be(p);
+    }
+
+    [Fact]
+    public void Database_defaults_views_and_procedures_to_empty()
+    {
+        Schema dbo = new("dbo");
+        Database db = new("MyDb", Schemas: [dbo], Tables: []);
+        db.Views.Should().BeEmpty();
+        db.Procedures.Should().BeEmpty();
+    }
 }
