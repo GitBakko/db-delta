@@ -4,7 +4,8 @@ using Microsoft.Data.SqlClient;
 namespace DbDelta.Providers.LiveDb.Readers;
 
 /// <summary>
-/// Reads user tables and their columns in a single round-trip per server.
+/// Reads user tables and their columns (including identity seed/increment +
+/// persisted-computed expressions) in a small number of round-trips.
 /// </summary>
 internal sealed class TableReader
 {
@@ -21,27 +22,34 @@ internal sealed class TableReader
 
     private const string ColumnsQuery = """
         SELECT
-            c.object_id        AS ObjectId,
-            c.name             AS ColumnName,
+            c.object_id            AS ObjectId,
+            c.name                 AS ColumnName,
             TYPE_NAME(c.user_type_id) AS TypeName,
-            c.max_length       AS MaxLength,
-            c.precision        AS Precision,
-            c.scale            AS Scale,
-            c.is_nullable      AS IsNullable,
-            c.is_identity      AS IsIdentity,
-            dc.definition      AS DefaultExpression,
-            c.column_id        AS Ordinal
+            c.max_length           AS MaxLength,
+            c.precision            AS [Precision],
+            c.scale                AS Scale,
+            c.is_nullable          AS IsNullable,
+            c.is_identity          AS IsIdentity,
+            CAST(ic.seed_value AS bigint)      AS IdentitySeed,
+            CAST(ic.increment_value AS bigint) AS IdentityIncrement,
+            dc.definition          AS DefaultExpression,
+            cc.definition          AS ComputedExpression,
+            ISNULL(cc.is_persisted, 0)         AS IsPersistedComputed,
+            c.column_id            AS Ordinal
         FROM sys.columns AS c
         INNER JOIN sys.tables AS t ON t.object_id = c.object_id
+        LEFT JOIN sys.identity_columns AS ic ON ic.object_id = c.object_id
+                                             AND ic.column_id = c.column_id
         LEFT JOIN sys.default_constraints AS dc ON dc.parent_object_id = c.object_id
-                                              AND dc.parent_column_id = c.column_id
+                                                AND dc.parent_column_id = c.column_id
+        LEFT JOIN sys.computed_columns AS cc ON cc.object_id = c.object_id
+                                              AND cc.column_id = c.column_id
         WHERE t.is_ms_shipped = 0
         ORDER BY c.object_id, c.column_id;
         """;
 
     public async Task<IReadOnlyList<Table>> ReadAsync(SqlConnection connection, CancellationToken ct)
     {
-        // 1. Build a map of objectId -> (schema, name)
         Dictionary<int, (string Schema, string Name)> tableShells = [];
         await using (var tablesCmd = new SqlCommand(TablesQuery, connection))
         await using (SqlDataReader tablesReader = await tablesCmd.ExecuteReaderAsync(ct).ConfigureAwait(false))
@@ -55,7 +63,6 @@ internal sealed class TableReader
             }
         }
 
-        // 2. Fetch all columns and group by object id
         Dictionary<int, List<Column>> columnsByObjectId = [];
         await using (var columnsCmd = new SqlCommand(ColumnsQuery, connection))
         await using (SqlDataReader columnsReader = await columnsCmd.ExecuteReaderAsync(ct).ConfigureAwait(false))
@@ -70,8 +77,12 @@ internal sealed class TableReader
                 byte scale = columnsReader.GetByte(5);
                 bool isNullable = columnsReader.GetBoolean(6);
                 bool isIdentity = columnsReader.GetBoolean(7);
-                string? defaultExpr = columnsReader.IsDBNull(8) ? null : columnsReader.GetString(8);
-                int ordinal = columnsReader.GetInt32(9);
+                long? identitySeed = columnsReader.IsDBNull(8) ? null : columnsReader.GetInt64(8);
+                long? identityIncrement = columnsReader.IsDBNull(9) ? null : columnsReader.GetInt64(9);
+                string? defaultExpr = columnsReader.IsDBNull(10) ? null : columnsReader.GetString(10);
+                string? computedExpr = columnsReader.IsDBNull(11) ? null : columnsReader.GetString(11);
+                bool isPersistedComputed = !columnsReader.IsDBNull(12) && columnsReader.GetBoolean(12);
+                int ordinal = columnsReader.GetInt32(13);
 
                 if (!tableShells.ContainsKey(objectId))
                 {
@@ -89,11 +100,14 @@ internal sealed class TableReader
                     isNullable: isNullable,
                     ordinal: ordinal,
                     defaultExpression: defaultExpr,
-                    isIdentity: isIdentity));
+                    isIdentity: isIdentity,
+                    identitySeed: identitySeed,
+                    identityIncrement: identityIncrement,
+                    computedExpression: computedExpr,
+                    isPersistedComputed: isPersistedComputed));
             }
         }
 
-        // 3. Build the table list
         var tables = new List<Table>(tableShells.Count);
         foreach (KeyValuePair<int, (string Schema, string Name)> kv in tableShells)
         {
