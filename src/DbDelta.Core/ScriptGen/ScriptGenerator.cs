@@ -7,13 +7,16 @@ namespace DbDelta.Core.ScriptGen;
 /// <summary>
 /// Orchestrates per-object emitters and wraps the output in a deployment-ready
 /// batch. Order: tables (with PK/UQ/CK/DF/identity/computed inline) → standalone
-/// CREATE INDEX → ALTER TABLE ADD CONSTRAINT … FOREIGN KEY.
+/// CREATE INDEX → views (CREATE OR ALTER) → procedures (CREATE OR ALTER) → ALTER
+/// TABLE ADD CONSTRAINT … FOREIGN KEY.
 /// </summary>
 public sealed class ScriptGenerator
 {
     private readonly TableScriptEmitter _tableEmitter = new();
     private readonly IndexScriptEmitter _indexEmitter = new();
     private readonly ForeignKeyScriptEmitter _fkEmitter = new();
+    private readonly ViewScriptEmitter _viewEmitter = new();
+    private readonly ProcedureScriptEmitter _procEmitter = new();
 
     /// <summary>
     /// Generates a complete T-SQL migration script for the given comparison result.
@@ -30,26 +33,22 @@ public sealed class ScriptGenerator
         sb.AppendLine("BEGIN TRANSACTION;");
         sb.AppendLine("GO");
 
-        // 1. Tables (CREATE / DROP / ALTER ADD COLUMN + ALTER ADD CONSTRAINT)
-        foreach (DifferencePair pair in pairs)
+        // 1. Tables (CREATE / DROP / ALTER ADD COLUMN + ALTER ADD CONSTRAINT inline)
+        foreach (DifferencePair pair in pairs.Where(p => p.Identity.Kind == "Table"))
         {
-            string tableDdl = _tableEmitter.Emit(pair);
-            if (!string.IsNullOrWhiteSpace(tableDdl))
+            string ddl = _tableEmitter.Emit(pair);
+            if (!string.IsNullOrWhiteSpace(ddl))
             {
-                sb.AppendLine(tableDdl);
+                sb.AppendLine(ddl);
                 sb.AppendLine("GO");
             }
         }
 
         // 2. Indexes — emitted for newly created tables (OnlyInA).
         //    Full add/drop index diff on Different tables lands in M8.
-        foreach (DifferencePair pair in pairs)
+        foreach (DifferencePair pair in pairs.Where(p => p.Identity.Kind == "Table"))
         {
-            if (pair.Status != DifferenceStatus.OnlyInA || pair.SideA is not Table t)
-            {
-                continue;
-            }
-            if (t.Indexes.Count == 0)
+            if (pair.Status != DifferenceStatus.OnlyInA || pair.SideA is not Table t || t.Indexes.Count == 0)
             {
                 continue;
             }
@@ -60,8 +59,36 @@ public sealed class ScriptGenerator
             sb.AppendLine("GO");
         }
 
-        // 3. Foreign keys — emitted last so referenced tables already exist.
-        foreach (DifferencePair pair in pairs)
+        // 3. Views — alphabetical per schema for deterministic output.
+        foreach (DifferencePair pair in pairs
+            .Where(p => p.Identity.Kind == "View")
+            .OrderBy(p => p.Identity.SchemaName)
+            .ThenBy(p => p.Identity.ObjectName))
+        {
+            string ddl = _viewEmitter.Emit(pair);
+            if (!string.IsNullOrWhiteSpace(ddl))
+            {
+                sb.AppendLine(ddl);
+                sb.AppendLine("GO");
+            }
+        }
+
+        // 4. Procedures — alphabetical per schema for deterministic output.
+        foreach (DifferencePair pair in pairs
+            .Where(p => p.Identity.Kind == "Procedure")
+            .OrderBy(p => p.Identity.SchemaName)
+            .ThenBy(p => p.Identity.ObjectName))
+        {
+            string ddl = _procEmitter.Emit(pair);
+            if (!string.IsNullOrWhiteSpace(ddl))
+            {
+                sb.AppendLine(ddl);
+                sb.AppendLine("GO");
+            }
+        }
+
+        // 5. Foreign keys — emitted last so referenced tables already exist.
+        foreach (DifferencePair pair in pairs.Where(p => p.Identity.Kind == "Table"))
         {
             if (pair.Status != DifferenceStatus.OnlyInA || pair.SideA is not Table t)
             {
