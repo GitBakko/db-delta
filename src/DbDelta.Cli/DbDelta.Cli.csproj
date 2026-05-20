@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>dbdelta</AssemblyName>
+    <RootNamespace>DbDelta.Cli</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" />
+    <PackageReference Include="Spectre.Console" />
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Sinks.File" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DbDelta.Core\DbDelta.Core.csproj" />
+    <ProjectReference Include="..\DbDelta.Providers.LiveDb\DbDelta.Providers.LiveDb.csproj" />
+    <ProjectReference Include="..\DbDelta.Persistence\DbDelta.Persistence.csproj" />
+    <ProjectReference Include="..\DbDelta.Shared\DbDelta.Shared.csproj" />
+  </ItemGroup>
+</Project>
