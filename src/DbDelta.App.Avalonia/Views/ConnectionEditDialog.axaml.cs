@@ -29,6 +29,16 @@ public partial class ConnectionEditDialog : Window
         box.PasswordChar = '•';
     }
 
+    private void OnColorSwatchTapped(object? sender, Avalonia.Input.TappedEventArgs e)
+    {
+        if (sender is Avalonia.Controls.Border b
+            && b.Tag is string hex
+            && DataContext is ViewModels.ConnectionEditViewModel vm)
+        {
+            vm.EnvironmentColorHex = hex;
+        }
+    }
+
     private void OnSaveClick(object? sender, RoutedEventArgs e) => Close(Result.Save);
     private void OnDeleteClick(object? sender, RoutedEventArgs e) => Close(Result.Delete);
     private void OnCancelClick(object? sender, RoutedEventArgs e) => Close(Result.Cancel);
