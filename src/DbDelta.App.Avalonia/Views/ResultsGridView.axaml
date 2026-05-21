@@ -1,0 +1,121 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DbDelta.App.ViewModels"
+             xmlns:v="using:DbDelta.App.Views"
+             x:Class="DbDelta.App.Views.ResultsGridView"
+             x:DataType="vm:MainWindowViewModel">
+
+  <Panel>
+
+    <!-- No comparison yet -->
+    <Border Classes="surface-subtle"
+            IsVisible="{Binding AppState.LastComparison,
+                                Converter={x:Static ObjectConverters.IsNull}}"
+            Padding="24"
+            HorizontalAlignment="Stretch">
+      <TextBlock Text="Nessun confronto eseguito. Inserisci due stringhe di connessione e premi Confronta."
+                 HorizontalAlignment="Center"
+                 FontStyle="Italic"
+                 Foreground="{StaticResource FgSubtleBrush}" />
+    </Border>
+
+    <!-- Results DataGrid -->
+    <Border Classes="surface-raised"
+            ClipToBounds="True"
+            Padding="0"
+            IsVisible="{Binding AppState.LastComparison,
+                                Converter={x:Static ObjectConverters.IsNotNull}}">
+
+      <DataGrid ItemsSource="{Binding RowsView}"
+                AutoGenerateColumns="False"
+                IsReadOnly="False"
+                CanUserResizeColumns="True"
+                CanUserSortColumns="True"
+                GridLinesVisibility="Horizontal"
+                HeadersVisibility="Column">
+
+        <DataGrid.Columns>
+
+          <!-- Col 1: Status pill + Kind label -->
+          <DataGridTemplateColumn Header="Tipo entità" Width="100" CanUserSort="True">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:DifferenceRowViewModel">
+                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="4,0">
+                  <!-- Coloured status square -->
+                  <Border Width="6" Height="6"
+                          CornerRadius="1"
+                          Background="{Binding SelectionBrushHex,
+                                               Converter={x:Static v:Converters.HexToBrush}}"
+                          VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding KindDisplayName}"
+                             FontSize="12"
+                             VerticalAlignment="Center"
+                             TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+
+          <!-- Col 2: Last modified source -->
+          <DataGridTextColumn Header="Ultima modifica (orig)"
+                              Binding="{Binding LastModifiedSourceDisplay}"
+                              Width="140"
+                              FontFamily="Cascadia Mono,Consolas,monospace"
+                              FontSize="11" />
+
+          <!-- Col 3: Source object name (bold when source-only) -->
+          <DataGridTemplateColumn Header="Nome (orig)" Width="*" CanUserSort="True">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:DifferenceRowViewModel">
+                <TextBlock Text="{Binding QualifiedName}"
+                           FontWeight="{Binding IsSourceOnly,
+                                                Converter={x:Static v:Converters.BoolToFontWeight}}"
+                           VerticalAlignment="Center"
+                           Margin="4,0"
+                           TextTrimming="CharacterEllipsis" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+
+          <!-- Col 4: Deploy selection checkbox -->
+          <DataGridTemplateColumn Header="" Width="40" CanUserSort="False" CanUserResize="False">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:DifferenceRowViewModel">
+                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          Foreground="{Binding SelectionBrushHex,
+                                               Converter={x:Static v:Converters.HexToBrush}}" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+
+          <!-- Col 5: Target object name (bold when target-only) -->
+          <DataGridTemplateColumn Header="Nome (dest)" Width="*" CanUserSort="True">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:DifferenceRowViewModel">
+                <TextBlock Text="{Binding QualifiedName}"
+                           FontWeight="{Binding IsTargetOnly,
+                                                Converter={x:Static v:Converters.BoolToFontWeight}}"
+                           VerticalAlignment="Center"
+                           Margin="4,0"
+                           TextTrimming="CharacterEllipsis" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+
+          <!-- Col 6: Last modified target -->
+          <DataGridTextColumn Header="Ultima modifica (dest)"
+                              Binding="{Binding LastModifiedTargetDisplay}"
+                              Width="140"
+                              FontFamily="Cascadia Mono,Consolas,monospace"
+                              FontSize="11" />
+
+        </DataGrid.Columns>
+      </DataGrid>
+
+    </Border>
+
+  </Panel>
+
+</UserControl>
