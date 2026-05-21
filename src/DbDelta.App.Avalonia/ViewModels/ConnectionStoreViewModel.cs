@@ -102,6 +102,55 @@ public sealed partial class ConnectionStoreViewModel(
         return password is null ? null : entry.ConnectionStringTemplate.Replace("{PASSWORD}", password, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Persist an explicit entry (used by the Edit dialog). When
+    /// <paramref name="password"/> is non-null and the credential store
+    /// is available, write it under <c>"dbdelta:connection:{Id:D}"</c>.
+    /// Replaces any existing entry with the same Id in the local
+    /// ObservableCollection.
+    /// </summary>
+    public async Task<ConnectionEntry> UpsertExplicitAsync(ConnectionEntry entry, string? password, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        if (!string.IsNullOrEmpty(password) && credentials.IsAvailable)
+        {
+            await credentials.SetSecretAsync(KeyPrefix + entry.Id.ToString("D"), password, ct).ConfigureAwait(true);
+        }
+        await store.UpsertAsync(entry, ct).ConfigureAwait(true);
+
+        int idx = Entries.ToList().FindIndex(e => e.Id == entry.Id);
+        if (idx >= 0)
+        {
+            Entries[idx] = entry;
+        }
+        else
+        {
+            Entries.Add(entry);
+        }
+        OnPropertyChanged(nameof(FilteredEntries));
+        return entry;
+    }
+
+    /// <summary>
+    /// Delete an entry + its credential. Used by the Edit dialog "Elimina" button.
+    /// </summary>
+    public async Task DeleteAsync(Guid id, CancellationToken ct)
+    {
+        if (credentials.IsAvailable)
+        {
+            try { await credentials.DeleteSecretAsync(KeyPrefix + id.ToString("D"), ct).ConfigureAwait(true); }
+            catch { /* best-effort */ }
+        }
+        await store.DeleteAsync(id, ct).ConfigureAwait(true);
+
+        int idx = Entries.ToList().FindIndex(e => e.Id == id);
+        if (idx >= 0)
+        {
+            Entries.RemoveAt(idx);
+        }
+        OnPropertyChanged(nameof(FilteredEntries));
+    }
+
     private void ReplaceInCollection(ConnectionEntry entry)
     {
         int idx = Entries.ToList().FindIndex(e => e.Id == entry.Id);

@@ -93,4 +93,35 @@ public class ConnectionStoreViewModelTests
         vm.FilteredEntries.Should().ContainSingle();
         vm.FilteredEntries[0].ServerName.Should().Be("ProdHost");
     }
+
+    [AvaloniaFact]
+    public async Task UpsertExplicitAsync_replaces_existing_by_Id()
+    {
+        InMemoryConnectionStore conns = new();
+        InMemoryCredentialStore creds = new();
+        ConnectionStoreViewModel vm = new(conns, creds);
+        Guid id = Guid.NewGuid();
+        DbDelta.Core.Abstractions.ConnectionEntry first = new(
+            id, "First", "srv", "db", "Server=srv;Database=db;Password={PASSWORD};", "Dev", "#0054BD", false,
+            DateTime.UtcNow, DateTime.UtcNow);
+        await vm.UpsertExplicitAsync(first, "pwd", CancellationToken.None);
+        DbDelta.Core.Abstractions.ConnectionEntry second = first with { Name = "Renamed" };
+        await vm.UpsertExplicitAsync(second, "pwd2", CancellationToken.None);
+        vm.Entries.Should().ContainSingle().Which.Name.Should().Be("Renamed");
+    }
+
+    [AvaloniaFact]
+    public async Task DeleteAsync_removes_entry_and_secret()
+    {
+        InMemoryConnectionStore conns = new();
+        InMemoryCredentialStore creds = new();
+        ConnectionStoreViewModel vm = new(conns, creds);
+        Guid id = Guid.NewGuid();
+        DbDelta.Core.Abstractions.ConnectionEntry e = new(
+            id, "x", "srv", "db", "Server=srv;Database=db;Password={PASSWORD};", "Dev", "#0054BD", false,
+            DateTime.UtcNow, DateTime.UtcNow);
+        await vm.UpsertExplicitAsync(e, "pwd", CancellationToken.None);
+        await vm.DeleteAsync(id, CancellationToken.None);
+        vm.Entries.Should().BeEmpty();
+    }
 }

@@ -78,19 +78,33 @@
                 Classes="ghost"
                 Command="{Binding SaveProjectCommand}"
                 CommandParameter="{Binding $parent[Window]}"
-                ToolTip.Tip="Salva progetto..."
+                ToolTip.Tip="Salva progetto…"
                 VerticalAlignment="Center"
                 Margin="0,0,4,0">
-          <TextBlock Text="&#x1F4BE;" />
+          <Path Width="16" Height="16"
+                Stretch="Uniform"
+                Stroke="{Binding $parent[Button].Foreground}"
+                StrokeThickness="1.6"
+                StrokeLineCap="Round"
+                StrokeJoin="Round"
+                Fill="Transparent"
+                Data="M 5,5 L 17,5 L 19,7 L 19,19 L 5,19 Z M 7,5 L 7,11 L 15,11 L 15,5 M 9,15 L 15,15" />
         </Button>
         <Button Grid.Column="3"
                 Classes="ghost"
                 Command="{Binding OpenProjectCommand}"
                 CommandParameter="{Binding $parent[Window]}"
-                ToolTip.Tip="Apri progetto..."
+                ToolTip.Tip="Apri progetto…"
                 VerticalAlignment="Center"
                 Margin="0,0,4,0">
-          <TextBlock Text="&#x1F4C2;" />
+          <Path Width="16" Height="16"
+                Stretch="Uniform"
+                Stroke="{Binding $parent[Button].Foreground}"
+                StrokeThickness="1.6"
+                StrokeLineCap="Round"
+                StrokeJoin="Round"
+                Fill="Transparent"
+                Data="M 4,7 L 4,18 L 20,18 L 20,9 L 12,9 L 10,7 Z" />
         </Button>
         <Button Grid.Column="4"
                 Classes="ghost"
