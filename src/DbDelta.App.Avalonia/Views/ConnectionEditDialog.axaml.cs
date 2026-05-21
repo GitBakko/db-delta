@@ -21,7 +21,7 @@ public partial class ConnectionEditDialog : Window
         // dispatcher so layout has a chance to settle. The inline ListBox
         // fallback below the input is the guaranteed visibility path; the
         // popup is a convenience.
-        this.DataContextChanged += (_, _) =>
+        DataContextChanged += (_, _) =>
         {
             if (DataContext is ViewModels.ConnectionEditViewModel vm)
             {
@@ -83,9 +83,9 @@ public partial class ConnectionEditDialog : Window
         box.PasswordChar = '•';
     }
 
-    private void OnColorSwatchTapped(object? sender, Avalonia.Input.TappedEventArgs e)
+    private void OnColorSwatchTapped(object? sender, TappedEventArgs e)
     {
-        if (sender is Avalonia.Controls.Border b
+        if (sender is Border b
             && b.Tag is string hex
             && DataContext is ViewModels.ConnectionEditViewModel vm)
         {

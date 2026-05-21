@@ -155,7 +155,7 @@ public sealed partial class ConnectionEditViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            ConnectionStatusMessage = $"Errore: {DbDelta.Persistence.Util.ConnectionStringRedactor.Redact(ex.Message)}";
+            ConnectionStatusMessage = $"Errore: {Persistence.Util.ConnectionStringRedactor.Redact(ex.Message)}";
         }
         finally
         {

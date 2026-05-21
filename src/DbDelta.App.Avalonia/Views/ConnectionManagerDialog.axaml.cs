@@ -36,7 +36,7 @@ public partial class ConnectionManagerDialog : Window
         ConnectionEditDialog.Result result = await dialog.ShowDialog<ConnectionEditDialog.Result>(this);
         if (result == ConnectionEditDialog.Result.Save)
         {
-            await cs.UpsertExplicitAsync(vm.ToEntry(), vm.Password, System.Threading.CancellationToken.None);
+            await cs.UpsertExplicitAsync(vm.ToEntry(), vm.Password, CancellationToken.None);
         }
     }
 
@@ -62,17 +62,17 @@ public partial class ConnectionManagerDialog : Window
             return;
         }
 
-        string? password = await cs.GetSecretPasswordAsync(entry.Id, System.Threading.CancellationToken.None);
+        string? password = await cs.GetSecretPasswordAsync(entry.Id, CancellationToken.None);
         ConnectionEditViewModel vm = new(entry, password) { IsNew = false };
         ConnectionEditDialog dialog = new() { DataContext = vm };
         ConnectionEditDialog.Result result = await dialog.ShowDialog<ConnectionEditDialog.Result>(this);
         if (result == ConnectionEditDialog.Result.Save)
         {
-            await cs.UpsertExplicitAsync(vm.ToEntry(), vm.Password, System.Threading.CancellationToken.None);
+            await cs.UpsertExplicitAsync(vm.ToEntry(), vm.Password, CancellationToken.None);
         }
         else if (result == ConnectionEditDialog.Result.Delete)
         {
-            await cs.DeleteAsync(entry.Id, System.Threading.CancellationToken.None);
+            await cs.DeleteAsync(entry.Id, CancellationToken.None);
         }
     }
 
@@ -83,7 +83,7 @@ public partial class ConnectionManagerDialog : Window
             return;
         }
 
-        await cs.DeleteAsync(id, System.Threading.CancellationToken.None);
+        await cs.DeleteAsync(id, CancellationToken.None);
     }
 
     private void OnCloseClick(object? sender, RoutedEventArgs e) => Close();

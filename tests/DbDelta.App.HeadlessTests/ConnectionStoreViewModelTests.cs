@@ -100,12 +100,12 @@ public class ConnectionStoreViewModelTests
         InMemoryConnectionStore conns = new();
         InMemoryCredentialStore creds = new();
         ConnectionStoreViewModel vm = new(conns, creds);
-        Guid id = Guid.NewGuid();
-        DbDelta.Core.Abstractions.ConnectionEntry first = new(
+        var id = Guid.NewGuid();
+        ConnectionEntry first = new(
             id, "First", "srv", "db", "Server=srv;Database=db;Password={PASSWORD};", "Dev", "#0054BD", false,
             DateTime.UtcNow, DateTime.UtcNow);
         await vm.UpsertExplicitAsync(first, "pwd", CancellationToken.None);
-        DbDelta.Core.Abstractions.ConnectionEntry second = first with { Name = "Renamed" };
+        ConnectionEntry second = first with { Name = "Renamed" };
         await vm.UpsertExplicitAsync(second, "pwd2", CancellationToken.None);
         vm.Entries.Should().ContainSingle().Which.Name.Should().Be("Renamed");
     }
@@ -116,8 +116,8 @@ public class ConnectionStoreViewModelTests
         InMemoryConnectionStore conns = new();
         InMemoryCredentialStore creds = new();
         ConnectionStoreViewModel vm = new(conns, creds);
-        Guid id = Guid.NewGuid();
-        DbDelta.Core.Abstractions.ConnectionEntry e = new(
+        var id = Guid.NewGuid();
+        ConnectionEntry e = new(
             id, "x", "srv", "db", "Server=srv;Database=db;Password={PASSWORD};", "Dev", "#0054BD", false,
             DateTime.UtcNow, DateTime.UtcNow);
         await vm.UpsertExplicitAsync(e, "pwd", CancellationToken.None);

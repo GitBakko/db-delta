@@ -227,7 +227,7 @@
                   Data="M 11,5 A 6,6 0 1 1 10.99,5 M 16,16 L 20,20" />
             <TextBox Grid.Column="1"
                      Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                     Watermark="Cerca in tutti i campi…"
+                     PlaceholderText="Cerca in tutti i campi…"
                      FontSize="12"
                      BorderThickness="0"
                      Background="Transparent"

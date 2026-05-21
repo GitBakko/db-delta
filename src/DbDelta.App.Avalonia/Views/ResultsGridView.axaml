@@ -57,11 +57,17 @@
           </DataGridTemplateColumn>
 
           <!-- Col 2: Last modified source -->
-          <DataGridTextColumn Header="Ultima modifica (orig)"
-                              Binding="{Binding LastModifiedSourceDisplay}"
-                              Width="140"
-                              FontFamily="Cascadia Mono,Consolas,monospace"
-                              FontSize="11" />
+          <DataGridTemplateColumn Header="Ultima modifica (orig)" Width="140" CanUserSort="True">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:DifferenceRowViewModel">
+                <TextBlock Text="{Binding LastModifiedSourceDisplay}"
+                           FontFamily="Cascadia Mono,Consolas,monospace"
+                           FontSize="11"
+                           VerticalAlignment="Center"
+                           Margin="4,0" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
 
           <!-- Col 3: Source object name (bold when source-only) -->
           <DataGridTemplateColumn Header="Nome (orig)" Width="*" CanUserSort="True">
@@ -105,11 +111,17 @@
           </DataGridTemplateColumn>
 
           <!-- Col 6: Last modified target -->
-          <DataGridTextColumn Header="Ultima modifica (dest)"
-                              Binding="{Binding LastModifiedTargetDisplay}"
-                              Width="140"
-                              FontFamily="Cascadia Mono,Consolas,monospace"
-                              FontSize="11" />
+          <DataGridTemplateColumn Header="Ultima modifica (dest)" Width="140" CanUserSort="True">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:DifferenceRowViewModel">
+                <TextBlock Text="{Binding LastModifiedTargetDisplay}"
+                           FontFamily="Cascadia Mono,Consolas,monospace"
+                           FontSize="11"
+                           VerticalAlignment="Center"
+                           Margin="4,0" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
 
         </DataGrid.Columns>
       </DataGrid>

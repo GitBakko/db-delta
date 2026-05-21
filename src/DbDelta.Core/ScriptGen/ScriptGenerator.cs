@@ -143,4 +143,5 @@ public sealed class ScriptGenerator
         sb.AppendLine("GO");
         return sb.ToString();
     }
+
 }
