@@ -101,7 +101,7 @@
               BorderBrush="{StaticResource BorderBrush}"
               BorderThickness="0,0,1,0"
               IsVisible="{Binding IsSidebarOpen}">
-        <!-- M1: sidebar placeholder — populated by later milestones -->
+        <v:RecentConnectionsSidebar DataContext="{Binding AppState.Connections}" />
       </Border>
 
       <!-- Main: 2-row grid lets ConnectionPicker keep its natural height
