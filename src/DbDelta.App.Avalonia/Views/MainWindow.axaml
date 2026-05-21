@@ -77,7 +77,7 @@
 
         <!-- 3: Apri progetto -->
         <Button Grid.Column="3"
-                Classes="ghost-violet"
+                Classes="ghost"
                 Command="{Binding OpenProjectCommand}"
                 CommandParameter="{Binding $parent[Window]}"
                 ToolTip.Tip="Apri un progetto DbDelta esistente"
@@ -95,7 +95,7 @@
 
         <!-- 4: Salva progetto -->
         <Button Grid.Column="4"
-                Classes="ghost-emerald"
+                Classes="ghost"
                 Command="{Binding SaveProjectCommand}"
                 CommandParameter="{Binding $parent[Window]}"
                 ToolTip.Tip="Salva il progetto corrente"
@@ -113,7 +113,7 @@
 
         <!-- 5: Connessioni — opens centralised manager -->
         <Button Grid.Column="5"
-                Classes="ghost-amber"
+                Classes="ghost"
                 Command="{Binding OpenConnectionManagerCommand}"
                 CommandParameter="{Binding $parent[Window]}"
                 ToolTip.Tip="Gestisci connessioni salvate"
@@ -124,7 +124,7 @@
                   Stroke="{Binding $parent[Button].Foreground}"
                   StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
                   Fill="Transparent"
-                  Data="M 12,3 C 10,3 8,4.5 8,6.5 C 8,8.5 10,10 12,10 C 14,10 16,8.5 16,6.5 C 16,4.5 14,3 12,3 Z M 5,21 C 5,16.5 8.1,13 12,13 C 15.9,13 19,16.5 19,21" />
+                  Data="M 4,6 C 4,4 8,3 12,3 C 16,3 20,4 20,6 L 20,18 C 20,20 16,21 12,21 C 8,21 4,20 4,18 Z M 4,6 C 4,8 8,9 12,9 C 16,9 20,8 20,6 M 4,12 C 4,14 8,15 12,15 C 16,15 20,14 20,12" />
             <TextBlock Text="Connessioni" VerticalAlignment="Center" />
           </StackPanel>
         </Button>
