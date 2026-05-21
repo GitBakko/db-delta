@@ -56,6 +56,9 @@ public sealed partial class ConnectionEditViewModel : ObservableObject
     private ObservableCollection<string> _serverSuggestions = [];
 
     [ObservableProperty]
+    private bool _hasServerSuggestions;
+
+    [ObservableProperty]
     private ObservableCollection<string> _availableDatabases = [];
 
     [ObservableProperty]
@@ -92,6 +95,7 @@ public sealed partial class ConnectionEditViewModel : ObservableObject
     public async Task LoadServerSuggestionsAsync()
     {
         IsScanning = true;
+        HasServerSuggestions = false;
         ScanStatusMessage = "Scansione in corso…";
         try
         {
@@ -99,9 +103,10 @@ public sealed partial class ConnectionEditViewModel : ObservableObject
                 await DbDelta.Persistence.Sql.SqlServerDiscovery.EnumerateServersAsync(System.Threading.CancellationToken.None);
             ServerSuggestions.Clear();
             foreach (string s in list) { ServerSuggestions.Add(s); }
+            HasServerSuggestions = list.Count > 0;
             ScanStatusMessage = list.Count == 0
                 ? "Nessun server rilevato (SQL Browser potrebbe essere disabilitato sui server di rete)."
-                : $"Trovati {list.Count} server. Apri il menu per selezionare.";
+                : $"Trovati {list.Count} server. Clicca su uno per selezionarlo.";
         }
         catch (System.Exception ex)
         {
@@ -110,6 +115,15 @@ public sealed partial class ConnectionEditViewModel : ObservableObject
         finally
         {
             IsScanning = false;
+        }
+    }
+
+    [RelayCommand]
+    public void PickServer(string? server)
+    {
+        if (!string.IsNullOrWhiteSpace(server))
+        {
+            ServerName = server;
         }
     }
 

@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 
 namespace DbDelta.App.Views;
 
@@ -16,8 +17,10 @@ public partial class ConnectionEditDialog : Window
         reveal.AddHandler(PointerPressedEvent, OnRevealPressed, RoutingStrategies.Tunnel);
         reveal.AddHandler(PointerReleasedEvent, OnRevealReleased, RoutingStrategies.Tunnel);
 
-        // After the VM finishes its scan, pop the server dropdown so the user
-        // can immediately pick.
+        // After the VM finishes its scan, pop the server dropdown via the
+        // dispatcher so layout has a chance to settle. The inline ListBox
+        // fallback below the input is the guaranteed visibility path; the
+        // popup is a convenience.
         this.DataContextChanged += (_, _) =>
         {
             if (DataContext is ViewModels.ConnectionEditViewModel vm)
@@ -28,12 +31,25 @@ public partial class ConnectionEditDialog : Window
                         && !vm.IsScanning
                         && vm.ServerSuggestions.Count > 0)
                     {
-                        AutoCompleteBox? box = this.FindControl<AutoCompleteBox>("ServerBox");
-                        box?.SetValue(AutoCompleteBox.IsDropDownOpenProperty, true);
+                        Dispatcher.UIThread.Post(() =>
+                        {
+                            AutoCompleteBox? box = this.FindControl<AutoCompleteBox>("ServerBox");
+                            if (box is null) { return; }
+                            box.Focus();
+                            box.IsDropDownOpen = true;
+                        }, DispatcherPriority.Background);
                     }
                 };
             }
         };
+    }
+
+    private void OnServerDropToggleClick(object? sender, RoutedEventArgs e)
+    {
+        AutoCompleteBox? box = this.FindControl<AutoCompleteBox>("ServerBox");
+        if (box is null) { return; }
+        box.Focus();
+        box.IsDropDownOpen = !box.IsDropDownOpen;
     }
 
     private void OnRevealPressed(object? sender, PointerPressedEventArgs e)
