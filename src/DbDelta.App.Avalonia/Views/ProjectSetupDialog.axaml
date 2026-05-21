@@ -1,0 +1,384 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DbDelta.App.ViewModels"
+        xmlns:sql="using:DbDelta.Persistence.Sql"
+        x:Class="DbDelta.App.Views.ProjectSetupDialog"
+        x:DataType="vm:ProjectSetupViewModel"
+        Title="Nuovo progetto"
+        Width="980" Height="640"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        Background="{StaticResource BgBrush}">
+
+  <Grid RowDefinitions="*,Auto">
+
+    <!-- ── Tab strip (fills all available space above action bar) ───────────── -->
+    <TabControl Grid.Row="0" Background="Transparent" Padding="0">
+      <TabControl.Styles>
+        <Style Selector="TabItem">
+          <Setter Property="Padding" Value="14,8" />
+          <Setter Property="FontSize" Value="13" />
+        </Style>
+      </TabControl.Styles>
+
+      <!-- DATA SOURCES tab (functional) -->
+      <TabItem Header="Data sources">
+        <Grid RowDefinitions="Auto,*">
+
+          <!-- Source / Target band -->
+          <Grid Grid.Row="0" ColumnDefinitions="*,*" Height="72">
+
+            <!-- Source half -->
+            <Border Grid.Column="0" Background="{StaticResource BgMutedBrush}">
+              <Grid ColumnDefinitions="Auto,*" Margin="16,8">
+                <Path Grid.Column="0"
+                      Width="28" Height="28" Stretch="Uniform"
+                      Stroke="{StaticResource FgMutedBrush}"
+                      StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
+                      Fill="Transparent" VerticalAlignment="Center"
+                      Data="M 4,6 C 4,4 8,3 12,3 C 16,3 20,4 20,6 L 20,18 C 20,20 16,21 12,21 C 8,21 4,20 4,18 Z M 4,6 C 4,8 8,9 12,9 C 16,9 20,8 20,6 M 4,12 C 4,14 8,15 12,15 C 16,15 20,14 20,12" />
+                <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" Spacing="2">
+                  <TextBlock Text="Source" FontSize="11" FontWeight="SemiBold"
+                             Foreground="{StaticResource FgSubtleBrush}" />
+                  <TextBlock Text="{Binding Source.ServerName}" FontSize="14" FontWeight="SemiBold"
+                             Foreground="{StaticResource FgStrongBrush}" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding Source.DatabaseName}" FontSize="12"
+                             Foreground="{StaticResource FgMutedBrush}" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <!-- Target half -->
+            <Border Grid.Column="1" Background="{StaticResource PrimaryBrush}">
+              <Grid ColumnDefinitions="*,Auto" Margin="16,8">
+                <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2" HorizontalAlignment="Right">
+                  <TextBlock Text="Target" FontSize="11" FontWeight="SemiBold"
+                             Foreground="{StaticResource PrimaryFgBrush}" HorizontalAlignment="Right" Opacity="0.8" />
+                  <TextBlock Text="{Binding Target.ServerName}" FontSize="14" FontWeight="SemiBold"
+                             Foreground="{StaticResource PrimaryFgBrush}" TextTrimming="CharacterEllipsis" HorizontalAlignment="Right" />
+                  <TextBlock Text="{Binding Target.DatabaseName}" FontSize="12"
+                             Foreground="{StaticResource PrimaryFgBrush}" TextTrimming="CharacterEllipsis"
+                             HorizontalAlignment="Right" Opacity="0.8" />
+                </StackPanel>
+                <Path Grid.Column="1" Width="28" Height="28" Stretch="Uniform"
+                      Stroke="{StaticResource PrimaryFgBrush}"
+                      StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
+                      Fill="Transparent" VerticalAlignment="Center" Margin="10,0,0,0"
+                      Data="M 4,6 C 4,4 8,3 12,3 C 16,3 20,4 20,6 L 20,18 C 20,20 16,21 12,21 C 8,21 4,20 4,18 Z M 4,6 C 4,8 8,9 12,9 C 16,9 20,8 20,6 M 4,12 C 4,14 8,15 12,15 C 16,15 20,14 20,12" />
+              </Grid>
+            </Border>
+
+          </Grid>
+
+          <!-- Two endpoint panels side by side -->
+          <Grid Grid.Row="1" ColumnDefinitions="*,1,*">
+
+            <!-- ── SOURCE panel ─────────────────────────────────────────────── -->
+            <ScrollViewer Grid.Column="0" Padding="16">
+              <StackPanel Spacing="10" DataContext="{Binding Source}">
+
+                <TextBlock Text="Server" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}" />
+                <Grid ColumnDefinitions="*,Auto,Auto">
+                  <AutoCompleteBox x:Name="SrcServerBox" Grid.Column="0"
+                                   Text="{Binding ServerName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                   ItemsSource="{Binding ServerSuggestions}"
+                                   ValueMemberBinding="{Binding Name}"
+                                   FilterMode="None" MinimumPrefixLength="0" MinimumPopulateDelay="0"
+                                   PlaceholderText="Scrivi o seleziona un server SQL…">
+                    <AutoCompleteBox.ItemTemplate>
+                      <DataTemplate DataType="sql:DiscoveredServer">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock Grid.Column="0" Text="{Binding Name}"
+                                     FontFamily="Cascadia Mono,Consolas,monospace" FontSize="12" />
+                          <TextBlock Grid.Column="1" Text="{Binding IpAddress}"
+                                     FontSize="11" Margin="12,0,0,0"
+                                     Foreground="{StaticResource FgSubtleBrush}"
+                                     IsVisible="{Binding IpAddress, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        </Grid>
+                      </DataTemplate>
+                    </AutoCompleteBox.ItemTemplate>
+                  </AutoCompleteBox>
+                  <Button Grid.Column="1" Classes="ghost" Margin="6,0,0,0"
+                          Click="OnSrcServerDropToggleClick" IsVisible="{Binding HasServerSuggestions}"
+                          ToolTip.Tip="Mostra elenco server rilevati">
+                    <Path Width="12" Height="12" Stretch="Uniform"
+                          Stroke="{Binding $parent[Button].Foreground}"
+                          StrokeThickness="1.8" StrokeLineCap="Round" StrokeJoin="Round"
+                          Fill="Transparent" Data="M 5,8 L 12,15 L 19,8" />
+                  </Button>
+                  <Button Grid.Column="2" Classes="ghost-violet" Margin="6,0,0,0"
+                          Command="{Binding ScanServersCommand}" ToolTip.Tip="Cerca server SQL in rete">
+                    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                      <ProgressBar IsIndeterminate="True" Width="14" Height="14"
+                                   IsVisible="{Binding IsScanningServers}" ShowProgressText="False" />
+                      <Path Width="14" Height="14" Stretch="Uniform"
+                            IsVisible="{Binding !IsScanningServers}"
+                            Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.7" StrokeLineCap="Round"
+                            Data="M 11,4 A 7,7 0 1 1 4,11 A 7,7 0 0 1 11,4 M 16,16 L 20,20" />
+                      <TextBlock Text="Scansiona" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </Button>
+                </Grid>
+                <TextBlock Text="{Binding ScanStatusMessage}" FontSize="11"
+                           Foreground="{StaticResource FgMutedBrush}"
+                           IsVisible="{Binding ScanStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                <TextBlock Text="Authentication" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}" />
+                <ComboBox SelectedIndex="{Binding AuthMode, Converter={x:Static vm:AuthModeConverter.Instance}}"
+                          HorizontalAlignment="Stretch">
+                  <ComboBoxItem Content="SQL Server authentication" />
+                  <ComboBoxItem Content="Windows authentication" />
+                </ComboBox>
+
+                <TextBlock Text="User name" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}"
+                           IsVisible="{Binding AuthMode, Converter={x:Static vm:AuthModeConverter.IsSqlServer}}" />
+                <TextBox Text="{Binding UserName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         IsVisible="{Binding AuthMode, Converter={x:Static vm:AuthModeConverter.IsSqlServer}}" />
+
+                <TextBlock Text="Password" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}"
+                           IsVisible="{Binding AuthMode, Converter={x:Static vm:AuthModeConverter.IsSqlServer}}" />
+                <Grid ColumnDefinitions="*,Auto"
+                      IsVisible="{Binding AuthMode, Converter={x:Static vm:AuthModeConverter.IsSqlServer}}">
+                  <TextBox x:Name="SrcPasswordBox" Grid.Column="0"
+                           Text="{Binding Password, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                           PasswordChar="&#x2022;" />
+                  <Button x:Name="SrcRevealButton" Grid.Column="1" Classes="ghost" Margin="6,0,0,0"
+                          ToolTip.Tip="Tieni premuto per mostrare la password">
+                    <Path Width="14" Height="14" Stretch="Uniform"
+                          Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.7" StrokeLineCap="Round"
+                          Data="M 2,12 C 4,7 8,4 12,4 C 16,4 20,7 22,12 C 20,17 16,20 12,20 C 8,20 4,17 2,12 Z M 12,9 A 3,3 0 1 0 12,15 A 3,3 0 0 0 12,9 Z" />
+                  </Button>
+                </Grid>
+
+                <CheckBox Content="Remember credentials" IsChecked="{Binding RememberCredentials, Mode=TwoWay}"
+                          IsVisible="{Binding AuthMode, Converter={x:Static vm:AuthModeConverter.IsSqlServer}}" />
+                <StackPanel Orientation="Horizontal" Spacing="16">
+                  <CheckBox Content="Encrypt" IsChecked="{Binding Encrypt, Mode=TwoWay}" />
+                  <CheckBox Content="Trust server certificate" IsChecked="{Binding TrustServerCertificate, Mode=TwoWay}" />
+                </StackPanel>
+
+                <TextBlock Text="Database" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}" />
+                <Grid ColumnDefinitions="*,Auto,Auto">
+                  <AutoCompleteBox x:Name="SrcDatabaseBox" Grid.Column="0"
+                                   Text="{Binding DatabaseName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                   ItemsSource="{Binding AvailableDatabases}"
+                                   FilterMode="None" MinimumPrefixLength="0" MinimumPopulateDelay="0"
+                                   PlaceholderText="Scegli un database…" IsVisible="{Binding HasDatabases}" />
+                  <Button Grid.Column="1" Classes="ghost" Margin="6,0,0,0"
+                          Click="OnSrcDatabaseDropToggleClick" IsVisible="{Binding HasDatabases}"
+                          ToolTip.Tip="Mostra elenco database">
+                    <Path Width="12" Height="12" Stretch="Uniform"
+                          Stroke="{Binding $parent[Button].Foreground}"
+                          StrokeThickness="1.8" StrokeLineCap="Round" StrokeJoin="Round"
+                          Fill="Transparent" Data="M 5,8 L 12,15 L 19,8" />
+                  </Button>
+                  <Button Grid.Column="2" Classes="ghost-emerald" Margin="6,0,0,0"
+                          Command="{Binding LoadDatabasesCommand}" ToolTip.Tip="Connetti e carica database">
+                    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                      <ProgressBar IsIndeterminate="True" Width="14" Height="14"
+                                   IsVisible="{Binding IsLoadingDatabases}" ShowProgressText="False" />
+                      <Path Width="14" Height="14" Stretch="Uniform"
+                            IsVisible="{Binding !IsLoadingDatabases}"
+                            Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.7" StrokeLineCap="Round"
+                            Data="M 5,12 L 19,12 M 13,6 L 19,12 L 13,18" />
+                      <TextBlock Text="Connetti" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </Button>
+                </Grid>
+                <TextBox Text="{Binding DatabaseName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         PlaceholderText="Nome database…" IsVisible="{Binding !HasDatabases}" />
+                <TextBlock Text="{Binding ConnectionStatusMessage}" FontSize="11"
+                           Foreground="{StaticResource FgMutedBrush}"
+                           IsVisible="{Binding ConnectionStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+              </StackPanel>
+            </ScrollViewer>
+
+            <!-- vertical divider -->
+            <Border Grid.Column="1" Background="{StaticResource BorderBrush}" />
+
+            <!-- ── TARGET panel ─────────────────────────────────────────────── -->
+            <ScrollViewer Grid.Column="2" Padding="16">
+              <StackPanel Spacing="10" DataContext="{Binding Target}">
+
+                <TextBlock Text="Server" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}" />
+                <Grid ColumnDefinitions="*,Auto,Auto">
+                  <AutoCompleteBox x:Name="TgtServerBox" Grid.Column="0"
+                                   Text="{Binding ServerName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                   ItemsSource="{Binding ServerSuggestions}"
+                                   ValueMemberBinding="{Binding Name}"
+                                   FilterMode="None" MinimumPrefixLength="0" MinimumPopulateDelay="0"
+                                   PlaceholderText="Scrivi o seleziona un server SQL…">
+                    <AutoCompleteBox.ItemTemplate>
+                      <DataTemplate DataType="sql:DiscoveredServer">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock Grid.Column="0" Text="{Binding Name}"
+                                     FontFamily="Cascadia Mono,Consolas,monospace" FontSize="12" />
+                          <TextBlock Grid.Column="1" Text="{Binding IpAddress}"
+                                     FontSize="11" Margin="12,0,0,0"
+                                     Foreground="{StaticResource FgSubtleBrush}"
+                                     IsVisible="{Binding IpAddress, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        </Grid>
+                      </DataTemplate>
+                    </AutoCompleteBox.ItemTemplate>
+                  </AutoCompleteBox>
+                  <Button Grid.Column="1" Classes="ghost" Margin="6,0,0,0"
+                          Click="OnTgtServerDropToggleClick" IsVisible="{Binding HasServerSuggestions}"
+                          ToolTip.Tip="Mostra elenco server rilevati">
+                    <Path Width="12" Height="12" Stretch="Uniform"
+                          Stroke="{Binding $parent[Button].Foreground}"
+                          StrokeThickness="1.8" StrokeLineCap="Round" StrokeJoin="Round"
+                          Fill="Transparent" Data="M 5,8 L 12,15 L 19,8" />
+                  </Button>
+                  <Button Grid.Column="2" Classes="ghost-violet" Margin="6,0,0,0"
+                          Command="{Binding ScanServersCommand}" ToolTip.Tip="Cerca server SQL in rete">
+                    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                      <ProgressBar IsIndeterminate="True" Width="14" Height="14"
+                                   IsVisible="{Binding IsScanningServers}" ShowProgressText="False" />
+                      <Path Width="14" Height="14" Stretch="Uniform"
+                            IsVisible="{Binding !IsScanningServers}"
+                            Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.7" StrokeLineCap="Round"
+                            Data="M 11,4 A 7,7 0 1 1 4,11 A 7,7 0 0 1 11,4 M 16,16 L 20,20" />
+                      <TextBlock Text="Scansiona" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </Button>
+                </Grid>
+                <TextBlock Text="{Binding ScanStatusMessage}" FontSize="11"
+                           Foreground="{StaticResource FgMutedBrush}"
+                           IsVisible="{Binding ScanStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                <TextBlock Text="Authentication" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}" />
+                <ComboBox SelectedIndex="{Binding AuthMode, Converter={x:Static vm:AuthModeConverter.Instance}}"
+                          HorizontalAlignment="Stretch">
+                  <ComboBoxItem Content="SQL Server authentication" />
+                  <ComboBoxItem Content="Windows authentication" />
+                </ComboBox>
+
+                <TextBlock Text="User name" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}"
+                           IsVisible="{Binding AuthMode, Converter={x:Static vm:AuthModeConverter.IsSqlServer}}" />
+                <TextBox Text="{Binding UserName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         IsVisible="{Binding AuthMode, Converter={x:Static vm:AuthModeConverter.IsSqlServer}}" />
+
+                <TextBlock Text="Password" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}"
+                           IsVisible="{Binding AuthMode, Converter={x:Static vm:AuthModeConverter.IsSqlServer}}" />
+                <Grid ColumnDefinitions="*,Auto"
+                      IsVisible="{Binding AuthMode, Converter={x:Static vm:AuthModeConverter.IsSqlServer}}">
+                  <TextBox x:Name="TgtPasswordBox" Grid.Column="0"
+                           Text="{Binding Password, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                           PasswordChar="&#x2022;" />
+                  <Button x:Name="TgtRevealButton" Grid.Column="1" Classes="ghost" Margin="6,0,0,0"
+                          ToolTip.Tip="Tieni premuto per mostrare la password">
+                    <Path Width="14" Height="14" Stretch="Uniform"
+                          Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.7" StrokeLineCap="Round"
+                          Data="M 2,12 C 4,7 8,4 12,4 C 16,4 20,7 22,12 C 20,17 16,20 12,20 C 8,20 4,17 2,12 Z M 12,9 A 3,3 0 1 0 12,15 A 3,3 0 0 0 12,9 Z" />
+                  </Button>
+                </Grid>
+
+                <CheckBox Content="Remember credentials" IsChecked="{Binding RememberCredentials, Mode=TwoWay}"
+                          IsVisible="{Binding AuthMode, Converter={x:Static vm:AuthModeConverter.IsSqlServer}}" />
+                <StackPanel Orientation="Horizontal" Spacing="16">
+                  <CheckBox Content="Encrypt" IsChecked="{Binding Encrypt, Mode=TwoWay}" />
+                  <CheckBox Content="Trust server certificate" IsChecked="{Binding TrustServerCertificate, Mode=TwoWay}" />
+                </StackPanel>
+
+                <TextBlock Text="Database" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}" />
+                <Grid ColumnDefinitions="*,Auto,Auto">
+                  <AutoCompleteBox x:Name="TgtDatabaseBox" Grid.Column="0"
+                                   Text="{Binding DatabaseName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                   ItemsSource="{Binding AvailableDatabases}"
+                                   FilterMode="None" MinimumPrefixLength="0" MinimumPopulateDelay="0"
+                                   PlaceholderText="Scegli un database…" IsVisible="{Binding HasDatabases}" />
+                  <Button Grid.Column="1" Classes="ghost" Margin="6,0,0,0"
+                          Click="OnTgtDatabaseDropToggleClick" IsVisible="{Binding HasDatabases}"
+                          ToolTip.Tip="Mostra elenco database">
+                    <Path Width="12" Height="12" Stretch="Uniform"
+                          Stroke="{Binding $parent[Button].Foreground}"
+                          StrokeThickness="1.8" StrokeLineCap="Round" StrokeJoin="Round"
+                          Fill="Transparent" Data="M 5,8 L 12,15 L 19,8" />
+                  </Button>
+                  <Button Grid.Column="2" Classes="ghost-emerald" Margin="6,0,0,0"
+                          Command="{Binding LoadDatabasesCommand}" ToolTip.Tip="Connetti e carica database">
+                    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                      <ProgressBar IsIndeterminate="True" Width="14" Height="14"
+                                   IsVisible="{Binding IsLoadingDatabases}" ShowProgressText="False" />
+                      <Path Width="14" Height="14" Stretch="Uniform"
+                            IsVisible="{Binding !IsLoadingDatabases}"
+                            Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.7" StrokeLineCap="Round"
+                            Data="M 5,12 L 19,12 M 13,6 L 19,12 L 13,18" />
+                      <TextBlock Text="Connetti" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </Button>
+                </Grid>
+                <TextBox Text="{Binding DatabaseName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         PlaceholderText="Nome database…" IsVisible="{Binding !HasDatabases}" />
+                <TextBlock Text="{Binding ConnectionStatusMessage}" FontSize="11"
+                           Foreground="{StaticResource FgMutedBrush}"
+                           IsVisible="{Binding ConnectionStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+              </StackPanel>
+            </ScrollViewer>
+
+          </Grid>
+
+        </Grid>
+      </TabItem>
+
+      <!-- STUB TABS -->
+      <TabItem Header="Table mapping">
+        <TextBlock Text="Sezione in arrivo"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   Foreground="{StaticResource FgSubtleBrush}" />
+      </TabItem>
+
+      <TabItem Header="Owner mapping">
+        <TextBlock Text="Sezione in arrivo"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   Foreground="{StaticResource FgSubtleBrush}" />
+      </TabItem>
+
+      <TabItem Header="Options">
+        <TextBlock Text="Sezione in arrivo"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   Foreground="{StaticResource FgSubtleBrush}" />
+      </TabItem>
+
+    </TabControl>
+
+    <!-- ── Action bar ──────────────────────────────────────────────────────── -->
+    <Border Grid.Row="1"
+            Background="{StaticResource BgMutedBrush}"
+            BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="0,1,0,0"
+            Padding="12,8">
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+
+        <Button Classes="ghost" Click="OnSaveClick" ToolTip.Tip="Salva progetto">
+          <TextBlock Text="Save" />
+        </Button>
+
+        <Button Classes="ghost" Click="OnSaveAsClick" ToolTip.Tip="Salva progetto con nome">
+          <TextBlock Text="Save as…" />
+        </Button>
+
+        <Button Classes="ghost" Command="{Binding SwapEndpointsCommand}"
+                ToolTip.Tip="Scambia origine e destinazione">
+          <Path Width="16" Height="16" Stretch="Uniform"
+                Stroke="{Binding $parent[Button].Foreground}"
+                StrokeThickness="1.7" StrokeLineCap="Round" StrokeJoin="Round"
+                Fill="Transparent"
+                Data="M 4,9 L 20,9 M 14,4 L 20,9 L 14,14 M 20,15 L 4,15 M 10,10 L 4,15 L 10,20" />
+        </Button>
+
+        <Button Classes="primary" IsEnabled="{Binding IsValid}" Click="OnOkClick">
+          <TextBlock Text="OK" />
+        </Button>
+
+        <Button Classes="ghost" Click="OnCancelClick">
+          <TextBlock Text="Cancel" />
+        </Button>
+
+      </StackPanel>
+    </Border>
+
+  </Grid>
+</Window>
