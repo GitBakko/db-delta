@@ -20,7 +20,7 @@ public partial class App : Application
             DbDelta.Core.Abstractions.IConnectionStore connectionStore = DbDelta.Persistence.Json.JsonConnectionStore.CreateDefault();
             ConnectionStoreViewModel connections = new(connectionStore, credentials);
             AppStateViewModel appState = new(connections);
-            _ = connections.LoadAsync(System.Threading.CancellationToken.None);
+            _ = LoadAndPrefillAsync(connections, appState);
             desktop.MainWindow = new MainWindow
             {
                 DataContext = new MainWindowViewModel(appState),
@@ -33,5 +33,28 @@ public partial class App : Application
 #endif
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private static async System.Threading.Tasks.Task LoadAndPrefillAsync(
+        ConnectionStoreViewModel cs,
+        AppStateViewModel state)
+    {
+        await cs.LoadAsync(System.Threading.CancellationToken.None).ConfigureAwait(true);
+        if (cs.Entries.Count >= 1)
+        {
+            string? src = await cs.MaterialiseAsync(cs.Entries[0], System.Threading.CancellationToken.None).ConfigureAwait(true);
+            if (src is not null)
+            {
+                state.SourceConnectionString = src;
+            }
+        }
+        if (cs.Entries.Count >= 2)
+        {
+            string? tgt = await cs.MaterialiseAsync(cs.Entries[1], System.Threading.CancellationToken.None).ConfigureAwait(true);
+            if (tgt is not null)
+            {
+                state.TargetConnectionString = tgt;
+            }
+        }
     }
 }
