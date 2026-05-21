@@ -84,4 +84,48 @@ internal sealed class ModuleReader
         }
         return procs;
     }
+
+    private const string FunctionQuery = """
+        SELECT s.name AS SchemaName,
+               o.name AS Name,
+               sm.definition AS Body,
+               o.type AS RawType
+        FROM sys.objects AS o
+        INNER JOIN sys.schemas AS s ON s.schema_id = o.schema_id
+        LEFT JOIN sys.sql_modules AS sm ON sm.object_id = o.object_id
+        WHERE o.is_ms_shipped = 0
+          AND o.type IN ('FN', 'IF', 'TF')
+        ORDER BY s.name, o.name;
+        """;
+
+    /// <summary>
+    /// Reads user-defined functions (scalar, inline-TVF, multi-TVF). Same
+    /// NULL-body coercion as the view + procedure readers — when the
+    /// definition row is missing (encrypted or permission edge case) the
+    /// result has <c>Body = null</c> and <c>IsEncrypted = true</c>.
+    /// </summary>
+    public async Task<IReadOnlyList<Function>> ReadFunctionsAsync(SqlConnection connection, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        List<Function> functions = [];
+        await using SqlCommand cmd = new(FunctionQuery, connection);
+        await using SqlDataReader r = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        while (await r.ReadAsync(ct).ConfigureAwait(false))
+        {
+            string schema = r.GetString(0);
+            string name = r.GetString(1);
+            string? body = r.IsDBNull(2) ? null : r.GetString(2);
+            string rawType = r.GetString(3).Trim();
+            FunctionKind kind = rawType switch
+            {
+                "FN" => FunctionKind.Scalar,
+                "IF" => FunctionKind.InlineTableValued,
+                "TF" => FunctionKind.MultiStatementTableValued,
+                _ => FunctionKind.Scalar,
+            };
+            bool encrypted = body is null;
+            functions.Add(new Function(schema, name, body, encrypted, kind));
+        }
+        return functions;
+    }
 }
