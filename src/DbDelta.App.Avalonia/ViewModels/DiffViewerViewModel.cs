@@ -12,6 +12,13 @@ namespace DbDelta.App.ViewModels;
 /// </summary>
 public sealed partial class DiffViewerViewModel(IObjectBodyResolver? resolver = null) : ObservableObject
 {
+    private IObjectBodyResolver? _resolver = resolver;
+
+    /// <summary>Replace the body resolver. Called by <see cref="AppStateViewModel"/>
+    /// after a successful comparison once the source/target connection strings
+    /// are known.</summary>
+    public void SetResolver(IObjectBodyResolver? value) => _resolver = value;
+
     [ObservableProperty]
     private string? _sourceBody;
 
@@ -49,15 +56,15 @@ public sealed partial class DiffViewerViewModel(IObjectBodyResolver? resolver = 
     public async Task LoadAsync(DifferenceRowViewModel row, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(row);
-        if (resolver is null) { return; }
+        if (_resolver is null) { return; }
 
         IsLoading = true;
         try
         {
             ObjectQualifiedName = row.QualifiedName;
-            SourceBody = await resolver.ResolveSourceBodyAsync(row.Kind, row.SchemaName, row.ObjectName, ct)
+            SourceBody = await _resolver.ResolveSourceBodyAsync(row.Kind, row.SchemaName, row.ObjectName, ct)
                 .ConfigureAwait(false);
-            TargetBody = await resolver.ResolveTargetBodyAsync(row.Kind, row.SchemaName, row.ObjectName, ct)
+            TargetBody = await _resolver.ResolveTargetBodyAsync(row.Kind, row.SchemaName, row.ObjectName, ct)
                 .ConfigureAwait(false);
             Rows = LineDiffer.Compute(SourceBody, TargetBody);
             Sections = LineDiffer.SectionsFrom(Rows);

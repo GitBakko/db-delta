@@ -172,6 +172,11 @@ public sealed partial class AppStateViewModel : ObservableObject
             LastComparisonRaw = result;
             LastComparison = Mapper.ToDto(result);
 
+            // Wire the diff viewer with a live resolver bound to the same
+            // source/target connection strings so the bottom pane can fetch
+            // per-object SQL bodies on row selection.
+            DiffViewer.SetResolver(new DbDelta.Providers.LiveDb.ObjectBody.LiveDbObjectBodyResolver(srcCs, tgtCs));
+
             if (Connections is not null)
             {
                 await Connections.AutosaveAsync(srcCs, ct).ConfigureAwait(true);
