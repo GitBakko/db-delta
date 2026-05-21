@@ -1,0 +1,1 @@
+﻿-- WARNING: trigger [dbo].[trgSecret] is encrypted (WITH ENCRYPTION); body cannot be scripted.

@@ -1,0 +1,1 @@
+﻿ENABLE TRIGGER [dbo].[trg] ON [dbo].[T];

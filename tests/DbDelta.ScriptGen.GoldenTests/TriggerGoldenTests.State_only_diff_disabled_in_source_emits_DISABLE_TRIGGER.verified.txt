@@ -1,0 +1,1 @@
+﻿DISABLE TRIGGER [dbo].[trg] ON [dbo].[T];
