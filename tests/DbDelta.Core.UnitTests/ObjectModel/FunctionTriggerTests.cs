@@ -78,4 +78,26 @@ public class FunctionTriggerTests
         Trigger b = new("dbo", "trg", "BODY", false, "dbo", "T", false, false);
         a.Should().Be(b);
     }
+
+    [Fact]
+    public void Database_carries_functions_and_triggers_collections()
+    {
+        Schema dbo = new("dbo");
+        Function fn = new("dbo", "fnA", "BODY", IsEncrypted: false, FunctionKind: FunctionKind.Scalar);
+        Trigger trg = new("dbo", "trgA", "BODY", IsEncrypted: false,
+            ParentSchema: "dbo", ParentTable: "T", IsDisabled: false, IsNotForReplication: false);
+        Database db = new("Db", Schemas: [dbo], Tables: [], Views: [], Procedures: [],
+            Functions: [fn], Triggers: [trg]);
+        db.Functions.Should().ContainSingle().Which.Should().Be(fn);
+        db.Triggers.Should().ContainSingle().Which.Should().Be(trg);
+    }
+
+    [Fact]
+    public void Database_defaults_functions_and_triggers_to_empty()
+    {
+        Schema dbo = new("dbo");
+        Database db = new("Db", Schemas: [dbo], Tables: []);
+        db.Functions.Should().BeEmpty();
+        db.Triggers.Should().BeEmpty();
+    }
 }
