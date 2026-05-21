@@ -1,0 +1,85 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DbDelta.App.ViewModels"
+        x:Class="DbDelta.App.Views.ConnectionEditDialog"
+        x:DataType="vm:ConnectionEditViewModel"
+        Title="Modifica connessione"
+        Width="520" Height="600"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        Background="{StaticResource BgBrush}">
+
+  <Grid RowDefinitions="*,Auto" Margin="16">
+
+    <ScrollViewer Grid.Row="0">
+      <StackPanel Spacing="12">
+
+        <TextBlock Text="Nome" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}" />
+        <TextBox Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Text="Server" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}" />
+        <TextBox Text="{Binding ServerName, Mode=TwoWay}" />
+
+        <TextBlock Text="Database" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}" />
+        <TextBox Text="{Binding DatabaseName, Mode=TwoWay}" />
+
+        <TextBlock Text="Password" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}" />
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBox Grid.Column="0"
+                   Text="{Binding Password, Mode=TwoWay}"
+                   PasswordChar="&#x2022;" />
+          <Button Grid.Column="1" Classes="ghost"
+                  ToolTip.Tip="Mostra"
+                  Margin="6,0,0,0">
+            <TextBlock Text="&#x1F441;" />
+          </Button>
+        </Grid>
+
+        <TextBlock Text="Tag ambiente" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}" />
+        <TextBox Text="{Binding EnvironmentTag, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                 PlaceholderText="Dev / Test / Prod / &#x2026;" />
+
+        <TextBlock Text="Colore ambiente" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}" />
+        <ItemsControl ItemsSource="{Binding ColorPalette}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <WrapPanel Orientation="Horizontal" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="vm:EnvironmentColorOption">
+              <Button Classes="ghost"
+                      Margin="0,0,4,4"
+                      Padding="2"
+                      CommandParameter="{Binding Hex}"
+                      Command="{Binding $parent[Window].((vm:ConnectionEditViewModel)DataContext).PickColorCommand}"
+                      ToolTip.Tip="{Binding Label}">
+                <Border Width="28" Height="28" CornerRadius="4">
+                  <Border.Background>
+                    <SolidColorBrush Color="{Binding Hex}" />
+                  </Border.Background>
+                </Border>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Text="{Binding EnvironmentColorHex}"
+                   FontFamily="Cascadia Mono,Consolas,monospace" FontSize="11"
+                   Foreground="{StaticResource FgSubtleBrush}" />
+
+        <CheckBox Content="Aggiungi ai preferiti (pin in cima)"
+                  IsChecked="{Binding IsPinned, Mode=TwoWay}" />
+
+      </StackPanel>
+    </ScrollViewer>
+
+    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,12,0,0">
+      <Button Content="Elimina" Classes="ghost" Click="OnDeleteClick" />
+      <Button Content="Annulla" Classes="ghost" Click="OnCancelClick" />
+      <Button Content="Salva" Classes="primary"
+              IsEnabled="{Binding IsValid}"
+              Click="OnSaveClick" />
+    </StackPanel>
+
+  </Grid>
+</Window>
