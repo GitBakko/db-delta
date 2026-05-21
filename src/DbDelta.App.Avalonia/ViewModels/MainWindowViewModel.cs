@@ -79,10 +79,13 @@ public sealed partial class MainWindowViewModel(AppStateViewModel appState) : Ob
         }
 
         Persistence.Xml.XmlProjectStore store = new();
+        DateTime now = DateTime.UtcNow;
         await store.SaveAsync(
             file.Path.LocalPath,
             new DbDeltaProject(
                 Name: Path.GetFileNameWithoutExtension(file.Path.LocalPath),
+                CreatedUtc: now,
+                LastModifiedUtc: now,
                 SourceConnectionId: src.Id,
                 TargetConnectionId: tgt.Id,
                 Options: Core.Options.ComparisonOptions.Default),

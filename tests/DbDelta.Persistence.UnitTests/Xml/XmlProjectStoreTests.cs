@@ -24,6 +24,8 @@ public class XmlProjectStoreTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
+    // ── Legacy (v1) tests — must remain unchanged ──────────────────────────
+
     [Fact]
     public async Task Save_then_Load_round_trips_all_fields()
     {
@@ -58,5 +60,200 @@ public class XmlProjectStoreTests : IDisposable
         await store.SaveAsync(_file, project, CancellationToken.None);
         string text = await File.ReadAllTextAsync(_file, CancellationToken.None);
         text.Should().Contain("xmlns=\"https://schemas.dbdelta.org/project/v1\"");
+    }
+
+    // ── V2 tests ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task V2_round_trip_all_sections()
+    {
+        XmlProjectStore store = new();
+        Guid connId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+        DateTime created = new(2026, 5, 21, 12, 0, 0, DateTimeKind.Utc);
+        DateTime modified = new(2026, 5, 21, 12, 34, 56, DateTimeKind.Utc);
+
+        ProjectConnectionRef connRef = new(
+            Id: connId,
+            Name: "Dev-Source",
+            ServerName: "sql-dev-01",
+            DatabaseName: "AdventureWorks",
+            EnvironmentTag: "DEV",
+            EnvironmentColorHex: "#1E90FF");
+
+        ProjectAuthentication auth = new(
+            Mode: AuthenticationMode.SqlServer,
+            UserName: "sa",
+            RememberCredentials: true,
+            Encrypt: false,
+            TrustServerCertificate: true);
+
+        ProjectEndpoint endpoint = new(connRef, auth);
+
+        ProjectConnectionRef connRefTgt = new(
+            Id: Guid.Parse("11111111-2222-3333-4444-555555555555"),
+            Name: "Prod-Target",
+            ServerName: "sql-prod-01",
+            DatabaseName: "AdventureWorks",
+            EnvironmentTag: "PROD",
+            EnvironmentColorHex: "#FF4500");
+
+        ProjectAuthentication authTgt = new(
+            Mode: AuthenticationMode.WindowsIntegrated,
+            UserName: null,
+            RememberCredentials: false,
+            Encrypt: true,
+            TrustServerCertificate: false);
+
+        ProjectEndpoint endpointTgt = new(connRefTgt, authTgt);
+
+        List<OwnerMappingEntry> owners =
+        [
+            new OwnerMappingEntry("dbo", "dbo"),
+            new OwnerMappingEntry("sales", "sales"),
+        ];
+
+        List<TableMappingEntry> tables =
+        [
+            new TableMappingEntry("dbo", "Orders", "dbo", "Orders"),
+            new TableMappingEntry("sales", "Customer", "sales", "Customer"),
+        ];
+
+        ProjectOptions opts = new(
+            IgnoreFillFactor: true,
+            IgnoreCollation: false,
+            IgnoreWhitespace: true,
+            IgnoreCommentBlocks: false,
+            TreatExtendedPropertiesAsObjects: true);
+
+        Dictionary<ObjectSelectionKey, bool> selections = new()
+        {
+            [new ObjectSelectionKey("Table", "dbo", "Orders")] = true,
+            [new ObjectSelectionKey("Table", "dbo", "Product")] = false,
+            [new ObjectSelectionKey("View", "dbo", "vOrders")] = true,
+        };
+
+        DbDeltaProject project = new(
+            Name: "Full v2 project",
+            CreatedUtc: created,
+            LastModifiedUtc: modified,
+            Source: endpoint,
+            Target: endpointTgt,
+            OwnerMappings: owners,
+            TableMappings: tables,
+            ProjectOptions: opts,
+            Selections: selections);
+
+        await store.SaveAsync(_file, project, CancellationToken.None);
+        DbDeltaProject back = await store.LoadAsync(_file, CancellationToken.None);
+
+        back.Name.Should().Be(project.Name);
+        back.CreatedUtc.Should().BeCloseTo(project.CreatedUtc, TimeSpan.FromSeconds(1));
+        back.LastModifiedUtc.Should().BeCloseTo(project.LastModifiedUtc, TimeSpan.FromSeconds(1));
+
+        back.Source.Should().NotBeNull();
+        back.Source!.Connection.Id.Should().Be(connRef.Id);
+        back.Source.Connection.Name.Should().Be(connRef.Name);
+        back.Source.Connection.ServerName.Should().Be(connRef.ServerName);
+        back.Source.Connection.DatabaseName.Should().Be(connRef.DatabaseName);
+        back.Source.Connection.EnvironmentTag.Should().Be(connRef.EnvironmentTag);
+        back.Source.Connection.EnvironmentColorHex.Should().Be(connRef.EnvironmentColorHex);
+        back.Source.Authentication.Mode.Should().Be(AuthenticationMode.SqlServer);
+        back.Source.Authentication.UserName.Should().Be("sa");
+        back.Source.Authentication.RememberCredentials.Should().BeTrue();
+        back.Source.Authentication.Encrypt.Should().BeFalse();
+        back.Source.Authentication.TrustServerCertificate.Should().BeTrue();
+
+        back.Target.Should().NotBeNull();
+        back.Target!.Authentication.Mode.Should().Be(AuthenticationMode.WindowsIntegrated);
+        back.Target.Authentication.Encrypt.Should().BeTrue();
+
+        back.OwnerMappings.Should().BeEquivalentTo(project.OwnerMappings);
+        back.TableMappings.Should().BeEquivalentTo(project.TableMappings);
+        back.ProjectOptions.Should().Be(project.ProjectOptions);
+        back.Selections.Should().BeEquivalentTo(project.Selections);
+    }
+
+    [Fact]
+    public async Task Read_legacy_v1_xml_produces_valid_project_with_defaults()
+    {
+        Guid srcId = Guid.Parse("9f2c1d76-1111-1111-1111-111111111111");
+        Guid tgtId = Guid.Parse("3a55ee99-2222-2222-2222-222222222222");
+
+        // Hand-crafted v1 XML — no schema attribute, uses XmlSerializer layout.
+        // Options element must use the named enum member; "None" = 0 is the
+        // simplest valid value for XmlSerializer with a [Flags] enum.
+        string v1Xml = $"""
+            <?xml version="1.0" encoding="utf-8"?>
+            <DbDeltaProject xmlns="https://schemas.dbdelta.org/project/v1" name="LegacyProject">
+              <SourceConnectionId>{srcId:D}</SourceConnectionId>
+              <TargetConnectionId>{tgtId:D}</TargetConnectionId>
+              <Options>None</Options>
+            </DbDeltaProject>
+            """;
+
+        await File.WriteAllTextAsync(_file, v1Xml, CancellationToken.None);
+
+        XmlProjectStore store = new();
+        DbDeltaProject project = await store.LoadAsync(_file, CancellationToken.None);
+
+        project.Name.Should().Be("LegacyProject");
+        project.SourceConnectionId.Should().Be(srcId);
+        project.TargetConnectionId.Should().Be(tgtId);
+        project.Source.Should().BeNull();
+        project.Target.Should().BeNull();
+        project.Selections.Should().BeEmpty();
+        project.OwnerMappings.Should().BeEmpty();
+        project.TableMappings.Should().BeEmpty();
+        project.ProjectOptions.Should().Be(ProjectOptions.Default);
+    }
+
+    [Fact]
+    public async Task Write_v2_emits_schema_2_attribute_and_Selections_section()
+    {
+        XmlProjectStore store = new();
+        Dictionary<ObjectSelectionKey, bool> selections = new()
+        {
+            [new ObjectSelectionKey("Table", "dbo", "Orders")] = true,
+        };
+
+        DbDeltaProject project = new(
+            Name: "AttrTest",
+            CreatedUtc: DateTime.UtcNow,
+            LastModifiedUtc: DateTime.UtcNow,
+            Selections: selections);
+
+        await store.SaveAsync(_file, project, CancellationToken.None);
+        string text = await File.ReadAllTextAsync(_file, CancellationToken.None);
+
+        text.Should().Contain("schema=\"2\"");
+        text.Should().Contain("<Selections");
+        text.Should().Contain("type=\"Table\"");
+        text.Should().Contain("name=\"Orders\"");
+    }
+
+    [Fact]
+    public async Task Selections_key_uniqueness_single_entry_round_trips()
+    {
+        // IReadOnlyDictionary<ObjectSelectionKey, bool> guarantees key uniqueness
+        // by construction.  This test verifies a single entry survives a write/read.
+        XmlProjectStore store = new();
+        ObjectSelectionKey key = new("StoredProcedure", "hr", "usp_GetEmployee");
+
+        Dictionary<ObjectSelectionKey, bool> selections = new()
+        {
+            [key] = false,
+        };
+
+        DbDeltaProject project = new(
+            Name: "UniqueKeyTest",
+            CreatedUtc: DateTime.UtcNow,
+            LastModifiedUtc: DateTime.UtcNow,
+            Selections: selections);
+
+        await store.SaveAsync(_file, project, CancellationToken.None);
+        DbDeltaProject back = await store.LoadAsync(_file, CancellationToken.None);
+
+        back.Selections.Should().ContainSingle();
+        back.Selections[key].Should().BeFalse();
     }
 }
