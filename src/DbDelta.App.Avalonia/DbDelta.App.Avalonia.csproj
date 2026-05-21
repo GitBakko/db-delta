@@ -24,6 +24,7 @@
     <ProjectReference Include="..\DbDelta.Core\DbDelta.Core.csproj" />
     <ProjectReference Include="..\DbDelta.Shared\DbDelta.Shared.csproj" />
     <ProjectReference Include="..\DbDelta.Providers.LiveDb\DbDelta.Providers.LiveDb.csproj" />
+    <ProjectReference Include="..\DbDelta.Persistence\DbDelta.Persistence.csproj" />
   </ItemGroup>
 
 </Project>

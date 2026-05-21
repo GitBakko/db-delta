@@ -14,8 +14,10 @@ namespace DbDelta.App.ViewModels;
 /// <c>DbDelta.App.State.AppState</c> but uses CommunityToolkit MVVM
 /// notifications + a <see cref="RelayCommand"/> for the Compare action.
 /// </summary>
-public sealed partial class AppStateViewModel : ObservableObject
+public sealed partial class AppStateViewModel(ConnectionStoreViewModel? connections = null) : ObservableObject
 {
+    public ConnectionStoreViewModel? Connections { get; } = connections;
+
     [ObservableProperty]
     private string _sourceConnectionString = "";
 
@@ -132,6 +134,12 @@ public sealed partial class AppStateViewModel : ObservableObject
             ComparisonEngine engine = new();
             ComparisonResult result = engine.Compare(srcRes.Value!, tgtRes.Value!, ComparisonOptions.Default);
             LastComparison = Mapper.ToDto(result);
+
+            if (Connections is not null)
+            {
+                await Connections.AutosaveAsync(srcCs, ct).ConfigureAwait(true);
+                await Connections.AutosaveAsync(tgtCs, ct).ConfigureAwait(true);
+            }
         }
         catch (Exception ex)
         {

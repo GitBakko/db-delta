@@ -16,7 +16,11 @@ public partial class App : Application
         {
             // Singleton AppState — the view model layer is intentionally light;
             // the heavy lifting lives in DbDelta.Core / Providers.
-            AppStateViewModel appState = new();
+            DbDelta.Core.Abstractions.ICredentialStore credentials = DbDelta.Persistence.Credentials.CredentialStoreFactory.Create();
+            DbDelta.Core.Abstractions.IConnectionStore connectionStore = DbDelta.Persistence.Json.JsonConnectionStore.CreateDefault();
+            ConnectionStoreViewModel connections = new(connectionStore, credentials);
+            AppStateViewModel appState = new(connections);
+            _ = connections.LoadAsync(System.Threading.CancellationToken.None);
             desktop.MainWindow = new MainWindow
             {
                 DataContext = new MainWindowViewModel(appState),
