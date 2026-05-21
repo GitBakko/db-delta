@@ -31,22 +31,41 @@ public partial class ConnectionEditDialog : Window
                         && !vm.IsScanning
                         && vm.ServerSuggestions.Count > 0)
                     {
-                        Dispatcher.UIThread.Post(() =>
-                        {
-                            AutoCompleteBox? box = this.FindControl<AutoCompleteBox>("ServerBox");
-                            if (box is null) { return; }
-                            box.Focus();
-                            box.IsDropDownOpen = true;
-                        }, DispatcherPriority.Background);
+                        OpenDropdownDeferred("ServerBox");
+                    }
+                    else if (args.PropertyName == nameof(ViewModels.ConnectionEditViewModel.IsLoadingDatabases)
+                             && !vm.IsLoadingDatabases
+                             && vm.HasDatabases)
+                    {
+                        OpenDropdownDeferred("DatabaseBox");
                     }
                 };
             }
         };
     }
 
+    private void OpenDropdownDeferred(string boxName)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            AutoCompleteBox? box = this.FindControl<AutoCompleteBox>(boxName);
+            if (box is null) { return; }
+            box.Focus();
+            box.IsDropDownOpen = true;
+        }, DispatcherPriority.Background);
+    }
+
     private void OnServerDropToggleClick(object? sender, RoutedEventArgs e)
     {
         AutoCompleteBox? box = this.FindControl<AutoCompleteBox>("ServerBox");
+        if (box is null) { return; }
+        box.Focus();
+        box.IsDropDownOpen = !box.IsDropDownOpen;
+    }
+
+    private void OnDatabaseDropToggleClick(object? sender, RoutedEventArgs e)
+    {
+        AutoCompleteBox? box = this.FindControl<AutoCompleteBox>("DatabaseBox");
         if (box is null) { return; }
         box.Focus();
         box.IsDropDownOpen = !box.IsDropDownOpen;

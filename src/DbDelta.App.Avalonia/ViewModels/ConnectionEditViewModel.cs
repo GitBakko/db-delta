@@ -62,6 +62,9 @@ public sealed partial class ConnectionEditViewModel : ObservableObject
     private ObservableCollection<string> _availableDatabases = [];
 
     [ObservableProperty]
+    private bool _hasDatabases;
+
+    [ObservableProperty]
     private bool _isLoadingDatabases;
 
     [ObservableProperty]
@@ -135,6 +138,7 @@ public sealed partial class ConnectionEditViewModel : ObservableObject
     public async Task LoadDatabasesAsync()
     {
         IsLoadingDatabases = true;
+        HasDatabases = false;
         AvailableDatabases.Clear();
         ConnectionStatusMessage = null;
         try
@@ -146,6 +150,7 @@ public sealed partial class ConnectionEditViewModel : ObservableObject
                 AvailableDatabases.Add(db);
             }
 
+            HasDatabases = dbs.Count > 0;
             ConnectionStatusMessage = $"Connesso — {dbs.Count} database disponibili";
         }
         catch (Exception ex)
