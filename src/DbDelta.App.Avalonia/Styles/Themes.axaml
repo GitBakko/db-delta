@@ -1,0 +1,153 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Theme-aware semantic tokens.
+
+         How this works:
+         1. ResourceDictionary.ThemeDictionaries declares one Color per key per variant.
+         2. Brushes below reference the Color via DynamicResource, so the same
+            brush instance re-resolves its Color when Application.RequestedThemeVariant
+            changes — every Border / TextBlock that uses BgBrush etc. flips for free. -->
+
+    <ResourceDictionary.ThemeDictionaries>
+
+        <!-- ============ LIGHT ============ -->
+        <ResourceDictionary x:Key="Light">
+            <Color x:Key="Bg">#FEFDFB</Color>
+            <Color x:Key="BgSubtle">#FAF9F6</Color>
+            <Color x:Key="BgMuted">#F5F3F0</Color>
+            <Color x:Key="BgRaised">#FEFDFB</Color>
+            <Color x:Key="BgInverse">#06090F</Color>
+
+            <Color x:Key="Fg">#06090F</Color>
+            <Color x:Key="FgStrong">#020306</Color>
+            <Color x:Key="FgMuted">#363B41</Color>
+            <Color x:Key="FgSubtle">#78746D</Color>
+            <Color x:Key="FgFaint">#98958E</Color>
+            <Color x:Key="FgInverse">#FEFDFB</Color>
+            <Color x:Key="FgOnAccent">#FEFDFB</Color>
+
+            <Color x:Key="Border">#E2DFDB</Color>
+            <Color x:Key="BorderSubtle">#EDEBE7</Color>
+            <Color x:Key="BorderStrong">#BAB7B1</Color>
+            <Color x:Key="BorderFocus">#1B6CDB</Color>
+
+            <Color x:Key="Primary">#0054BD</Color>
+            <Color x:Key="PrimaryHover">#003F93</Color>
+            <Color x:Key="PrimaryActive">#002A66</Color>
+            <Color x:Key="PrimaryFg">#FEFDFB</Color>
+            <Color x:Key="PrimarySoft">#DDECFF</Color>
+            <Color x:Key="PrimarySoftFg">#003F93</Color>
+
+            <Color x:Key="Secondary">#6649BE</Color>
+            <Color x:Key="SecondaryFg">#FEFDFB</Color>
+            <Color x:Key="SecondarySoft">#EAE8FF</Color>
+            <Color x:Key="SecondarySoftFg">#4A328E</Color>
+
+            <Color x:Key="Success">#007339</Color>
+            <Color x:Key="SuccessSoft">#DAF3E1</Color>
+            <Color x:Key="SuccessFg">#005226</Color>
+
+            <Color x:Key="Warning">#AE5C00</Color>
+            <Color x:Key="WarningSoft">#FDECD5</Color>
+            <Color x:Key="WarningFg">#883C00</Color>
+
+            <Color x:Key="Danger">#B31220</Color>
+            <Color x:Key="DangerSoft">#FFE4E1</Color>
+            <Color x:Key="DangerFg">#850513</Color>
+        </ResourceDictionary>
+
+        <!-- ============ DARK ============ -->
+        <ResourceDictionary x:Key="Dark">
+            <Color x:Key="Bg">#0E1014</Color>
+            <Color x:Key="BgSubtle">#16181D</Color>
+            <Color x:Key="BgMuted">#1B1E24</Color>
+            <Color x:Key="BgRaised">#1A1D22</Color>
+            <Color x:Key="BgInverse">#FEFDFB</Color>
+
+            <Color x:Key="Fg">#E8EAED</Color>
+            <Color x:Key="FgStrong">#FFFFFF</Color>
+            <Color x:Key="FgMuted">#B6BAC0</Color>
+            <Color x:Key="FgSubtle">#7E848C</Color>
+            <Color x:Key="FgFaint">#52575E</Color>
+            <Color x:Key="FgInverse">#06090F</Color>
+            <Color x:Key="FgOnAccent">#FEFDFB</Color>
+
+            <Color x:Key="Border">#2A2E33</Color>
+            <Color x:Key="BorderSubtle">#1F2329</Color>
+            <Color x:Key="BorderStrong">#3D4147</Color>
+            <Color x:Key="BorderFocus">#4D88E0</Color>
+
+            <Color x:Key="Primary">#4D88E0</Color>
+            <Color x:Key="PrimaryHover">#5F95E5</Color>
+            <Color x:Key="PrimaryActive">#3B73C8</Color>
+            <Color x:Key="PrimaryFg">#06090F</Color>
+            <Color x:Key="PrimarySoft">#13243C</Color>
+            <Color x:Key="PrimarySoftFg">#9CBCE8</Color>
+
+            <Color x:Key="Secondary">#9A82E8</Color>
+            <Color x:Key="SecondaryFg">#06090F</Color>
+            <Color x:Key="SecondarySoft">#1F1A30</Color>
+            <Color x:Key="SecondarySoftFg">#B7A3F0</Color>
+
+            <Color x:Key="Success">#4DC07A</Color>
+            <Color x:Key="SuccessSoft">#102B1B</Color>
+            <Color x:Key="SuccessFg">#94D9B0</Color>
+
+            <Color x:Key="Warning">#D89958</Color>
+            <Color x:Key="WarningSoft">#2C1F11</Color>
+            <Color x:Key="WarningFg">#E5BC85</Color>
+
+            <Color x:Key="Danger">#E55C7D</Color>
+            <Color x:Key="DangerSoft">#3A1822</Color>
+            <Color x:Key="DangerFg">#E89AAA</Color>
+        </ResourceDictionary>
+
+    </ResourceDictionary.ThemeDictionaries>
+
+    <!-- ===== Brushes (single instance, theme-reactive Color) ===== -->
+
+    <SolidColorBrush x:Key="BgBrush"          Color="{DynamicResource Bg}" />
+    <SolidColorBrush x:Key="BgSubtleBrush"    Color="{DynamicResource BgSubtle}" />
+    <SolidColorBrush x:Key="BgMutedBrush"     Color="{DynamicResource BgMuted}" />
+    <SolidColorBrush x:Key="BgRaisedBrush"    Color="{DynamicResource BgRaised}" />
+    <SolidColorBrush x:Key="BgInverseBrush"   Color="{DynamicResource BgInverse}" />
+
+    <SolidColorBrush x:Key="FgBrush"          Color="{DynamicResource Fg}" />
+    <SolidColorBrush x:Key="FgStrongBrush"    Color="{DynamicResource FgStrong}" />
+    <SolidColorBrush x:Key="FgMutedBrush"     Color="{DynamicResource FgMuted}" />
+    <SolidColorBrush x:Key="FgSubtleBrush"    Color="{DynamicResource FgSubtle}" />
+    <SolidColorBrush x:Key="FgFaintBrush"     Color="{DynamicResource FgFaint}" />
+    <SolidColorBrush x:Key="FgInverseBrush"   Color="{DynamicResource FgInverse}" />
+    <SolidColorBrush x:Key="FgOnAccentBrush"  Color="{DynamicResource FgOnAccent}" />
+
+    <SolidColorBrush x:Key="BorderBrush"          Color="{DynamicResource Border}" />
+    <SolidColorBrush x:Key="BorderSubtleBrush"    Color="{DynamicResource BorderSubtle}" />
+    <SolidColorBrush x:Key="BorderStrongBrush"    Color="{DynamicResource BorderStrong}" />
+    <SolidColorBrush x:Key="BorderFocusBrush"     Color="{DynamicResource BorderFocus}" />
+
+    <SolidColorBrush x:Key="PrimaryBrush"         Color="{DynamicResource Primary}" />
+    <SolidColorBrush x:Key="PrimaryHoverBrush"    Color="{DynamicResource PrimaryHover}" />
+    <SolidColorBrush x:Key="PrimaryActiveBrush"   Color="{DynamicResource PrimaryActive}" />
+    <SolidColorBrush x:Key="PrimaryFgBrush"       Color="{DynamicResource PrimaryFg}" />
+    <SolidColorBrush x:Key="PrimarySoftBrush"     Color="{DynamicResource PrimarySoft}" />
+    <SolidColorBrush x:Key="PrimarySoftFgBrush"   Color="{DynamicResource PrimarySoftFg}" />
+
+    <SolidColorBrush x:Key="SecondaryBrush"       Color="{DynamicResource Secondary}" />
+    <SolidColorBrush x:Key="SecondaryFgBrush"     Color="{DynamicResource SecondaryFg}" />
+    <SolidColorBrush x:Key="SecondarySoftBrush"   Color="{DynamicResource SecondarySoft}" />
+    <SolidColorBrush x:Key="SecondarySoftFgBrush" Color="{DynamicResource SecondarySoftFg}" />
+
+    <SolidColorBrush x:Key="SuccessBrush"         Color="{DynamicResource Success}" />
+    <SolidColorBrush x:Key="SuccessSoftBrush"     Color="{DynamicResource SuccessSoft}" />
+    <SolidColorBrush x:Key="SuccessFgBrush"       Color="{DynamicResource SuccessFg}" />
+
+    <SolidColorBrush x:Key="WarningBrush"         Color="{DynamicResource Warning}" />
+    <SolidColorBrush x:Key="WarningSoftBrush"     Color="{DynamicResource WarningSoft}" />
+    <SolidColorBrush x:Key="WarningFgBrush"       Color="{DynamicResource WarningFg}" />
+
+    <SolidColorBrush x:Key="DangerBrush"          Color="{DynamicResource Danger}" />
+    <SolidColorBrush x:Key="DangerSoftBrush"      Color="{DynamicResource DangerSoft}" />
+    <SolidColorBrush x:Key="DangerFgBrush"        Color="{DynamicResource DangerFg}" />
+
+</ResourceDictionary>

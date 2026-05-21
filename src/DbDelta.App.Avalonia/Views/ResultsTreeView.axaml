@@ -51,8 +51,7 @@
                   CanUserResizeColumns="True"
                   CanUserSortColumns="True"
                   GridLinesVisibility="Horizontal"
-                  HeadersVisibility="Column"
-                  MaxHeight="500">
+                  HeadersVisibility="Column">
           <DataGrid.Columns>
 
             <!-- Status strip (4px colored bar driven by Status) -->

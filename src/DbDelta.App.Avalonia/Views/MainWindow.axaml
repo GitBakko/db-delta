@@ -17,12 +17,27 @@
             Background="{StaticResource BgMutedBrush}"
             BorderBrush="{StaticResource BorderBrush}"
             BorderThickness="0,0,0,1">
-      <Grid ColumnDefinitions="*,Auto" Margin="16,0">
-        <StackPanel Grid.Column="0"
+      <Grid ColumnDefinitions="Auto,*,Auto" Margin="12,0">
+
+        <!-- Sidebar toggle (hamburger) -->
+        <Button Grid.Column="0"
+                Classes="ghost"
+                Command="{Binding ToggleSidebarCommand}"
+                ToolTip.Tip="Toggle sidebar"
+                VerticalAlignment="Center"
+                Margin="0,0,8,0">
+          <Path Width="16" Height="16"
+                Stretch="Uniform"
+                Stroke="{Binding $parent[Button].Foreground}"
+                StrokeThickness="1.7"
+                StrokeLineCap="Round"
+                Data="M 4,7 L 20,7 M 4,12 L 20,12 M 4,17 L 20,17" />
+        </Button>
+
+        <StackPanel Grid.Column="1"
                     Orientation="Horizontal"
                     Spacing="10"
                     VerticalAlignment="Center">
-          <!-- Brand glyph: triangle + center mark -->
           <Border Width="22" Height="22"
                   Background="{StaticResource PrimaryBrush}"
                   CornerRadius="5">
@@ -45,35 +60,47 @@
                      VerticalAlignment="Center" />
         </StackPanel>
 
-        <Button Grid.Column="1"
+        <Button Grid.Column="2"
                 Classes="ghost"
                 Command="{Binding ToggleThemeCommand}"
-                ToolTip.Tip="Toggle light/dark theme"
+                ToolTip.Tip="Toggle light / dark theme"
                 VerticalAlignment="Center">
           <Path Width="16" Height="16"
                 Stretch="Uniform"
                 Stroke="{Binding $parent[Button].Foreground}"
                 StrokeThickness="1.6"
+                StrokeLineCap="Round"
                 Data="M 12,4 A 8,8 0 1 0 20,12 A 6,6 0 0 1 12,4 Z" />
         </Button>
       </Grid>
     </Border>
 
-    <!-- Middle: 240px sidebar + 1fr main -->
-    <Grid Grid.Row="1" ColumnDefinitions="240,*">
+    <!-- Middle: sidebar column (collapsible) + 1fr main -->
+    <Grid Grid.Row="1">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="{Binding SidebarWidth}" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+
       <Border Grid.Column="0"
               Background="{StaticResource BgSubtleBrush}"
               BorderBrush="{StaticResource BorderBrush}"
-              BorderThickness="0,0,1,0">
-        <!-- M1: sidebar placeholder; later milestones populate -->
+              BorderThickness="0,0,1,0"
+              IsVisible="{Binding IsSidebarOpen}">
+        <!-- M1: sidebar placeholder — populated by later milestones -->
       </Border>
 
-      <ScrollViewer Grid.Column="1" Padding="24" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Spacing="16">
-          <v:ConnectionPickerView DataContext="{Binding AppState}" />
-          <v:ResultsTreeView DataContext="{Binding AppState}" />
-        </StackPanel>
-      </ScrollViewer>
+      <!-- Main: 2-row grid lets ConnectionPicker keep its natural height
+           while ResultsTree expands to fill all remaining vertical space. -->
+      <Grid Grid.Column="1"
+            RowDefinitions="Auto,*"
+            Margin="24">
+        <v:ConnectionPickerView Grid.Row="0"
+                                DataContext="{Binding AppState}"
+                                Margin="0,0,0,16" />
+        <v:ResultsTreeView Grid.Row="1"
+                          DataContext="{Binding AppState}" />
+      </Grid>
     </Grid>
 
     <!-- Status bar -->
