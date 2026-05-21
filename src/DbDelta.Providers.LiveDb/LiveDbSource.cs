@@ -60,9 +60,11 @@ public sealed class LiveDbSource : ISchemaSource
             ModuleReader moduleReader = new();
             IReadOnlyList<View> views = await moduleReader.ReadViewsAsync(connection, cancellationToken);
             IReadOnlyList<StoredProcedure> procs = await moduleReader.ReadProceduresAsync(connection, cancellationToken);
+            IReadOnlyList<Function> functions = await moduleReader.ReadFunctionsAsync(connection, cancellationToken);
+            IReadOnlyList<Trigger> triggers = await moduleReader.ReadTriggersAsync(connection, cancellationToken);
 
             string dbName = new SqlConnectionStringBuilder(_connectionString).InitialCatalog;
-            return Result<Database>.Success(new Database(dbName, schemas, tables, views, procs));
+            return Result<Database>.Success(new Database(dbName, schemas, tables, views, procs, functions, triggers));
         }
         catch (SqlException ex) when (ex.Number is 4060 or 18456)
         {
