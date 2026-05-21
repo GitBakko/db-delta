@@ -6,6 +6,10 @@ using Microsoft.Data.SqlClient;
 
 namespace DbDelta.Persistence.Sql;
 
+/// <summary>One SQL Server reachable via the Browser service. <see cref="IpAddress"/>
+/// is the source IPv4 of the UDP response and is <c>null</c> for local aliases.</summary>
+public sealed record DiscoveredServer(string Name, string? IpAddress);
+
 /// <summary>
 /// SQL Server discovery utilities.
 ///
@@ -28,16 +32,18 @@ public static class SqlServerDiscovery
     private static readonly byte[] s_browserQuery = [0x02];
     private static readonly TimeSpan s_defaultTimeout = TimeSpan.FromSeconds(3);
 
-    public static async Task<IReadOnlyList<string>> EnumerateServersAsync(
+    public static async Task<IReadOnlyList<DiscoveredServer>> EnumerateServersAsync(
         CancellationToken ct,
         TimeSpan? timeout = null)
     {
         TimeSpan window = timeout ?? s_defaultTimeout;
-        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase)
+        // Captured server name → IP (last write wins, but multiple NICs will
+        // typically return identical results so this is fine).
+        Dictionary<string, string?> seen = new(StringComparer.OrdinalIgnoreCase)
         {
-            "(local)",
-            "localhost",
-            "127.0.0.1",
+            ["(local)"] = null,
+            ["localhost"] = null,
+            ["127.0.0.1"] = null,
         };
 
         // Best-effort send + collect. Each task owns its own UdpClient
@@ -99,9 +105,10 @@ public static class SqlServerDiscovery
                 {
                     break;
                 }
+                string sourceIp = result.RemoteEndPoint.Address.ToString();
                 foreach (string entry in ParseSqlBrowserResponse(result.Buffer))
                 {
-                    seen.Add(entry);
+                    seen[entry] = sourceIp;
                 }
             }
         }
@@ -111,11 +118,12 @@ public static class SqlServerDiscovery
         }
 
         // Stable order: localhost-like aliases first, then alphabetical.
-        List<string> ordered = [.. seen.OrderBy(s =>
-            s.Equals("(local)", StringComparison.OrdinalIgnoreCase) ? 0 :
-            s.Equals("localhost", StringComparison.OrdinalIgnoreCase) ? 1 :
-            s.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase) ? 2 : 3)
-            .ThenBy(s => s, StringComparer.OrdinalIgnoreCase)];
+        List<DiscoveredServer> ordered = [.. seen.OrderBy(kv =>
+            kv.Key.Equals("(local)", StringComparison.OrdinalIgnoreCase) ? 0 :
+            kv.Key.Equals("localhost", StringComparison.OrdinalIgnoreCase) ? 1 :
+            kv.Key.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase) ? 2 : 3)
+            .ThenBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(kv => new DiscoveredServer(kv.Key, kv.Value))];
         return ordered;
     }
 

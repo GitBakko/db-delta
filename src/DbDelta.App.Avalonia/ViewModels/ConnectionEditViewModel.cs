@@ -53,7 +53,7 @@ public sealed partial class ConnectionEditViewModel : ObservableObject
     private string? _scanStatusMessage;
 
     [ObservableProperty]
-    private ObservableCollection<string> _serverSuggestions = [];
+    private ObservableCollection<DiscoveredServer> _serverSuggestions = [];
 
     [ObservableProperty]
     private bool _hasServerSuggestions;
@@ -99,16 +99,16 @@ public sealed partial class ConnectionEditViewModel : ObservableObject
         ScanStatusMessage = "Scansione in corso…";
         try
         {
-            System.Collections.Generic.IReadOnlyList<string> list =
-                await DbDelta.Persistence.Sql.SqlServerDiscovery.EnumerateServersAsync(System.Threading.CancellationToken.None);
+            IReadOnlyList<DiscoveredServer> list =
+                await SqlServerDiscovery.EnumerateServersAsync(CancellationToken.None);
             ServerSuggestions.Clear();
-            foreach (string s in list) { ServerSuggestions.Add(s); }
+            foreach (DiscoveredServer s in list) { ServerSuggestions.Add(s); }
             HasServerSuggestions = list.Count > 0;
             ScanStatusMessage = list.Count == 0
                 ? "Nessun server rilevato (SQL Browser potrebbe essere disabilitato sui server di rete)."
                 : $"Trovati {list.Count} server. Clicca su uno per selezionarlo.";
         }
-        catch (System.Exception ex)
+        catch (Exception ex)
         {
             ScanStatusMessage = $"Errore: {ex.Message}";
         }
@@ -119,11 +119,11 @@ public sealed partial class ConnectionEditViewModel : ObservableObject
     }
 
     [RelayCommand]
-    public void PickServer(string? server)
+    public void PickServer(DiscoveredServer? server)
     {
-        if (!string.IsNullOrWhiteSpace(server))
+        if (server is not null && !string.IsNullOrWhiteSpace(server.Name))
         {
-            ServerName = server;
+            ServerName = server.Name;
         }
     }
 

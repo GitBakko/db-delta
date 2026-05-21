@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:DbDelta.App.ViewModels"
         xmlns:v="using:DbDelta.App.Views"
+        xmlns:sql="using:DbDelta.Persistence.Sql"
         x:Class="DbDelta.App.Views.ConnectionEditDialog"
         x:DataType="vm:ConnectionEditViewModel"
         Title="Modifica connessione"
@@ -24,10 +25,28 @@
                            Grid.Column="0"
                            Text="{Binding ServerName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                            ItemsSource="{Binding ServerSuggestions}"
-                           FilterMode="ContainsOrdinal"
+                           ValueMemberBinding="{Binding Name}"
+                           FilterMode="Contains"
                            MinimumPrefixLength="0"
                            MinimumPopulateDelay="0"
-                           PlaceholderText="Scrivi o seleziona un server SQL…" />
+                           PlaceholderText="Scrivi o seleziona un server SQL…">
+            <AutoCompleteBox.ItemTemplate>
+              <DataTemplate DataType="sql:DiscoveredServer">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Grid.Column="0"
+                             Text="{Binding Name}"
+                             FontFamily="Cascadia Mono,Consolas,monospace"
+                             FontSize="12" />
+                  <TextBlock Grid.Column="1"
+                             Text="{Binding IpAddress}"
+                             FontSize="11"
+                             Margin="12,0,0,0"
+                             Foreground="{StaticResource FgSubtleBrush}"
+                             IsVisible="{Binding IpAddress, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </Grid>
+              </DataTemplate>
+            </AutoCompleteBox.ItemTemplate>
+          </AutoCompleteBox>
           <Button Grid.Column="1" Classes="ghost" Margin="6,0,0,0"
                   Click="OnServerDropToggleClick"
                   IsVisible="{Binding HasServerSuggestions}"
@@ -72,23 +91,32 @@
           <ScrollViewer VerticalScrollBarVisibility="Auto">
             <ItemsControl ItemsSource="{Binding ServerSuggestions}">
               <ItemsControl.ItemTemplate>
-                <DataTemplate>
+                <DataTemplate DataType="sql:DiscoveredServer">
                   <Button Classes="ghost"
                           HorizontalAlignment="Stretch"
                           HorizontalContentAlignment="Left"
                           Padding="8,4"
                           Command="{Binding $parent[Window].((vm:ConnectionEditViewModel)DataContext).PickServerCommand}"
                           CommandParameter="{Binding}">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                      <Path Width="12" Height="12" Stretch="Uniform"
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                      <Path Grid.Column="0"
+                            Width="12" Height="12" Stretch="Uniform"
                             Stroke="{Binding $parent[Button].Foreground}"
                             StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
                             Fill="Transparent"
                             Data="M 4,6 C 4,4 8,3 12,3 C 16,3 20,4 20,6 L 20,18 C 20,20 16,21 12,21 C 8,21 4,20 4,18 Z M 4,6 C 4,8 8,9 12,9 C 16,9 20,8 20,6 M 4,12 C 4,14 8,15 12,15 C 16,15 20,14 20,12" />
-                      <TextBlock Text="{Binding}"
+                      <TextBlock Grid.Column="1"
+                                 Text="{Binding Name}"
                                  FontFamily="Cascadia Mono,Consolas,monospace"
-                                 FontSize="12" />
-                    </StackPanel>
+                                 FontSize="12"
+                                 Margin="6,0,0,0" />
+                      <TextBlock Grid.Column="2"
+                                 Text="{Binding IpAddress}"
+                                 FontSize="11"
+                                 Margin="12,0,0,0"
+                                 Foreground="{StaticResource FgSubtleBrush}"
+                                 IsVisible="{Binding IpAddress, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </Grid>
                   </Button>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
