@@ -9,15 +9,39 @@
         MinWidth="900" MinHeight="600"
         Background="{StaticResource BgBrush}">
 
-  <!-- App shell: 44px topbar / flex middle / 24px statusbar -->
-  <Grid RowDefinitions="44,*,24">
+  <!-- App shell: 44px topbar / 56px header strip / flex middle / 24px statusbar -->
+  <Grid RowDefinitions="44,56,*,24">
 
-    <!-- Topbar -->
+    <!-- ── Band 1: App topbar ─────────────────────────────────────────────── -->
     <Border Grid.Row="0"
             Background="{StaticResource BgMutedBrush}"
             BorderBrush="{StaticResource BorderBrush}"
             BorderThickness="0,0,0,1">
-      <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto,Auto" Margin="12,0">
+      <Grid Margin="12,0">
+        <Grid.ColumnDefinitions>
+          <!-- 0: sidebar toggle -->
+          <ColumnDefinition Width="Auto" />
+          <!-- 1: brand -->
+          <ColumnDefinition Width="Auto" />
+          <!-- 2: divider -->
+          <ColumnDefinition Width="Auto" />
+          <!-- 3: Group A — New / Open / Save -->
+          <ColumnDefinition Width="Auto" />
+          <!-- 4: divider -->
+          <ColumnDefinition Width="Auto" />
+          <!-- 5: Group B — MRU / Edit / Refresh -->
+          <ColumnDefinition Width="Auto" />
+          <!-- 6: filler -->
+          <ColumnDefinition Width="*" />
+          <!-- 7: Cerca TextBox -->
+          <ColumnDefinition Width="220" />
+          <!-- 8: Raggruppa per ComboBox -->
+          <ColumnDefinition Width="Auto" />
+          <!-- 9: divider -->
+          <ColumnDefinition Width="Auto" />
+          <!-- 10: theme toggle -->
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
 
         <!-- 0: sidebar toggle -->
         <Button Grid.Column="0"
@@ -50,7 +74,8 @@
         <StackPanel Grid.Column="1"
                     Orientation="Horizontal"
                     Spacing="10"
-                    VerticalAlignment="Center">
+                    VerticalAlignment="Center"
+                    Margin="0,0,4,0">
           <Border Width="22" Height="22"
                   Background="{StaticResource PrimaryBrush}"
                   CornerRadius="5">
@@ -73,67 +98,158 @@
                      VerticalAlignment="Center" />
         </StackPanel>
 
-        <!-- 2: spacer * -->
+        <!-- 2: divider -->
+        <Border Grid.Column="2" Classes="topbar-divider" />
 
-        <!-- 3: Apri progetto -->
-        <Button Grid.Column="3"
-                Classes="ghost"
-                Command="{Binding OpenProjectCommand}"
-                CommandParameter="{Binding $parent[Window]}"
-                ToolTip.Tip="Apri un progetto DbDelta esistente"
+        <!-- 3: Group A — Nuovo / Apri / Salva -->
+        <StackPanel Grid.Column="3"
+                    Orientation="Horizontal"
+                    Spacing="2"
+                    VerticalAlignment="Center">
+
+          <!-- Nuovo progetto -->
+          <Button Classes="ghost"
+                  Command="{Binding NewProjectCommand}"
+                  ToolTip.Tip="Crea un nuovo progetto DbDelta"
+                  Padding="6">
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <!-- New/plus DB icon -->
+              <Path Width="15" Height="15" Stretch="Uniform"
+                    Stroke="{Binding $parent[Button].Foreground}"
+                    StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
+                    Fill="Transparent"
+                    Data="M 4,6 C 4,4 8,3 12,3 C 16,3 20,4 20,6 L 20,13 C 20,15 16,16 12,16 C 8,16 4,15 4,13 Z M 4,6 C 4,8 8,9 12,9 C 16,9 20,8 20,6 M 15,18 L 15,24 M 12,21 L 18,21" />
+              <TextBlock Text="Nuovo" VerticalAlignment="Center" FontSize="12" />
+            </StackPanel>
+          </Button>
+
+          <!-- Apri progetto -->
+          <Button Classes="ghost"
+                  Command="{Binding OpenProjectCommand}"
+                  CommandParameter="{Binding $parent[Window]}"
+                  ToolTip.Tip="Apri un progetto DbDelta esistente"
+                  Padding="6">
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <Path Width="15" Height="15" Stretch="Uniform"
+                    Stroke="{Binding $parent[Button].Foreground}"
+                    StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
+                    Fill="Transparent"
+                    Data="M 4,7 L 4,18 L 20,18 L 20,9 L 12,9 L 10,7 Z" />
+              <TextBlock Text="Apri" VerticalAlignment="Center" FontSize="12" />
+            </StackPanel>
+          </Button>
+
+          <!-- Salva progetto -->
+          <Button Classes="ghost"
+                  Command="{Binding SaveProjectCommand}"
+                  CommandParameter="{Binding $parent[Window]}"
+                  ToolTip.Tip="Salva il progetto corrente"
+                  Padding="6">
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <Path Width="15" Height="15" Stretch="Uniform"
+                    Stroke="{Binding $parent[Button].Foreground}"
+                    StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
+                    Fill="Transparent"
+                    Data="M 5,5 L 17,5 L 19,7 L 19,19 L 5,19 Z M 7,5 L 7,11 L 15,11 L 15,5 M 9,15 L 15,15" />
+              <TextBlock Text="Salva" VerticalAlignment="Center" FontSize="12" />
+            </StackPanel>
+          </Button>
+
+        </StackPanel>
+
+        <!-- 4: divider -->
+        <Border Grid.Column="4" Classes="topbar-divider" />
+
+        <!-- 5: Group B — I miei progetti / Modifica / Refresh -->
+        <StackPanel Grid.Column="5"
+                    Orientation="Horizontal"
+                    Spacing="2"
+                    VerticalAlignment="Center">
+
+          <!-- I miei progetti (MRU drop-down) -->
+          <ComboBox ItemsSource="{Binding ProjectMru}"
+                    PlaceholderText="I miei progetti"
+                    MinWidth="160"
+                    VerticalAlignment="Center"
+                    ToolTip.Tip="Apri un progetto recente"
+                    FontSize="12" />
+
+          <!-- Modifica progetto -->
+          <Button Classes="ghost"
+                  Command="{Binding EditProjectCommand}"
+                  ToolTip.Tip="Modifica il progetto corrente"
+                  Padding="6">
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <Path Width="14" Height="14" Stretch="Uniform"
+                    Stroke="{Binding $parent[Button].Foreground}"
+                    StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
+                    Fill="Transparent"
+                    Data="M 15,5 L 19,9 L 9,19 L 5,19 L 5,15 Z M 13,7 L 17,11" />
+              <TextBlock Text="Modifica" VerticalAlignment="Center" FontSize="12" />
+            </StackPanel>
+          </Button>
+
+          <!-- Refresh -->
+          <Button Classes="ghost"
+                  Command="{Binding RefreshCommand}"
+                  ToolTip.Tip="Riesegui il confronto"
+                  Padding="6">
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <Path Width="14" Height="14" Stretch="Uniform"
+                    Stroke="{Binding $parent[Button].Foreground}"
+                    StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
+                    Fill="Transparent"
+                    Data="M 20,12 A 8,8 0 1 1 18,7 M 18,4 L 18,8 L 14,8" />
+              <TextBlock Text="Aggiorna" VerticalAlignment="Center" FontSize="12" />
+            </StackPanel>
+          </Button>
+
+        </StackPanel>
+
+        <!-- 6: filler -->
+
+        <!-- 7: Cerca TextBox -->
+        <Border Grid.Column="7"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Background="{StaticResource BgBrush}"
                 VerticalAlignment="Center"
-                Margin="0,0,4,0">
-          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-            <Path Width="16" Height="16" Stretch="Uniform"
-                  Stroke="{Binding $parent[Button].Foreground}"
-                  StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
-                  Fill="Transparent"
-                  Data="M 4,7 L 4,18 L 20,18 L 20,9 L 12,9 L 10,7 Z" />
-            <TextBlock Text="Apri" VerticalAlignment="Center" />
-          </StackPanel>
-        </Button>
+                Margin="0,0,6,0">
+          <Grid ColumnDefinitions="Auto,*">
+            <Path Grid.Column="0"
+                  Width="14" Height="14"
+                  Stretch="Uniform"
+                  Stroke="{StaticResource FgSubtleBrush}"
+                  StrokeThickness="1.5"
+                  StrokeLineCap="Round"
+                  Margin="8,0,4,0"
+                  Data="M 11,5 A 6,6 0 1 1 10.99,5 M 16,16 L 20,20" />
+            <TextBox Grid.Column="1"
+                     Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     Watermark="Cerca in tutti i campi…"
+                     FontSize="12"
+                     BorderThickness="0"
+                     Background="Transparent"
+                     Padding="4,6"
+                     VerticalAlignment="Center" />
+          </Grid>
+        </Border>
 
-        <!-- 4: Salva progetto -->
-        <Button Grid.Column="4"
-                Classes="ghost"
-                Command="{Binding SaveProjectCommand}"
-                CommandParameter="{Binding $parent[Window]}"
-                ToolTip.Tip="Salva il progetto corrente"
-                VerticalAlignment="Center"
-                Margin="0,0,4,0">
-          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-            <Path Width="16" Height="16" Stretch="Uniform"
-                  Stroke="{Binding $parent[Button].Foreground}"
-                  StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
-                  Fill="Transparent"
-                  Data="M 5,5 L 17,5 L 19,7 L 19,19 L 5,19 Z M 7,5 L 7,11 L 15,11 L 15,5 M 9,15 L 15,15" />
-            <TextBlock Text="Salva" VerticalAlignment="Center" />
-          </StackPanel>
-        </Button>
+        <!-- 8: Raggruppa per ComboBox -->
+        <ComboBox Grid.Column="8"
+                  ItemsSource="{Binding GroupingOptions}"
+                  SelectedItem="{Binding GroupingMode, Mode=TwoWay}"
+                  VerticalAlignment="Center"
+                  MinWidth="180"
+                  FontSize="12"
+                  ToolTip.Tip="Raggruppa i risultati per criterio" />
 
-        <!-- 5: Connessioni — opens centralised manager -->
-        <Button Grid.Column="5"
-                Classes="ghost"
-                Command="{Binding OpenConnectionManagerCommand}"
-                CommandParameter="{Binding $parent[Window]}"
-                ToolTip.Tip="Gestisci connessioni salvate"
-                VerticalAlignment="Center"
-                Margin="0,0,4,0">
-          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-            <Path Width="16" Height="16" Stretch="Uniform"
-                  Stroke="{Binding $parent[Button].Foreground}"
-                  StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
-                  Fill="Transparent"
-                  Data="M 4,6 C 4,4 8,3 12,3 C 16,3 20,4 20,6 L 20,18 C 20,20 16,21 12,21 C 8,21 4,20 4,18 Z M 4,6 C 4,8 8,9 12,9 C 16,9 20,8 20,6 M 4,12 C 4,14 8,15 12,15 C 16,15 20,14 20,12" />
-            <TextBlock Text="Connessioni" VerticalAlignment="Center" />
-          </StackPanel>
-        </Button>
+        <!-- 9: divider -->
+        <Border Grid.Column="9" Classes="topbar-divider" />
 
-        <!-- 6: divider -->
-        <Border Grid.Column="6" Classes="topbar-divider" />
-
-        <!-- 7: theme toggle — icon-only (system affordance, not an app-menu item) -->
-        <Button Grid.Column="7"
+        <!-- 10: theme toggle -->
+        <Button Grid.Column="10"
                 Classes="ghost"
                 Command="{Binding ToggleThemeCommand}"
                 ToolTip.Tip="Tema chiaro / scuro"
@@ -149,8 +265,15 @@
       </Grid>
     </Border>
 
-    <!-- Middle: sidebar column (collapsible) + 1fr main -->
-    <Grid Grid.Row="1">
+    <!-- ── Band 2: Project header strip ─────────────────────────────────── -->
+    <Border Grid.Row="1"
+            BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="0,0,0,1">
+      <v:ProjectHeaderStrip DataContext="{Binding}" />
+    </Border>
+
+    <!-- ── Band 3: Middle — sidebar + main content ───────────────────────── -->
+    <Grid Grid.Row="2">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="{Binding SidebarWidth}" />
         <ColumnDefinition Width="*" />
@@ -164,21 +287,20 @@
         <v:RecentConnectionsSidebar DataContext="{Binding AppState.Connections}" />
       </Border>
 
-      <!-- Main: 2-row grid lets ConnectionPicker keep its natural height
-           while ResultsTree expands to fill all remaining vertical space. -->
+      <!-- Main area: ConnectionPicker (collapsible) + ResultsGridView -->
       <Grid Grid.Column="1"
             RowDefinitions="Auto,*"
             Margin="24">
         <v:ConnectionPickerView Grid.Row="0"
                                 DataContext="{Binding AppState}"
                                 Margin="0,0,0,16" />
-        <v:ResultsTreeView Grid.Row="1"
-                          DataContext="{Binding AppState}" />
+        <v:ResultsGridView Grid.Row="1"
+                           DataContext="{Binding}" />
       </Grid>
     </Grid>
 
     <!-- Status bar -->
-    <Border Grid.Row="2"
+    <Border Grid.Row="3"
             Background="{StaticResource BgMutedBrush}"
             BorderBrush="{StaticResource BorderBrush}"
             BorderThickness="0,1,0,0">

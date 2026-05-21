@@ -75,4 +75,12 @@ public static class Converters
             return null;
         }
     });
+
+    /// <summary>
+    /// Returns <see cref="FontWeight.Bold"/> when <c>true</c>, otherwise
+    /// <see cref="FontWeight.Normal"/>. Used to bold source-only / target-only
+    /// object names in the results grid.
+    /// </summary>
+    public static readonly IValueConverter BoolToFontWeight = new FuncValueConverter<bool, FontWeight>(
+        static bold => bold ? FontWeight.Bold : FontWeight.Normal);
 }
