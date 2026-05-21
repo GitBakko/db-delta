@@ -1,2 +1,9 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <PackageReference Include="Meziantou.Framework.Win32.CredentialManager" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DbDelta.Core\DbDelta.Core.csproj" />
+  </ItemGroup>
 </Project>

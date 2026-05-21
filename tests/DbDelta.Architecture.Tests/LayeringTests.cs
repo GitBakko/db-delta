@@ -45,4 +45,21 @@ public class LayeringTests
 
         result.IsSuccessful.Should().BeTrue();
     }
+
+    [Fact]
+    public void Persistence_may_reference_Core_SqlClient_Meziantou_only()
+    {
+        Assembly persistence = Assembly.Load("DbDelta.Persistence");
+        NetArchTest.Rules.TestResult result = Types.InAssembly(persistence)
+            .Should()
+            .HaveDependencyOnAny(
+                "DbDelta.Core",
+                "Microsoft.Data.SqlClient",
+                "Meziantou.Framework.Win32",
+                "System")
+            .GetResult();
+        result.IsSuccessful.Should().BeTrue(
+            "Persistence may reference Core + SqlClient + Meziantou + BCL only. Offenders: "
+            + string.Join(", ", result.FailingTypeNames ?? []));
+    }
 }
