@@ -23,7 +23,14 @@ public sealed class SqlExecutorTests : IAsyncLifetime
             return;
         }
 
-        _container = new MsSqlBuilder().Build();
+        // Match the image used by LiveDbFixture so a single docker pull
+        // services every integration test project; the default unpinned
+        // MsSqlBuilder() requires the CU-suffixed image to be pre-cached
+        // and Assert.Skip cannot intercept DockerImageNotFoundException.
+        _container = new MsSqlBuilder()
+            .WithImage("mcr.microsoft.com/mssql/server:2022-latest")
+            .WithPassword("Y0urStrong!Pass")
+            .Build();
         await _container.StartAsync();
         _connectionString = _container.GetConnectionString();
     }
