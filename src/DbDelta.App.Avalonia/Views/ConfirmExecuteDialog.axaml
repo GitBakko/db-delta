@@ -1,0 +1,64 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DbDelta.App.ViewModels"
+        x:Class="DbDelta.App.Views.ConfirmExecuteDialog"
+        x:DataType="vm:ConfirmExecuteViewModel"
+        Title="Conferma esecuzione"
+        Width="480" Height="220"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        Background="{StaticResource BgBrush}">
+
+  <Grid RowDefinitions="*,Auto" Margin="20">
+
+    <StackPanel Grid.Row="0" Spacing="10">
+
+      <!-- Alert header band -->
+      <Border Background="#B31220" CornerRadius="6" Padding="12,8">
+        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+          <Path Width="18" Height="18" Stretch="Uniform"
+                Fill="White"
+                Data="M 12,2 L 22,20 L 2,20 Z M 12,9 L 12,14 M 12,16 L 12,18" />
+          <TextBlock Text="Esecuzione diretta sul database di destinazione"
+                     FontWeight="SemiBold"
+                     Foreground="White"
+                     VerticalAlignment="Center" />
+        </StackPanel>
+      </Border>
+
+      <!-- Detail rows -->
+      <StackPanel Spacing="4" Margin="4,0,0,0">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <TextBlock Text="Oggetti selezionati:"
+                     Foreground="{StaticResource FgSubtleBrush}" />
+          <TextBlock Text="{Binding ObjectCount}"
+                     FontWeight="SemiBold"
+                     Foreground="{StaticResource FgStrongBrush}" />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <TextBlock Text="Destinazione:"
+                     Foreground="{StaticResource FgSubtleBrush}" />
+          <TextBlock Text="{Binding TargetSummary}"
+                     FontFamily="Cascadia Mono,Consolas,monospace"
+                     FontSize="11"
+                     Foreground="{StaticResource FgStrongBrush}"
+                     TextWrapping="Wrap" />
+        </StackPanel>
+      </StackPanel>
+
+    </StackPanel>
+
+    <!-- Action bar -->
+    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right"
+                Spacing="8" Margin="0,10,0,0">
+      <Button Classes="ghost" Click="OnAnnullaClick">
+        <TextBlock Text="Annulla" />
+      </Button>
+      <Button Classes="solid-crimson" Click="OnEseguiClick">
+        <TextBlock Text="Esegui" Foreground="White" />
+      </Button>
+    </StackPanel>
+
+  </Grid>
+
+</Window>
