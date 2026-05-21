@@ -12,11 +12,11 @@ internal sealed class SecretServiceCredentialStore : ICredentialStore
     public bool IsAvailable => false;
 
     public Task<string?> GetSecretAsync(string targetKey, CancellationToken ct) =>
-        throw new System.NotSupportedException("Linux Secret Service credential store ships in v2.");
+        throw new NotSupportedException("Linux Secret Service credential store ships in v2.");
 
     public Task SetSecretAsync(string targetKey, string secret, CancellationToken ct) =>
-        throw new System.NotSupportedException("Linux Secret Service credential store ships in v2.");
+        throw new NotSupportedException("Linux Secret Service credential store ships in v2.");
 
     public Task DeleteSecretAsync(string targetKey, CancellationToken ct) =>
-        throw new System.NotSupportedException("Linux Secret Service credential store ships in v2.");
+        throw new NotSupportedException("Linux Secret Service credential store ships in v2.");
 }

@@ -49,7 +49,7 @@ public class LayeringTests
     [Fact]
     public void Persistence_may_reference_Core_SqlClient_Meziantou_only()
     {
-        Assembly persistence = Assembly.Load("DbDelta.Persistence");
+        var persistence = Assembly.Load("DbDelta.Persistence");
         NetArchTest.Rules.TestResult result = Types.InAssembly(persistence)
             .Should()
             .HaveDependencyOnAny(

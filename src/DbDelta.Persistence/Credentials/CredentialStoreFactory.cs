@@ -29,7 +29,7 @@ public static class CredentialStoreFactory
             return new SecretServiceCredentialStore();
 #pragma warning restore CA1416
         }
-        throw new System.PlatformNotSupportedException(
+        throw new PlatformNotSupportedException(
             $"No credential store implementation for {RuntimeInformation.OSDescription}.");
     }
 }

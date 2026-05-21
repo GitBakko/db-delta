@@ -78,15 +78,15 @@ public sealed partial class MainWindowViewModel(AppStateViewModel appState) : Ob
             return;
         }
 
-        DbDelta.Persistence.Xml.XmlProjectStore store = new();
+        Persistence.Xml.XmlProjectStore store = new();
         await store.SaveAsync(
             file.Path.LocalPath,
             new DbDeltaProject(
-                Name: System.IO.Path.GetFileNameWithoutExtension(file.Path.LocalPath),
+                Name: Path.GetFileNameWithoutExtension(file.Path.LocalPath),
                 SourceConnectionId: src.Id,
                 TargetConnectionId: tgt.Id,
-                Options: DbDelta.Core.Options.ComparisonOptions.Default),
-            System.Threading.CancellationToken.None).ConfigureAwait(true);
+                Options: Core.Options.ComparisonOptions.Default),
+            CancellationToken.None).ConfigureAwait(true);
         ProjectFilePath = file.Path.LocalPath;
     }
 
@@ -98,7 +98,7 @@ public sealed partial class MainWindowViewModel(AppStateViewModel appState) : Ob
             return;
         }
         IStorageProvider sp = window.StorageProvider;
-        System.Collections.Generic.IReadOnlyList<IStorageFile> picked = await sp.OpenFilePickerAsync(new FilePickerOpenOptions
+        IReadOnlyList<IStorageFile> picked = await sp.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = "Apri progetto DbDelta",
             AllowMultiple = false,
@@ -108,8 +108,8 @@ public sealed partial class MainWindowViewModel(AppStateViewModel appState) : Ob
             return;
         }
         string path = picked[0].Path.LocalPath;
-        DbDelta.Persistence.Xml.XmlProjectStore store = new();
-        DbDeltaProject project = await store.LoadAsync(path, System.Threading.CancellationToken.None).ConfigureAwait(true);
+        Persistence.Xml.XmlProjectStore store = new();
+        DbDeltaProject project = await store.LoadAsync(path, CancellationToken.None).ConfigureAwait(true);
 
         ConnectionEntry? src = AppState.Connections.Entries.FirstOrDefault(e => e.Id == project.SourceConnectionId);
         ConnectionEntry? tgt = AppState.Connections.Entries.FirstOrDefault(e => e.Id == project.TargetConnectionId);
@@ -118,8 +118,8 @@ public sealed partial class MainWindowViewModel(AppStateViewModel appState) : Ob
             AppState.LastError = "Una o entrambe le connessioni referenziate dal progetto non esistono più. Selezionane di nuove e salva il progetto.";
             return;
         }
-        string? srcCs = await AppState.Connections.MaterialiseAsync(src, System.Threading.CancellationToken.None).ConfigureAwait(true);
-        string? tgtCs = await AppState.Connections.MaterialiseAsync(tgt, System.Threading.CancellationToken.None).ConfigureAwait(true);
+        string? srcCs = await AppState.Connections.MaterialiseAsync(src, CancellationToken.None).ConfigureAwait(true);
+        string? tgtCs = await AppState.Connections.MaterialiseAsync(tgt, CancellationToken.None).ConfigureAwait(true);
         if (srcCs is not null)
         {
             AppState.SourceConnectionString = srcCs;

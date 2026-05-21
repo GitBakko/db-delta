@@ -74,7 +74,7 @@ public sealed partial class AppStateViewModel : ObservableObject
             ? []
             : (StatusFilter is null
                 ? LastComparison.Differences
-                : [.. LastComparison.Differences.Where(d => string.Equals(d.Status, StatusFilter, System.StringComparison.Ordinal))]);
+                : [.. LastComparison.Differences.Where(d => string.Equals(d.Status, StatusFilter, StringComparison.Ordinal))]);
 
     partial void OnLastComparisonChanged(ComparisonResultDto? value) => OnPropertyChanged(nameof(FilteredDifferences));
     partial void OnStatusFilterChanged(string? value) => OnPropertyChanged(nameof(FilteredDifferences));
@@ -104,7 +104,7 @@ public sealed partial class AppStateViewModel : ObservableObject
             {
                 _ = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(srcCs);
             }
-            catch (System.Exception parseEx)
+            catch (Exception parseEx)
             {
                 LastError = $"Source connection string parse failed: {parseEx.Message}\n"
                     + $"len={srcCs.Length}\n"
@@ -115,7 +115,7 @@ public sealed partial class AppStateViewModel : ObservableObject
             {
                 _ = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(tgtCs);
             }
-            catch (System.Exception parseEx)
+            catch (Exception parseEx)
             {
                 LastError = $"Target connection string parse failed: {parseEx.Message}\n"
                     + $"len={tgtCs.Length}\n"

@@ -10,7 +10,7 @@ public class ConnectionTesterTests
     [Fact]
     public async Task Bad_connection_string_fails_fast_and_returns_failure()
     {
-        Stopwatch sw = Stopwatch.StartNew();
+        var sw = Stopwatch.StartNew();
         ConnectionTester.TestResult result = await ConnectionTester.TestAsync(
             "Server=tcp:127.0.0.1,59999;Database=NoSuchDb;User Id=sa;Password=wrong;Encrypt=False;Connect Timeout=2",
             CancellationToken.None);

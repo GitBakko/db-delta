@@ -13,11 +13,11 @@ internal sealed class KeychainCredentialStore : ICredentialStore
     public bool IsAvailable => false;
 
     public Task<string?> GetSecretAsync(string targetKey, CancellationToken ct) =>
-        throw new System.NotSupportedException("macOS Keychain credential store ships in v2.");
+        throw new NotSupportedException("macOS Keychain credential store ships in v2.");
 
     public Task SetSecretAsync(string targetKey, string secret, CancellationToken ct) =>
-        throw new System.NotSupportedException("macOS Keychain credential store ships in v2.");
+        throw new NotSupportedException("macOS Keychain credential store ships in v2.");
 
     public Task DeleteSecretAsync(string targetKey, CancellationToken ct) =>
-        throw new System.NotSupportedException("macOS Keychain credential store ships in v2.");
+        throw new NotSupportedException("macOS Keychain credential store ships in v2.");
 }

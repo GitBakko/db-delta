@@ -20,16 +20,16 @@ public class DpapiCredentialStoreTests
 
 #pragma warning disable CA1416
         ICredentialStore store = new DpapiCredentialStore();
-        string key = $"dbdelta:test:{System.Guid.NewGuid():N}";
+        string key = $"dbdelta:test:{Guid.NewGuid():N}";
         try
         {
-            await store.SetSecretAsync(key, "Hello123!", System.Threading.CancellationToken.None);
-            string? back = await store.GetSecretAsync(key, System.Threading.CancellationToken.None);
+            await store.SetSecretAsync(key, "Hello123!", CancellationToken.None);
+            string? back = await store.GetSecretAsync(key, CancellationToken.None);
             back.Should().Be("Hello123!");
         }
         finally
         {
-            await store.DeleteSecretAsync(key, System.Threading.CancellationToken.None);
+            await store.DeleteSecretAsync(key, CancellationToken.None);
         }
 #pragma warning restore CA1416
     }
@@ -44,7 +44,7 @@ public class DpapiCredentialStoreTests
 
 #pragma warning disable CA1416
         ICredentialStore store = new DpapiCredentialStore();
-        string? back = await store.GetSecretAsync($"dbdelta:test:nokey-{System.Guid.NewGuid():N}", System.Threading.CancellationToken.None);
+        string? back = await store.GetSecretAsync($"dbdelta:test:nokey-{Guid.NewGuid():N}", CancellationToken.None);
         back.Should().BeNull();
 #pragma warning restore CA1416
     }
@@ -59,7 +59,7 @@ public class DpapiCredentialStoreTests
 
 #pragma warning disable CA1416
         ICredentialStore store = new DpapiCredentialStore();
-        System.Func<System.Threading.Tasks.Task> act = () => store.DeleteSecretAsync($"dbdelta:test:noop-{System.Guid.NewGuid():N}", System.Threading.CancellationToken.None);
+        Func<Task> act = () => store.DeleteSecretAsync($"dbdelta:test:noop-{Guid.NewGuid():N}", CancellationToken.None);
         await act.Should().NotThrowAsync();
 #pragma warning restore CA1416
     }

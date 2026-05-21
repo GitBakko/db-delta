@@ -122,7 +122,7 @@ public class JsonConnectionStoreTests : IDisposable
     [Fact]
     public async Task Future_schema_version_renames_aside_and_returns_empty()
     {
-        await File.WriteAllTextAsync(_file, """{"schemaVersion":999,"entries":[]}""", CancellationToken.None);
+        await File.WriteAllTextAsync(_file, /*lang=json,strict*/ """{"schemaVersion":999,"entries":[]}""", CancellationToken.None);
         JsonConnectionStore store = CreateStore();
         IReadOnlyList<ConnectionEntry> entries = await store.LoadAsync(CancellationToken.None);
         entries.Should().BeEmpty();

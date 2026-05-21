@@ -64,7 +64,7 @@ public sealed partial class ConnectionStoreViewModel(
 
         string password = builder.Password ?? "";
         string template = ReplacePassword(rawConnectionString, "{PASSWORD}");
-        Guid id = Guid.NewGuid();
+        var id = Guid.NewGuid();
         ConnectionEntry entry = new(
             Id: id,
             Name: $"{server}.{database} (auto)",

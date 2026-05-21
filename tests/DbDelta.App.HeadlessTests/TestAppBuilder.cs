@@ -15,8 +15,5 @@ public sealed class TestAppBuilder
 
 public sealed class TestApp : Application
 {
-    public override void Initialize()
-    {
-        Styles.Add(new FluentTheme());
-    }
+    public override void Initialize() => Styles.Add(new FluentTheme());
 }

@@ -35,7 +35,7 @@ public static class Converters
     /// Used to drive style-class toggles on the status badge.
     /// </summary>
     public static readonly IValueConverter IsStatus = new FuncValueConverter<string?, string?, bool>(static (status, target) =>
-        string.Equals(status, target, System.StringComparison.Ordinal));
+        string.Equals(status, target, StringComparison.Ordinal));
 
     /// <summary>
     /// Maps the raw <c>DifferenceStatus</c> name (e.g. <c>"OnlyInA"</c>) to a
@@ -52,5 +52,5 @@ public static class Converters
 
     /// <summary>Masks <c>password=</c> / <c>pwd=</c> in any connection-string preview.</summary>
     public static readonly IValueConverter RedactConnectionString = new FuncValueConverter<string?, string?>(static value =>
-        value is null ? null : DbDelta.Persistence.Util.ConnectionStringRedactor.Redact(value));
+        value is null ? null : Persistence.Util.ConnectionStringRedactor.Redact(value));
 }
