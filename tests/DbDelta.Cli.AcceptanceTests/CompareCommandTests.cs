@@ -218,6 +218,64 @@ public class CompareCommandTests(CliFixture fixture)
             $"IF OBJECT_ID('dbo.uspGet') IS NULL EXEC('CREATE PROCEDURE dbo.uspGet AS {innerSql}');", c);
         await cmd.ExecuteNonQueryAsync(ct);
     }
+
+    [Fact]
+    public async Task Returns_exit_code_1_when_source_has_an_extra_function()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        const string srcDb = "DbDeltaFnSrc";
+        const string tgtDb = "DbDeltaFnTgt";
+        await CreateDb(srcDb, ct);
+        await CreateDb(tgtDb, ct);
+        await CreateScalarFunction(srcDb, ct);
+
+        int exit = await RunCli(["compare",
+            "--source", ConnectionFor(srcDb),
+            "--target", ConnectionFor(tgtDb),
+            "--format", "json"], ct);
+
+        exit.Should().Be(ExpectedExitCodes.SuccessDifferencesFound);
+    }
+
+    [Fact]
+    public async Task Returns_exit_code_1_when_a_trigger_body_differs()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        const string srcDb = "DbDeltaTrgSrc";
+        const string tgtDb = "DbDeltaTrgTgt";
+        await CreateDb(srcDb, ct);
+        await CreateDb(tgtDb, ct);
+        await CreateTriggerWithBody(srcDb, "SET NOCOUNT ON;", ct);
+        await CreateTriggerWithBody(tgtDb, "DECLARE @x int = 1;", ct);
+
+        int exit = await RunCli(["compare",
+            "--source", ConnectionFor(srcDb),
+            "--target", ConnectionFor(tgtDb),
+            "--format", "json"], ct);
+
+        exit.Should().Be(ExpectedExitCodes.SuccessDifferencesFound);
+    }
+
+    private async Task CreateScalarFunction(string db, CancellationToken ct)
+    {
+        await using SqlConnection c = new(ConnectionFor(db));
+        await c.OpenAsync(ct);
+        await using SqlCommand cmd = new(
+            "IF OBJECT_ID('dbo.fnSum') IS NULL EXEC('CREATE FUNCTION dbo.fnSum() RETURNS int AS BEGIN RETURN 1; END');", c);
+        await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+    private async Task CreateTriggerWithBody(string db, string innerSql, CancellationToken ct)
+    {
+        await using SqlConnection c = new(ConnectionFor(db));
+        await c.OpenAsync(ct);
+        await using SqlCommand setup = new(
+            "IF OBJECT_ID('dbo.Customer') IS NULL CREATE TABLE dbo.Customer(Id int NOT NULL);", c);
+        await setup.ExecuteNonQueryAsync(ct);
+        await using SqlCommand cmd = new(
+            $"IF OBJECT_ID('dbo.trgCustomer') IS NULL EXEC('CREATE TRIGGER dbo.trgCustomer ON dbo.Customer AFTER INSERT AS BEGIN {innerSql} END');", c);
+        await cmd.ExecuteNonQueryAsync(ct);
+    }
 }
 
 /// <summary>
