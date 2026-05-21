@@ -128,4 +128,57 @@ internal sealed class ModuleReader
         }
         return functions;
     }
+
+    private const string TriggerQuery = """
+        SELECT ps.name AS TriggerSchemaName,
+               tr.name AS TriggerName,
+               sm.definition AS Body,
+               ts.name AS ParentSchema,
+               t.name  AS ParentTable,
+               CAST(tr.is_disabled AS BIT)             AS IsDisabled,
+               CAST(tr.is_not_for_replication AS BIT)  AS IsNotForReplication
+        FROM sys.triggers AS tr
+        INNER JOIN sys.objects AS o ON o.object_id = tr.object_id
+        INNER JOIN sys.schemas AS ps ON ps.schema_id = o.schema_id
+        INNER JOIN sys.tables  AS t  ON t.object_id  = tr.parent_id
+        INNER JOIN sys.schemas AS ts ON ts.schema_id = t.schema_id
+        LEFT  JOIN sys.sql_modules AS sm ON sm.object_id = tr.object_id
+        WHERE tr.parent_class = 1
+          AND tr.is_ms_shipped = 0
+        ORDER BY ps.name, tr.name;
+        """;
+
+    /// <summary>
+    /// Reads user DML triggers (INSERT / UPDATE / DELETE) with their parent
+    /// table identity and the IsDisabled / IsNotForReplication flags.
+    /// Encrypted bodies surface as <c>IsEncrypted = true</c> + <c>Body = null</c>.
+    /// </summary>
+    public async Task<IReadOnlyList<Trigger>> ReadTriggersAsync(SqlConnection connection, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        List<Trigger> triggers = [];
+        await using SqlCommand cmd = new(TriggerQuery, connection);
+        await using SqlDataReader r = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        while (await r.ReadAsync(ct).ConfigureAwait(false))
+        {
+            string triggerSchema = r.GetString(0);
+            string triggerName = r.GetString(1);
+            string? body = r.IsDBNull(2) ? null : r.GetString(2);
+            string parentSchema = r.GetString(3);
+            string parentTable = r.GetString(4);
+            bool isDisabled = !r.IsDBNull(5) && r.GetBoolean(5);
+            bool isNfr = !r.IsDBNull(6) && r.GetBoolean(6);
+            bool encrypted = body is null;
+            triggers.Add(new Trigger(
+                Schema: triggerSchema,
+                Name: triggerName,
+                Body: body,
+                IsEncrypted: encrypted,
+                ParentSchema: parentSchema,
+                ParentTable: parentTable,
+                IsDisabled: isDisabled,
+                IsNotForReplication: isNfr));
+        }
+        return triggers;
+    }
 }
