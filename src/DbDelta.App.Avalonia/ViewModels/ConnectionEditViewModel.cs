@@ -1,6 +1,9 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DbDelta.Core.Abstractions;
+using DbDelta.Persistence.Sql;
+using Microsoft.Data.SqlClient;
 
 namespace DbDelta.App.ViewModels;
 
@@ -22,6 +25,7 @@ public sealed partial class ConnectionEditViewModel : ObservableObject
         EnvironmentColorHex = entry.EnvironmentColorHex;
         IsPinned = entry.IsPinned;
         Password = password ?? "";
+        UserName = ExtractUserId(entry.ConnectionStringTemplate) ?? "sa";
     }
 
     /// <summary>True when the form is creating a brand-new entry.
@@ -39,6 +43,21 @@ public sealed partial class ConnectionEditViewModel : ObservableObject
     [ObservableProperty] private string _password = "";
     [ObservableProperty] private bool _isPasswordVisible;
 
+    [ObservableProperty]
+    private string _userName = "sa";
+
+    [ObservableProperty]
+    private ObservableCollection<string> _serverSuggestions = [];
+
+    [ObservableProperty]
+    private ObservableCollection<string> _availableDatabases = [];
+
+    [ObservableProperty]
+    private bool _isLoadingDatabases;
+
+    [ObservableProperty]
+    private string? _connectionStatusMessage;
+
     public IReadOnlyList<EnvironmentColorOption> ColorPalette => EnvironmentColorPalette.All;
 
     public bool IsValid =>
@@ -49,21 +68,103 @@ public sealed partial class ConnectionEditViewModel : ObservableObject
     partial void OnNameChanged(string value) => OnPropertyChanged(nameof(IsValid));
     partial void OnEnvironmentColorHexChanged(string value) => OnPropertyChanged(nameof(IsValid));
 
+    partial void OnServerNameChanged(string value) => LoadDatabasesCommand.NotifyCanExecuteChanged();
+    partial void OnUserNameChanged(string value) => LoadDatabasesCommand.NotifyCanExecuteChanged();
+    partial void OnPasswordChanged(string value) => LoadDatabasesCommand.NotifyCanExecuteChanged();
+    partial void OnIsLoadingDatabasesChanged(bool value) => LoadDatabasesCommand.NotifyCanExecuteChanged();
+
     [RelayCommand]
     public void PickColor(string? hex)
     {
-        if (!string.IsNullOrWhiteSpace(hex)) { EnvironmentColorHex = hex; }
+        if (!string.IsNullOrWhiteSpace(hex))
+        {
+            EnvironmentColorHex = hex;
+        }
     }
 
-    public ConnectionEntry ToEntry() => new(
-        Id: _id,
-        Name: Name,
-        ServerName: ServerName,
-        DatabaseName: DatabaseName,
-        ConnectionStringTemplate: ConnectionStringTemplate,
-        EnvironmentTag: EnvironmentTag,
-        EnvironmentColorHex: EnvironmentColorHex,
-        IsPinned: IsPinned,
-        CreatedUtc: _createdUtc,
-        LastUsedUtc: DateTime.UtcNow);
+    [RelayCommand]
+    public async Task LoadServerSuggestionsAsync()
+    {
+        IReadOnlyList<string> list = await SqlServerDiscovery.EnumerateServersAsync(CancellationToken.None);
+        ServerSuggestions.Clear();
+        foreach (string s in list)
+        {
+            ServerSuggestions.Add(s);
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanLoadDatabases))]
+    public async Task LoadDatabasesAsync()
+    {
+        IsLoadingDatabases = true;
+        AvailableDatabases.Clear();
+        ConnectionStatusMessage = null;
+        try
+        {
+            string raw = BuildConnectionString(includeDatabase: false);
+            IReadOnlyList<string> dbs = await SqlServerDiscovery.ListDatabasesAsync(raw, CancellationToken.None);
+            foreach (string db in dbs)
+            {
+                AvailableDatabases.Add(db);
+            }
+
+            ConnectionStatusMessage = $"Connesso — {dbs.Count} database disponibili";
+        }
+        catch (Exception ex)
+        {
+            ConnectionStatusMessage = $"Errore: {DbDelta.Persistence.Util.ConnectionStringRedactor.Redact(ex.Message)}";
+        }
+        finally
+        {
+            IsLoadingDatabases = false;
+        }
+    }
+
+    private bool CanLoadDatabases() =>
+        !IsLoadingDatabases
+        && !string.IsNullOrWhiteSpace(ServerName)
+        && !string.IsNullOrWhiteSpace(UserName)
+        && !string.IsNullOrWhiteSpace(Password);
+
+    private string BuildConnectionString(bool includeDatabase)
+    {
+        string db = includeDatabase && !string.IsNullOrWhiteSpace(DatabaseName)
+            ? $"Database={DatabaseName};"
+            : "";
+        return $"Server={ServerName};{db}User Id={UserName};Password={Password};TrustServerCertificate=True";
+    }
+
+    public ConnectionEntry ToEntry()
+    {
+        string template = $"Server={ServerName};Database={DatabaseName};User Id={UserName};Password={{PASSWORD}};TrustServerCertificate=True";
+        return new ConnectionEntry(
+            Id: _id,
+            Name: Name,
+            ServerName: ServerName,
+            DatabaseName: DatabaseName,
+            ConnectionStringTemplate: template,
+            EnvironmentTag: EnvironmentTag,
+            EnvironmentColorHex: EnvironmentColorHex,
+            IsPinned: IsPinned,
+            CreatedUtc: _createdUtc,
+            LastUsedUtc: DateTime.UtcNow);
+    }
+
+    private static string? ExtractUserId(string? template)
+    {
+        if (string.IsNullOrWhiteSpace(template))
+        {
+            return null;
+        }
+
+        try
+        {
+            SqlConnectionStringBuilder b = new(template);
+            return b.UserID;
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }

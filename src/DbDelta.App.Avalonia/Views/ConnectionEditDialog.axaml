@@ -4,7 +4,7 @@
         x:Class="DbDelta.App.Views.ConnectionEditDialog"
         x:DataType="vm:ConnectionEditViewModel"
         Title="Modifica connessione"
-        Width="520" Height="600"
+        Width="560" Height="680"
         WindowStartupLocation="CenterOwner"
         CanResize="False"
         Background="{StaticResource BgBrush}">
@@ -18,26 +18,67 @@
         <TextBox Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
         <TextBlock Text="Server" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}" />
-        <TextBox Text="{Binding ServerName, Mode=TwoWay}" />
-
-        <TextBlock Text="Database" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}" />
-        <TextBox Text="{Binding DatabaseName, Mode=TwoWay}" />
-
-        <TextBlock Text="Password" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}" />
         <Grid ColumnDefinitions="*,Auto">
-          <TextBox Grid.Column="0"
-                   Text="{Binding Password, Mode=TwoWay}"
-                   PasswordChar="&#x2022;" />
-          <Button Grid.Column="1" Classes="ghost"
-                  ToolTip.Tip="Mostra"
-                  Margin="6,0,0,0">
-            <TextBlock Text="&#x1F441;" />
+          <AutoCompleteBox Grid.Column="0"
+                           Text="{Binding ServerName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                           ItemsSource="{Binding ServerSuggestions}"
+                           FilterMode="ContainsOrdinal"
+                           PlaceholderText="Scrivi o seleziona un server SQL…" />
+          <Button Grid.Column="1" Classes="ghost-violet" Margin="6,0,0,0"
+                  Command="{Binding LoadServerSuggestionsCommand}"
+                  ToolTip.Tip="Cerca server SQL noti">
+            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+              <Path Width="14" Height="14" Stretch="Uniform"
+                    Stroke="{Binding $parent[Button].Foreground}"
+                    StrokeThickness="1.7" StrokeLineCap="Round"
+                    Data="M 11,4 A 7,7 0 1 1 4,11 A 7,7 0 0 1 11,4 M 16,16 L 20,20" />
+              <TextBlock Text="Scansiona" VerticalAlignment="Center" />
+            </StackPanel>
           </Button>
         </Grid>
 
+        <TextBlock Text="Utente" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}" />
+        <TextBox Text="{Binding UserName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+        <TextBlock Text="Password" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}" />
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBox x:Name="PasswordBox" Grid.Column="0"
+                   Text="{Binding Password, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                   PasswordChar="&#x2022;" />
+          <Button x:Name="RevealButton" Grid.Column="1" Classes="ghost" Margin="6,0,0,0"
+                  ToolTip.Tip="Tieni premuto per mostrare la password">
+            <Path Width="14" Height="14" Stretch="Uniform"
+                  Stroke="{Binding $parent[Button].Foreground}"
+                  StrokeThickness="1.7" StrokeLineCap="Round"
+                  Data="M 2,12 C 4,7 8,4 12,4 C 16,4 20,7 22,12 C 20,17 16,20 12,20 C 8,20 4,17 2,12 Z M 12,9 A 3,3 0 1 0 12,15 A 3,3 0 0 0 12,9 Z" />
+          </Button>
+        </Grid>
+
+        <TextBlock Text="Database" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}" />
+        <Grid ColumnDefinitions="*,Auto">
+          <AutoCompleteBox Grid.Column="0"
+                           Text="{Binding DatabaseName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                           ItemsSource="{Binding AvailableDatabases}"
+                           PlaceholderText="Scrivi o seleziona dopo aver connesso…" />
+          <Button Grid.Column="1" Classes="ghost-emerald" Margin="6,0,0,0"
+                  Command="{Binding LoadDatabasesCommand}"
+                  ToolTip.Tip="Connetti e carica i database disponibili">
+            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+              <Path Width="14" Height="14" Stretch="Uniform"
+                    Stroke="{Binding $parent[Button].Foreground}"
+                    StrokeThickness="1.7" StrokeLineCap="Round"
+                    Data="M 5,12 L 19,12 M 13,6 L 19,12 L 13,18" />
+              <TextBlock Text="Connetti" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </Grid>
+        <TextBlock Text="{Binding ConnectionStatusMessage}" FontSize="11"
+                   Foreground="{StaticResource FgMutedBrush}"
+                   IsVisible="{Binding ConnectionStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
         <TextBlock Text="Tag ambiente" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}" />
         <TextBox Text="{Binding EnvironmentTag, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                 PlaceholderText="Dev / Test / Prod / &#x2026;" />
+                 PlaceholderText="Dev / Test / Prod / …" />
 
         <TextBlock Text="Colore ambiente" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}" />
         <ItemsControl ItemsSource="{Binding ColorPalette}">
@@ -48,13 +89,16 @@
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate DataType="vm:EnvironmentColorOption">
-              <Button Classes="ghost"
-                      Margin="0,0,4,4"
-                      Padding="2"
+              <Button Margin="0,0,6,6"
+                      Padding="0"
+                      Background="Transparent"
+                      BorderBrush="{StaticResource BorderBrush}"
+                      BorderThickness="1"
+                      CornerRadius="6"
                       CommandParameter="{Binding Hex}"
                       Command="{Binding $parent[Window].((vm:ConnectionEditViewModel)DataContext).PickColorCommand}"
                       ToolTip.Tip="{Binding Label}">
-                <Border Width="28" Height="28" CornerRadius="4">
+                <Border Width="36" Height="36" CornerRadius="5" Margin="2">
                   <Border.Background>
                     <SolidColorBrush Color="{Binding Hex}" />
                   </Border.Background>
@@ -63,9 +107,16 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
-        <TextBlock Text="{Binding EnvironmentColorHex}"
-                   FontFamily="Cascadia Mono,Consolas,monospace" FontSize="11"
-                   Foreground="{StaticResource FgSubtleBrush}" />
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <Border Width="14" Height="14" CornerRadius="3">
+            <Border.Background>
+              <SolidColorBrush Color="{Binding EnvironmentColorHex}" />
+            </Border.Background>
+          </Border>
+          <TextBlock Text="{Binding EnvironmentColorHex}"
+                     FontFamily="Cascadia Mono,Consolas,monospace" FontSize="11"
+                     Foreground="{StaticResource FgSubtleBrush}" />
+        </StackPanel>
 
         <CheckBox Content="Aggiungi ai preferiti (pin in cima)"
                   IsChecked="{Binding IsPinned, Mode=TwoWay}" />
@@ -73,12 +124,39 @@
       </StackPanel>
     </ScrollViewer>
 
+    <!-- Action bar -->
     <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,12,0,0">
-      <Button Content="Elimina" Classes="ghost" Click="OnDeleteClick" />
-      <Button Content="Annulla" Classes="ghost" Click="OnCancelClick" />
-      <Button Content="Salva" Classes="primary"
+      <Button Classes="ghost-crimson" Click="OnDeleteClick"
+              IsVisible="{Binding !IsNew}">
+        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <Path Width="14" Height="14" Stretch="Uniform"
+                Stroke="{Binding $parent[Button].Foreground}"
+                StrokeThickness="1.7" StrokeLineCap="Round"
+                Data="M 5,7 L 19,7 M 9,7 L 9,4 L 15,4 L 15,7 M 6,7 L 7,20 L 17,20 L 18,7 M 10,11 L 10,17 M 14,11 L 14,17" />
+          <TextBlock Text="Elimina" VerticalAlignment="Center" />
+        </StackPanel>
+      </Button>
+      <Button Classes="ghost" Click="OnCancelClick">
+        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <Path Width="14" Height="14" Stretch="Uniform"
+                Stroke="{Binding $parent[Button].Foreground}"
+                StrokeThickness="1.7" StrokeLineCap="Round"
+                Data="M 6,6 L 18,18 M 6,18 L 18,6" />
+          <TextBlock Text="Annulla" VerticalAlignment="Center" />
+        </StackPanel>
+      </Button>
+      <Button Classes="primary"
               IsEnabled="{Binding IsValid}"
-              Click="OnSaveClick" />
+              Click="OnSaveClick">
+        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <Path Width="14" Height="14" Stretch="Uniform"
+                Stroke="{StaticResource PrimaryFgBrush}"
+                StrokeThickness="1.8" StrokeLineCap="Round" StrokeJoin="Round"
+                Fill="Transparent"
+                Data="M 5,12 L 10,17 L 19,7" />
+          <TextBlock Text="Salva" VerticalAlignment="Center" />
+        </StackPanel>
+      </Button>
     </StackPanel>
 
   </Grid>
