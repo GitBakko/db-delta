@@ -17,7 +17,7 @@
             Background="{StaticResource BgMutedBrush}"
             BorderBrush="{StaticResource BorderBrush}"
             BorderThickness="0,0,0,1">
-      <Grid ColumnDefinitions="Auto,*,Auto" Margin="12,0">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="12,0">
 
         <!-- Sidebar toggle: panel-left-close when open, panel-left-open when closed -->
         <Button Grid.Column="0"
@@ -75,6 +75,24 @@
         </StackPanel>
 
         <Button Grid.Column="2"
+                Classes="ghost"
+                Command="{Binding SaveProjectCommand}"
+                CommandParameter="{Binding $parent[Window]}"
+                ToolTip.Tip="Salva progetto..."
+                VerticalAlignment="Center"
+                Margin="0,0,4,0">
+          <TextBlock Text="&#x1F4BE;" />
+        </Button>
+        <Button Grid.Column="3"
+                Classes="ghost"
+                Command="{Binding OpenProjectCommand}"
+                CommandParameter="{Binding $parent[Window]}"
+                ToolTip.Tip="Apri progetto..."
+                VerticalAlignment="Center"
+                Margin="0,0,4,0">
+          <TextBlock Text="&#x1F4C2;" />
+        </Button>
+        <Button Grid.Column="4"
                 Classes="ghost"
                 Command="{Binding ToggleThemeCommand}"
                 ToolTip.Tip="Toggle light / dark theme"
