@@ -4,7 +4,7 @@
         x:Class="DbDelta.App.Views.ConnectionEditDialog"
         x:DataType="vm:ConnectionEditViewModel"
         Title="Modifica connessione"
-        Width="560" Height="680"
+        Width="600" Height="820"
         WindowStartupLocation="CenterOwner"
         CanResize="False"
         Background="{StaticResource BgBrush}">
