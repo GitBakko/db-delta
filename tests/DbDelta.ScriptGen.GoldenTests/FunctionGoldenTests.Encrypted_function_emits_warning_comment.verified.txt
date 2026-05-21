@@ -1,0 +1,1 @@
+﻿-- WARNING: function [dbo].[fnSecret] is encrypted (WITH ENCRYPTION); body cannot be scripted.
