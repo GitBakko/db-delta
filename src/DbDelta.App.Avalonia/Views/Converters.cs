@@ -35,5 +35,18 @@ public static class Converters
     /// Used to drive style-class toggles on the status badge.
     /// </summary>
     public static readonly IValueConverter IsStatus = new FuncValueConverter<string?, string?, bool>(static (status, target) =>
-        string.Equals(status, target, StringComparison.Ordinal));
+        string.Equals(status, target, System.StringComparison.Ordinal));
+
+    /// <summary>
+    /// Maps the raw <c>DifferenceStatus</c> name (e.g. <c>"OnlyInA"</c>) to a
+    /// human-friendly Italian label shown in the badge.
+    /// </summary>
+    public static readonly IValueConverter StatusToDisplayName = new FuncValueConverter<string?, string?>(static status => status switch
+    {
+        "OnlyInA" => "Solo in origine",
+        "OnlyInB" => "Solo in destinazione",
+        "Different" => "Modificato",
+        "Identical" => "Identico",
+        _ => status,
+    });
 }

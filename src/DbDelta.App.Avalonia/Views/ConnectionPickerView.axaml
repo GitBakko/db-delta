@@ -5,7 +5,7 @@
              x:DataType="vm:AppStateViewModel">
 
   <StackPanel Spacing="12">
-    <TextBlock Text="Connections"
+    <TextBlock Text="Connessioni"
                FontSize="20"
                FontWeight="SemiBold"
                Foreground="{StaticResource FgStrongBrush}" />
@@ -16,7 +16,7 @@
               Classes="endpoint endpoint-source"
               Padding="14">
         <StackPanel Spacing="6">
-          <TextBlock Text="SOURCE"
+          <TextBlock Text="ORIGINE"
                      FontSize="10"
                      FontWeight="Bold"
                      LetterSpacing="0.6"
@@ -34,7 +34,7 @@
               Margin="10,0"
               VerticalAlignment="Center"
               Command="{Binding SwapCommand}"
-              ToolTip.Tip="Swap source and target">
+              ToolTip.Tip="Inverti origine e destinazione">
         <Path Width="14" Height="14"
               Stretch="Uniform"
               Stroke="{Binding $parent[Button].Foreground}"
@@ -47,7 +47,7 @@
               Classes="endpoint endpoint-target"
               Padding="14">
         <StackPanel Spacing="6">
-          <TextBlock Text="TARGET"
+          <TextBlock Text="DESTINAZIONE"
                      FontSize="10"
                      FontWeight="Bold"
                      LetterSpacing="0.6"
@@ -66,20 +66,28 @@
       <Button Classes="primary lg"
               Command="{Binding CompareCommand}"
               IsEnabled="{Binding !IsBusy}">
-        <StackPanel Orientation="Horizontal" Spacing="6">
+        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
           <ProgressBar IsIndeterminate="True"
-                       Width="14" Height="14"
+                       Width="16" Height="16"
                        IsVisible="{Binding IsBusy}"
-                       ShowProgressText="False" />
-          <TextBlock Text="Comparing…" IsVisible="{Binding IsBusy}" />
+                       ShowProgressText="False"
+                       Foreground="{StaticResource PrimaryFgBrush}"
+                       Background="Transparent" />
+          <TextBlock Text="Confronto in corso…"
+                     IsVisible="{Binding IsBusy}"
+                     Foreground="{StaticResource PrimaryFgBrush}"
+                     VerticalAlignment="Center" />
           <Path Width="12" Height="12"
                 IsVisible="{Binding !IsBusy}"
                 Stretch="Uniform"
-                Stroke="{Binding $parent[Button].Foreground}"
+                Stroke="{StaticResource PrimaryFgBrush}"
                 StrokeThickness="1.8"
                 StrokeLineCap="Round"
-                Data="M 5,12 L 19,12 M 13,6 L 19,12 L 13,18" />
-          <TextBlock Text="Compare" IsVisible="{Binding !IsBusy}" />
+                Data="M 5,12 L 19,12 M 13,6 L 19,12 L 13,18"
+                VerticalAlignment="Center" />
+          <TextBlock Text="Confronta"
+                     IsVisible="{Binding !IsBusy}"
+                     VerticalAlignment="Center" />
         </StackPanel>
       </Button>
     </StackPanel>
@@ -95,7 +103,7 @@
               StrokeThickness="1.8"
               Data="M 12,3 A 9,9 0 1 1 11.99,3 M 12,7 L 12,13 M 12,16 L 12.01,16" />
         <StackPanel>
-          <TextBlock Text="Comparison failed."
+          <TextBlock Text="Confronto fallito."
                      FontWeight="SemiBold"
                      Foreground="{StaticResource DangerFgBrush}" />
           <TextBlock Text="{Binding LastError}"

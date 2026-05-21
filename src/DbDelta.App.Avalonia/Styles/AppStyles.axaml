@@ -174,4 +174,43 @@
     <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}" />
   </Style>
 
+  <!-- ===== DataGrid overrides =====
+
+       FluentTheme defaults paint selected rows with a strong accent fill and
+       draw a 2px black focus rectangle around the active cell. Both clash
+       with the DbDelta design system; remap them to the softer PrimarySoft
+       token and hide the cell focus rectangle entirely (the colored row
+       background is plenty of selection feedback). -->
+
+  <Style Selector="DataGridRow:selected /template/ Rectangle#BackgroundRectangle">
+    <Setter Property="Fill" Value="{StaticResource PrimarySoftBrush}" />
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+  <Style Selector="DataGridRow:selected:pointerover /template/ Rectangle#BackgroundRectangle">
+    <Setter Property="Fill" Value="{StaticResource PrimarySoftBrush}" />
+    <Setter Property="Opacity" Value="0.85" />
+  </Style>
+  <Style Selector="DataGridRow:selected">
+    <Setter Property="Foreground" Value="{StaticResource FgStrongBrush}" />
+  </Style>
+
+  <Style Selector="DataGridCell">
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="FocusAdorner" Value="{x:Null}" />
+  </Style>
+  <Style Selector="DataGridCell:focus">
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="DataGridCell:current">
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="DataGridCell:focus /template/ Grid#FocusVisual">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="DataGridCell:current /template/ Grid#FocusVisual">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+
 </Styles>

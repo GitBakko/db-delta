@@ -33,6 +33,41 @@ public sealed partial class AppStateViewModel : ObservableObject
     [ObservableProperty]
     private ComparisonResultDto? _lastComparison;
 
+    /// <summary>
+    /// Active status filter for the result grid. <c>null</c> = no filter.
+    /// Bound options match the raw <see cref="DifferenceDto.Status"/> string
+    /// values ("Different" / "OnlyInA" / "OnlyInB" / "Identical").
+    /// </summary>
+    [ObservableProperty]
+    private string? _statusFilter;
+
+    /// <summary>
+    /// Filter options shown in the picker — value is the raw Status string,
+    /// label is the Italian display name.
+    /// </summary>
+    public IReadOnlyList<StatusFilterOption> StatusFilterOptions { get; } =
+    [
+        new(null,         "Tutti"),
+        new("Different",  "Modificato"),
+        new("OnlyInA",    "Solo in origine"),
+        new("OnlyInB",    "Solo in destinazione"),
+        new("Identical",  "Identico"),
+    ];
+
+    /// <summary>
+    /// Differences filtered by the current <see cref="StatusFilter"/>.
+    /// Recomputed whenever LastComparison or StatusFilter change.
+    /// </summary>
+    public IReadOnlyList<DifferenceDto> FilteredDifferences =>
+        LastComparison is null
+            ? []
+            : (StatusFilter is null
+                ? LastComparison.Differences
+                : [.. LastComparison.Differences.Where(d => string.Equals(d.Status, StatusFilter, System.StringComparison.Ordinal))]);
+
+    partial void OnLastComparisonChanged(ComparisonResultDto? value) => OnPropertyChanged(nameof(FilteredDifferences));
+    partial void OnStatusFilterChanged(string? value) => OnPropertyChanged(nameof(FilteredDifferences));
+
     public string StatusText => IsBusy ? "Working…" : "Ready";
 
     partial void OnIsBusyChanged(bool value) => OnPropertyChanged(nameof(StatusText));
@@ -50,6 +85,33 @@ public sealed partial class AppStateViewModel : ObservableObject
             // "Format of the initialization string does not conform to specification" error.
             string srcCs = (SourceConnectionString ?? string.Empty).Trim();
             string tgtCs = (TargetConnectionString ?? string.Empty).Trim();
+
+            // Surface a sanitised echo of the parsed string when SqlClient throws
+            // so we know exactly what the parser saw (e.g. a stray newline at
+            // index N, or markdown ** that survived the paste).
+            try
+            {
+                _ = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(srcCs);
+            }
+            catch (System.Exception parseEx)
+            {
+                LastError = $"Source connection string parse failed: {parseEx.Message}\n"
+                    + $"len={srcCs.Length}\n"
+                    + $"sanitised='{System.Text.RegularExpressions.Regex.Replace(srcCs, @"(?i)(password|pwd)\s*=\s*[^;]+", "$1=***")}'";
+                return;
+            }
+            try
+            {
+                _ = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(tgtCs);
+            }
+            catch (System.Exception parseEx)
+            {
+                LastError = $"Target connection string parse failed: {parseEx.Message}\n"
+                    + $"len={tgtCs.Length}\n"
+                    + $"sanitised='{System.Text.RegularExpressions.Regex.Replace(tgtCs, @"(?i)(password|pwd)\s*=\s*[^;]+", "$1=***")}'";
+                return;
+            }
+
             LiveDbSource src = new(srcCs, "source");
             LiveDbSource tgt = new(tgtCs, "target");
 
