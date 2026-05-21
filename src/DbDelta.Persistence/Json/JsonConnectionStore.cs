@@ -83,15 +83,56 @@ public sealed class JsonConnectionStore : IConnectionStore
         {
             return new Document(CurrentSchemaVersion, []);
         }
-        await using FileStream fs = File.OpenRead(_filePath);
-        Document? doc = await JsonSerializer.DeserializeAsync<Document>(fs, s_json, ct).ConfigureAwait(false);
-        return doc ?? new Document(CurrentSchemaVersion, []);
+        try
+        {
+            byte[] bytes = await File.ReadAllBytesAsync(_filePath, ct).ConfigureAwait(false);
+            Document? doc = JsonSerializer.Deserialize<Document>(bytes, s_json);
+            if (doc is null)
+            {
+                return new Document(CurrentSchemaVersion, []);
+            }
+            if (doc.SchemaVersion > CurrentSchemaVersion)
+            {
+                MoveAside("future-schema");
+                return new Document(CurrentSchemaVersion, []);
+            }
+            return doc;
+        }
+        catch (JsonException)
+        {
+            MoveAside("invalid-json");
+            return new Document(CurrentSchemaVersion, []);
+        }
+    }
+
+    private void MoveAside(string reason)
+    {
+        string aside = _filePath + ".broken-" + DateTime.UtcNow.ToString("yyyyMMddHHmmssfff") + "-" + reason;
+        try
+        {
+            File.Move(_filePath, aside, overwrite: false);
+        }
+        catch (IOException)
+        {
+            // Another instance may have moved it already. Best-effort.
+        }
     }
 
     private async Task WriteAtomicAsync(Document doc, CancellationToken ct)
     {
         string tmp = _filePath + ".tmp";
-        await using (FileStream fs = File.Create(tmp))
+        FileStreamOptions options = new()
+        {
+            Mode = FileMode.Create,
+            Access = FileAccess.Write,
+            Share = FileShare.None,
+        };
+        if (!OperatingSystem.IsWindows())
+        {
+            // 0600 — owner read/write only.
+            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        }
+        await using (FileStream fs = new(tmp, options))
         {
             await JsonSerializer.SerializeAsync(fs, doc, s_json, ct).ConfigureAwait(false);
         }

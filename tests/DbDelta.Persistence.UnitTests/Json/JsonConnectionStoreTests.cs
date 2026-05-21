@@ -108,4 +108,24 @@ public class JsonConnectionStoreTests : IDisposable
         IReadOnlyList<ConnectionEntry> entries = await store.LoadAsync(CancellationToken.None);
         entries.Select(e => e.Name).Should().ContainInOrder("Pinned", "Recent", "Old");
     }
+
+    [Fact]
+    public async Task Corrupted_file_is_renamed_aside_and_load_returns_empty()
+    {
+        await File.WriteAllTextAsync(_file, "{ this is not valid json", CancellationToken.None);
+        JsonConnectionStore store = CreateStore();
+        IReadOnlyList<ConnectionEntry> entries = await store.LoadAsync(CancellationToken.None);
+        entries.Should().BeEmpty();
+        Directory.GetFiles(_dir).Should().ContainSingle(p => p.Contains(".broken-"));
+    }
+
+    [Fact]
+    public async Task Future_schema_version_renames_aside_and_returns_empty()
+    {
+        await File.WriteAllTextAsync(_file, """{"schemaVersion":999,"entries":[]}""", CancellationToken.None);
+        JsonConnectionStore store = CreateStore();
+        IReadOnlyList<ConnectionEntry> entries = await store.LoadAsync(CancellationToken.None);
+        entries.Should().BeEmpty();
+        Directory.GetFiles(_dir).Should().ContainSingle(p => p.Contains(".broken-"));
+    }
 }
