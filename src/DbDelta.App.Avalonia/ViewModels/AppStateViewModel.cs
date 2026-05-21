@@ -44,8 +44,14 @@ public sealed partial class AppStateViewModel : ObservableObject
         LastError = null;
         try
         {
-            LiveDbSource src = new(SourceConnectionString, "source");
-            LiveDbSource tgt = new(TargetConnectionString, "target");
+            // Trim defensively — pasted connection strings often carry a trailing
+            // newline or stray whitespace from markdown / IDE clipboards that the
+            // strict SqlConnectionStringBuilder parser rejects with the unhelpful
+            // "Format of the initialization string does not conform to specification" error.
+            string srcCs = (SourceConnectionString ?? string.Empty).Trim();
+            string tgtCs = (TargetConnectionString ?? string.Empty).Trim();
+            LiveDbSource src = new(srcCs, "source");
+            LiveDbSource tgt = new(tgtCs, "target");
 
             Result<Database> srcRes = await src.LoadAsync(ct).ConfigureAwait(true);
             if (!srcRes.IsSuccess)
