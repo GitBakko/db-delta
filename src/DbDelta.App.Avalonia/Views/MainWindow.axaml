@@ -19,19 +19,33 @@
             BorderThickness="0,0,0,1">
       <Grid ColumnDefinitions="Auto,*,Auto" Margin="12,0">
 
-        <!-- Sidebar toggle (hamburger) -->
+        <!-- Sidebar toggle: panel-left-close when open, panel-left-open when closed -->
         <Button Grid.Column="0"
                 Classes="ghost"
                 Command="{Binding ToggleSidebarCommand}"
                 ToolTip.Tip="Toggle sidebar"
                 VerticalAlignment="Center"
                 Margin="0,0,8,0">
-          <Path Width="16" Height="16"
-                Stretch="Uniform"
-                Stroke="{Binding $parent[Button].Foreground}"
-                StrokeThickness="1.7"
-                StrokeLineCap="Round"
-                Data="M 4,7 L 20,7 M 4,12 L 20,12 M 4,17 L 20,17" />
+          <Panel Width="16" Height="16">
+            <!-- Open (sidebar visible): panel with chevron pointing left = collapse -->
+            <Path Stretch="Uniform"
+                  Stroke="{Binding $parent[Button].Foreground}"
+                  StrokeThickness="1.7"
+                  StrokeLineCap="Round"
+                  StrokeJoin="Round"
+                  Fill="Transparent"
+                  IsVisible="{Binding IsSidebarOpen}"
+                  Data="M 3,5 L 21,5 L 21,19 L 3,19 Z M 9,5 L 9,19 M 16,9 L 13,12 L 16,15" />
+            <!-- Closed: panel with chevron pointing right = expand -->
+            <Path Stretch="Uniform"
+                  Stroke="{Binding $parent[Button].Foreground}"
+                  StrokeThickness="1.7"
+                  StrokeLineCap="Round"
+                  StrokeJoin="Round"
+                  Fill="Transparent"
+                  IsVisible="{Binding !IsSidebarOpen}"
+                  Data="M 3,5 L 21,5 L 21,19 L 3,19 Z M 9,5 L 9,19 M 13,9 L 16,12 L 13,15" />
+          </Panel>
         </Button>
 
         <StackPanel Grid.Column="1"
