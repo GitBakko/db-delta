@@ -49,4 +49,8 @@ public static class Converters
         "Identical" => "Identico",
         _ => status,
     });
+
+    /// <summary>Masks <c>password=</c> / <c>pwd=</c> in any connection-string preview.</summary>
+    public static readonly IValueConverter RedactConnectionString = new FuncValueConverter<string?, string?>(static value =>
+        value is null ? null : DbDelta.Persistence.Util.ConnectionStringRedactor.Redact(value));
 }

@@ -145,14 +145,14 @@
                    FontSize="11"
                    Foreground="{StaticResource FgSubtleBrush}" />
         <TextBlock Text="·" Foreground="{StaticResource BorderStrongBrush}" FontSize="11" />
-        <TextBlock Text="{Binding AppState.SourceConnectionString}"
+        <TextBlock Text="{Binding AppState.SourceConnectionString, Converter={x:Static v:Converters.RedactConnectionString}}"
                    FontSize="11"
                    FontFamily="Cascadia Mono,Consolas,monospace"
                    Foreground="{StaticResource FgSubtleBrush}"
                    TextTrimming="CharacterEllipsis"
                    MaxWidth="500" />
         <TextBlock Text="→" Foreground="{StaticResource FgFaintBrush}" FontSize="11" />
-        <TextBlock Text="{Binding AppState.TargetConnectionString}"
+        <TextBlock Text="{Binding AppState.TargetConnectionString, Converter={x:Static v:Converters.RedactConnectionString}}"
                    FontSize="11"
                    FontFamily="Cascadia Mono,Consolas,monospace"
                    Foreground="{StaticResource FgSubtleBrush}"
