@@ -6,4 +6,7 @@
   <ItemGroup>
     <ProjectReference Include="..\DbDelta.Core\DbDelta.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DbDelta.Persistence.IntegrationTests" />
+  </ItemGroup>
 </Project>

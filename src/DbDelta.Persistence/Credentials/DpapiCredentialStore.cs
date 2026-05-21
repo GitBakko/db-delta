@@ -45,7 +45,14 @@ internal sealed class DpapiCredentialStore : ICredentialStore
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(targetKey);
 #pragma warning disable CA1416
-        CredentialManager.DeleteCredential(targetKey);
+        try
+        {
+            CredentialManager.DeleteCredential(targetKey);
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            // Credential not found; no-op per interface contract
+        }
 #pragma warning restore CA1416
         return Task.CompletedTask;
     }
