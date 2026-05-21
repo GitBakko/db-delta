@@ -151,6 +151,16 @@ public sealed partial class ConnectionStoreViewModel(
         OnPropertyChanged(nameof(FilteredEntries));
     }
 
+    /// <summary>
+    /// Returns the stored password for <paramref name="id"/>, or
+    /// <see langword="null"/> when the credential store is unavailable or
+    /// no secret has been written for this entry.
+    /// </summary>
+    public Task<string?> GetSecretPasswordAsync(Guid id, CancellationToken ct) =>
+        credentials.IsAvailable
+            ? credentials.GetSecretAsync(KeyPrefix + id.ToString("D"), ct)
+            : Task.FromResult<string?>(null);
+
     private void ReplaceInCollection(ConnectionEntry entry)
     {
         int idx = Entries.ToList().FindIndex(e => e.Id == entry.Id);

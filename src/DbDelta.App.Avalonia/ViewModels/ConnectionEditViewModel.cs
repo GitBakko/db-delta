@@ -24,6 +24,11 @@ public sealed partial class ConnectionEditViewModel : ObservableObject
         Password = password ?? "";
     }
 
+    /// <summary>True when the form is creating a brand-new entry.
+    /// Used by the dialog to hide the "Elimina" button.</summary>
+    [ObservableProperty]
+    private bool _isNew;
+
     [ObservableProperty] private string _name = "";
     [ObservableProperty] private string _serverName = "";
     [ObservableProperty] private string _databaseName = "";

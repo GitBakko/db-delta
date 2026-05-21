@@ -91,6 +91,17 @@ public sealed partial class MainWindowViewModel(AppStateViewModel appState) : Ob
     }
 
     [RelayCommand]
+    public async Task OpenConnectionManagerAsync(Window? owner)
+    {
+        if (owner is null || AppState.Connections is null)
+        {
+            return;
+        }
+        Views.ConnectionManagerDialog dialog = new() { DataContext = AppState.Connections };
+        await dialog.ShowDialog(owner);
+    }
+
+    [RelayCommand]
     public async Task OpenProjectAsync(Window? window)
     {
         if (window is null || AppState.Connections is null)
