@@ -18,6 +18,7 @@ public sealed class ComparisonEngine
         pairs.AddRange(CompareTables(a, b, options));
         pairs.AddRange(CompareModules(a.Views, b.Views));
         pairs.AddRange(CompareModules(a.Procedures, b.Procedures));
+        pairs.AddRange(CompareModules(a.Functions, b.Functions));
 
         return new ComparisonResult(pairs);
     }
