@@ -90,6 +90,16 @@ public sealed class TableScriptEmitter : IScriptEmitter
 
     private static string Bracket(string identifier) => $"[{identifier}]";
 
+    /// <summary>
+    /// Generates a standalone CREATE TABLE script for a single table, suitable for
+    /// body diffing in the diff viewer. Does not include the transaction wrapper.
+    /// </summary>
+    public static string GenerateCreateTable(Table table)
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        return EmitCreate(table);
+    }
+
     private static string EmitDrop(Table table) =>
         $"DROP TABLE [{table.Schema}].[{table.Name}];";
 
