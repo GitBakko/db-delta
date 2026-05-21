@@ -7,8 +7,9 @@ namespace DbDelta.Core.ScriptGen;
 /// <summary>
 /// Orchestrates per-object emitters and wraps the output in a deployment-ready
 /// batch. Order: tables (with PK/UQ/CK/DF/identity/computed inline) → standalone
-/// CREATE INDEX → views (CREATE OR ALTER) → procedures (CREATE OR ALTER) → ALTER
-/// TABLE ADD CONSTRAINT … FOREIGN KEY.
+/// CREATE INDEX → views (CREATE OR ALTER) → functions (CREATE OR ALTER) →
+/// procedures (CREATE OR ALTER) → triggers (CREATE OR ALTER) → ALTER TABLE
+/// ADD CONSTRAINT … FOREIGN KEY.
 /// </summary>
 public sealed class ScriptGenerator
 {
@@ -17,6 +18,8 @@ public sealed class ScriptGenerator
     private readonly ForeignKeyScriptEmitter _fkEmitter = new();
     private readonly ViewScriptEmitter _viewEmitter = new();
     private readonly ProcedureScriptEmitter _procEmitter = new();
+    private readonly FunctionScriptEmitter _functionEmitter = new();
+    private readonly TriggerScriptEmitter _triggerEmitter = new();
 
     /// <summary>
     /// Generates a complete T-SQL migration script for the given comparison result.
@@ -73,7 +76,22 @@ public sealed class ScriptGenerator
             }
         }
 
-        // 4. Procedures — alphabetical per schema for deterministic output.
+        // 4. Functions — alphabetical per schema for deterministic output.
+        //    Slots after views so view-of-function dependencies hold.
+        foreach (DifferencePair pair in pairs
+            .Where(p => p.Identity.Kind == "Function")
+            .OrderBy(p => p.Identity.SchemaName)
+            .ThenBy(p => p.Identity.ObjectName))
+        {
+            string ddl = _functionEmitter.Emit(pair);
+            if (!string.IsNullOrWhiteSpace(ddl))
+            {
+                sb.AppendLine(ddl);
+                sb.AppendLine("GO");
+            }
+        }
+
+        // 5. Procedures — alphabetical per schema for deterministic output.
         foreach (DifferencePair pair in pairs
             .Where(p => p.Identity.Kind == "Procedure")
             .OrderBy(p => p.Identity.SchemaName)
@@ -87,7 +105,22 @@ public sealed class ScriptGenerator
             }
         }
 
-        // 5. Foreign keys — emitted last so referenced tables already exist.
+        // 6. Triggers — alphabetical per schema for deterministic output.
+        //    Goes after procedures so procs referenced by trigger bodies already exist.
+        foreach (DifferencePair pair in pairs
+            .Where(p => p.Identity.Kind == "Trigger")
+            .OrderBy(p => p.Identity.SchemaName)
+            .ThenBy(p => p.Identity.ObjectName))
+        {
+            string ddl = _triggerEmitter.Emit(pair);
+            if (!string.IsNullOrWhiteSpace(ddl))
+            {
+                sb.AppendLine(ddl);
+                sb.AppendLine("GO");
+            }
+        }
+
+        // 7. Foreign keys — emitted last so referenced tables already exist.
         foreach (DifferencePair pair in pairs.Where(p => p.Identity.Kind == "Table"))
         {
             if (pair.Status != DifferenceStatus.OnlyInA || pair.SideA is not Table t)
