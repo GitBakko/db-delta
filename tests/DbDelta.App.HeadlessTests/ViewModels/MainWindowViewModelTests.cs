@@ -1,5 +1,7 @@
 using Avalonia.Headless.XUnit;
 using DbDelta.App.ViewModels;
+using DbDelta.Core.Diff;
+using DbDelta.Core.ObjectModel;
 using DbDelta.Shared.Dtos;
 using FluentAssertions;
 
@@ -14,6 +16,12 @@ public class MainWindowViewModelTests
 
         if (diffs.Length > 0)
         {
+            DifferencePair[] pairs = [.. diffs.Select(d => new DifferencePair(
+                Identity: new ObjectIdentity(d.SchemaName, d.ObjectName, d.Kind),
+                Status: DifferenceStatus.Different,
+                SideA: null,
+                SideB: null))];
+            appState.LastComparisonRaw = new ComparisonResult(pairs);
             appState.LastComparison = new ComparisonResultDto([.. diffs]);
         }
 
@@ -122,12 +130,20 @@ public class MainWindowViewModelTests
 
     // ── DifferenceRowViewModel helpers ───────────────────────────────────────
 
+    private static DifferenceRowViewModel MakeRowVm(DifferenceDto dto) =>
+        new(new DifferencePair(
+                Identity: new ObjectIdentity(dto.SchemaName, dto.ObjectName, dto.Kind),
+                Status: DifferenceStatus.Different,
+                SideA: null,
+                SideB: null),
+            dto, "#000");
+
     [AvaloniaFact]
     public void SelectionBrushHex_correct_for_each_status()
     {
         static string Brush(string status)
         {
-            return new DifferenceRowViewModel(MakeDto("X", status), "#000").SelectionBrushHex;
+            return MakeRowVm(MakeDto("X", status)).SelectionBrushHex;
         }
 
         Brush("Different").Should().Be("#0064C8");
@@ -139,9 +155,7 @@ public class MainWindowViewModelTests
     [AvaloniaFact]
     public void QualifiedName_includes_schema_prefix()
     {
-        DifferenceRowViewModel row = new(
-            new DifferenceDto("Table", "dbo", "Orders", "Different"),
-            "#000");
+        DifferenceRowViewModel row = MakeRowVm(new DifferenceDto("Table", "dbo", "Orders", "Different"));
 
         row.QualifiedName.Should().Be("dbo.Orders");
     }
@@ -150,9 +164,7 @@ public class MainWindowViewModelTests
     public void LastModifiedDisplay_formats_correctly_when_present()
     {
         DateTime dt = new(2025, 11, 3, 14, 30, 0, DateTimeKind.Utc);
-        DifferenceRowViewModel row = new(
-            new DifferenceDto("Table", "dbo", "X", "Different", dt, null),
-            "#000");
+        DifferenceRowViewModel row = MakeRowVm(new DifferenceDto("Table", "dbo", "X", "Different", dt, null));
 
         row.LastModifiedSourceDisplay.Should().Be("2025-11-03 14:30");
         row.LastModifiedTargetDisplay.Should().BeEmpty();
