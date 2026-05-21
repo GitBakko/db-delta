@@ -7,6 +7,10 @@ using Avalonia.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DbDelta.Core.Abstractions;
+using DbDelta.Core.Diff;
+using DbDelta.Core.ScriptGen;
+using DbDelta.Persistence.Sql;
+using DbDelta.Persistence.Util;
 using DbDelta.Shared.Dtos;
 
 namespace DbDelta.App.ViewModels;
@@ -31,6 +35,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
             {
                 RebuildRows();
             }
+            else if (e.PropertyName == nameof(AppStateViewModel.TargetConnectionString))
+            {
+                ExecuteOnTargetCommand.NotifyCanExecuteChanged();
+            }
+        };
+        Rows.CollectionChanged += (_, _) =>
+        {
+            DeployCommand.NotifyCanExecuteChanged();
+            ExecuteOnTargetCommand.NotifyCanExecuteChanged();
         };
     }
 
@@ -268,14 +281,28 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         Rows.Clear();
         string envColor = "#0054BD"; // default cobalt — env-aware colour comes in Wave 2C
-        if (AppState.LastComparison is not null)
+        if (AppState.LastComparison is not null && AppState.LastComparisonRaw is not null)
         {
+            // Build a lookup from (Kind, Schema, Name) → DifferencePair so each
+            // row can carry its typed pair for the deploy pipeline.
+            // Key = (Kind, Schema, Name) — all strings come from the same comparison engine
+            // so ordinal equality is sufficient.
+            Dictionary<(string Kind, string Schema, string Name), DifferencePair> pairMap =
+                AppState.LastComparisonRaw.Differences.ToDictionary(
+                    p => (p.Identity.Kind, p.Identity.SchemaName, p.Identity.ObjectName));
+
             foreach (DifferenceDto dto in AppState.LastComparison.Differences)
             {
-                Rows.Add(new DifferenceRowViewModel(dto, envColor));
+                if (pairMap.TryGetValue((dto.Kind, dto.SchemaName, dto.ObjectName), out DifferencePair? pair)
+                    && pair is not null)
+                {
+                    Rows.Add(new DifferenceRowViewModel(pair, dto, envColor));
+                }
             }
         }
         _rowsView?.Refresh();
+        DeployCommand.NotifyCanExecuteChanged();
+        ExecuteOnTargetCommand.NotifyCanExecuteChanged();
     }
 
     // ── New topbar commands ──────────────────────────────────────────────────
@@ -305,55 +332,97 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Collects selected rows and writes an alignment SQL summary to a file.
-    /// Full DDL generation is available in M9.
+    /// Status text shown in the bottom bar of the main window.
+    /// Overrides the simple "Ready / Working…" text from AppStateViewModel
+    /// with deploy-action feedback.
+    /// </summary>
+    [ObservableProperty]
+    private string _statusText = "Ready";
+
+    /// <summary>
+    /// Produces an alignment SQL script for the selected rows and lets the
+    /// user save it to a file via the system Save dialog.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanDeploy))]
-    public async Task DeployAsync(Window? window)
+    public async Task DeployAsync(Window? owner)
     {
-        if (window is null)
-        {
-            return;
-        }
+        if (owner is null) { return; }
+        if (AppState.LastComparisonRaw is null) { return; }
 
-        IStorageProvider sp = window.StorageProvider;
-        IStorageFile? file = await sp.SaveFilePickerAsync(new FilePickerSaveOptions
+        IReadOnlyList<DifferencePair> selected = SelectedPairs();
+        if (selected.Count == 0) { StatusText = "Nessuna differenza selezionata."; return; }
+
+        FilePickerSaveOptions opts = new()
         {
             Title = "Salva script di allineamento",
-            DefaultExtension = "sql",
-            SuggestedFileName = "allineamento.sql",
-        });
-        if (file is null)
-        {
-            return;
-        }
+            SuggestedFileName = $"DbDelta-{DateTime.Now:yyyyMMdd-HHmm}.sql",
+            FileTypeChoices = [new("Script SQL") { Patterns = ["*.sql"] }],
+        };
+        IStorageFile? file = await owner.StorageProvider.SaveFilePickerAsync(opts).ConfigureAwait(true);
+        if (file is null) { return; }
 
-        IEnumerable<DifferenceRowViewModel> selected = Rows.Where(r => r.IsSelected);
-        string sql = BuildAlignmentSummary([.. selected.Select(r => r.Dto)]);
-        await File.WriteAllTextAsync(file.Path.LocalPath, sql).ConfigureAwait(true);
+        string script = DeployScriptBuilder.Build(
+            selected,
+            AppState.SourceConnectionString ?? string.Empty,
+            AppState.TargetConnectionString ?? string.Empty,
+            DateTime.UtcNow);
+
+        await using Stream s = await file.OpenWriteAsync().ConfigureAwait(true);
+        await using StreamWriter w = new(s, Encoding.UTF8);
+        await w.WriteAsync(script).ConfigureAwait(true);
+
+        StatusText = $"Script salvato in {file.Path.LocalPath} — {selected.Count} oggetti.";
     }
 
     private bool CanDeploy() => Rows.Any(r => r.IsSelected);
 
-    /// <summary>Execute on target — disabled stub for M9.</summary>
+    /// <summary>
+    /// Shows a confirmation dialog then executes the alignment script for the
+    /// selected rows in a transaction against the target connection.
+    /// </summary>
     [RelayCommand(CanExecute = nameof(CanExecuteOnTarget))]
-    public void ExecuteOnTarget()
+    public async Task ExecuteOnTargetAsync(Window? owner)
     {
-        // M9 stub — not yet implemented.
-    }
+        if (owner is null) { return; }
+        if (AppState.LastComparisonRaw is null) { return; }
+        if (string.IsNullOrWhiteSpace(AppState.TargetConnectionString)) { return; }
 
-    private static bool CanExecuteOnTarget() => false;
+        IReadOnlyList<DifferencePair> selected = SelectedPairs();
+        if (selected.Count == 0) { StatusText = "Nessuna differenza selezionata."; return; }
 
-    private static string BuildAlignmentSummary(IReadOnlyList<DifferenceDto> selection)
-    {
-        StringBuilder sb = new();
-        sb.AppendLine("-- Generated by DbDelta (selected objects)");
-        sb.AppendLine("-- Full DDL generation requires live-db context (available in M9).");
-        sb.AppendLine("-- Selected differences:");
-        foreach (DifferenceDto dto in selection)
+        Views.ConfirmExecuteDialog dlg = new()
         {
-            sb.AppendLine($"--   [{dto.Status}] {dto.Kind} {dto.SchemaName}.{dto.ObjectName}");
-        }
-        return sb.ToString();
+            DataContext = new ConfirmExecuteViewModel(
+                selected.Count,
+                ConnectionStringRedactor.Redact(AppState.TargetConnectionString)),
+        };
+        bool? ok = await dlg.ShowDialog<bool?>(owner).ConfigureAwait(true);
+        if (ok != true) { return; }
+
+        string script = DeployScriptBuilder.Build(
+            selected,
+            AppState.SourceConnectionString ?? string.Empty,
+            AppState.TargetConnectionString ?? string.Empty,
+            DateTime.UtcNow);
+
+        StatusText = "Esecuzione in corso…";
+        SqlBatchResult res = await SqlExecutor.ExecuteAsync(
+            AppState.TargetConnectionString!,
+            script,
+            CancellationToken.None).ConfigureAwait(true);
+
+        StatusText = res.Success
+            ? $"Esecuzione completata — {res.BatchesExecuted} batch in {res.TotalDurationMs} ms."
+            : $"Esecuzione fallita: {res.ErrorMessage}";
     }
+
+    private bool CanExecuteOnTarget() =>
+        Rows.Any(r => r.IsSelected)
+        && !string.IsNullOrWhiteSpace(AppState.TargetConnectionString);
+
+    /// <summary>
+    /// Returns the <see cref="DifferencePair"/> for every currently selected row.
+    /// </summary>
+    private IReadOnlyList<DifferencePair> SelectedPairs() =>
+        [.. Rows.Where(r => r.IsSelected).Select(r => r.Pair)];
 }

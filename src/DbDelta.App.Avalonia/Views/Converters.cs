@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
+using DbDelta.Core.Diff;
 
 namespace DbDelta.App.Views;
 
@@ -83,4 +84,32 @@ public static class Converters
     /// </summary>
     public static readonly IValueConverter BoolToFontWeight = new FuncValueConverter<bool, FontWeight>(
         static bold => bold ? FontWeight.Bold : FontWeight.Normal);
+
+    /// <summary>
+    /// Maps a <see cref="LineStatus"/> to the background brush for the SOURCE pane row.
+    /// Added → transparent; Removed → #FFCED3 (crimson soft); Modified → #CFE2FF (primary soft).
+    /// </summary>
+    public static readonly IValueConverter LineStatusToSourceBackground =
+        new FuncValueConverter<LineStatus, IBrush?>(static status => status switch
+        {
+            LineStatus.Removed => new SolidColorBrush(Color.Parse("#FFCED3")),
+            LineStatus.Modified => new SolidColorBrush(Color.Parse("#CFE2FF")),
+            LineStatus.Unchanged => Brushes.Transparent,
+            LineStatus.Added => Brushes.Transparent,
+            _ => Brushes.Transparent,
+        });
+
+    /// <summary>
+    /// Maps a <see cref="LineStatus"/> to the background brush for the TARGET pane row.
+    /// Added → #CDFFD6 (emerald soft); Removed → transparent; Modified → #CFE2FF (primary soft).
+    /// </summary>
+    public static readonly IValueConverter LineStatusToTargetBackground =
+        new FuncValueConverter<LineStatus, IBrush?>(static status => status switch
+        {
+            LineStatus.Added => new SolidColorBrush(Color.Parse("#CDFFD6")),
+            LineStatus.Modified => new SolidColorBrush(Color.Parse("#CFE2FF")),
+            LineStatus.Unchanged => Brushes.Transparent,
+            LineStatus.Removed => Brushes.Transparent,
+            _ => Brushes.Transparent,
+        });
 }

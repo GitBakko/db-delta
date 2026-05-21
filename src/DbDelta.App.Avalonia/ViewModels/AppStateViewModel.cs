@@ -45,6 +45,14 @@ public sealed partial class AppStateViewModel : ObservableObject
     private ComparisonResultDto? _lastComparison;
 
     /// <summary>
+    /// The raw <see cref="ComparisonResult"/> from the most recent comparison run.
+    /// Carries the typed <see cref="DifferencePair"/> objects needed by
+    /// <c>DeployScriptBuilder</c> and <c>SqlExecutor</c>.
+    /// </summary>
+    [ObservableProperty]
+    private ComparisonResult? _lastComparisonRaw;
+
+    /// <summary>
     /// Active status filter for the result grid. <c>null</c> = no filter.
     /// Bound options match the raw <see cref="DifferenceDto.Status"/> string
     /// values ("Different" / "OnlyInA" / "OnlyInB" / "Identical").
@@ -78,6 +86,25 @@ public sealed partial class AppStateViewModel : ObservableObject
 
     partial void OnLastComparisonChanged(ComparisonResultDto? value) => OnPropertyChanged(nameof(FilteredDifferences));
     partial void OnStatusFilterChanged(string? value) => OnPropertyChanged(nameof(FilteredDifferences));
+
+    /// <summary>
+    /// The row currently selected in the results grid. When set, triggers an
+    /// async body load in <see cref="DiffViewer"/>.
+    /// </summary>
+    [ObservableProperty]
+    private DifferenceRowViewModel? _selectedRow;
+
+    partial void OnSelectedRowChanged(DifferenceRowViewModel? value)
+    {
+        if (value is null) { return; }
+        _ = DiffViewer.LoadAsync(value, CancellationToken.None);
+    }
+
+    /// <summary>
+    /// Diff viewer state. The resolver is injected by DI in the real app; in
+    /// tests or design-time the resolver is null and Load is a no-op.
+    /// </summary>
+    public DiffViewerViewModel DiffViewer { get; } = new(resolver: null);
 
     public string StatusText => IsBusy ? "Working…" : "Ready";
 
@@ -142,6 +169,7 @@ public sealed partial class AppStateViewModel : ObservableObject
 
             ComparisonEngine engine = new();
             ComparisonResult result = engine.Compare(srcRes.Value!, tgtRes.Value!, ComparisonOptions.Default);
+            LastComparisonRaw = result;
             LastComparison = Mapper.ToDto(result);
 
             if (Connections is not null)

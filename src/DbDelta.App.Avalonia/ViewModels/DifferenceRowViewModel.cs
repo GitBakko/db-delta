@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using DbDelta.Core.Diff;
 using DbDelta.Shared.Dtos;
 
 namespace DbDelta.App.ViewModels;
@@ -7,9 +8,16 @@ namespace DbDelta.App.ViewModels;
 /// Wraps a <see cref="DifferenceDto"/> for display in <c>ResultsGridView</c>.
 /// Carries the env colour, the deploy-selection checkbox state, and the
 /// computed brush hex used for the checkbox accent colour.
+/// Also holds the underlying <see cref="DifferencePair"/> so that the deploy
+/// pipeline can produce proper DDL without a secondary index lookup.
 /// </summary>
-public sealed partial class DifferenceRowViewModel(DifferenceDto dto, string envColorHex) : ObservableObject
+public sealed partial class DifferenceRowViewModel(DifferencePair pair, DifferenceDto dto, string envColorHex) : ObservableObject
 {
+    /// <summary>
+    /// The raw pair from the comparison engine; used by <c>DeployScriptBuilder</c>.
+    /// </summary>
+    public DifferencePair Pair { get; } = pair;
+
     public DifferenceDto Dto { get; } = dto;
 
     public string EnvColorHex { get; } = envColorHex;

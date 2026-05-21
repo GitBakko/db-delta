@@ -287,15 +287,23 @@
         <v:RecentConnectionsSidebar DataContext="{Binding AppState.Connections}" />
       </Border>
 
-      <!-- Main area: ConnectionPicker (collapsible) + ResultsGridView -->
+      <!-- Main area: ConnectionPicker (collapsible) + ResultsGridView + DiffViewer -->
       <Grid Grid.Column="1"
-            RowDefinitions="Auto,*"
-            Margin="24">
+            RowDefinitions="Auto,*,280"
+            Margin="24,24,24,0">
         <v:ConnectionPickerView Grid.Row="0"
                                 DataContext="{Binding AppState}"
                                 Margin="0,0,0,16" />
         <v:ResultsGridView Grid.Row="1"
                            DataContext="{Binding}" />
+        <!-- Diff viewer — only visible when a row is selected -->
+        <Border Grid.Row="2"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,1,0,0"
+                Margin="0,0,0,0"
+                IsVisible="{Binding AppState.SelectedRow, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <v:DiffViewerView DataContext="{Binding AppState.DiffViewer}" />
+        </Border>
       </Grid>
     </Grid>
 

@@ -27,6 +27,7 @@
                                 Converter={x:Static ObjectConverters.IsNotNull}}">
 
       <DataGrid ItemsSource="{Binding RowsView}"
+                SelectedItem="{Binding AppState.SelectedRow, Mode=TwoWay}"
                 AutoGenerateColumns="False"
                 IsReadOnly="False"
                 CanUserResizeColumns="True"

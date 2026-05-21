@@ -1,0 +1,225 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DbDelta.App.ViewModels"
+             xmlns:v="using:DbDelta.App.Views"
+             xmlns:diff="using:DbDelta.Core.Diff"
+             x:Class="DbDelta.App.Views.DiffViewerView"
+             x:DataType="vm:DiffViewerViewModel">
+
+  <!-- Fixed line height: 18px (kept in sync with code-behind LineHeight constant). -->
+  <Grid RowDefinitions="32,*">
+
+    <!-- ── Header row ────────────────────────────────────────────────────── -->
+    <Grid Grid.Row="0"
+          ColumnDefinitions="*,Auto"
+          Background="{StaticResource BgMutedBrush}">
+
+      <!-- Object qualified name + loading indicator -->
+      <StackPanel Grid.Column="0"
+                  Orientation="Horizontal"
+                  Spacing="8"
+                  VerticalAlignment="Center"
+                  Margin="12,0">
+        <TextBlock Text="Differenze:"
+                   FontSize="12"
+                   FontWeight="SemiBold"
+                   Foreground="{StaticResource FgSubtleBrush}"
+                   VerticalAlignment="Center" />
+        <TextBlock Text="{Binding ObjectQualifiedName}"
+                   FontSize="12"
+                   FontWeight="SemiBold"
+                   FontFamily="Cascadia Mono,Consolas,monospace"
+                   Foreground="{StaticResource FgStrongBrush}"
+                   VerticalAlignment="Center" />
+        <ProgressBar IsIndeterminate="True"
+                     Width="60" Height="4"
+                     IsVisible="{Binding IsLoading}"
+                     ShowProgressText="False" />
+      </StackPanel>
+
+      <!-- Prev / Next navigation (ghost icon-only buttons, top-right) -->
+      <StackPanel Grid.Column="1"
+                  Orientation="Horizontal"
+                  Spacing="4"
+                  VerticalAlignment="Center"
+                  Margin="8,0">
+        <Button Classes="ghost"
+                Command="{Binding PreviousSectionCommand}"
+                ToolTip.Tip="Sezione precedente"
+                Padding="6,4">
+          <Path Width="10" Height="10"
+                Stretch="Uniform"
+                Stroke="{Binding $parent[Button].Foreground}"
+                StrokeThickness="2"
+                StrokeLineCap="Round"
+                StrokeJoin="Round"
+                Data="M 2,8 L 6,4 L 10,8 M 6,4 L 6,11" />
+        </Button>
+        <Button Classes="ghost"
+                Command="{Binding NextSectionCommand}"
+                ToolTip.Tip="Sezione successiva"
+                Padding="6,4">
+          <Path Width="10" Height="10"
+                Stretch="Uniform"
+                Stroke="{Binding $parent[Button].Foreground}"
+                StrokeThickness="2"
+                StrokeLineCap="Round"
+                StrokeJoin="Round"
+                Data="M 2,4 L 6,8 L 10,4 M 6,8 L 6,1" />
+        </Button>
+      </StackPanel>
+    </Grid>
+
+    <!-- ── Diff body ─────────────────────────────────────────────────────── -->
+    <!-- 3-column layout: [left pane (1*)][right pane (1*)][shared scrollbar (16)] -->
+    <Grid Grid.Row="1" ColumnDefinitions="*,*,16">
+
+      <!-- ── Left (Source) pane ──────────────────────────────────────────── -->
+      <Grid Grid.Column="0" ColumnDefinitions="12,*">
+
+        <!-- Left minimap (12px wide, sections highlighted in primary blue) -->
+        <ItemsControl Grid.Column="0"
+                      x:Name="LeftMinimap"
+                      ItemsSource="{Binding Sections}"
+                      Background="{StaticResource BgMutedBrush}"
+                      ClipToBounds="True">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <Canvas />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="diff:DiffSection">
+              <Border Width="8"
+                      Height="2"
+                      Background="{StaticResource PrimaryBrush}"
+                      CornerRadius="1"
+                      HorizontalAlignment="Center" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Source text -->
+        <ScrollViewer Grid.Column="1"
+                      x:Name="SourceScroll"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Hidden">
+          <ItemsControl ItemsSource="{Binding Rows}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Orientation="Vertical" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="diff:LineDiff">
+                <Grid ColumnDefinitions="36,*"
+                      Height="18"
+                      Background="{Binding Status,
+                                           Converter={x:Static v:Converters.LineStatusToSourceBackground}}">
+                  <TextBlock Grid.Column="0"
+                             Text="{Binding SourceLineNumber}"
+                             FontFamily="Cascadia Mono,Consolas,monospace"
+                             FontSize="11"
+                             Foreground="{StaticResource FgFaintBrush}"
+                             VerticalAlignment="Center"
+                             HorizontalAlignment="Right"
+                             Margin="0,0,6,0" />
+                  <SelectableTextBlock Grid.Column="1"
+                                       Text="{Binding SourceText}"
+                                       FontFamily="Cascadia Mono,Consolas,monospace"
+                                       FontSize="12"
+                                       VerticalAlignment="Center"
+                                       TextWrapping="NoWrap"
+                                       Padding="4,0" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+
+      </Grid>
+
+      <!-- Column divider -->
+      <Border Grid.Column="0"
+              Width="1"
+              HorizontalAlignment="Right"
+              Background="{StaticResource BorderBrush}"
+              IsHitTestVisible="False" />
+
+      <!-- ── Right (Target) pane ─────────────────────────────────────────── -->
+      <Grid Grid.Column="1" ColumnDefinitions="12,*">
+
+        <!-- Right minimap -->
+        <ItemsControl Grid.Column="0"
+                      x:Name="RightMinimap"
+                      ItemsSource="{Binding Sections}"
+                      Background="{StaticResource BgMutedBrush}"
+                      ClipToBounds="True">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <Canvas />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="diff:DiffSection">
+              <Border Width="8"
+                      Height="2"
+                      Background="{StaticResource PrimaryBrush}"
+                      CornerRadius="1"
+                      HorizontalAlignment="Center" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Target text -->
+        <ScrollViewer Grid.Column="1"
+                      x:Name="TargetScroll"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Hidden">
+          <ItemsControl ItemsSource="{Binding Rows}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Orientation="Vertical" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="diff:LineDiff">
+                <Grid ColumnDefinitions="*,36"
+                      Height="18"
+                      Background="{Binding Status,
+                                           Converter={x:Static v:Converters.LineStatusToTargetBackground}}">
+                  <SelectableTextBlock Grid.Column="0"
+                                       Text="{Binding TargetText}"
+                                       FontFamily="Cascadia Mono,Consolas,monospace"
+                                       FontSize="12"
+                                       VerticalAlignment="Center"
+                                       TextWrapping="NoWrap"
+                                       Padding="4,0" />
+                  <TextBlock Grid.Column="1"
+                             Text="{Binding TargetLineNumber}"
+                             FontFamily="Cascadia Mono,Consolas,monospace"
+                             FontSize="11"
+                             Foreground="{StaticResource FgFaintBrush}"
+                             VerticalAlignment="Center"
+                             HorizontalAlignment="Left"
+                             Margin="6,0,0,0" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+
+      </Grid>
+
+      <!-- ── Shared vertical scrollbar (rightmost column) ────────────────── -->
+      <ScrollBar Grid.Column="2"
+                 x:Name="SharedScrollBar"
+                 Orientation="Vertical"
+                 HorizontalAlignment="Stretch"
+                 VerticalAlignment="Stretch" />
+
+    </Grid>
+
+  </Grid>
+
+</UserControl>
