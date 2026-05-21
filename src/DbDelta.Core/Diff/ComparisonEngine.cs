@@ -19,6 +19,7 @@ public sealed class ComparisonEngine
         pairs.AddRange(CompareModules(a.Views, b.Views));
         pairs.AddRange(CompareModules(a.Procedures, b.Procedures));
         pairs.AddRange(CompareModules(a.Functions, b.Functions));
+        pairs.AddRange(CompareTriggers(a.Triggers, b.Triggers));
 
         return new ComparisonResult(pairs);
     }
@@ -287,5 +288,43 @@ public sealed class ComparisonEngine
         }
 
         return true;
+    }
+
+    private static IEnumerable<DifferencePair> CompareTriggers(
+        IReadOnlyList<Trigger> ax,
+        IReadOnlyList<Trigger> bx)
+    {
+        var aByIdentity = ax.ToDictionary(m => m.Identity);
+        var bByIdentity = bx.ToDictionary(m => m.Identity);
+        HashSet<ObjectIdentity> allIdentities = [.. aByIdentity.Keys];
+        allIdentities.UnionWith(bByIdentity.Keys);
+
+        foreach (ObjectIdentity id in allIdentities.OrderBy(i => i.SchemaName).ThenBy(i => i.ObjectName))
+        {
+            aByIdentity.TryGetValue(id, out Trigger? sideA);
+            bByIdentity.TryGetValue(id, out Trigger? sideB);
+            DifferenceStatus status = ClassifyTrigger(sideA, sideB);
+            yield return new DifferencePair(id, status, sideA, sideB);
+        }
+    }
+
+    private static DifferenceStatus ClassifyTrigger(Trigger? a, Trigger? b)
+    {
+        // Reuse the module-body classification first.
+        DifferenceStatus body = ClassifyModule(a, b);
+        if (body != DifferenceStatus.Identical)
+        {
+            return body;
+        }
+        // Body is byte-equal AND neither side is encrypted — drop into the
+        // trigger-specific state check. Both `a` and `b` are guaranteed
+        // non-null here because ClassifyModule returns Identical only when
+        // both sides are present.
+        return a!.IsDisabled != b!.IsDisabled
+            || a.IsNotForReplication != b.IsNotForReplication
+            || !string.Equals(a.ParentSchema, b.ParentSchema, StringComparison.Ordinal)
+            || !string.Equals(a.ParentTable, b.ParentTable, StringComparison.Ordinal)
+            ? DifferenceStatus.Different
+            : DifferenceStatus.Identical;
     }
 }
