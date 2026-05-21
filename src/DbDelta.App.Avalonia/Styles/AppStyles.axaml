@@ -189,6 +189,24 @@
     <Setter Property="TextElement.Foreground" Value="{StaticResource DangerFgBrush}" />
   </Style>
 
+  <Style Selector="Button.ghost-cobalt">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="8,6" />
+    <Setter Property="Cursor" Value="Hand" />
+  </Style>
+  <Style Selector="Button.ghost-cobalt:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource PrimarySoftBrush}" />
+    <Setter Property="TextElement.Foreground" Value="{StaticResource PrimarySoftFgBrush}" />
+  </Style>
+  <Style Selector="Button.ghost-cobalt:pressed /template/ ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource PrimarySoftBrush}" />
+    <Setter Property="TextElement.Foreground" Value="{StaticResource PrimarySoftFgBrush}" />
+  </Style>
+
   <!-- Solid filled variants — for "primary action" semantics other than cobalt -->
 
   <Style Selector="Button.solid-emerald">

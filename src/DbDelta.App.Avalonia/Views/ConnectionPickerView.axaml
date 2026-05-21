@@ -37,16 +37,16 @@
                    Classes="connection-input"
                    PlaceholderText="Server=.;Database=Dev;User Id=sa;Password=…;TrustServerCertificate=True" />
           <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Classes="ghost"
+            <Button Classes="ghost-violet"
                     Command="{Binding TestConnectionCommand}">
               <TextBlock Text="Test" />
             </Button>
-            <Button Classes="ghost"
+            <Button Classes="ghost-violet"
                     Command="{Binding NewCommand}"
                     CommandParameter="{Binding $parent[Window]}">
               <TextBlock Text="+ Nuovo" />
             </Button>
-            <Button Classes="ghost"
+            <Button Classes="ghost-violet"
                     Command="{Binding EditCommand}"
                     CommandParameter="{Binding $parent[Window]}">
               <TextBlock Text="✎ Modifica" />
@@ -90,16 +90,16 @@
                    Classes="connection-input"
                    PlaceholderText="Server=.;Database=Prod;User Id=sa;Password=…;TrustServerCertificate=True" />
           <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Classes="ghost"
+            <Button Classes="ghost-cobalt"
                     Command="{Binding TestConnectionCommand}">
               <TextBlock Text="Test" />
             </Button>
-            <Button Classes="ghost"
+            <Button Classes="ghost-cobalt"
                     Command="{Binding NewCommand}"
                     CommandParameter="{Binding $parent[Window]}">
               <TextBlock Text="+ Nuovo" />
             </Button>
-            <Button Classes="ghost"
+            <Button Classes="ghost-cobalt"
                     Command="{Binding EditCommand}"
                     CommandParameter="{Binding $parent[Window]}">
               <TextBlock Text="✎ Modifica" />
