@@ -5,8 +5,8 @@ namespace DbDelta.Core.ObjectModel;
 /// <c>sys.sql_modules.definition</c>; <c>null</c> when the view is encrypted
 /// (see <see cref="Module.IsEncrypted"/>).
 /// </summary>
-public sealed record View(string Schema, string Name, string? Body, bool IsEncrypted)
-    : Module(Schema, Name, Body, IsEncrypted)
+public sealed record View(string Schema, string Name, string? Body, bool IsEncrypted, DateTime? ModifyDate = null)
+    : Module(Schema, Name, Body, IsEncrypted, ModifyDate)
 {
     public override string Kind => "View";
 }

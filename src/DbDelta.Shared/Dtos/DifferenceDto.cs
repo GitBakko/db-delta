@@ -8,4 +8,6 @@ public sealed record DifferenceDto(
     string Kind,
     string SchemaName,
     string ObjectName,
-    string Status);
+    string Status,
+    DateTime? LastModifiedSourceUtc = null,
+    DateTime? LastModifiedTargetUtc = null);

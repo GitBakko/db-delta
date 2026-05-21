@@ -20,6 +20,7 @@ namespace DbDelta.Core.ObjectModel;
 /// rather than a full <c>CREATE OR ALTER</c>.
 /// </param>
 /// <param name="IsNotForReplication"><c>true</c> when defined with <c>NOT FOR REPLICATION</c>.</param>
+/// <param name="ModifyDate">Last modification date from <c>sys.objects.modify_date</c>, or <c>null</c> when unavailable.</param>
 public sealed record Trigger(
     string Schema,
     string Name,
@@ -28,8 +29,9 @@ public sealed record Trigger(
     string ParentSchema,
     string ParentTable,
     bool IsDisabled,
-    bool IsNotForReplication)
-    : Module(Schema, Name, Body, IsEncrypted)
+    bool IsNotForReplication,
+    DateTime? ModifyDate = null)
+    : Module(Schema, Name, Body, IsEncrypted, ModifyDate)
 {
     public override string Kind => "Trigger";
 }

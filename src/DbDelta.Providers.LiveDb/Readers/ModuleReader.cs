@@ -23,7 +23,8 @@ internal sealed class ModuleReader
     private const string ViewQuery = """
         SELECT s.name AS SchemaName,
                v.name AS Name,
-               sm.definition AS Body
+               sm.definition AS Body,
+               v.modify_date AS ModifyDate
         FROM sys.views AS v
         INNER JOIN sys.schemas AS s ON s.schema_id = v.schema_id
         LEFT JOIN sys.sql_modules AS sm ON sm.object_id = v.object_id
@@ -34,7 +35,8 @@ internal sealed class ModuleReader
     private const string ProcQuery = """
         SELECT s.name AS SchemaName,
                p.name AS Name,
-               sm.definition AS Body
+               sm.definition AS Body,
+               p.modify_date AS ModifyDate
         FROM sys.procedures AS p
         INNER JOIN sys.schemas AS s ON s.schema_id = p.schema_id
         LEFT JOIN sys.sql_modules AS sm ON sm.object_id = p.object_id
@@ -59,7 +61,8 @@ internal sealed class ModuleReader
             string name = r.GetString(1);
             string? body = r.IsDBNull(2) ? null : r.GetString(2);
             bool encrypted = body is null;
-            views.Add(new View(schema, name, body, encrypted));
+            DateTime? modifyDate = r.IsDBNull(3) ? null : DateTime.SpecifyKind(r.GetDateTime(3), DateTimeKind.Utc);
+            views.Add(new View(schema, name, body, encrypted, modifyDate));
         }
         return views;
     }
@@ -80,7 +83,8 @@ internal sealed class ModuleReader
             string name = r.GetString(1);
             string? body = r.IsDBNull(2) ? null : r.GetString(2);
             bool encrypted = body is null;
-            procs.Add(new StoredProcedure(schema, name, body, encrypted));
+            DateTime? modifyDate = r.IsDBNull(3) ? null : DateTime.SpecifyKind(r.GetDateTime(3), DateTimeKind.Utc);
+            procs.Add(new StoredProcedure(schema, name, body, encrypted, modifyDate));
         }
         return procs;
     }
@@ -89,7 +93,8 @@ internal sealed class ModuleReader
         SELECT s.name AS SchemaName,
                o.name AS Name,
                sm.definition AS Body,
-               o.type AS RawType
+               o.type AS RawType,
+               o.modify_date AS ModifyDate
         FROM sys.objects AS o
         INNER JOIN sys.schemas AS s ON s.schema_id = o.schema_id
         LEFT JOIN sys.sql_modules AS sm ON sm.object_id = o.object_id
@@ -124,7 +129,8 @@ internal sealed class ModuleReader
                 _ => FunctionKind.Scalar,
             };
             bool encrypted = body is null;
-            functions.Add(new Function(schema, name, body, encrypted, kind));
+            DateTime? modifyDate = r.IsDBNull(4) ? null : DateTime.SpecifyKind(r.GetDateTime(4), DateTimeKind.Utc);
+            functions.Add(new Function(schema, name, body, encrypted, kind, modifyDate));
         }
         return functions;
     }
@@ -136,7 +142,8 @@ internal sealed class ModuleReader
                ts.name AS ParentSchema,
                t.name  AS ParentTable,
                CAST(tr.is_disabled AS BIT)             AS IsDisabled,
-               CAST(tr.is_not_for_replication AS BIT)  AS IsNotForReplication
+               CAST(tr.is_not_for_replication AS BIT)  AS IsNotForReplication,
+               o.modify_date AS ModifyDate
         FROM sys.triggers AS tr
         INNER JOIN sys.objects AS o ON o.object_id = tr.object_id
         INNER JOIN sys.schemas AS ps ON ps.schema_id = o.schema_id
@@ -169,6 +176,7 @@ internal sealed class ModuleReader
             bool isDisabled = !r.IsDBNull(5) && r.GetBoolean(5);
             bool isNfr = !r.IsDBNull(6) && r.GetBoolean(6);
             bool encrypted = body is null;
+            DateTime? modifyDate = r.IsDBNull(7) ? null : DateTime.SpecifyKind(r.GetDateTime(7), DateTimeKind.Utc);
             triggers.Add(new Trigger(
                 Schema: triggerSchema,
                 Name: triggerName,
@@ -177,7 +185,8 @@ internal sealed class ModuleReader
                 ParentSchema: parentSchema,
                 ParentTable: parentTable,
                 IsDisabled: isDisabled,
-                IsNotForReplication: isNfr));
+                IsNotForReplication: isNfr,
+                ModifyDate: modifyDate));
         }
         return triggers;
     }

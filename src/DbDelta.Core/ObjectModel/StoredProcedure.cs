@@ -11,8 +11,8 @@ namespace DbDelta.Core.ObjectModel;
 /// the comparison engine, and the per-kind script emitters — it mirrors SQL Server's
 /// own naming (e.g. <c>DROP PROCEDURE</c>) rather than the C# class name.
 /// </remarks>
-public sealed record StoredProcedure(string Schema, string Name, string? Body, bool IsEncrypted)
-    : Module(Schema, Name, Body, IsEncrypted)
+public sealed record StoredProcedure(string Schema, string Name, string? Body, bool IsEncrypted, DateTime? ModifyDate = null)
+    : Module(Schema, Name, Body, IsEncrypted, ModifyDate)
 {
     public override string Kind => "Procedure";
 }

@@ -17,8 +17,9 @@ public sealed record Function(
     string Name,
     string? Body,
     bool IsEncrypted,
-    FunctionKind FunctionKind)
-    : Module(Schema, Name, Body, IsEncrypted)
+    FunctionKind FunctionKind,
+    DateTime? ModifyDate = null)
+    : Module(Schema, Name, Body, IsEncrypted, ModifyDate)
 {
     public override string Kind => "Function";
 }

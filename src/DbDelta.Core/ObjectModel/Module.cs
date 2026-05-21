@@ -14,7 +14,11 @@ namespace DbDelta.Core.ObjectModel;
 /// an opaque definition: DbDelta surfaces presence/absence diffs and emits a warning but
 /// cannot diff bodies.
 /// </param>
-public abstract record Module(string Schema, string Name, string? Body, bool IsEncrypted)
+/// <param name="ModifyDate">
+/// The <c>sys.objects.modify_date</c> for this module, in UTC. <c>null</c> when the value
+/// was not available from the data source (e.g. older provider versions).
+/// </param>
+public abstract record Module(string Schema, string Name, string? Body, bool IsEncrypted, DateTime? ModifyDate = null)
 {
     /// <summary>The discriminator used in <see cref="ObjectIdentity"/> for this module kind.</summary>
     public abstract string Kind { get; }

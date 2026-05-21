@@ -1,4 +1,5 @@
 using DbDelta.Core.Diff;
+using DbDelta.Core.ObjectModel;
 
 namespace DbDelta.Shared.Dtos;
 
@@ -16,7 +17,16 @@ public static class Mapper
                 Kind: d.Identity.Kind,
                 SchemaName: d.Identity.SchemaName,
                 ObjectName: d.Identity.ObjectName,
-                Status: d.Status.ToString()))
+                Status: d.Status.ToString(),
+                LastModifiedSourceUtc: ExtractModifyDate(d.SideA),
+                LastModifiedTargetUtc: ExtractModifyDate(d.SideB)))
         ]);
     }
+
+    private static DateTime? ExtractModifyDate(object? side) => side switch
+    {
+        Module m => m.ModifyDate,
+        // TODO M10: surface table modify_date
+        _ => null,
+    };
 }
