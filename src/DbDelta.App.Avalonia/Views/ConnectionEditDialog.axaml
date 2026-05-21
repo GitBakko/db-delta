@@ -20,16 +20,22 @@
 
         <TextBlock Text="Server" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}" />
         <Grid ColumnDefinitions="*,Auto">
-          <AutoCompleteBox Grid.Column="0"
+          <AutoCompleteBox x:Name="ServerBox"
+                           Grid.Column="0"
                            Text="{Binding ServerName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                            ItemsSource="{Binding ServerSuggestions}"
                            FilterMode="ContainsOrdinal"
                            PlaceholderText="Scrivi o seleziona un server SQL…" />
           <Button Grid.Column="1" Classes="ghost-violet" Margin="6,0,0,0"
                   Command="{Binding LoadServerSuggestionsCommand}"
-                  ToolTip.Tip="Cerca server SQL noti">
+                  IsEnabled="{Binding !IsScanning}"
+                  ToolTip.Tip="Cerca server SQL in rete">
             <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+              <ProgressBar IsIndeterminate="True" Width="14" Height="14"
+                           IsVisible="{Binding IsScanning}"
+                           ShowProgressText="False" />
               <Path Width="14" Height="14" Stretch="Uniform"
+                    IsVisible="{Binding !IsScanning}"
                     Stroke="{Binding $parent[Button].Foreground}"
                     StrokeThickness="1.7" StrokeLineCap="Round"
                     Data="M 11,4 A 7,7 0 1 1 4,11 A 7,7 0 0 1 11,4 M 16,16 L 20,20" />
@@ -37,6 +43,10 @@
             </StackPanel>
           </Button>
         </Grid>
+        <TextBlock Text="{Binding ScanStatusMessage}"
+                   FontSize="11"
+                   Foreground="{StaticResource FgMutedBrush}"
+                   IsVisible="{Binding ScanStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
         <TextBlock Text="Utente" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}" />
         <TextBox Text="{Binding UserName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />

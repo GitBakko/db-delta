@@ -47,6 +47,12 @@ public sealed partial class ConnectionEditViewModel : ObservableObject
     private string _userName = "sa";
 
     [ObservableProperty]
+    private bool _isScanning;
+
+    [ObservableProperty]
+    private string? _scanStatusMessage;
+
+    [ObservableProperty]
     private ObservableCollection<string> _serverSuggestions = [];
 
     [ObservableProperty]
@@ -82,16 +88,34 @@ public sealed partial class ConnectionEditViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanScan))]
     public async Task LoadServerSuggestionsAsync()
     {
-        IReadOnlyList<string> list = await SqlServerDiscovery.EnumerateServersAsync(CancellationToken.None);
-        ServerSuggestions.Clear();
-        foreach (string s in list)
+        IsScanning = true;
+        ScanStatusMessage = "Scansione in corso…";
+        try
         {
-            ServerSuggestions.Add(s);
+            System.Collections.Generic.IReadOnlyList<string> list =
+                await DbDelta.Persistence.Sql.SqlServerDiscovery.EnumerateServersAsync(System.Threading.CancellationToken.None);
+            ServerSuggestions.Clear();
+            foreach (string s in list) { ServerSuggestions.Add(s); }
+            ScanStatusMessage = list.Count == 0
+                ? "Nessun server rilevato (SQL Browser potrebbe essere disabilitato sui server di rete)."
+                : $"Trovati {list.Count} server. Apri il menu per selezionare.";
+        }
+        catch (System.Exception ex)
+        {
+            ScanStatusMessage = $"Errore: {ex.Message}";
+        }
+        finally
+        {
+            IsScanning = false;
         }
     }
+
+    private bool CanScan() => !IsScanning;
+
+    partial void OnIsScanningChanged(bool value) => LoadServerSuggestionsCommand.NotifyCanExecuteChanged();
 
     [RelayCommand(CanExecute = nameof(CanLoadDatabases))]
     public async Task LoadDatabasesAsync()
