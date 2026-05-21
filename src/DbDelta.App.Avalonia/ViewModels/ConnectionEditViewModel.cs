@@ -180,15 +180,19 @@ public sealed partial class ConnectionEditViewModel : ObservableObject
         {
             return null;
         }
-
         try
         {
             SqlConnectionStringBuilder b = new(template);
-            return b.UserID;
+            string? uid = b.UserID;
+            // Guard against placeholder values used by the "new entry" template.
+            return string.IsNullOrWhiteSpace(uid) || IsPlaceholder(uid) ? null : uid;
         }
         catch
         {
             return null;
         }
     }
+
+    private static bool IsPlaceholder(string value) =>
+        value.StartsWith('{') && value.EndsWith('}');
 }
