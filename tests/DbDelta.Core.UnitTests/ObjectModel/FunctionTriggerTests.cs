@@ -41,4 +41,41 @@ public class FunctionTriggerTests
         Function b = new("dbo", "fnA", "BODY", IsEncrypted: false, FunctionKind: FunctionKind.Scalar);
         a.Should().Be(b);
     }
+
+    [Fact]
+    public void Trigger_identity_uses_Trigger_kind_and_carries_parent_table()
+    {
+        Trigger trg = new(
+            Schema: "dbo",
+            Name: "trg_Customer_Audit",
+            Body: "CREATE TRIGGER dbo.trg_Customer_Audit ON dbo.Customer AFTER INSERT AS BEGIN INSERT INTO dbo.Audit DEFAULT VALUES; END",
+            IsEncrypted: false,
+            ParentSchema: "dbo",
+            ParentTable: "Customer",
+            IsDisabled: false,
+            IsNotForReplication: false);
+        trg.Identity.SchemaName.Should().Be("dbo");
+        trg.Identity.ObjectName.Should().Be("trg_Customer_Audit");
+        trg.Identity.Kind.Should().Be("Trigger");
+        trg.ParentSchema.Should().Be("dbo");
+        trg.ParentTable.Should().Be("Customer");
+        trg.IsDisabled.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Disabled_trigger_carries_the_flag()
+    {
+        Trigger trg = new("dbo", "trg", "BODY", IsEncrypted: false,
+            ParentSchema: "dbo", ParentTable: "T",
+            IsDisabled: true, IsNotForReplication: false);
+        trg.IsDisabled.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Trigger_records_have_value_equality()
+    {
+        Trigger a = new("dbo", "trg", "BODY", false, "dbo", "T", false, false);
+        Trigger b = new("dbo", "trg", "BODY", false, "dbo", "T", false, false);
+        a.Should().Be(b);
+    }
 }
