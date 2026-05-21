@@ -53,4 +53,26 @@ public static class Converters
     /// <summary>Masks <c>password=</c> / <c>pwd=</c> in any connection-string preview.</summary>
     public static readonly IValueConverter RedactConnectionString = new FuncValueConverter<string?, string?>(static value =>
         value is null ? null : Persistence.Util.ConnectionStringRedactor.Redact(value));
+
+    /// <summary>
+    /// Converts a hex colour string (e.g. <c>"#0054BD"</c>) to a fresh
+    /// <see cref="SolidColorBrush"/>. Returns <c>null</c> for null / empty
+    /// / unparseable input — the bound control will fall back to its
+    /// default Background.
+    /// </summary>
+    public static readonly IValueConverter HexToBrush = new FuncValueConverter<string?, IBrush?>(static hex =>
+    {
+        if (string.IsNullOrWhiteSpace(hex))
+        {
+            return null;
+        }
+        try
+        {
+            return new SolidColorBrush(Color.Parse(hex));
+        }
+        catch
+        {
+            return null;
+        }
+    });
 }

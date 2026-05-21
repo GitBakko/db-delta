@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:DbDelta.App.ViewModels"
+        xmlns:v="using:DbDelta.App.Views"
         x:Class="DbDelta.App.Views.ConnectionEditDialog"
         x:DataType="vm:ConnectionEditViewModel"
         Title="Modifica connessione"
@@ -97,20 +98,14 @@
                       Cursor="Hand"
                       Tag="{Binding Hex}"
                       Tapped="OnColorSwatchTapped"
-                      ToolTip.Tip="{Binding Label}">
-                <Border.Background>
-                  <SolidColorBrush Color="{Binding Hex}" />
-                </Border.Background>
-              </Border>
+                      Background="{Binding Hex, Converter={x:Static v:Converters.HexToBrush}}"
+                      ToolTip.Tip="{Binding Label}" />
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
         <StackPanel Orientation="Horizontal" Spacing="6">
-          <Border Width="14" Height="14" CornerRadius="3">
-            <Border.Background>
-              <SolidColorBrush Color="{Binding EnvironmentColorHex}" />
-            </Border.Background>
-          </Border>
+          <Border Width="14" Height="14" CornerRadius="3"
+                  Background="{Binding EnvironmentColorHex, Converter={x:Static v:Converters.HexToBrush}}" />
           <TextBlock Text="{Binding EnvironmentColorHex}"
                      FontFamily="Cascadia Mono,Consolas,monospace" FontSize="11"
                      Foreground="{StaticResource FgSubtleBrush}" />

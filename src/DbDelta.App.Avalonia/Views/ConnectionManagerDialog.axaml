@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:DbDelta.App.ViewModels"
+        xmlns:v="using:DbDelta.App.Views"
         xmlns:core="using:DbDelta.Core.Abstractions"
         x:Class="DbDelta.App.Views.ConnectionManagerDialog"
         x:DataType="vm:ConnectionStoreViewModel"
@@ -35,19 +36,14 @@
           <ItemsControl.ItemTemplate>
             <DataTemplate DataType="core:ConnectionEntry">
               <Grid ColumnDefinitions="6,*,Auto" Margin="0,1" MinHeight="44">
-                <Border Grid.Column="0">
-                  <Border.Background>
-                    <SolidColorBrush Color="{Binding EnvironmentColorHex}" />
-                  </Border.Background>
-                </Border>
+                <Border Grid.Column="0"
+                        Background="{Binding EnvironmentColorHex, Converter={x:Static v:Converters.HexToBrush}}" />
                 <StackPanel Grid.Column="1" Margin="12,6">
                   <StackPanel Orientation="Horizontal" Spacing="8">
                     <TextBlock Text="{Binding Name}" FontWeight="Medium"
                                Foreground="{StaticResource FgStrongBrush}" />
-                    <Border CornerRadius="3" Padding="6,1">
-                      <Border.Background>
-                        <SolidColorBrush Color="{Binding EnvironmentColorHex}" />
-                      </Border.Background>
+                    <Border CornerRadius="3" Padding="6,1"
+                            Background="{Binding EnvironmentColorHex, Converter={x:Static v:Converters.HexToBrush}}">
                       <TextBlock Text="{Binding EnvironmentTag}"
                                  FontSize="10" Foreground="White" />
                     </Border>

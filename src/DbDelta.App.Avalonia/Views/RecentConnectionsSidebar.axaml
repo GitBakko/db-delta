@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:DbDelta.App.ViewModels"
+             xmlns:v="using:DbDelta.App.Views"
              xmlns:core="using:DbDelta.Core.Abstractions"
              x:Class="DbDelta.App.Views.RecentConnectionsSidebar"
              x:DataType="vm:ConnectionStoreViewModel">
@@ -16,11 +17,8 @@
         <ItemsControl.ItemTemplate>
           <DataTemplate DataType="core:ConnectionEntry">
             <Grid ColumnDefinitions="6,*" Margin="0,2" Cursor="Hand">
-              <Border Grid.Column="0">
-                <Border.Background>
-                  <SolidColorBrush Color="{Binding EnvironmentColorHex}" />
-                </Border.Background>
-              </Border>
+              <Border Grid.Column="0"
+                      Background="{Binding EnvironmentColorHex, Converter={x:Static v:Converters.HexToBrush}}" />
               <StackPanel Grid.Column="1" Margin="8,4">
                 <TextBlock Text="{Binding Name}" FontWeight="Medium" Foreground="{StaticResource FgStrongBrush}" />
                 <TextBlock FontSize="11" Foreground="{StaticResource FgSubtleBrush}">
