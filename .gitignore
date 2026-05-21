@@ -56,3 +56,8 @@ coverage/
 
 # Local scratch (draft outputs from subagents, etc.)
 tmp/
+
+# Ruflo / agentdb local state
+agentdb.rvf
+agentdb.rvf-*
+agentdb.rvf.lock
