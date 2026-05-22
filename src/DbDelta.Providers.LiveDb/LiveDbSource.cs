@@ -63,8 +63,19 @@ public sealed class LiveDbSource : ISchemaSource
             IReadOnlyList<Function> functions = await moduleReader.ReadFunctionsAsync(connection, cancellationToken);
             IReadOnlyList<Trigger> triggers = await moduleReader.ReadTriggersAsync(connection, cancellationToken);
 
+            // M5: sequences + synonyms + alias UDTs
+            IReadOnlyList<Sequence> sequences = await new SequenceReader().ReadAsync(connection, cancellationToken);
+            IReadOnlyList<Synonym> synonyms = await new SynonymReader().ReadAsync(connection, cancellationToken);
+            IReadOnlyList<UserDefinedType> udts = await new UserDefinedTypeReader().ReadAsync(connection, cancellationToken);
+
             string dbName = new SqlConnectionStringBuilder(_connectionString).InitialCatalog;
-            return Result<Database>.Success(new Database(dbName, schemas, tables, views, procs, functions, triggers));
+            Database db = new(dbName, schemas, tables, views, procs, functions, triggers)
+            {
+                Sequences = sequences,
+                Synonyms = synonyms,
+                UserDefinedTypes = udts,
+            };
+            return Result<Database>.Success(db);
         }
         catch (SqlException ex) when (ex.Number is 4060 or 18456)
         {

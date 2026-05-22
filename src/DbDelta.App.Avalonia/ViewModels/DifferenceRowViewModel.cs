@@ -89,6 +89,9 @@ public sealed partial class DifferenceRowViewModel(DifferencePair pair, Differen
         "Procedure" => "Procedure",
         "Function" => "Funzioni",
         "Trigger" => "Trigger",
+        "Sequence" => "Sequenze",
+        "Synonym" => "Sinonimi",
+        "UserDefinedType" => "Tipi utente",
         _ => Kind,
     };
 
@@ -106,6 +109,9 @@ public sealed partial class DifferenceRowViewModel(DifferencePair pair, Differen
         "Procedure" => 2,
         "Function" => 3,
         "Trigger" => 4,
+        "Sequence" => 5,
+        "Synonym" => 6,
+        "UserDefinedType" => 7,
         _ => 99,
     };
 

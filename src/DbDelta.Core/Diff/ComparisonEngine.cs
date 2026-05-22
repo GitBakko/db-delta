@@ -20,9 +20,105 @@ public sealed class ComparisonEngine
         pairs.AddRange(CompareModules(a.Procedures, b.Procedures));
         pairs.AddRange(CompareModules(a.Functions, b.Functions));
         pairs.AddRange(CompareTriggers(a.Triggers, b.Triggers));
+        pairs.AddRange(CompareSequences(a.Sequences, b.Sequences));
+        pairs.AddRange(CompareSynonyms(a.Synonyms, b.Synonyms));
+        pairs.AddRange(CompareUserDefinedTypes(a.UserDefinedTypes, b.UserDefinedTypes));
 
         return new ComparisonResult(pairs);
     }
+
+    // ── M5: Sequence / Synonym / UserDefinedType ──────────────────────────
+
+    private static IEnumerable<DifferencePair> CompareSequences(
+        IReadOnlyList<Sequence> ax,
+        IReadOnlyList<Sequence> bx)
+    {
+        var aByIdentity = ax.ToDictionary(s => s.Identity);
+        var bByIdentity = bx.ToDictionary(s => s.Identity);
+        HashSet<ObjectIdentity> allIdentities = [.. aByIdentity.Keys];
+        allIdentities.UnionWith(bByIdentity.Keys);
+
+        foreach (ObjectIdentity id in allIdentities.OrderBy(i => i.SchemaName).ThenBy(i => i.ObjectName))
+        {
+            aByIdentity.TryGetValue(id, out Sequence? sideA);
+            bByIdentity.TryGetValue(id, out Sequence? sideB);
+            DifferenceStatus status = (sideA, sideB) switch
+            {
+                (null, null) => DifferenceStatus.Identical,
+                (null, _) => DifferenceStatus.OnlyInB,
+                (_, null) => DifferenceStatus.OnlyInA,
+                _ => SequencesEqual(sideA, sideB) ? DifferenceStatus.Identical : DifferenceStatus.Different,
+            };
+            yield return new DifferencePair(id, status, sideA, sideB);
+        }
+    }
+
+    private static bool SequencesEqual(Sequence a, Sequence b) =>
+        string.Equals(a.DataType, b.DataType, StringComparison.OrdinalIgnoreCase)
+        && a.StartValue == b.StartValue
+        && a.Increment == b.Increment
+        && a.MinValue == b.MinValue
+        && a.MaxValue == b.MaxValue
+        && a.IsCycling == b.IsCycling
+        && a.IsCached == b.IsCached
+        && a.CacheSize == b.CacheSize;
+
+    private static IEnumerable<DifferencePair> CompareSynonyms(
+        IReadOnlyList<Synonym> ax,
+        IReadOnlyList<Synonym> bx)
+    {
+        var aByIdentity = ax.ToDictionary(s => s.Identity);
+        var bByIdentity = bx.ToDictionary(s => s.Identity);
+        HashSet<ObjectIdentity> allIdentities = [.. aByIdentity.Keys];
+        allIdentities.UnionWith(bByIdentity.Keys);
+
+        foreach (ObjectIdentity id in allIdentities.OrderBy(i => i.SchemaName).ThenBy(i => i.ObjectName))
+        {
+            aByIdentity.TryGetValue(id, out Synonym? sideA);
+            bByIdentity.TryGetValue(id, out Synonym? sideB);
+            DifferenceStatus status = (sideA, sideB) switch
+            {
+                (null, null) => DifferenceStatus.Identical,
+                (null, _) => DifferenceStatus.OnlyInB,
+                (_, null) => DifferenceStatus.OnlyInA,
+                _ => string.Equals(sideA.BaseObjectName, sideB.BaseObjectName, StringComparison.OrdinalIgnoreCase)
+                    ? DifferenceStatus.Identical
+                    : DifferenceStatus.Different,
+            };
+            yield return new DifferencePair(id, status, sideA, sideB);
+        }
+    }
+
+    private static IEnumerable<DifferencePair> CompareUserDefinedTypes(
+        IReadOnlyList<UserDefinedType> ax,
+        IReadOnlyList<UserDefinedType> bx)
+    {
+        var aByIdentity = ax.ToDictionary(t => t.Identity);
+        var bByIdentity = bx.ToDictionary(t => t.Identity);
+        HashSet<ObjectIdentity> allIdentities = [.. aByIdentity.Keys];
+        allIdentities.UnionWith(bByIdentity.Keys);
+
+        foreach (ObjectIdentity id in allIdentities.OrderBy(i => i.SchemaName).ThenBy(i => i.ObjectName))
+        {
+            aByIdentity.TryGetValue(id, out UserDefinedType? sideA);
+            bByIdentity.TryGetValue(id, out UserDefinedType? sideB);
+            DifferenceStatus status = (sideA, sideB) switch
+            {
+                (null, null) => DifferenceStatus.Identical,
+                (null, _) => DifferenceStatus.OnlyInB,
+                (_, null) => DifferenceStatus.OnlyInA,
+                _ => UdtsEqual(sideA, sideB) ? DifferenceStatus.Identical : DifferenceStatus.Different,
+            };
+            yield return new DifferencePair(id, status, sideA, sideB);
+        }
+    }
+
+    private static bool UdtsEqual(UserDefinedType a, UserDefinedType b) =>
+        string.Equals(a.BaseTypeName, b.BaseTypeName, StringComparison.OrdinalIgnoreCase)
+        && a.MaxLength == b.MaxLength
+        && a.Precision == b.Precision
+        && a.Scale == b.Scale
+        && a.IsNullable == b.IsNullable;
 
     private static IEnumerable<DifferencePair> CompareTables(Database a, Database b, ComparisonOptions options)
     {

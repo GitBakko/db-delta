@@ -20,6 +20,16 @@ public sealed record Database(
     /// <summary>All DML triggers defined in the database.</summary>
     public IReadOnlyList<Trigger> Triggers { get; init; } = [];
 
+    /// <summary>All sequence objects (M5).</summary>
+    public IReadOnlyList<Sequence> Sequences { get; init; } = [];
+
+    /// <summary>All synonym aliases (M5).</summary>
+    public IReadOnlyList<Synonym> Synonyms { get; init; } = [];
+
+    /// <summary>All alias user-defined types (M5).
+    /// CLR UDTs are intentionally excluded — see <see cref="UserDefinedType"/>.</summary>
+    public IReadOnlyList<UserDefinedType> UserDefinedTypes { get; init; } = [];
+
     /// <summary>
     /// M3 ctor — tables + views + procedures. Kept so existing call sites still compile.
     /// </summary>

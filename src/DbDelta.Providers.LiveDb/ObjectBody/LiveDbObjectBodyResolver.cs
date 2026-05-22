@@ -37,8 +37,92 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
             "Table" => await ResolveTableBodyAsync(connection, schemaName, objectName, ct).ConfigureAwait(false),
             "View" or "Procedure" or "Function" or "Trigger" =>
                 await ResolveModuleBodyAsync(connection, schemaName, objectName, ct).ConfigureAwait(false),
+            "Sequence" => await ResolveSequenceBodyAsync(connection, schemaName, objectName, ct).ConfigureAwait(false),
+            "Synonym" => await ResolveSynonymBodyAsync(connection, schemaName, objectName, ct).ConfigureAwait(false),
+            "UserDefinedType" => await ResolveUserDefinedTypeBodyAsync(connection, schemaName, objectName, ct).ConfigureAwait(false),
             _ => await ResolveModuleBodyAsync(connection, schemaName, objectName, ct).ConfigureAwait(false),
         };
+    }
+
+    // ── M5 body resolvers ──────────────────────────────────────────────────
+
+    private static async Task<string?> ResolveSequenceBodyAsync(
+        SqlConnection connection, string schema, string name, CancellationToken ct)
+    {
+        const string sql = """
+            SELECT seq.name, TYPE_NAME(seq.user_type_id),
+                   CAST(seq.start_value AS bigint), CAST(seq.increment AS bigint),
+                   CAST(seq.minimum_value AS bigint), CAST(seq.maximum_value AS bigint),
+                   seq.is_cycling, seq.is_cached, seq.cache_size
+            FROM sys.sequences AS seq
+            INNER JOIN sys.schemas AS s ON s.schema_id = seq.schema_id
+            WHERE s.name = @schema AND seq.name = @name;
+            """;
+
+        await using SqlCommand cmd = new(sql, connection);
+        cmd.Parameters.AddWithValue("@schema", schema);
+        cmd.Parameters.AddWithValue("@name", name);
+        await using SqlDataReader r = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        if (!await r.ReadAsync(ct).ConfigureAwait(false)) { return null; }
+
+        Sequence seq = new(
+            Schema: schema,
+            Name: r.GetString(0),
+            DataType: r.GetString(1),
+            StartValue: r.GetInt64(2),
+            Increment: r.GetInt64(3),
+            MinValue: r.IsDBNull(4) ? null : r.GetInt64(4),
+            MaxValue: r.IsDBNull(5) ? null : r.GetInt64(5),
+            IsCycling: r.GetBoolean(6),
+            IsCached: r.GetBoolean(7),
+            CacheSize: r.IsDBNull(8) ? null : r.GetInt32(8));
+        return new SequenceScriptEmitter().EmitCreate(seq);
+    }
+
+    private static async Task<string?> ResolveSynonymBodyAsync(
+        SqlConnection connection, string schema, string name, CancellationToken ct)
+    {
+        const string sql = """
+            SELECT syn.base_object_name
+            FROM sys.synonyms AS syn
+            INNER JOIN sys.schemas AS s ON s.schema_id = syn.schema_id
+            WHERE s.name = @schema AND syn.name = @name;
+            """;
+        await using SqlCommand cmd = new(sql, connection);
+        cmd.Parameters.AddWithValue("@schema", schema);
+        cmd.Parameters.AddWithValue("@name", name);
+        object? raw = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        if (raw is null or DBNull) { return null; }
+
+        Synonym syn = new(
+            Schema: schema, Name: name, BaseObjectName: (string)raw,
+            TargetServer: null, TargetDatabase: null, TargetSchema: null, TargetObject: null);
+        return new SynonymScriptEmitter().EmitCreate(syn);
+    }
+
+    private static async Task<string?> ResolveUserDefinedTypeBodyAsync(
+        SqlConnection connection, string schema, string name, CancellationToken ct)
+    {
+        const string sql = """
+            SELECT TYPE_NAME(t.system_type_id), t.max_length, t.precision, t.scale, t.is_nullable
+            FROM sys.types AS t
+            INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
+            WHERE s.name = @schema AND t.name = @name AND t.is_user_defined = 1 AND t.is_assembly_type = 0;
+            """;
+        await using SqlCommand cmd = new(sql, connection);
+        cmd.Parameters.AddWithValue("@schema", schema);
+        cmd.Parameters.AddWithValue("@name", name);
+        await using SqlDataReader r = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        if (!await r.ReadAsync(ct).ConfigureAwait(false)) { return null; }
+
+        UserDefinedType udt = new(
+            Schema: schema, Name: name,
+            BaseTypeName: r.GetString(0),
+            MaxLength: r.GetInt16(1),
+            Precision: r.GetByte(2),
+            Scale: r.GetByte(3),
+            IsNullable: r.GetBoolean(4));
+        return new UserDefinedTypeScriptEmitter().EmitCreate(udt);
     }
 
     private static async Task<string?> ResolveModuleBodyAsync(
