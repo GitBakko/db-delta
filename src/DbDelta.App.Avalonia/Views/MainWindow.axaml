@@ -72,13 +72,15 @@
         <!-- 1: divider -->
         <Border Grid.Column="1" Classes="topbar-divider" />
 
-        <!-- 2: Group A — Nuovo / Apri / Salva -->
+        <!-- 2: Group A — Nuovo / Carica / Salva -->
         <StackPanel Grid.Column="2"
                     Orientation="Horizontal"
                     Spacing="2"
                     VerticalAlignment="Center">
 
-          <!-- Nuovo progetto — file-plus icon -->
+          <!-- Nuovo progetto — file-plus icon (data bbox centered at y=12 in 24x24
+               so Stretch=Uniform produces a glyph that vertically aligns with
+               the text label baseline) -->
           <Button Classes="ghost"
                   Command="{Binding NewProjectCommand}"
                   ToolTip.Tip="Crea un nuovo progetto DbDelta"
@@ -90,16 +92,17 @@
                     StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
                     Fill="Transparent"
                     VerticalAlignment="Center"
-                    Data="M 6,3 L 14,3 L 19,8 L 19,21 L 6,21 Z M 14,3 L 14,8 L 19,8 M 12,12 L 12,18 M 9,15 L 15,15" />
+                    Data="M 7,4 L 14,4 L 19,9 L 19,20 L 7,20 Z M 14,4 L 14,9 L 19,9 M 13,12 L 13,18 M 10,15 L 16,15" />
               <TextBlock Text="Nuovo" VerticalAlignment="Center" FontSize="12" />
             </StackPanel>
           </Button>
 
-          <!-- Apri progetto — folder-open icon -->
+          <!-- Carica progetto — folder icon, data bbox centered at y=12 in
+               24x24 so the glyph height matches the text label baseline -->
           <Button Classes="ghost"
                   Command="{Binding OpenProjectCommand}"
                   CommandParameter="{Binding $parent[Window]}"
-                  ToolTip.Tip="Apri un progetto DbDelta esistente"
+                  ToolTip.Tip="Carica un progetto DbDelta esistente"
                   Padding="6"
                   VerticalContentAlignment="Center">
             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
@@ -108,8 +111,8 @@
                     StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
                     Fill="Transparent"
                     VerticalAlignment="Center"
-                    Data="M 3,7 L 3,19 L 21,19 L 21,9 L 11,9 L 9,7 Z" />
-              <TextBlock Text="Apri" VerticalAlignment="Center" FontSize="12" />
+                    Data="M 3,7 L 9,7 L 11,9 L 21,9 L 21,17 L 3,17 Z" />
+              <TextBlock Text="Carica" VerticalAlignment="Center" FontSize="12" />
             </StackPanel>
           </Button>
 
@@ -147,7 +150,7 @@
                     PlaceholderText="I miei progetti"
                     MinWidth="160"
                     VerticalAlignment="Center"
-                    ToolTip.Tip="Apri un progetto recente"
+                    ToolTip.Tip="Carica un progetto recente"
                     FontSize="12" />
 
           <!-- Modifica progetto -->

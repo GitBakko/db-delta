@@ -13,9 +13,13 @@ namespace DbDelta.App.ViewModels;
 /// </summary>
 public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
 {
-    public ProjectEndpointPanelViewModel(string title, bool isTarget)
+    private readonly ICredentialStore? _credentialStore;
+    private bool _autoFillFromCredentialsInFlight;
+
+    public ProjectEndpointPanelViewModel(string title, bool isTarget, ICredentialStore? credentialStore = null)
     {
         (Title, IsTarget) = (title, isTarget);
+        _credentialStore = credentialStore;
         _serverSuggestions.CollectionChanged += (_, _) =>
         {
             OnPropertyChanged(nameof(ServerCountText));
@@ -44,6 +48,13 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
     [ObservableProperty] private bool _trustServerCertificate = true;
     [ObservableProperty] private string _databaseName = "";
 
+    /// <summary>
+    /// IPv4 address of the currently-selected server, when it matches a row
+    /// in <see cref="ServerSuggestions"/>. Used to show the IP next to the
+    /// server name in the band header.
+    /// </summary>
+    [ObservableProperty] private string? _serverIpAddress;
+
     // ── Server scan state ────────────────────────────────────────────────────
 
     [ObservableProperty] private ObservableCollection<DiscoveredServer> _serverSuggestions = [];
@@ -67,11 +78,14 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
 
     /// <summary>
     /// Friendly display name shown in the Source/Target band header.
-    /// Falls back to a placeholder when ServerName is empty.
+    /// Falls back to a placeholder when ServerName is empty. Appends the IP
+    /// in parentheses when known (resolved from <see cref="ServerSuggestions"/>).
     /// </summary>
     public string DisplayBandName => string.IsNullOrWhiteSpace(ServerName)
         ? (IsTarget ? "Seleziona una destinazione…" : "Seleziona una provenienza…")
-        : ServerName;
+        : (string.IsNullOrWhiteSpace(ServerIpAddress)
+            ? ServerName
+            : $"{ServerName}  ({ServerIpAddress})");
 
     /// <summary>Inline counter text shown next to the "Server" section label.</summary>
     public string ServerCountText => $"({ServerSuggestions.Count} trovati)";
@@ -93,7 +107,15 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
         OnPropertyChanged(nameof(IsValid));
         OnPropertyChanged(nameof(DisplayBandName));
         LoadDatabasesCommand.NotifyCanExecuteChanged();
+
+        // Refresh IP from suggestions list (if any) and try DPAPI auto-fill.
+        ServerIpAddress = ServerSuggestions
+            .FirstOrDefault(s => string.Equals(s.Name, value, StringComparison.OrdinalIgnoreCase))?.IpAddress;
+        _ = TryAutoFillCredentialsAsync(value);
     }
+
+    partial void OnServerIpAddressChanged(string? value)
+        => OnPropertyChanged(nameof(DisplayBandName));
 
     partial void OnDatabaseNameChanged(string value) => OnPropertyChanged(nameof(IsValid));
 
@@ -134,15 +156,7 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
             IReadOnlyList<DiscoveredServer> list =
                 await SqlServerDiscovery.EnumerateServersAsync(CancellationToken.None)
                                         .ConfigureAwait(true);
-            ServerSuggestions.Clear();
-            foreach (DiscoveredServer s in list)
-            {
-                ServerSuggestions.Add(s);
-            }
-            HasServerSuggestions = list.Count > 0;
-            ScanStatusMessage = list.Count == 0
-                ? "Nessun server rilevato (SQL Browser potrebbe essere disabilitato)."
-                : null;
+            ApplyScanResults(list);
         }
         catch (Exception ex)
         {
@@ -155,6 +169,34 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
     }
 
     private bool CanScanServers() => !IsScanningServers;
+
+    /// <summary>
+    /// Replaces <see cref="ServerSuggestions"/> with the given list and refreshes
+    /// <see cref="ServerIpAddress"/> for the currently-typed <see cref="ServerName"/>
+    /// (if any). Public so the parent VM can push a single shared scan into
+    /// both source and target panels at once.
+    /// </summary>
+    public void ApplyScanResults(IReadOnlyList<DiscoveredServer> list)
+    {
+        ArgumentNullException.ThrowIfNull(list);
+        ServerSuggestions.Clear();
+        foreach (DiscoveredServer s in list)
+        {
+            ServerSuggestions.Add(s);
+        }
+        HasServerSuggestions = list.Count > 0;
+        ScanStatusMessage = list.Count == 0
+            ? "Nessun server rilevato (SQL Browser potrebbe essere disabilitato)."
+            : null;
+
+        // Refresh IP for the currently-typed server name, if it matches a row.
+        if (!string.IsNullOrWhiteSpace(ServerName))
+        {
+            ServerIpAddress = list
+                .FirstOrDefault(s => string.Equals(s.Name, ServerName, StringComparison.OrdinalIgnoreCase))?
+                .IpAddress;
+        }
+    }
 
     [RelayCommand]
     public void PickServer(DiscoveredServer? server)
@@ -183,7 +225,12 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
                 AvailableDatabases.Add(db);
             }
             HasDatabases = dbs.Count > 0;
-            ConnectionStatusMessage = $"Connesso — {dbs.Count} database disponibili";
+            // Success → no inline status message; the populated database combo
+            // is itself the visible confirmation. Errors still surface here.
+            ConnectionStatusMessage = null;
+
+            // Persist credentials if user opted in.
+            await TryPersistCredentialsAsync().ConfigureAwait(true);
 
             // Best-effort version detection — failure is silently suppressed.
             try
@@ -297,9 +344,10 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
     public static ProjectEndpointPanelViewModel FromEndpoint(
         ProjectEndpoint? endpoint,
         string title,
-        bool isTarget)
+        bool isTarget,
+        ICredentialStore? credentialStore = null)
     {
-        ProjectEndpointPanelViewModel vm = new(title, isTarget);
+        ProjectEndpointPanelViewModel vm = new(title, isTarget, credentialStore);
         if (endpoint is null)
         {
             return vm;
@@ -338,7 +386,104 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
         HasDatabases = false;
         ServerVersion = null;
         ServerMajorVersion = null;
+        ServerIpAddress = null;
         ScanStatusMessage = null;
         ConnectionStatusMessage = null;
+    }
+
+    // ── DPAPI credential persistence ─────────────────────────────────────────
+
+    /// <summary>
+    /// Builds the per-server credential key used by <see cref="ICredentialStore"/>.
+    /// Server name is normalised to lower-case so different casings collapse to
+    /// the same entry.
+    /// </summary>
+    private static string CredentialKey(string serverName)
+        => $"dbdelta:server:{serverName.Trim().ToLowerInvariant()}";
+
+    /// <summary>
+    /// Attempts to read previously-saved credentials for the given server and
+    /// populate <see cref="UserName"/> + <see cref="Password"/>. Triggered on
+    /// every <see cref="ServerName"/> change. Idempotent and silent on failure.
+    /// </summary>
+    private async Task TryAutoFillCredentialsAsync(string serverName)
+    {
+        if (_credentialStore is null
+            || !_credentialStore.IsAvailable
+            || string.IsNullOrWhiteSpace(serverName)
+            || _autoFillFromCredentialsInFlight)
+        {
+            return;
+        }
+
+        _autoFillFromCredentialsInFlight = true;
+        try
+        {
+            string? blob = await _credentialStore
+                .GetSecretAsync(CredentialKey(serverName), CancellationToken.None)
+                .ConfigureAwait(true);
+            if (string.IsNullOrEmpty(blob)) { return; }
+
+            // Format: "user|password" — '|' is forbidden in SQL Server logins so
+            // it's a safe separator. Older single-field secrets land in Password.
+            int sep = blob.IndexOf('|');
+            if (sep < 0)
+            {
+                Password = blob;
+                return;
+            }
+
+            string user = blob[..sep];
+            string pwd = blob[(sep + 1)..];
+            if (!string.IsNullOrWhiteSpace(user)) { UserName = user; }
+            Password = pwd;
+            RememberCredentials = true;
+        }
+        catch
+        {
+            // Credential store failures are non-fatal — fall back to manual entry.
+        }
+        finally
+        {
+            _autoFillFromCredentialsInFlight = false;
+        }
+    }
+
+    /// <summary>
+    /// Persists the current <see cref="UserName"/>/<see cref="Password"/> to
+    /// <see cref="ICredentialStore"/> under the server-specific key when
+    /// <see cref="RememberCredentials"/> is enabled; otherwise removes any
+    /// existing entry so unchecking the flag actively forgets the secret.
+    /// </summary>
+    private async Task TryPersistCredentialsAsync()
+    {
+        if (_credentialStore is null
+            || !_credentialStore.IsAvailable
+            || string.IsNullOrWhiteSpace(ServerName)
+            || AuthMode != AuthenticationMode.SqlServer)
+        {
+            return;
+        }
+
+        string key = CredentialKey(ServerName);
+        try
+        {
+            if (RememberCredentials && !string.IsNullOrEmpty(Password))
+            {
+                await _credentialStore
+                    .SetSecretAsync(key, $"{UserName}|{Password}", CancellationToken.None)
+                    .ConfigureAwait(true);
+            }
+            else
+            {
+                await _credentialStore
+                    .DeleteSecretAsync(key, CancellationToken.None)
+                    .ConfigureAwait(true);
+            }
+        }
+        catch
+        {
+            // Non-fatal — secret persistence is best-effort.
+        }
     }
 }

@@ -38,7 +38,9 @@ public partial class App : Application
                 // start empty until the user confirms a project.
                 await connections.LoadAsync(CancellationToken.None).ConfigureAwait(true);
 
-                ProjectSetupViewModel setupVm = new();
+                // Pass the credential store so the dialog can auto-fill saved
+                // user/password pairs on server selection (DPAPI on Windows).
+                ProjectSetupViewModel setupVm = new(credentials);
                 ProjectSetupDialog dialog = new() { DataContext = setupVm };
                 DbDeltaProject? result =
                     await dialog.ShowDialog<DbDeltaProject?>(mainWindow)
@@ -51,16 +53,16 @@ public partial class App : Application
                     return;
                 }
 
-                if (result.Source is not null)
-                {
-                    appState.SourceConnectionString =
-                        BuildConnectionString(result.Source);
-                }
-                if (result.Target is not null)
-                {
-                    appState.TargetConnectionString =
-                        BuildConnectionString(result.Target);
-                }
+                // Prefer the live connection strings captured at OK time — they
+                // include the password the user just typed, which is NOT carried
+                // by ProjectEndpoint (intentionally). Fall back to the endpoint
+                // builder for the (rare) case where the dialog was bypassed.
+                appState.SourceConnectionString =
+                    dialog.LastSourceConnectionString
+                    ?? (result.Source is not null ? BuildConnectionString(result.Source) : string.Empty);
+                appState.TargetConnectionString =
+                    dialog.LastTargetConnectionString
+                    ?? (result.Target is not null ? BuildConnectionString(result.Target) : string.Empty);
 
                 // Auto-run the comparison so the main view is no longer empty.
                 if (!string.IsNullOrWhiteSpace(appState.SourceConnectionString)

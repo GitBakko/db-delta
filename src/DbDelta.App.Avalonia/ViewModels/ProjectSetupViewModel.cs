@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DbDelta.Core.Abstractions;
+using DbDelta.Persistence.Sql;
 
 namespace DbDelta.App.ViewModels;
 
@@ -13,8 +14,13 @@ namespace DbDelta.App.ViewModels;
 /// </summary>
 public sealed partial class ProjectSetupViewModel : ObservableObject
 {
-    public ProjectSetupViewModel()
+    public ProjectSetupViewModel() : this(credentialStore: null) { }
+
+    public ProjectSetupViewModel(ICredentialStore? credentialStore)
     {
+        Source = new ProjectEndpointPanelViewModel("Source", isTarget: false, credentialStore);
+        Target = new ProjectEndpointPanelViewModel("Target", isTarget: true, credentialStore);
+
         // Bubble endpoint validity changes up to this VM so bindings on IsValid
         // stay live.
         Source.PropertyChanged += (_, _) => OnPropertyChanged(nameof(IsValid));
@@ -23,11 +29,53 @@ public sealed partial class ProjectSetupViewModel : ObservableObject
 
     // ── Endpoint panels ───────────────────────────────────────────────────────
 
-    public ProjectEndpointPanelViewModel Source { get; } =
-        new("Source", isTarget: false);
+    public ProjectEndpointPanelViewModel Source { get; }
 
-    public ProjectEndpointPanelViewModel Target { get; } =
-        new("Target", isTarget: true);
+    public ProjectEndpointPanelViewModel Target { get; }
+
+    // ── Shared server scan ──────────────────────────────────────────────────
+
+    /// <summary>True while a network-wide server scan is running. Mirrored into
+    /// both panels' <c>IsScanningServers</c> so either spinner reflects the
+    /// shared progress.</summary>
+    [ObservableProperty] private bool _isScanningServers;
+
+    /// <summary>
+    /// Runs a single network-wide SQL Server scan and pushes the result into
+    /// both source and target panels at once. Invoked from either panel's
+    /// "Scansiona" button — the user only needs to scan once.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanScanServers))]
+    public async Task ScanServersAsync()
+    {
+        IsScanningServers = true;
+        Source.IsScanningServers = true;
+        Target.IsScanningServers = true;
+        Source.ScanStatusMessage = "Scansione in corso…";
+        Target.ScanStatusMessage = "Scansione in corso…";
+        try
+        {
+            IReadOnlyList<DiscoveredServer> list =
+                await SqlServerDiscovery.EnumerateServersAsync(CancellationToken.None)
+                                        .ConfigureAwait(true);
+            Source.ApplyScanResults(list);
+            Target.ApplyScanResults(list);
+        }
+        catch (Exception ex)
+        {
+            string msg = $"Errore: {ex.Message}";
+            Source.ScanStatusMessage = msg;
+            Target.ScanStatusMessage = msg;
+        }
+        finally
+        {
+            IsScanningServers = false;
+            Source.IsScanningServers = false;
+            Target.IsScanningServers = false;
+        }
+    }
+
+    private bool CanScanServers() => !IsScanningServers;
 
     // ── Project-level fields ─────────────────────────────────────────────────
 
@@ -128,9 +176,11 @@ public sealed partial class ProjectSetupViewModel : ObservableObject
     /// Constructs a <see cref="ProjectSetupViewModel"/> pre-populated from an
     /// existing project.  Passing <see langword="null"/> returns a blank setup.
     /// </summary>
-    public static ProjectSetupViewModel FromProject(DbDeltaProject? p)
+    public static ProjectSetupViewModel FromProject(
+        DbDeltaProject? p,
+        ICredentialStore? credentialStore = null)
     {
-        ProjectSetupViewModel vm = new();
+        ProjectSetupViewModel vm = new(credentialStore);
         if (p is null)
         {
             return vm;
@@ -153,9 +203,9 @@ public sealed partial class ProjectSetupViewModel : ObservableObject
 
         // Repopulate endpoint panels from the saved endpoints.
         var src =
-            ProjectEndpointPanelViewModel.FromEndpoint(p.Source, "Source", isTarget: false);
+            ProjectEndpointPanelViewModel.FromEndpoint(p.Source, "Source", isTarget: false, credentialStore);
         var tgt =
-            ProjectEndpointPanelViewModel.FromEndpoint(p.Target, "Target", isTarget: true);
+            ProjectEndpointPanelViewModel.FromEndpoint(p.Target, "Target", isTarget: true, credentialStore);
 
         // Copy fields into the pre-wired panels so PropertyChanged subscriptions
         // remain intact.
@@ -163,6 +213,31 @@ public sealed partial class ProjectSetupViewModel : ObservableObject
         CopyEndpoint(tgt, vm.Target);
 
         return vm;
+    }
+
+    /// <summary>
+    /// Materialises the source connection string using the live VM password
+    /// (which is never serialised in <see cref="DbDeltaProject"/>). Used by
+    /// <c>App.OnFrameworkInitializationCompleted</c> to seed <c>AppState</c>
+    /// without re-asking the user for credentials.
+    /// </summary>
+    public string BuildSourceConnectionString() => BuildConnectionString(Source);
+
+    /// <summary>
+    /// Materialises the target connection string using the live VM password.
+    /// </summary>
+    public string BuildTargetConnectionString() => BuildConnectionString(Target);
+
+    private static string BuildConnectionString(ProjectEndpointPanelViewModel p)
+    {
+        string baseCs = $"Server={p.ServerName};Database={p.DatabaseName};"
+            + $"Encrypt={p.Encrypt};TrustServerCertificate={p.TrustServerCertificate}";
+        return p.AuthMode switch
+        {
+            AuthenticationMode.WindowsIntegrated => $"{baseCs};Integrated Security=True",
+            AuthenticationMode.SqlServer => $"{baseCs};User Id={p.UserName};Password={p.Password}",
+            _ => $"{baseCs};User Id={p.UserName};Password={p.Password}",
+        };
     }
 
     private static void CopyEndpoint(

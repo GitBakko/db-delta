@@ -128,7 +128,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IStorageProvider sp = window.StorageProvider;
         IReadOnlyList<IStorageFile> picked = await sp.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Apri progetto DbDelta",
+            Title = "Carica progetto DbDelta",
             AllowMultiple = false,
         });
         if (picked.Count == 0)

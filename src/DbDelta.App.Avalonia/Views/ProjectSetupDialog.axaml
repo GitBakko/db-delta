@@ -6,8 +6,8 @@
         x:Class="DbDelta.App.Views.ProjectSetupDialog"
         x:DataType="vm:ProjectSetupViewModel"
         Title="Nuovo progetto"
-        Width="1180" Height="860"
-        MinWidth="900" MinHeight="640"
+        Width="1180" Height="560"
+        MinWidth="900" MinHeight="480"
         WindowStartupLocation="CenterOwner"
         CanResize="True"
         Background="{StaticResource BgBrush}">
@@ -121,16 +121,24 @@
                       Fill="Transparent" Data="M 5,8 L 12,15 L 19,8" />
               </Button>
               <Button Grid.Column="2" Classes="ghost-violet" Margin="6,0,0,0"
-                      Command="{Binding ScanServersCommand}" ToolTip.Tip="Cerca server SQL in rete">
-                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                  <ProgressBar IsIndeterminate="True" Width="14" Height="14"
+                      MinWidth="120"
+                      Command="{Binding $parent[Window].((vm:ProjectSetupViewModel)DataContext).ScanServersCommand}"
+                      ToolTip.Tip="Cerca server SQL in rete (popola entrambi i pannelli)">
+                <Panel>
+                  <!-- Idle: icon + label -->
+                  <StackPanel Orientation="Horizontal" Spacing="6"
+                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                              IsVisible="{Binding !IsScanningServers}">
+                    <Path Width="14" Height="14" Stretch="Uniform"
+                          Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.7" StrokeLineCap="Round"
+                          Data="M 11,4 A 7,7 0 1 1 4,11 A 7,7 0 0 1 11,4 M 16,16 L 20,20" />
+                    <TextBlock Text="Scansiona" VerticalAlignment="Center" />
+                  </StackPanel>
+                  <!-- Busy: slim progress bar fills button -->
+                  <ProgressBar IsIndeterminate="True" Height="6"
+                               HorizontalAlignment="Stretch" VerticalAlignment="Center"
                                IsVisible="{Binding IsScanningServers}" ShowProgressText="False" />
-                  <Path Width="14" Height="14" Stretch="Uniform"
-                        IsVisible="{Binding !IsScanningServers}"
-                        Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.7" StrokeLineCap="Round"
-                        Data="M 11,4 A 7,7 0 1 1 4,11 A 7,7 0 0 1 11,4 M 16,16 L 20,20" />
-                  <TextBlock Text="Scansiona" VerticalAlignment="Center" />
-                </StackPanel>
+                </Panel>
               </Button>
             </Grid>
             <!-- Error-only scan status (counter is inline above) -->
@@ -175,17 +183,21 @@
                         IsChecked="{Binding Encrypt, Mode=TwoWay}" />
               <CheckBox Grid.Column="2" Content="Fidati del certificato" Margin="12,0,0,0"
                         IsChecked="{Binding TrustServerCertificate, Mode=TwoWay}" />
-              <Button Grid.Column="4" Classes="ghost-emerald"
+              <Button Grid.Column="4" Classes="ghost-emerald" MinWidth="110"
                       Command="{Binding LoadDatabasesCommand}" ToolTip.Tip="Connetti e carica database">
-                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                  <ProgressBar IsIndeterminate="True" Width="14" Height="14"
+                <Panel>
+                  <StackPanel Orientation="Horizontal" Spacing="6"
+                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                              IsVisible="{Binding !IsLoadingDatabases}">
+                    <Path Width="14" Height="14" Stretch="Uniform"
+                          Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.7" StrokeLineCap="Round"
+                          Data="M 5,12 L 19,12 M 13,6 L 19,12 L 13,18" />
+                    <TextBlock Text="Connetti" VerticalAlignment="Center" />
+                  </StackPanel>
+                  <ProgressBar IsIndeterminate="True" Height="6"
+                               HorizontalAlignment="Stretch" VerticalAlignment="Center"
                                IsVisible="{Binding IsLoadingDatabases}" ShowProgressText="False" />
-                  <Path Width="14" Height="14" Stretch="Uniform"
-                        IsVisible="{Binding !IsLoadingDatabases}"
-                        Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.7" StrokeLineCap="Round"
-                        Data="M 5,12 L 19,12 M 13,6 L 19,12 L 13,18" />
-                  <TextBlock Text="Connetti" VerticalAlignment="Center" />
-                </StackPanel>
+                </Panel>
               </Button>
             </Grid>
 
@@ -213,6 +225,7 @@
             </Grid>
             <TextBox Text="{Binding DatabaseName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                      PlaceholderText="Nome database…" IsVisible="{Binding !HasDatabases}" />
+            <!-- Error-only connection status (success is implied by the populated combo above) -->
             <TextBlock Text="{Binding ConnectionStatusMessage}" FontSize="11"
                        Foreground="{StaticResource FgMutedBrush}"
                        IsVisible="{Binding ConnectionStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
@@ -264,16 +277,22 @@
                       Fill="Transparent" Data="M 5,8 L 12,15 L 19,8" />
               </Button>
               <Button Grid.Column="2" Classes="ghost-violet" Margin="6,0,0,0"
-                      Command="{Binding ScanServersCommand}" ToolTip.Tip="Cerca server SQL in rete">
-                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                  <ProgressBar IsIndeterminate="True" Width="14" Height="14"
+                      MinWidth="120"
+                      Command="{Binding $parent[Window].((vm:ProjectSetupViewModel)DataContext).ScanServersCommand}"
+                      ToolTip.Tip="Cerca server SQL in rete (popola entrambi i pannelli)">
+                <Panel>
+                  <StackPanel Orientation="Horizontal" Spacing="6"
+                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                              IsVisible="{Binding !IsScanningServers}">
+                    <Path Width="14" Height="14" Stretch="Uniform"
+                          Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.7" StrokeLineCap="Round"
+                          Data="M 11,4 A 7,7 0 1 1 4,11 A 7,7 0 0 1 11,4 M 16,16 L 20,20" />
+                    <TextBlock Text="Scansiona" VerticalAlignment="Center" />
+                  </StackPanel>
+                  <ProgressBar IsIndeterminate="True" Height="6"
+                               HorizontalAlignment="Stretch" VerticalAlignment="Center"
                                IsVisible="{Binding IsScanningServers}" ShowProgressText="False" />
-                  <Path Width="14" Height="14" Stretch="Uniform"
-                        IsVisible="{Binding !IsScanningServers}"
-                        Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.7" StrokeLineCap="Round"
-                        Data="M 11,4 A 7,7 0 1 1 4,11 A 7,7 0 0 1 11,4 M 16,16 L 20,20" />
-                  <TextBlock Text="Scansiona" VerticalAlignment="Center" />
-                </StackPanel>
+                </Panel>
               </Button>
             </Grid>
             <TextBlock Text="{Binding ScanStatusMessage}" FontSize="11"
@@ -317,17 +336,21 @@
                         IsChecked="{Binding Encrypt, Mode=TwoWay}" />
               <CheckBox Grid.Column="2" Content="Fidati del certificato" Margin="12,0,0,0"
                         IsChecked="{Binding TrustServerCertificate, Mode=TwoWay}" />
-              <Button Grid.Column="4" Classes="ghost-emerald"
+              <Button Grid.Column="4" Classes="ghost-emerald" MinWidth="110"
                       Command="{Binding LoadDatabasesCommand}" ToolTip.Tip="Connetti e carica database">
-                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                  <ProgressBar IsIndeterminate="True" Width="14" Height="14"
+                <Panel>
+                  <StackPanel Orientation="Horizontal" Spacing="6"
+                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                              IsVisible="{Binding !IsLoadingDatabases}">
+                    <Path Width="14" Height="14" Stretch="Uniform"
+                          Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.7" StrokeLineCap="Round"
+                          Data="M 5,12 L 19,12 M 13,6 L 19,12 L 13,18" />
+                    <TextBlock Text="Connetti" VerticalAlignment="Center" />
+                  </StackPanel>
+                  <ProgressBar IsIndeterminate="True" Height="6"
+                               HorizontalAlignment="Stretch" VerticalAlignment="Center"
                                IsVisible="{Binding IsLoadingDatabases}" ShowProgressText="False" />
-                  <Path Width="14" Height="14" Stretch="Uniform"
-                        IsVisible="{Binding !IsLoadingDatabases}"
-                        Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.7" StrokeLineCap="Round"
-                        Data="M 5,12 L 19,12 M 13,6 L 19,12 L 13,18" />
-                  <TextBlock Text="Connetti" VerticalAlignment="Center" />
-                </StackPanel>
+                </Panel>
               </Button>
             </Grid>
 
@@ -382,7 +405,7 @@
           <TextBlock Text="Salva con nome…" />
         </Button>
 
-        <Button Classes="ghost" Click="OnLoadClick" ToolTip.Tip="Apri progetto esistente">
+        <Button Classes="ghost" Click="OnLoadClick" ToolTip.Tip="Carica un progetto esistente">
           <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
             <Path Width="14" Height="14" Stretch="Uniform"
                   Stroke="{Binding $parent[Button].Foreground}"

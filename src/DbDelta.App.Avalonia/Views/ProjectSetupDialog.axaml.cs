@@ -146,10 +146,20 @@ public partial class ProjectSetupDialog : Window
 
     private void OnCancelClick(object? sender, RoutedEventArgs e) => Close(null);
 
+    /// <summary>Source connection string from the last successful OK, including
+    /// the live password the user typed. Read by <c>App</c> to seed
+    /// <c>AppState.SourceConnectionString</c> without re-prompting.</summary>
+    public string? LastSourceConnectionString { get; private set; }
+
+    /// <summary>Target connection string from the last successful OK.</summary>
+    public string? LastTargetConnectionString { get; private set; }
+
     private void OnOkClick(object? sender, RoutedEventArgs e)
     {
         if (DataContext is ProjectSetupViewModel vm)
         {
+            LastSourceConnectionString = vm.BuildSourceConnectionString();
+            LastTargetConnectionString = vm.BuildTargetConnectionString();
             Close(vm.Build());
         }
     }
@@ -197,7 +207,7 @@ public partial class ProjectSetupDialog : Window
     {
         FilePickerOpenOptions opts = new()
         {
-            Title = "Apri progetto DbDelta",
+            Title = "Carica progetto DbDelta",
             AllowMultiple = false,
             FileTypeFilter =
             [
