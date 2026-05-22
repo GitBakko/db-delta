@@ -16,6 +16,16 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
     public ProjectEndpointPanelViewModel(string title, bool isTarget)
     {
         (Title, IsTarget) = (title, isTarget);
+        _serverSuggestions.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(ServerCountText));
+            OnPropertyChanged(nameof(HasServerSuggestions));
+        };
+        _availableDatabases.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(DatabaseCountText));
+            OnPropertyChanged(nameof(HasDatabases));
+        };
     }
 
     // ── Identity ────────────────────────────────────────────────────────────
@@ -48,6 +58,27 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
     [ObservableProperty] private bool _isLoadingDatabases;
     [ObservableProperty] private string? _connectionStatusMessage;
 
+    // ── Version info ─────────────────────────────────────────────────────────
+
+    [ObservableProperty] private string? _serverVersion;
+    [ObservableProperty] private int? _serverMajorVersion;
+
+    // ── Derived display properties ────────────────────────────────────────────
+
+    /// <summary>
+    /// Friendly display name shown in the Source/Target band header.
+    /// Falls back to a placeholder when ServerName is empty.
+    /// </summary>
+    public string DisplayBandName => string.IsNullOrWhiteSpace(ServerName)
+        ? (IsTarget ? "Seleziona una destinazione…" : "Seleziona una provenienza…")
+        : ServerName;
+
+    /// <summary>Inline counter text shown next to the "Server" section label.</summary>
+    public string ServerCountText => $"({ServerSuggestions.Count} trovati)";
+
+    /// <summary>Inline counter text shown next to the "Database" section label.</summary>
+    public string DatabaseCountText => $"({AvailableDatabases.Count} trovati)";
+
     // ── Validity ─────────────────────────────────────────────────────────────
 
     public bool IsValid =>
@@ -60,6 +91,7 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
     partial void OnServerNameChanged(string value)
     {
         OnPropertyChanged(nameof(IsValid));
+        OnPropertyChanged(nameof(DisplayBandName));
         LoadDatabasesCommand.NotifyCanExecuteChanged();
     }
 
@@ -110,7 +142,7 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
             HasServerSuggestions = list.Count > 0;
             ScanStatusMessage = list.Count == 0
                 ? "Nessun server rilevato (SQL Browser potrebbe essere disabilitato)."
-                : $"Trovati {list.Count} server.";
+                : null;
         }
         catch (Exception ex)
         {
@@ -142,7 +174,7 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
         ConnectionStatusMessage = null;
         try
         {
-            string cs = BuildConnectionString();
+            string cs = BuildConnectionString(includeDatabase: false);
             IReadOnlyList<string> dbs =
                 await SqlServerDiscovery.ListDatabasesAsync(cs, CancellationToken.None)
                                         .ConfigureAwait(true);
@@ -152,6 +184,28 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
             }
             HasDatabases = dbs.Count > 0;
             ConnectionStatusMessage = $"Connesso — {dbs.Count} database disponibili";
+
+            // Best-effort version detection — failure is silently suppressed.
+            try
+            {
+                string? version = await SqlServerDiscovery
+                    .GetServerVersionAsync(cs, CancellationToken.None)
+                    .ConfigureAwait(true);
+                ServerVersion = version;
+                if (version is not null)
+                {
+                    // Parse the major version number from the connection string builder.
+                    // We re-query SERVERPROPERTY via the same connection string, but
+                    // the version string itself starts with the product year — extract major
+                    // from the connection (the method already succeeded so the server is reachable).
+                    int? major = await TryGetMajorVersionAsync(cs).ConfigureAwait(true);
+                    ServerMajorVersion = major;
+                }
+            }
+            catch
+            {
+                // Version info is a nice-to-have — keep databases loaded.
+            }
         }
         catch (Exception ex)
         {
@@ -164,6 +218,27 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
         }
     }
 
+    private static async Task<int?> TryGetMajorVersionAsync(string connectionString)
+    {
+        try
+        {
+            Microsoft.Data.SqlClient.SqlConnectionStringBuilder b = new(connectionString)
+            {
+                ConnectTimeout = 5,
+            };
+            await using Microsoft.Data.SqlClient.SqlConnection cn = new(b.ConnectionString);
+            await cn.OpenAsync(CancellationToken.None).ConfigureAwait(false);
+            await using Microsoft.Data.SqlClient.SqlCommand cmd = new(
+                "SELECT CAST(SERVERPROPERTY('ProductMajorVersion') AS INT);", cn);
+            object? result = await cmd.ExecuteScalarAsync(CancellationToken.None).ConfigureAwait(false);
+            return result is int i ? i : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private bool CanLoadDatabases() =>
         !IsLoadingDatabases
         && !string.IsNullOrWhiteSpace(ServerName)
@@ -172,12 +247,21 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private string BuildConnectionString() =>
-        AuthMode == AuthenticationMode.WindowsIntegrated
-            ? $"Server={ServerName};Integrated Security=True;"
-              + $"Encrypt={Encrypt};TrustServerCertificate={TrustServerCertificate}"
-            : $"Server={ServerName};User Id={UserName};Password={Password};"
-              + $"Encrypt={Encrypt};TrustServerCertificate={TrustServerCertificate}";
+    private string BuildConnectionString(bool includeDatabase = false)
+    {
+        string db = includeDatabase && !string.IsNullOrWhiteSpace(DatabaseName)
+            ? $"Database={DatabaseName};"
+            : "";
+        return AuthMode switch
+        {
+            AuthenticationMode.WindowsIntegrated =>
+                $"Server={ServerName};{db}Integrated Security=True;"
+                + $"Encrypt={Encrypt};TrustServerCertificate={TrustServerCertificate}",
+            AuthenticationMode.SqlServer or _ =>
+                $"Server={ServerName};{db}User Id={UserName};Password={Password};"
+                + $"Encrypt={Encrypt};TrustServerCertificate={TrustServerCertificate}",
+        };
+    }
 
     // ── Materialisation ───────────────────────────────────────────────────────
 
@@ -229,5 +313,32 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
         vm.Encrypt = endpoint.Authentication.Encrypt;
         vm.TrustServerCertificate = endpoint.Authentication.TrustServerCertificate;
         return vm;
+    }
+
+    /// <summary>
+    /// Copies all connection fields from the given endpoint into this instance.
+    /// Clears runtime scan/load state (suggestions, databases, version).
+    /// </summary>
+    public void LoadFromEndpoint(ProjectEndpoint? endpoint)
+    {
+        if (endpoint is null) { return; }
+
+        ServerName = endpoint.Connection.ServerName;
+        DatabaseName = endpoint.Connection.DatabaseName;
+        AuthMode = endpoint.Authentication.Mode;
+        UserName = endpoint.Authentication.UserName ?? "";
+        RememberCredentials = endpoint.Authentication.RememberCredentials;
+        Encrypt = endpoint.Authentication.Encrypt;
+        TrustServerCertificate = endpoint.Authentication.TrustServerCertificate;
+
+        // Clear runtime state.
+        ServerSuggestions.Clear();
+        HasServerSuggestions = false;
+        AvailableDatabases.Clear();
+        HasDatabases = false;
+        ServerVersion = null;
+        ServerMajorVersion = null;
+        ScanStatusMessage = null;
+        ConnectionStatusMessage = null;
     }
 }
