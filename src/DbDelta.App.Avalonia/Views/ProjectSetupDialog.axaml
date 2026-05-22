@@ -103,27 +103,32 @@
                                PlaceholderText="Scrivi o seleziona…">
                 <AutoCompleteBox.ItemTemplate>
                   <DataTemplate DataType="sql:DiscoveredServer">
-                    <StackPanel Orientation="Vertical">
-                      <!-- Section header on the first row of each section.
-                           Rendered INSIDE the data row's bounding box (so the
-                           ListBoxItem hover-bg paints behind it) but with an
-                           opaque BgStrongBrush background + visible top/bottom
-                           borders that fully MASK the underlying hover/select
-                           tint — visually it reads as a horizontal divider
-                           strip, not as part of the row. Negative horizontal
-                           margins extend it edge-to-edge across the popup. -->
-                      <Border IsVisible="{Binding IsSectionFirst}"
-                              IsHitTestVisible="False"
-                              Background="{StaticResource BgRaisedBrush}"
+                    <!-- Two mutually-exclusive variants share the same row
+                         slot, so first-of-section items are NEVER taller than
+                         a regular data row: section headers are their own
+                         dedicated non-selectable items injected by the VM,
+                         data items render as before. Negative horizontal
+                         margins on the header strip extend it edge-to-edge
+                         across the popup width. -->
+                    <Panel>
+                      <!-- HEADER variant — divider strip, click rejected by
+                           OnServerSelectionChanged so picking it does nothing.
+                           Opaque background covers any hover/select tint the
+                           ListBoxItem paints behind it. -->
+                      <Border IsVisible="{Binding IsHeaderOnly}"
+                              Background="{StaticResource BgMutedBrush}"
                               BorderBrush="{StaticResource BorderStrongBrush}"
-                              BorderThickness="0,1,0,1"
+                              BorderThickness="0,0,0,1"
                               Padding="10,3"
-                              Margin="-8,-2,-8,4">
+                              Margin="-8,0,-8,0">
                         <TextBlock Text="{Binding Section}"
                                    FontSize="9" FontWeight="Bold" LetterSpacing="1.2"
                                    Foreground="{StaticResource FgSubtleBrush}" />
                       </Border>
-                      <Grid ColumnDefinitions="*,Auto">
+
+                      <!-- DATA variant — same row layout as before. -->
+                      <Grid IsVisible="{Binding !IsHeaderOnly}"
+                            ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Text="{Binding Name}"
                                    FontFamily="Cascadia Mono,Consolas,monospace" FontSize="12"
                                    VerticalAlignment="Center" />
@@ -133,7 +138,7 @@
                                    VerticalAlignment="Center"
                                    IsVisible="{Binding IpAddress, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                       </Grid>
-                    </StackPanel>
+                    </Panel>
                   </DataTemplate>
                 </AutoCompleteBox.ItemTemplate>
               </AutoCompleteBox>
@@ -287,27 +292,32 @@
                                PlaceholderText="Scrivi o seleziona…">
                 <AutoCompleteBox.ItemTemplate>
                   <DataTemplate DataType="sql:DiscoveredServer">
-                    <StackPanel Orientation="Vertical">
-                      <!-- Section header on the first row of each section.
-                           Rendered INSIDE the data row's bounding box (so the
-                           ListBoxItem hover-bg paints behind it) but with an
-                           opaque BgStrongBrush background + visible top/bottom
-                           borders that fully MASK the underlying hover/select
-                           tint — visually it reads as a horizontal divider
-                           strip, not as part of the row. Negative horizontal
-                           margins extend it edge-to-edge across the popup. -->
-                      <Border IsVisible="{Binding IsSectionFirst}"
-                              IsHitTestVisible="False"
-                              Background="{StaticResource BgRaisedBrush}"
+                    <!-- Two mutually-exclusive variants share the same row
+                         slot, so first-of-section items are NEVER taller than
+                         a regular data row: section headers are their own
+                         dedicated non-selectable items injected by the VM,
+                         data items render as before. Negative horizontal
+                         margins on the header strip extend it edge-to-edge
+                         across the popup width. -->
+                    <Panel>
+                      <!-- HEADER variant — divider strip, click rejected by
+                           OnServerSelectionChanged so picking it does nothing.
+                           Opaque background covers any hover/select tint the
+                           ListBoxItem paints behind it. -->
+                      <Border IsVisible="{Binding IsHeaderOnly}"
+                              Background="{StaticResource BgMutedBrush}"
                               BorderBrush="{StaticResource BorderStrongBrush}"
-                              BorderThickness="0,1,0,1"
+                              BorderThickness="0,0,0,1"
                               Padding="10,3"
-                              Margin="-8,-2,-8,4">
+                              Margin="-8,0,-8,0">
                         <TextBlock Text="{Binding Section}"
                                    FontSize="9" FontWeight="Bold" LetterSpacing="1.2"
                                    Foreground="{StaticResource FgSubtleBrush}" />
                       </Border>
-                      <Grid ColumnDefinitions="*,Auto">
+
+                      <!-- DATA variant — same row layout as before. -->
+                      <Grid IsVisible="{Binding !IsHeaderOnly}"
+                            ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Text="{Binding Name}"
                                    FontFamily="Cascadia Mono,Consolas,monospace" FontSize="12"
                                    VerticalAlignment="Center" />
@@ -317,7 +327,7 @@
                                    VerticalAlignment="Center"
                                    IsVisible="{Binding IpAddress, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                       </Grid>
-                    </StackPanel>
+                    </Panel>
                   </DataTemplate>
                 </AutoCompleteBox.ItemTemplate>
               </AutoCompleteBox>

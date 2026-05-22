@@ -191,7 +191,7 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
     {
         ArgumentNullException.ThrowIfNull(list);
 
-        // Preserve any "Usati di recente" prefix at the top of the list when
+        // Preserve any "Usati di recente" prefix (header + items) when
         // refreshing — only replace the "Risultati scansione" tail.
         List<DiscoveredServer> recents = [..
             ServerSuggestions.Where(s => string.Equals(s.Section, RecentSection, StringComparison.Ordinal))];
@@ -202,12 +202,23 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
             ServerSuggestions.Add(r);
         }
 
-        bool first = true;
-        foreach (DiscoveredServer s in list)
+        if (list.Count > 0)
         {
-            ServerSuggestions.Add(s with { Section = ScanSection, IsSectionFirst = first });
-            first = false;
+            // Dedicated non-selectable header sentinel — visually a divider
+            // strip, never returned by AutoCompleteBox text selection.
+            ServerSuggestions.Add(new DiscoveredServer(
+                Name: string.Empty,
+                IpAddress: null,
+                Section: ScanSection,
+                IsSectionFirst: true,
+                IsHeaderOnly: true));
+
+            foreach (DiscoveredServer s in list)
+            {
+                ServerSuggestions.Add(s with { Section = ScanSection, IsSectionFirst = false });
+            }
         }
+
         HasServerSuggestions = ServerSuggestions.Count > 0;
         ScanStatusMessage = list.Count == 0
             ? "Nessun server rilevato (SQL Browser potrebbe essere disabilitato)."
@@ -238,8 +249,8 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
     {
         if (recents is null || recents.Count == 0) { return; }
 
-        // Strip any previous "recent" entries first so we don't duplicate them
-        // across multiple seedings.
+        // Strip any previous "recent" entries (header + data) so we don't
+        // duplicate them across multiple seedings.
         for (int i = ServerSuggestions.Count - 1; i >= 0; i--)
         {
             if (string.Equals(ServerSuggestions[i].Section, RecentSection, StringComparison.Ordinal))
@@ -248,30 +259,30 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
             }
         }
 
-        // Insert recents at the top, marking the first as section-first.
-        for (int i = 0; i < recents.Count; i++)
+        // Build the new "Usati di recente" block: one header sentinel + the
+        // recent server data items.
+        List<DiscoveredServer> block =
+        [
+            new DiscoveredServer(
+                Name: string.Empty,
+                IpAddress: null,
+                Section: RecentSection,
+                IsSectionFirst: true,
+                IsHeaderOnly: true),
+        ];
+        foreach ((string name, string? ip) in recents)
         {
-            (string name, string? ip) = recents[i];
-            ServerSuggestions.Insert(i, new DiscoveredServer(
+            block.Add(new DiscoveredServer(
                 Name: name,
                 IpAddress: ip,
                 Section: RecentSection,
-                IsSectionFirst: i == 0));
+                IsSectionFirst: false));
         }
 
-        // First scan-section item may need its IsSectionFirst recomputed:
-        // it's the first row whose Section equals ScanSection.
-        bool firstScanSeen = false;
-        for (int i = 0; i < ServerSuggestions.Count; i++)
+        // Prepend the recents block at the top of the suggestions list.
+        for (int i = 0; i < block.Count; i++)
         {
-            DiscoveredServer s = ServerSuggestions[i];
-            if (!string.Equals(s.Section, ScanSection, StringComparison.Ordinal)) { continue; }
-            bool shouldBeFirst = !firstScanSeen;
-            if (s.IsSectionFirst != shouldBeFirst)
-            {
-                ServerSuggestions[i] = s with { IsSectionFirst = shouldBeFirst };
-            }
-            firstScanSeen = true;
+            ServerSuggestions.Insert(i, block[i]);
         }
 
         HasServerSuggestions = ServerSuggestions.Count > 0;

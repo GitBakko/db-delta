@@ -1,7 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.Platform.Storage;
 using DbDelta.App.ViewModels;
 using DbDelta.Core.Abstractions;
 using DbDelta.Persistence.Sql;
@@ -39,6 +38,11 @@ public partial class ProjectSetupDialog : Window
         AutoCompleteBox? tgtServerBox = this.FindControl<AutoCompleteBox>("TgtServerBox");
         tgtServerBox?.SetValue(AutoCompleteBox.ItemFilterProperty, filter);
 
+        // Reject header sentinel picks: clicking "Usati di recente" or
+        // "Risultati scansione" must not select the divider as a value.
+        if (srcServerBox is { }) { srcServerBox.SelectionChanged += OnServerSelectionChanged; }
+        if (tgtServerBox is { }) { tgtServerBox.SelectionChanged += OnServerSelectionChanged; }
+
         // After scan finishes → open server dropdown deferred.
         DataContextChanged += (_, _) =>
         {
@@ -54,11 +58,35 @@ public partial class ProjectSetupDialog : Window
 
     // ── Server item filter (Name OR IpAddress) ────────────────────────────────
 
+    /// <summary>
+    /// Match-by-Name or match-by-IP filter, with section-header sentinels
+    /// (<c>IsHeaderOnly</c>) always passed through so the dividers stay
+    /// visible regardless of what the user types.
+    /// </summary>
     private static bool ServerItemFilter(string? searchText, object? item) =>
         item is DiscoveredServer s
-        && (string.IsNullOrEmpty(searchText)
+        && (s.IsHeaderOnly
+            || string.IsNullOrEmpty(searchText)
             || s.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase)
             || (s.IpAddress?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false));
+
+    /// <summary>
+    /// Rejects accidental selection of the section-header sentinel items —
+    /// they are dividers, not real servers. Resets the AutoCompleteBox text
+    /// + selection back to whatever was active before the click.
+    /// </summary>
+    private static void OnServerSelectionChanged(object? sender, Avalonia.Controls.SelectionChangedEventArgs e)
+    {
+        if (sender is not AutoCompleteBox box) { return; }
+        if (box.SelectedItem is DiscoveredServer { IsHeaderOnly: true })
+        {
+            // Avoid recursion: temporarily detach, clear, re-attach.
+            box.SelectionChanged -= OnServerSelectionChanged;
+            box.SelectedItem = null;
+            box.Text = string.Empty;
+            box.SelectionChanged += OnServerSelectionChanged;
+        }
+    }
 
     private void HandleEndpointPropertyChanged(
         string? propertyName,
@@ -161,29 +189,27 @@ public partial class ProjectSetupDialog : Window
             return;
         }
 
-        IStorageFile? file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
-        {
-            Title = "Salva progetto DbDelta",
-            DefaultExtension = "dbd",
-            SuggestedFileName = vm.ProjectName,
-            FileTypeChoices =
-            [
-                new FilePickerFileType("Progetto DbDelta")
-                {
-                    Patterns = ["*.dbd"],
-                },
-            ],
-        }).ConfigureAwait(true);
+        // Round-8 UX: ditch the OS save-file picker; the modal's Salva /
+        // Salva con nome flow routes through SaveProjectDialog (name-only)
+        // so projects land under %LOCALAPPDATA%\DbDelta\Projects\ and show
+        // up in the MRU automatically.
+        SaveProjectDialog dialog = new();
+        dialog.SetInitialName(vm.ProjectName);
+        dialog.SetHint($"Verrà salvato in: {Persistence.Json.ProjectsFolder.GetOrCreate()}");
 
-        if (file is null)
-        {
-            return;
-        }
+        string? name = await dialog.ShowDialog<string?>(this).ConfigureAwait(true);
+        if (string.IsNullOrWhiteSpace(name)) { return; }
 
-        DbDeltaProject project = vm.Build();
+        string path = Persistence.Json.ProjectsFolder.ResolvePath(name);
+
+        DbDeltaProject project = vm.Build() with { Name = name, LastModifiedUtc = DateTime.UtcNow };
         Persistence.Xml.XmlProjectStore store = new();
-        await store.SaveAsync(file.Path.LocalPath, project, CancellationToken.None)
-                   .ConfigureAwait(true);
+        await store.SaveAsync(path, project, CancellationToken.None).ConfigureAwait(true);
+
+        // Touch the MRU so the next session lists this project first.
+        Persistence.Json.JsonRecentProjectsStore mru =
+            Persistence.Json.JsonRecentProjectsStore.CreateDefault();
+        await mru.AddOrTouchAsync(path, CancellationToken.None).ConfigureAwait(true);
     }
 
     // ── Carica… button ────────────────────────────────────────────────────────
