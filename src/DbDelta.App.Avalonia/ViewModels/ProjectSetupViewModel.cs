@@ -82,7 +82,7 @@ public sealed partial class ProjectSetupViewModel : ObservableObject
         Target.DatabaseName = srcDb;
     }
 
-    // ── Build / FromProject ───────────────────────────────────────────────────
+    // ── Build / FromProject / LoadFrom ───────────────────────────────────────
 
     /// <summary>
     /// Materialises a <see cref="DbDeltaProject"/> from the current VM state.
@@ -97,6 +97,32 @@ public sealed partial class ProjectSetupViewModel : ObservableObject
             TableMappings: [.. TableMappings],
             ProjectOptions: Options,
             Selections: FrozenDictionary<ObjectSelectionKey, bool>.Empty);
+
+    /// <summary>
+    /// Loads project data into the current VM instance in-place.
+    /// Used by the "Carica…" button so the dialog stays open for review/edit.
+    /// </summary>
+    public void LoadFrom(DbDeltaProject project)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+        ProjectName = project.Name;
+        Options = project.ProjectOptions;
+
+        OwnerMappings.Clear();
+        foreach (OwnerMappingEntry entry in project.OwnerMappings)
+        {
+            OwnerMappings.Add(entry);
+        }
+
+        TableMappings.Clear();
+        foreach (TableMappingEntry entry in project.TableMappings)
+        {
+            TableMappings.Add(entry);
+        }
+
+        Source.LoadFromEndpoint(project.Source);
+        Target.LoadFromEndpoint(project.Target);
+    }
 
     /// <summary>
     /// Constructs a <see cref="ProjectSetupViewModel"/> pre-populated from an
