@@ -33,40 +33,42 @@ public partial class App : Application
             // call ShowDialog.
             desktop.MainWindow.Opened += async (_, _) =>
             {
-                await LoadAndPrefillAsync(connections, appState).ConfigureAwait(true);
+                // Preload the MRU connection list so the dialog's pickers are
+                // populated; do NOT auto-prefill AppState — the main shell must
+                // start empty until the user confirms a project.
+                await connections.LoadAsync(CancellationToken.None).ConfigureAwait(true);
 
-                // Skip the dialog when autosave already restored both endpoints.
-                bool alreadyLoaded =
-                    !string.IsNullOrWhiteSpace(appState.SourceConnectionString)
-                    && !string.IsNullOrWhiteSpace(appState.TargetConnectionString);
+                ProjectSetupViewModel setupVm = new();
+                ProjectSetupDialog dialog = new() { DataContext = setupVm };
+                DbDeltaProject? result =
+                    await dialog.ShowDialog<DbDeltaProject?>(mainWindow)
+                                .ConfigureAwait(true);
 
-                if (!alreadyLoaded)
+                if (result is null)
                 {
-                    ProjectSetupViewModel setupVm = new();
-                    ProjectSetupDialog dialog = new() { DataContext = setupVm };
-                    DbDeltaProject? result =
-                        await dialog.ShowDialog<DbDeltaProject?>(mainWindow)
-                                    .ConfigureAwait(true);
+                    // User cancelled — close the app gracefully.
+                    desktop.Shutdown();
+                    return;
+                }
 
-                    if (result is null)
-                    {
-                        // User cancelled — close the app gracefully.
-                        desktop.Shutdown();
-                        return;
-                    }
+                if (result.Source is not null)
+                {
+                    appState.SourceConnectionString =
+                        BuildConnectionString(result.Source);
+                }
+                if (result.Target is not null)
+                {
+                    appState.TargetConnectionString =
+                        BuildConnectionString(result.Target);
+                }
 
-                    // Feed the project's connection strings into AppState so the
-                    // comparison flow can run immediately.
-                    if (result.Source is not null)
-                    {
-                        appState.SourceConnectionString =
-                            BuildConnectionString(result.Source);
-                    }
-                    if (result.Target is not null)
-                    {
-                        appState.TargetConnectionString =
-                            BuildConnectionString(result.Target);
-                    }
+                // Auto-run the comparison so the main view is no longer empty.
+                if (!string.IsNullOrWhiteSpace(appState.SourceConnectionString)
+                    && !string.IsNullOrWhiteSpace(appState.TargetConnectionString))
+                {
+                    await appState.CompareCommand
+                                  .ExecuteAsync(CancellationToken.None)
+                                  .ConfigureAwait(true);
                 }
             };
         }
@@ -77,29 +79,6 @@ public partial class App : Application
 #endif
 
         base.OnFrameworkInitializationCompleted();
-    }
-
-    private static async Task LoadAndPrefillAsync(
-        ConnectionStoreViewModel cs,
-        AppStateViewModel state)
-    {
-        await cs.LoadAsync(CancellationToken.None).ConfigureAwait(true);
-        if (cs.Entries.Count >= 1)
-        {
-            string? src = await cs.MaterialiseAsync(cs.Entries[0], CancellationToken.None).ConfigureAwait(true);
-            if (src is not null)
-            {
-                state.SourceConnectionString = src;
-            }
-        }
-        if (cs.Entries.Count >= 2)
-        {
-            string? tgt = await cs.MaterialiseAsync(cs.Entries[1], CancellationToken.None).ConfigureAwait(true);
-            if (tgt is not null)
-            {
-                state.TargetConnectionString = tgt;
-            }
-        }
     }
 
     private static string BuildConnectionString(ProjectEndpoint endpoint)

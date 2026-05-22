@@ -23,9 +23,6 @@ namespace DbDelta.App.ViewModels;
 /// </summary>
 public sealed partial class MainWindowViewModel : ObservableObject
 {
-    private static readonly GridLength _sidebarOpenWidth = new(240);
-    private static readonly GridLength _sidebarClosedWidth = new(0);
-
     public MainWindowViewModel(AppStateViewModel appState)
     {
         AppState = appState;
@@ -56,12 +53,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private bool _isDarkTheme;
 
     [ObservableProperty]
-    private GridLength _sidebarWidth = _sidebarOpenWidth;
-
-    [ObservableProperty]
-    private bool _isSidebarOpen = true;
-
-    [ObservableProperty]
     private string? _projectFilePath;
 
     [RelayCommand]
@@ -72,13 +63,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             app.RequestedThemeVariant = IsDarkTheme ? ThemeVariant.Dark : ThemeVariant.Light;
         }
-    }
-
-    [RelayCommand]
-    public void ToggleSidebar()
-    {
-        IsSidebarOpen = !IsSidebarOpen;
-        SidebarWidth = IsSidebarOpen ? _sidebarOpenWidth : _sidebarClosedWidth;
     }
 
     [RelayCommand]

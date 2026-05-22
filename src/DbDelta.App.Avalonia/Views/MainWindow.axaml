@@ -19,59 +19,30 @@
             BorderThickness="0,0,0,1">
       <Grid Margin="12,0">
         <Grid.ColumnDefinitions>
-          <!-- 0: sidebar toggle -->
+          <!-- 0: brand -->
           <ColumnDefinition Width="Auto" />
-          <!-- 1: brand -->
+          <!-- 1: divider -->
           <ColumnDefinition Width="Auto" />
-          <!-- 2: divider -->
+          <!-- 2: Group A — New / Open / Save -->
           <ColumnDefinition Width="Auto" />
-          <!-- 3: Group A — New / Open / Save -->
+          <!-- 3: divider -->
           <ColumnDefinition Width="Auto" />
-          <!-- 4: divider -->
+          <!-- 4: Group B — MRU / Edit / Refresh -->
           <ColumnDefinition Width="Auto" />
-          <!-- 5: Group B — MRU / Edit / Refresh -->
-          <ColumnDefinition Width="Auto" />
-          <!-- 6: filler -->
+          <!-- 5: filler -->
           <ColumnDefinition Width="*" />
-          <!-- 7: Cerca TextBox -->
+          <!-- 6: Cerca TextBox -->
           <ColumnDefinition Width="220" />
-          <!-- 8: Raggruppa per ComboBox -->
+          <!-- 7: Raggruppa per ComboBox -->
           <ColumnDefinition Width="Auto" />
-          <!-- 9: divider -->
+          <!-- 8: divider -->
           <ColumnDefinition Width="Auto" />
-          <!-- 10: theme toggle -->
+          <!-- 9: theme toggle -->
           <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
 
-        <!-- 0: sidebar toggle -->
-        <Button Grid.Column="0"
-                Classes="ghost"
-                Command="{Binding ToggleSidebarCommand}"
-                ToolTip.Tip="Mostra/nascondi pannello laterale"
-                VerticalAlignment="Center"
-                Margin="0,0,8,0">
-          <Panel Width="16" Height="16">
-            <Path Stretch="Uniform"
-                  Stroke="{Binding $parent[Button].Foreground}"
-                  StrokeThickness="1.7"
-                  StrokeLineCap="Round"
-                  StrokeJoin="Round"
-                  Fill="Transparent"
-                  IsVisible="{Binding IsSidebarOpen}"
-                  Data="M 3,5 L 21,5 L 21,19 L 3,19 Z M 9,5 L 9,19 M 16,9 L 13,12 L 16,15" />
-            <Path Stretch="Uniform"
-                  Stroke="{Binding $parent[Button].Foreground}"
-                  StrokeThickness="1.7"
-                  StrokeLineCap="Round"
-                  StrokeJoin="Round"
-                  Fill="Transparent"
-                  IsVisible="{Binding !IsSidebarOpen}"
-                  Data="M 3,5 L 21,5 L 21,19 L 3,19 Z M 9,5 L 9,19 M 13,9 L 16,12 L 13,15" />
-          </Panel>
-        </Button>
-
-        <!-- 1: brand stack -->
-        <StackPanel Grid.Column="1"
+        <!-- 0: brand stack -->
+        <StackPanel Grid.Column="0"
                     Orientation="Horizontal"
                     Spacing="10"
                     VerticalAlignment="Center"
@@ -98,43 +69,46 @@
                      VerticalAlignment="Center" />
         </StackPanel>
 
-        <!-- 2: divider -->
-        <Border Grid.Column="2" Classes="topbar-divider" />
+        <!-- 1: divider -->
+        <Border Grid.Column="1" Classes="topbar-divider" />
 
-        <!-- 3: Group A — Nuovo / Apri / Salva -->
-        <StackPanel Grid.Column="3"
+        <!-- 2: Group A — Nuovo / Apri / Salva -->
+        <StackPanel Grid.Column="2"
                     Orientation="Horizontal"
                     Spacing="2"
                     VerticalAlignment="Center">
 
-          <!-- Nuovo progetto -->
+          <!-- Nuovo progetto — file-plus icon -->
           <Button Classes="ghost"
                   Command="{Binding NewProjectCommand}"
                   ToolTip.Tip="Crea un nuovo progetto DbDelta"
-                  Padding="6">
+                  Padding="6"
+                  VerticalContentAlignment="Center">
             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-              <!-- New/plus DB icon -->
               <Path Width="15" Height="15" Stretch="Uniform"
                     Stroke="{Binding $parent[Button].Foreground}"
                     StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
                     Fill="Transparent"
-                    Data="M 4,6 C 4,4 8,3 12,3 C 16,3 20,4 20,6 L 20,13 C 20,15 16,16 12,16 C 8,16 4,15 4,13 Z M 4,6 C 4,8 8,9 12,9 C 16,9 20,8 20,6 M 15,18 L 15,24 M 12,21 L 18,21" />
+                    VerticalAlignment="Center"
+                    Data="M 6,3 L 14,3 L 19,8 L 19,21 L 6,21 Z M 14,3 L 14,8 L 19,8 M 12,12 L 12,18 M 9,15 L 15,15" />
               <TextBlock Text="Nuovo" VerticalAlignment="Center" FontSize="12" />
             </StackPanel>
           </Button>
 
-          <!-- Apri progetto -->
+          <!-- Apri progetto — folder-open icon -->
           <Button Classes="ghost"
                   Command="{Binding OpenProjectCommand}"
                   CommandParameter="{Binding $parent[Window]}"
                   ToolTip.Tip="Apri un progetto DbDelta esistente"
-                  Padding="6">
+                  Padding="6"
+                  VerticalContentAlignment="Center">
             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
               <Path Width="15" Height="15" Stretch="Uniform"
                     Stroke="{Binding $parent[Button].Foreground}"
                     StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
                     Fill="Transparent"
-                    Data="M 4,7 L 4,18 L 20,18 L 20,9 L 12,9 L 10,7 Z" />
+                    VerticalAlignment="Center"
+                    Data="M 3,7 L 3,19 L 21,19 L 21,9 L 11,9 L 9,7 Z" />
               <TextBlock Text="Apri" VerticalAlignment="Center" FontSize="12" />
             </StackPanel>
           </Button>
@@ -144,12 +118,14 @@
                   Command="{Binding SaveProjectCommand}"
                   CommandParameter="{Binding $parent[Window]}"
                   ToolTip.Tip="Salva il progetto corrente"
-                  Padding="6">
+                  Padding="6"
+                  VerticalContentAlignment="Center">
             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
               <Path Width="15" Height="15" Stretch="Uniform"
                     Stroke="{Binding $parent[Button].Foreground}"
                     StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
                     Fill="Transparent"
+                    VerticalAlignment="Center"
                     Data="M 5,5 L 17,5 L 19,7 L 19,19 L 5,19 Z M 7,5 L 7,11 L 15,11 L 15,5 M 9,15 L 15,15" />
               <TextBlock Text="Salva" VerticalAlignment="Center" FontSize="12" />
             </StackPanel>
@@ -157,11 +133,11 @@
 
         </StackPanel>
 
-        <!-- 4: divider -->
-        <Border Grid.Column="4" Classes="topbar-divider" />
+        <!-- 3: divider -->
+        <Border Grid.Column="3" Classes="topbar-divider" />
 
-        <!-- 5: Group B — I miei progetti / Modifica / Refresh -->
-        <StackPanel Grid.Column="5"
+        <!-- 4: Group B — I miei progetti / Modifica / Refresh -->
+        <StackPanel Grid.Column="4"
                     Orientation="Horizontal"
                     Spacing="2"
                     VerticalAlignment="Center">
@@ -206,10 +182,10 @@
 
         </StackPanel>
 
-        <!-- 6: filler -->
+        <!-- 5: filler -->
 
-        <!-- 7: Cerca TextBox -->
-        <Border Grid.Column="7"
+        <!-- 6: Cerca TextBox -->
+        <Border Grid.Column="6"
                 BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="1"
                 CornerRadius="6"
@@ -236,8 +212,8 @@
           </Grid>
         </Border>
 
-        <!-- 8: Raggruppa per ComboBox -->
-        <ComboBox Grid.Column="8"
+        <!-- 7: Raggruppa per ComboBox -->
+        <ComboBox Grid.Column="7"
                   ItemsSource="{Binding GroupingOptions}"
                   SelectedItem="{Binding GroupingMode, Mode=TwoWay}"
                   VerticalAlignment="Center"
@@ -245,11 +221,11 @@
                   FontSize="12"
                   ToolTip.Tip="Raggruppa i risultati per criterio" />
 
-        <!-- 9: divider -->
-        <Border Grid.Column="9" Classes="topbar-divider" />
+        <!-- 8: divider -->
+        <Border Grid.Column="8" Classes="topbar-divider" />
 
-        <!-- 10: theme toggle -->
-        <Button Grid.Column="10"
+        <!-- 9: theme toggle -->
+        <Button Grid.Column="9"
                 Classes="ghost"
                 Command="{Binding ToggleThemeCommand}"
                 ToolTip.Tip="Tema chiaro / scuro"
@@ -272,39 +248,23 @@
       <v:ProjectHeaderStrip DataContext="{Binding}" />
     </Border>
 
-    <!-- ── Band 3: Middle — sidebar + main content ───────────────────────── -->
-    <Grid Grid.Row="2">
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="{Binding SidebarWidth}" />
-        <ColumnDefinition Width="*" />
-      </Grid.ColumnDefinitions>
-
-      <Border Grid.Column="0"
-              Background="{StaticResource BgSubtleBrush}"
+    <!-- ── Band 3: Middle — main content (no sidebar) ─────────────────────── -->
+    <Grid Grid.Row="2"
+          RowDefinitions="Auto,*,280"
+          Margin="24,24,24,0">
+      <v:ConnectionPickerView Grid.Row="0"
+                              DataContext="{Binding AppState}"
+                              Margin="0,0,0,16" />
+      <v:ResultsGridView Grid.Row="1"
+                         DataContext="{Binding}" />
+      <!-- Diff viewer — only visible when a row is selected -->
+      <Border Grid.Row="2"
               BorderBrush="{StaticResource BorderBrush}"
-              BorderThickness="0,0,1,0"
-              IsVisible="{Binding IsSidebarOpen}">
-        <v:RecentConnectionsSidebar DataContext="{Binding AppState.Connections}" />
+              BorderThickness="0,1,0,0"
+              Margin="0,0,0,0"
+              IsVisible="{Binding AppState.SelectedRow, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <v:DiffViewerView DataContext="{Binding AppState.DiffViewer}" />
       </Border>
-
-      <!-- Main area: ConnectionPicker (collapsible) + ResultsGridView + DiffViewer -->
-      <Grid Grid.Column="1"
-            RowDefinitions="Auto,*,280"
-            Margin="24,24,24,0">
-        <v:ConnectionPickerView Grid.Row="0"
-                                DataContext="{Binding AppState}"
-                                Margin="0,0,0,16" />
-        <v:ResultsGridView Grid.Row="1"
-                           DataContext="{Binding}" />
-        <!-- Diff viewer — only visible when a row is selected -->
-        <Border Grid.Row="2"
-                BorderBrush="{StaticResource BorderBrush}"
-                BorderThickness="0,1,0,0"
-                Margin="0,0,0,0"
-                IsVisible="{Binding AppState.SelectedRow, Converter={x:Static ObjectConverters.IsNotNull}}">
-          <v:DiffViewerView DataContext="{Binding AppState.DiffViewer}" />
-        </Border>
-      </Grid>
     </Grid>
 
     <!-- Status bar -->
