@@ -102,7 +102,10 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
             Indexes = idx ?? [],
         };
 
-        return TableScriptEmitter.GenerateCreateTable(fullTable);
+        // GenerateFullTableBody includes FK + index DDL so the diff viewer
+        // surfaces every kind of difference the ComparisonEngine flags
+        // (columns + constraints + indexes). Round-16 bugfix.
+        return TableScriptEmitter.GenerateFullTableBody(fullTable);
     }
 
     private static async Task<Table> ReadSingleTableAsync(

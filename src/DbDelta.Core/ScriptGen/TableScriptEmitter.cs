@@ -100,6 +100,57 @@ public sealed class TableScriptEmitter : IScriptEmitter
         return EmitCreate(table);
     }
 
+    /// <summary>
+    /// Full table body for the diff viewer — CREATE TABLE plus standalone
+    /// FOREIGN KEY ALTER statements plus CREATE INDEX statements. The
+    /// ComparisonEngine flags a table as <c>Different</c> when columns OR
+    /// constraints (incl. FKs) OR indexes differ, so the body shown to the
+    /// user MUST include all three or "Different" rows render as empty
+    /// diffs (the bug fixed in round-16). Statements are emitted in a
+    /// deterministic order (FKs by name, indexes by name) so both source
+    /// and target sides line up cleanly in the line-diff.
+    /// </summary>
+    public static string GenerateFullTableBody(Table table)
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        StringBuilder sb = new();
+        sb.Append(EmitCreate(table));
+
+        // Foreign-key constraints — appended as standalone ALTER TABLE statements.
+        List<ForeignKey> fks =
+        [
+            .. table.Constraints
+                .OfType<ForeignKey>()
+                .OrderBy(fk => fk.Name, StringComparer.Ordinal)
+        ];
+        if (fks.Count > 0)
+        {
+            sb.AppendLine();
+            ForeignKeyScriptEmitter fkEmitter = new();
+            foreach (ForeignKey fk in fks)
+            {
+                sb.AppendLine(fkEmitter.EmitAdd(table.Schema, table.Name, fk));
+            }
+        }
+
+        // Indexes — appended as standalone CREATE INDEX statements.
+        List<TableIndex> indexes =
+        [
+            .. table.Indexes.OrderBy(ix => ix.Name, StringComparer.Ordinal)
+        ];
+        if (indexes.Count > 0)
+        {
+            sb.AppendLine();
+            IndexScriptEmitter ixEmitter = new();
+            foreach (TableIndex ix in indexes)
+            {
+                sb.AppendLine(ixEmitter.EmitCreate(table.Schema, table.Name, ix));
+            }
+        }
+
+        return sb.ToString();
+    }
+
     private static string EmitDrop(Table table) =>
         $"DROP TABLE [{table.Schema}].[{table.Name}];";
 
