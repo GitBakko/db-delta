@@ -65,17 +65,53 @@
                     <!-- 6-px status colour stripe -->
                     <Border Grid.Column="0"
                             Background="{Binding Key, Converter={x:Static v:Converters.StatusKeyToBrush}}" />
-                    <!-- Accordion chevron — visible cue that the row is clickable.
-                         Click anywhere on the header toggles collapse (DataGrid
-                         handles the wiring); the chevron is decorative. -->
-                    <Path Grid.Column="1"
-                          Width="10" Height="10" Stretch="Uniform"
-                          Margin="10,0,0,0"
-                          VerticalAlignment="Center"
-                          Stroke="{StaticResource FgMutedBrush}"
-                          StrokeThickness="2" StrokeLineCap="Round" StrokeJoin="Round"
-                          Fill="Transparent"
-                          Data="M 5,8 L 12,15 L 19,8" />
+                    <!-- PART_ExpanderButton — DataGrid wires this ToggleButton's
+                         IsChecked to the group's expansion state. Single click
+                         toggles. The chevron Path rotates -90° when checked
+                         (i.e. expanded) so it visually maps to ▶ collapsed /
+                         ▼ expanded. -->
+                    <ToggleButton Grid.Column="1"
+                                  x:Name="PART_ExpanderButton"
+                                  Background="Transparent"
+                                  BorderThickness="0"
+                                  Padding="6,0"
+                                  MinHeight="0"
+                                  VerticalAlignment="Stretch"
+                                  HorizontalContentAlignment="Center"
+                                  VerticalContentAlignment="Center"
+                                  Cursor="Hand">
+                      <ToggleButton.Styles>
+                        <!-- Strip the FluentTheme ToggleButton background so
+                             it stays a flat clickable cell. -->
+                        <Style Selector="ToggleButton:pointerover /template/ ContentPresenter">
+                          <Setter Property="Background" Value="{StaticResource BgSubtleBrush}" />
+                          <Setter Property="BorderBrush" Value="Transparent" />
+                        </Style>
+                        <Style Selector="ToggleButton:checked /template/ ContentPresenter">
+                          <Setter Property="Background" Value="Transparent" />
+                          <Setter Property="BorderBrush" Value="Transparent" />
+                        </Style>
+                        <Style Selector="ToggleButton:checked:pointerover /template/ ContentPresenter">
+                          <Setter Property="Background" Value="{StaticResource BgSubtleBrush}" />
+                          <Setter Property="BorderBrush" Value="Transparent" />
+                        </Style>
+                      </ToggleButton.Styles>
+                      <Path Width="10" Height="10" Stretch="Uniform"
+                            Stroke="{StaticResource FgMutedBrush}"
+                            StrokeThickness="2" StrokeLineCap="Round" StrokeJoin="Round"
+                            Fill="Transparent"
+                            RenderTransformOrigin="50%,50%"
+                            Data="M 8,5 L 15,12 L 8,19">
+                        <Path.Styles>
+                          <!-- Default (unchecked → collapsed) = pointing right ▶.
+                               When ToggleButton is checked (expanded) rotate
+                               +90° → chevron points down ▼. -->
+                          <Style Selector="ToggleButton:checked Path">
+                            <Setter Property="RenderTransform" Value="rotate(90deg)" />
+                          </Style>
+                        </Path.Styles>
+                      </Path>
+                    </ToggleButton>
                     <TextBlock Grid.Column="2"
                                Text="{Binding Key}"
                                Margin="8,0,0,0"
