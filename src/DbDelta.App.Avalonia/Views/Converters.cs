@@ -60,6 +60,13 @@ public static class Converters
     public static readonly IValueConverter RedactConnectionString = new FuncValueConverter<string?, string?>(static value =>
         value is null ? null : Persistence.Util.ConnectionStringRedactor.Redact(value));
 
+    /// <summary>Extracts the filename (without extension) from a full path.
+    /// Used by the project MRU combo so the visible label is concise while
+    /// the tooltip shows the full path.</summary>
+    public static readonly IValueConverter PathToFileName =
+        new FuncValueConverter<string?, string?>(static path =>
+            string.IsNullOrWhiteSpace(path) ? path : System.IO.Path.GetFileNameWithoutExtension(path));
+
     /// <summary>
     /// Converts a hex colour string (e.g. <c>"#0054BD"</c>) to a fresh
     /// <see cref="SolidColorBrush"/>. Returns <c>null</c> for null / empty

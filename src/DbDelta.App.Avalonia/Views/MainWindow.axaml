@@ -151,17 +151,31 @@
                     Spacing="2"
                     VerticalAlignment="Center">
 
-          <!-- I miei progetti (MRU drop-down) -->
-          <ComboBox ItemsSource="{Binding ProjectMru}"
+          <!-- I miei progetti (MRU drop-down) — selection fires OpenRecent
+               with (Window, Path) tuple so the VM can re-route through the
+               shared LoadProjectFromPathAsync flow -->
+          <ComboBox x:Name="ProjectMruCombo"
+                    ItemsSource="{Binding ProjectMru}"
                     PlaceholderText="I miei progetti"
-                    MinWidth="160"
+                    MinWidth="200"
                     VerticalAlignment="Center"
                     ToolTip.Tip="Carica un progetto recente"
-                    FontSize="12" />
+                    FontSize="12"
+                    SelectionChanged="OnProjectMruSelectionChanged">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="x:String">
+                <TextBlock Text="{Binding ., Converter={x:Static v:Converters.PathToFileName}}"
+                           ToolTip.Tip="{Binding .}"
+                           FontFamily="Cascadia Mono,Consolas,monospace"
+                           FontSize="11" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
 
           <!-- Modifica progetto -->
           <Button Classes="ghost"
                   Command="{Binding EditProjectCommand}"
+                  CommandParameter="{Binding $parent[Window]}"
                   ToolTip.Tip="Modifica il progetto corrente"
                   Padding="6">
             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">

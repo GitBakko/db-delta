@@ -22,9 +22,11 @@ public partial class App : Application
             ConnectionStoreViewModel connections = new(connectionStore, credentials);
             AppStateViewModel appState = new(connections);
 
+            Persistence.Json.JsonRecentProjectsStore recentProjects =
+                Persistence.Json.JsonRecentProjectsStore.CreateDefault();
             MainWindow mainWindow = new()
             {
-                DataContext = new MainWindowViewModel(appState),
+                DataContext = new MainWindowViewModel(appState, recentProjects, credentials),
                 WindowState = Avalonia.Controls.WindowState.Maximized,
             };
             desktop.MainWindow = mainWindow;

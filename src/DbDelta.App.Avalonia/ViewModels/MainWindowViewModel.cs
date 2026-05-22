@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.Collections.ObjectModel;
 using System.Text;
 using Avalonia.Collections;
@@ -9,6 +10,7 @@ using CommunityToolkit.Mvvm.Input;
 using DbDelta.Core.Abstractions;
 using DbDelta.Core.Diff;
 using DbDelta.Core.ScriptGen;
+using DbDelta.Persistence.Json;
 using DbDelta.Persistence.Sql;
 using DbDelta.Persistence.Util;
 using DbDelta.Shared.Dtos;
@@ -23,9 +25,22 @@ namespace DbDelta.App.ViewModels;
 /// </summary>
 public sealed partial class MainWindowViewModel : ObservableObject
 {
+    private readonly JsonRecentProjectsStore _recentProjects;
+    private readonly ICredentialStore? _credentials;
+
     public MainWindowViewModel(AppStateViewModel appState)
+        : this(appState, JsonRecentProjectsStore.CreateDefault(), credentials: null)
+    {
+    }
+
+    public MainWindowViewModel(
+        AppStateViewModel appState,
+        JsonRecentProjectsStore recentProjects,
+        ICredentialStore? credentials)
     {
         AppState = appState;
+        _recentProjects = recentProjects;
+        _credentials = credentials;
         AppState.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(AppStateViewModel.LastComparison))
@@ -43,6 +58,32 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ExecuteOnTargetCommand.NotifyCanExecuteChanged();
             OnPropertyChanged(nameof(SelectionSummary));
         };
+
+        // Fire-and-forget initial MRU load; failures are silent (empty combo).
+        _ = RefreshProjectMruAsync();
+    }
+
+    /// <summary>
+    /// Reloads <see cref="ProjectMru"/> from the JSON store. Called on startup
+    /// and after every save / open so the topbar combo reflects the latest
+    /// recent-files list.
+    /// </summary>
+    private async Task RefreshProjectMruAsync()
+    {
+        try
+        {
+            IReadOnlyList<RecentProject> list =
+                await _recentProjects.LoadAsync(CancellationToken.None).ConfigureAwait(true);
+            ProjectMru.Clear();
+            foreach (RecentProject e in list)
+            {
+                ProjectMru.Add(e.Path);
+            }
+        }
+        catch
+        {
+            // Best-effort — leaving the combo empty is acceptable.
+        }
     }
 
     /// <summary>Count of rows with <c>Different</c> status (modified on both sides).</summary>
@@ -119,43 +160,50 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     public async Task SaveProjectAsync(Window? window)
     {
-        if (window is null || AppState.Connections is null)
+        if (window is null) { return; }
+        if (AppState.CurrentProject is null)
         {
+            AppState.LastError = "Nessun progetto attivo da salvare. Apri o crea un progetto prima.";
             return;
         }
+
         IStorageProvider sp = window.StorageProvider;
         IStorageFile? file = await sp.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = "Salva progetto DbDelta",
             DefaultExtension = "dbd",
-            SuggestedFileName = "progetto.dbd",
+            SuggestedFileName = (AppState.CurrentProject.Name ?? "progetto") + ".dbd",
+            FileTypeChoices =
+            [
+                new FilePickerFileType("Progetto DbDelta") { Patterns = ["*.dbd"] },
+            ],
         });
-        if (file is null)
+        if (file is null) { return; }
+
+        // Snapshot current grid selection into the project's Selections map so
+        // it round-trips on reload (matches the spec's schema v2 contract).
+        Dictionary<ObjectSelectionKey, bool> selections = [];
+        foreach (DifferenceRowViewModel row in Rows.Where(r => r.IsSelectable))
         {
-            return;
+            selections[new ObjectSelectionKey(row.Kind, row.SchemaName, row.ObjectName)] = row.IsSelected;
         }
 
-        ConnectionEntry? src = AppState.Connections.Entries.FirstOrDefault();
-        ConnectionEntry? tgt = AppState.Connections.Entries.Skip(1).FirstOrDefault();
-        if (src is null || tgt is null)
+        DbDeltaProject p = AppState.CurrentProject;
+        DbDeltaProject toSave = p with
         {
-            AppState.LastError = "Servono almeno due connessioni salvate prima di poter salvare un progetto.";
-            return;
-        }
+            Name = Path.GetFileNameWithoutExtension(file.Path.LocalPath),
+            LastModifiedUtc = DateTime.UtcNow,
+            Selections = selections.ToFrozenDictionary(),
+        };
 
         Persistence.Xml.XmlProjectStore store = new();
-        DateTime now = DateTime.UtcNow;
-        await store.SaveAsync(
-            file.Path.LocalPath,
-            new DbDeltaProject(
-                Name: Path.GetFileNameWithoutExtension(file.Path.LocalPath),
-                CreatedUtc: now,
-                LastModifiedUtc: now,
-                SourceConnectionId: src.Id,
-                TargetConnectionId: tgt.Id,
-                Options: Core.Options.ComparisonOptions.Default),
-            CancellationToken.None).ConfigureAwait(true);
+        await store.SaveAsync(file.Path.LocalPath, toSave, CancellationToken.None).ConfigureAwait(true);
+        AppState.CurrentProject = toSave;
         ProjectFilePath = file.Path.LocalPath;
+
+        // Touch the MRU so the topbar combo lists it first next session.
+        await _recentProjects.AddOrTouchAsync(file.Path.LocalPath, CancellationToken.None).ConfigureAwait(true);
+        await RefreshProjectMruAsync().ConfigureAwait(true);
     }
 
     [RelayCommand]
@@ -172,42 +220,104 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     public async Task OpenProjectAsync(Window? window)
     {
-        if (window is null || AppState.Connections is null)
-        {
-            return;
-        }
+        if (window is null) { return; }
+
         IStorageProvider sp = window.StorageProvider;
         IReadOnlyList<IStorageFile> picked = await sp.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = "Carica progetto DbDelta",
             AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("Progetto DbDelta") { Patterns = ["*.dbd"] },
+            ],
         });
-        if (picked.Count == 0)
-        {
-            return;
-        }
-        string path = picked[0].Path.LocalPath;
-        Persistence.Xml.XmlProjectStore store = new();
-        DbDeltaProject project = await store.LoadAsync(path, CancellationToken.None).ConfigureAwait(true);
+        if (picked.Count == 0) { return; }
 
-        ConnectionEntry? src = AppState.Connections.Entries.FirstOrDefault(e => e.Id == project.SourceConnectionId);
-        ConnectionEntry? tgt = AppState.Connections.Entries.FirstOrDefault(e => e.Id == project.TargetConnectionId);
-        if (src is null || tgt is null)
+        await LoadProjectFromPathAsync(window, picked[0].Path.LocalPath).ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// Shared open-from-disk flow used by both <see cref="OpenProjectAsync"/>
+    /// and the MRU dropdown. Loads the .dbd, opens the setup dialog
+    /// pre-populated with the project endpoints (so DPAPI auto-fill can
+    /// recover saved passwords), and on OK swaps the new project into
+    /// AppState + restores the grid selection state.
+    /// </summary>
+    private async Task LoadProjectFromPathAsync(Window window, string path)
+    {
+        Persistence.Xml.XmlProjectStore store = new();
+        DbDeltaProject project;
+        try
         {
-            AppState.LastError = "Una o entrambe le connessioni referenziate dal progetto non esistono più. Selezionane di nuove e salva il progetto.";
+            project = await store.LoadAsync(path, CancellationToken.None).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            AppState.LastError = $"Impossibile caricare il progetto: {ex.Message}";
             return;
         }
-        string? srcCs = await AppState.Connections.MaterialiseAsync(src, CancellationToken.None).ConfigureAwait(true);
-        string? tgtCs = await AppState.Connections.MaterialiseAsync(tgt, CancellationToken.None).ConfigureAwait(true);
-        if (srcCs is not null)
-        {
-            AppState.SourceConnectionString = srcCs;
-        }
-        if (tgtCs is not null)
-        {
-            AppState.TargetConnectionString = tgtCs;
-        }
+
+        // Reuse the setup dialog so the user can confirm credentials (DPAPI
+        // auto-fill restores passwords for RememberCredentials endpoints).
+        ProjectSetupViewModel vm = ProjectSetupViewModel.FromProject(project, _credentials);
+        Views.ProjectSetupDialog dialog = new() { DataContext = vm };
+
+        DbDeltaProject? result =
+            await dialog.ShowDialog<DbDeltaProject?>(window).ConfigureAwait(true);
+        if (result is null) { return; }
+
+        // Carry over the pre-existing Selections so user-marked rows survive
+        // a reload (the rebuilt grid will re-apply them on the next compare).
+        DbDeltaProject merged = result with { Selections = project.Selections };
+
+        AppState.SourceConnectionString = dialog.LastSourceConnectionString ?? string.Empty;
+        AppState.TargetConnectionString = dialog.LastTargetConnectionString ?? string.Empty;
+        AppState.CurrentProject = merged;
         ProjectFilePath = path;
+
+        if (!string.IsNullOrWhiteSpace(AppState.SourceConnectionString)
+            && !string.IsNullOrWhiteSpace(AppState.TargetConnectionString))
+        {
+            await AppState.CompareCommand.ExecuteAsync(CancellationToken.None).ConfigureAwait(true);
+            ReapplySavedSelections(project.Selections);
+        }
+
+        await _recentProjects.AddOrTouchAsync(path, CancellationToken.None).ConfigureAwait(true);
+        await RefreshProjectMruAsync().ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// Restores saved per-row IsSelected flags after a comparison rebuild.
+    /// Keys match by (Kind, Schema, Name); rows missing from the saved map
+    /// stay at their current state.
+    /// </summary>
+    private void ReapplySavedSelections(IReadOnlyDictionary<ObjectSelectionKey, bool> saved)
+    {
+        if (saved.Count == 0) { return; }
+        foreach (DifferenceRowViewModel row in Rows)
+        {
+            ObjectSelectionKey key = new(row.Kind, row.SchemaName, row.ObjectName);
+            if (saved.TryGetValue(key, out bool sel))
+            {
+                row.IsSelected = sel;
+            }
+        }
+    }
+
+    /// <summary>Opens the project at the given path. Invoked when the user
+    /// picks an entry from the topbar MRU combo.</summary>
+    [RelayCommand]
+    public async Task OpenRecentProjectAsync((Window? Window, string? Path) args)
+    {
+        if (args.Window is null || string.IsNullOrWhiteSpace(args.Path)) { return; }
+        if (!File.Exists(args.Path))
+        {
+            AppState.LastError = $"Il file '{args.Path}' non esiste più. Verrà rimosso dalla lista.";
+            await RefreshProjectMruAsync().ConfigureAwait(true);
+            return;
+        }
+        await LoadProjectFromPathAsync(args.Window, args.Path).ConfigureAwait(true);
     }
 
     // ── Results grid state ───────────────────────────────────────────────────
@@ -378,12 +488,35 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Edit the current project (opens Wave 2C dialog — no-op stub until ready).
+    /// Re-opens the project-setup dialog pre-populated with the currently
+    /// active project, so the user can tweak endpoint, credentials, or
+    /// options. On OK the new project replaces <c>AppState.CurrentProject</c>
+    /// and a fresh comparison is fired.
     /// </summary>
     [RelayCommand]
-    public void EditProject()
+    public async Task EditProjectAsync(Window? owner)
     {
-        // Wave 2C stub.
+        if (owner is null || AppState.CurrentProject is null)
+        {
+            return;
+        }
+
+        ProjectSetupViewModel vm = ProjectSetupViewModel.FromProject(AppState.CurrentProject, _credentials);
+        Views.ProjectSetupDialog dialog = new() { DataContext = vm };
+
+        DbDeltaProject? edited =
+            await dialog.ShowDialog<DbDeltaProject?>(owner).ConfigureAwait(true);
+        if (edited is null) { return; }
+
+        AppState.SourceConnectionString = dialog.LastSourceConnectionString ?? string.Empty;
+        AppState.TargetConnectionString = dialog.LastTargetConnectionString ?? string.Empty;
+        AppState.CurrentProject = edited;
+
+        if (!string.IsNullOrWhiteSpace(AppState.SourceConnectionString)
+            && !string.IsNullOrWhiteSpace(AppState.TargetConnectionString))
+        {
+            await AppState.CompareCommand.ExecuteAsync(CancellationToken.None).ConfigureAwait(true);
+        }
     }
 
     /// <summary>Re-runs the comparison and rebuilds the grid.</summary>
