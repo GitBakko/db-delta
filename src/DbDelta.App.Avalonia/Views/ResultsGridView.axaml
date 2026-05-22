@@ -61,17 +61,29 @@
                 <Border BorderBrush="{StaticResource BorderBrush}"
                         BorderThickness="0,0,0,1"
                         Background="{TemplateBinding Background}">
-                  <Grid ColumnDefinitions="6,Auto,*">
+                  <Grid ColumnDefinitions="6,Auto,Auto,*">
+                    <!-- 6-px status colour stripe -->
                     <Border Grid.Column="0"
                             Background="{Binding Key, Converter={x:Static v:Converters.StatusKeyToBrush}}" />
-                    <TextBlock Grid.Column="1"
+                    <!-- Accordion chevron — visible cue that the row is clickable.
+                         Click anywhere on the header toggles collapse (DataGrid
+                         handles the wiring); the chevron is decorative. -->
+                    <Path Grid.Column="1"
+                          Width="10" Height="10" Stretch="Uniform"
+                          Margin="10,0,0,0"
+                          VerticalAlignment="Center"
+                          Stroke="{StaticResource FgMutedBrush}"
+                          StrokeThickness="2" StrokeLineCap="Round" StrokeJoin="Round"
+                          Fill="Transparent"
+                          Data="M 5,8 L 12,15 L 19,8" />
+                    <TextBlock Grid.Column="2"
                                Text="{Binding Key}"
-                               Margin="12,0,0,0"
+                               Margin="8,0,0,0"
                                FontSize="12"
                                FontWeight="SemiBold"
                                Foreground="{StaticResource FgStrongBrush}"
                                VerticalAlignment="Center" />
-                    <TextBlock Grid.Column="2"
+                    <TextBlock Grid.Column="3"
                                Text="{Binding ItemCount, StringFormat='({0})'}"
                                Margin="6,0,0,0"
                                FontSize="11"

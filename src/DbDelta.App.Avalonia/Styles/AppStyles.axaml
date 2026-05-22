@@ -309,6 +309,27 @@
     <Setter Property="TextElement.Foreground" Value="{StaticResource FgOnAccentBrush}" />
   </Style>
 
+  <!-- ===== Busy spinner =====
+       Tiny rotating arc used as the in-button "loading" indicator. The
+       <Border Classes="spinner"> rotates around its centre 360° once per
+       900 ms. Pair with a "In corso…" TextBlock to replace the (chunky)
+       ProgressBar inside Scansiona / Connetti buttons. -->
+  <Style Selector="Border.spinner">
+    <Setter Property="Width" Value="14" />
+    <Setter Property="Height" Value="14" />
+    <Setter Property="RenderTransformOrigin" Value="50%,50%" />
+    <Style.Animations>
+      <Animation Duration="0:0:0.9" IterationCount="INFINITE" Easing="LinearEasing">
+        <KeyFrame Cue="0%">
+          <Setter Property="RenderTransform" Value="rotate(0deg)" />
+        </KeyFrame>
+        <KeyFrame Cue="100%">
+          <Setter Property="RenderTransform" Value="rotate(360deg)" />
+        </KeyFrame>
+      </Animation>
+    </Style.Animations>
+  </Style>
+
   <!-- Topbar vertical separator -->
   <Style Selector="Border.topbar-divider">
     <Setter Property="Width" Value="1" />

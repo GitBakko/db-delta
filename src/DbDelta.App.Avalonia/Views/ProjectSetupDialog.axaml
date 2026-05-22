@@ -166,12 +166,19 @@
                           Data="M 11,4 A 7,7 0 1 1 4,11 A 7,7 0 0 1 11,4 M 16,16 L 20,20" />
                     <TextBlock Text="Scansiona" VerticalAlignment="Center" />
                   </StackPanel>
-                  <!-- Busy: slim progress bar centred in the button (≤ button width) -->
-                  <ProgressBar IsIndeterminate="True" Height="6"
-                               MaxWidth="96" HorizontalAlignment="Center" VerticalAlignment="Center"
-                               Foreground="{StaticResource Violet500Brush}"
-                               Background="{StaticResource Violet100Brush}"
-                               IsVisible="{Binding IsScanningServers}" ShowProgressText="False" />
+                  <!-- Busy: compact rotating spinner + "In corso…" label -->
+                  <StackPanel Orientation="Horizontal" Spacing="6"
+                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                              IsVisible="{Binding IsScanningServers}">
+                    <Border Classes="spinner">
+                      <Path Width="14" Height="14" Stretch="Uniform"
+                            Stroke="{Binding $parent[Button].Foreground}"
+                            StrokeThickness="2" StrokeLineCap="Round"
+                            Fill="Transparent"
+                            Data="M 12,3 A 9,9 0 0 1 21,12" />
+                    </Border>
+                    <TextBlock Text="In corso…" VerticalAlignment="Center" />
+                  </StackPanel>
                 </Panel>
               </Button>
             </Grid>
@@ -228,11 +235,18 @@
                           Data="M 5,12 L 19,12 M 13,6 L 19,12 L 13,18" />
                     <TextBlock Text="Connetti" VerticalAlignment="Center" />
                   </StackPanel>
-                  <ProgressBar IsIndeterminate="True" Height="6"
-                               MaxWidth="86" HorizontalAlignment="Center" VerticalAlignment="Center"
-                               Foreground="{StaticResource Emerald500Brush}"
-                               Background="{StaticResource Emerald100Brush}"
-                               IsVisible="{Binding IsLoadingDatabases}" ShowProgressText="False" />
+                  <StackPanel Orientation="Horizontal" Spacing="6"
+                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                              IsVisible="{Binding IsLoadingDatabases}">
+                    <Border Classes="spinner">
+                      <Path Width="14" Height="14" Stretch="Uniform"
+                            Stroke="{Binding $parent[Button].Foreground}"
+                            StrokeThickness="2" StrokeLineCap="Round"
+                            Fill="Transparent"
+                            Data="M 12,3 A 9,9 0 0 1 21,12" />
+                    </Border>
+                    <TextBlock Text="In corso…" VerticalAlignment="Center" />
+                  </StackPanel>
                 </Panel>
               </Button>
             </Grid>
@@ -414,11 +428,18 @@
                           Data="M 5,12 L 19,12 M 13,6 L 19,12 L 13,18" />
                     <TextBlock Text="Connetti" VerticalAlignment="Center" />
                   </StackPanel>
-                  <ProgressBar IsIndeterminate="True" Height="6"
-                               MaxWidth="86" HorizontalAlignment="Center" VerticalAlignment="Center"
-                               Foreground="{StaticResource Emerald500Brush}"
-                               Background="{StaticResource Emerald100Brush}"
-                               IsVisible="{Binding IsLoadingDatabases}" ShowProgressText="False" />
+                  <StackPanel Orientation="Horizontal" Spacing="6"
+                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                              IsVisible="{Binding IsLoadingDatabases}">
+                    <Border Classes="spinner">
+                      <Path Width="14" Height="14" Stretch="Uniform"
+                            Stroke="{Binding $parent[Button].Foreground}"
+                            StrokeThickness="2" StrokeLineCap="Round"
+                            Fill="Transparent"
+                            Data="M 12,3 A 9,9 0 0 1 21,12" />
+                    </Border>
+                    <TextBlock Text="In corso…" VerticalAlignment="Center" />
+                  </StackPanel>
                 </Panel>
               </Button>
             </Grid>
