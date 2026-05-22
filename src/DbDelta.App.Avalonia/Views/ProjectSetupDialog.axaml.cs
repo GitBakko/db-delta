@@ -30,16 +30,15 @@ public partial class ProjectSetupDialog : Window
         tgtReveal.AddHandler(PointerPressedEvent, OnTgtRevealPressed, RoutingStrategies.Tunnel);
         tgtReveal.AddHandler(PointerReleasedEvent, OnTgtRevealReleased, RoutingStrategies.Tunnel);
 
-        // Wire custom text filters for the server AutoCompleteBoxes.
+        // Wire custom item filters for the server AutoCompleteBoxes.
+        // TextFilter is typed AutoCompleteFilterPredicate<string?> (matches by
+        // the item's ToString); we need to inspect DiscoveredServer.Name and
+        // .IpAddress directly, which requires ItemFilter (typed <object?>).
+        AutoCompleteFilterPredicate<object?> filter = ServerItemFilter;
         AutoCompleteBox? srcServerBox = this.FindControl<AutoCompleteBox>("SrcServerBox");
-        srcServerBox?.SetValue(
-            AutoCompleteBox.TextFilterProperty,
-            (AutoCompleteFilterPredicate<object?>)ServerItemFilter);
-
+        srcServerBox?.SetValue(AutoCompleteBox.ItemFilterProperty, filter);
         AutoCompleteBox? tgtServerBox = this.FindControl<AutoCompleteBox>("TgtServerBox");
-        tgtServerBox?.SetValue(
-            AutoCompleteBox.TextFilterProperty,
-            (AutoCompleteFilterPredicate<object?>)ServerItemFilter);
+        tgtServerBox?.SetValue(AutoCompleteBox.ItemFilterProperty, filter);
 
         // After scan finishes → open server dropdown deferred.
         DataContextChanged += (_, _) =>
