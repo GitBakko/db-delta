@@ -191,4 +191,81 @@ public class ProjectSetupViewModelTests
         rebuilt.ProjectOptions.IgnoreCollation.Should().Be(original.ProjectOptions.IgnoreCollation);
         rebuilt.OwnerMappings.Should().HaveCount(original.OwnerMappings.Count);
     }
+
+    // ── Test 6: DisplayBandName_returns_placeholder_when_server_empty ─────────
+
+    [AvaloniaFact]
+    public void DisplayBandName_returns_placeholder_when_server_name_empty()
+    {
+        ProjectEndpointPanelViewModel src = new("Source", isTarget: false);
+        ProjectEndpointPanelViewModel tgt = new("Target", isTarget: true);
+
+        src.ServerName = "";
+        tgt.ServerName = "";
+
+        src.DisplayBandName.Should().Be("Seleziona una provenienza…");
+        tgt.DisplayBandName.Should().Be("Seleziona una destinazione…");
+    }
+
+    [AvaloniaFact]
+    public void DisplayBandName_returns_server_name_when_set()
+    {
+        ProjectEndpointPanelViewModel ep = new("Source", isTarget: false) { ServerName = "MY-SERVER" };
+        ep.DisplayBandName.Should().Be("MY-SERVER");
+    }
+
+    // ── Test 7: ServerCountText and DatabaseCountText reflect collection size ──
+
+    [AvaloniaFact]
+    public void ServerCountText_reflects_suggestions_count()
+    {
+        ProjectEndpointPanelViewModel ep = new("Source", isTarget: false);
+        ep.ServerCountText.Should().Be("(0 trovati)");
+
+        ep.ServerSuggestions.Add(new DbDelta.Persistence.Sql.DiscoveredServer("SRV1", null));
+        ep.ServerSuggestions.Add(new DbDelta.Persistence.Sql.DiscoveredServer("SRV2", "10.0.0.1"));
+        ep.ServerCountText.Should().Be("(2 trovati)");
+    }
+
+    [AvaloniaFact]
+    public void DatabaseCountText_reflects_available_databases_count()
+    {
+        ProjectEndpointPanelViewModel ep = new("Target", isTarget: true);
+        ep.DatabaseCountText.Should().Be("(0 trovati)");
+
+        ep.AvailableDatabases.Add("AdventureWorks");
+        ep.AvailableDatabases.Add("Northwind");
+        ep.DatabaseCountText.Should().Be("(2 trovati)");
+    }
+
+    // ── Test 8: LoadFrom_populates_vm_from_project ────────────────────────────
+
+    [AvaloniaFact]
+    public void LoadFrom_populates_vm_fields_from_project()
+    {
+        DbDeltaProject original = BuildFullProject();
+        ProjectSetupViewModel vm = new();
+        vm.LoadFrom(original);
+
+        vm.ProjectName.Should().Be(original.Name);
+        vm.Source.ServerName.Should().Be(original.Source!.Connection.ServerName);
+        vm.Source.DatabaseName.Should().Be(original.Source.Connection.DatabaseName);
+        vm.Target.ServerName.Should().Be(original.Target!.Connection.ServerName);
+        vm.Target.DatabaseName.Should().Be(original.Target.Connection.DatabaseName);
+    }
+
+    [AvaloniaFact]
+    public void LoadFrom_clears_runtime_scan_state()
+    {
+        ProjectSetupViewModel vm = new();
+        // Simulate a server scan result existing before load.
+        vm.Source.ServerSuggestions.Add(new DbDelta.Persistence.Sql.DiscoveredServer("OLD", null));
+        vm.Source.HasServerSuggestions = true;
+
+        DbDeltaProject original = BuildFullProject();
+        vm.LoadFrom(original);
+
+        vm.Source.ServerSuggestions.Should().BeEmpty();
+        vm.Source.HasServerSuggestions.Should().BeFalse();
+    }
 }
