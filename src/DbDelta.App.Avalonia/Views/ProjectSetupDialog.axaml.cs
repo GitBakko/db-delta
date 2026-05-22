@@ -5,11 +5,12 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using DbDelta.App.ViewModels;
 using DbDelta.Core.Abstractions;
+using DbDelta.Persistence.Sql;
 
 namespace DbDelta.App.Views;
 
 /// <summary>
-/// Code-behind for the "New project" setup dialog.
+/// Code-behind for the "Nuovo progetto" setup dialog.
 /// Returns a <see cref="DbDeltaProject"/> on OK / Save-as,
 /// or <see langword="null"/> when the user cancels.
 /// </summary>
@@ -29,6 +30,17 @@ public partial class ProjectSetupDialog : Window
         tgtReveal.AddHandler(PointerPressedEvent, OnTgtRevealPressed, RoutingStrategies.Tunnel);
         tgtReveal.AddHandler(PointerReleasedEvent, OnTgtRevealReleased, RoutingStrategies.Tunnel);
 
+        // Wire custom text filters for the server AutoCompleteBoxes.
+        AutoCompleteBox? srcServerBox = this.FindControl<AutoCompleteBox>("SrcServerBox");
+        srcServerBox?.SetValue(
+            AutoCompleteBox.TextFilterProperty,
+            (AutoCompleteFilterPredicate<object?>)ServerItemFilter);
+
+        AutoCompleteBox? tgtServerBox = this.FindControl<AutoCompleteBox>("TgtServerBox");
+        tgtServerBox?.SetValue(
+            AutoCompleteBox.TextFilterProperty,
+            (AutoCompleteFilterPredicate<object?>)ServerItemFilter);
+
         // After scan finishes → open server dropdown deferred.
         DataContextChanged += (_, _) =>
         {
@@ -41,6 +53,14 @@ public partial class ProjectSetupDialog : Window
             }
         };
     }
+
+    // ── Server item filter (Name OR IpAddress) ────────────────────────────────
+
+    private static bool ServerItemFilter(string? searchText, object? item) =>
+        item is DiscoveredServer s
+        && (string.IsNullOrEmpty(searchText)
+            || s.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+            || (s.IpAddress?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false));
 
     private void HandleEndpointPropertyChanged(
         string? propertyName,
@@ -135,9 +155,8 @@ public partial class ProjectSetupDialog : Window
         }
     }
 
-    private void OnSaveClick(object? sender, RoutedEventArgs e) =>
-        // Quick save: delegates to Save-as flow when no path is associated.
-        _ = SaveAsAsync();
+    // Quick save: delegates to Save-as flow when no path is associated.
+    private void OnSaveClick(object? sender, RoutedEventArgs e) => _ = SaveAsAsync();
 
     private void OnSaveAsClick(object? sender, RoutedEventArgs e) => _ = SaveAsAsync();
 
@@ -155,7 +174,7 @@ public partial class ProjectSetupDialog : Window
             SuggestedFileName = vm.ProjectName,
             FileTypeChoices =
             [
-                new FilePickerFileType("DbDelta project")
+                new FilePickerFileType("Progetto DbDelta")
                 {
                     Patterns = ["*.dbd"],
                 },
@@ -171,5 +190,34 @@ public partial class ProjectSetupDialog : Window
         Persistence.Xml.XmlProjectStore store = new();
         await store.SaveAsync(file.Path.LocalPath, project, CancellationToken.None)
                    .ConfigureAwait(true);
+    }
+
+    // ── Carica… button ────────────────────────────────────────────────────────
+
+    private async void OnLoadClick(object? sender, RoutedEventArgs e)
+    {
+        FilePickerOpenOptions opts = new()
+        {
+            Title = "Apri progetto DbDelta",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("Progetto DbDelta") { Patterns = ["*.dbd"] },
+            ],
+        };
+        IReadOnlyList<IStorageFile> files =
+            await StorageProvider.OpenFilePickerAsync(opts).ConfigureAwait(true);
+        if (files.Count == 0) { return; }
+        IStorageFile file = files[0];
+
+        Persistence.Xml.XmlProjectStore store = new();
+        DbDeltaProject project =
+            await store.LoadAsync(file.Path.LocalPath, CancellationToken.None)
+                       .ConfigureAwait(true);
+
+        if (DataContext is ProjectSetupViewModel vm)
+        {
+            vm.LoadFrom(project);
+        }
     }
 }
