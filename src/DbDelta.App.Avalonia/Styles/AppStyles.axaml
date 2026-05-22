@@ -310,24 +310,21 @@
   </Style>
 
   <!-- ===== Busy spinner =====
-       Tiny rotating arc used as the in-button "loading" indicator. The
-       <Border Classes="spinner"> rotates around its centre 360° once per
-       900 ms. Pair with a "In corso…" TextBlock to replace the (chunky)
-       ProgressBar inside Scansiona / Connetti buttons. -->
-  <Style Selector="Border.spinner">
-    <Setter Property="Width" Value="14" />
-    <Setter Property="Height" Value="14" />
-    <Setter Property="RenderTransformOrigin" Value="50%,50%" />
-    <Style.Animations>
-      <Animation Duration="0:0:0.9" IterationCount="INFINITE" Easing="LinearEasing">
-        <KeyFrame Cue="0%">
-          <Setter Property="RenderTransform" Value="rotate(0deg)" />
-        </KeyFrame>
-        <KeyFrame Cue="100%">
-          <Setter Property="RenderTransform" Value="rotate(360deg)" />
-        </KeyFrame>
-      </Animation>
-    </Style.Animations>
+       Compact in-button loading indicator. Implemented as a slim, fixed-
+       width ProgressBar (Avalonia's IsIndeterminate animation is built-in
+       and survives across themes). Paired with an "In corso…" TextBlock
+       inside Scansiona / Connetti to replace the previous chunky inline
+       progress strip. We avoid an animated RotateTransform because
+       Avalonia has no built-in animator for the RenderTransform property
+       (verified by the round-12 startup crash). -->
+  <Style Selector="ProgressBar.spinner">
+    <Setter Property="IsIndeterminate" Value="True" />
+    <Setter Property="ShowProgressText" Value="False" />
+    <Setter Property="MinHeight" Value="4" />
+    <Setter Property="Height" Value="4" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="Width" Value="42" />
+    <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
 
   <!-- Topbar vertical separator -->
