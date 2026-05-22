@@ -179,12 +179,25 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
     public void ApplyScanResults(IReadOnlyList<DiscoveredServer> list)
     {
         ArgumentNullException.ThrowIfNull(list);
+
+        // Preserve any "Usati di recente" prefix at the top of the list when
+        // refreshing — only replace the "Risultati scansione" tail.
+        List<DiscoveredServer> recents = [..
+            ServerSuggestions.Where(s => string.Equals(s.Section, RecentSection, StringComparison.Ordinal))];
+
         ServerSuggestions.Clear();
+        foreach (DiscoveredServer r in recents)
+        {
+            ServerSuggestions.Add(r);
+        }
+
+        bool first = true;
         foreach (DiscoveredServer s in list)
         {
-            ServerSuggestions.Add(s);
+            ServerSuggestions.Add(s with { Section = ScanSection, IsSectionFirst = first });
+            first = false;
         }
-        HasServerSuggestions = list.Count > 0;
+        HasServerSuggestions = ServerSuggestions.Count > 0;
         ScanStatusMessage = list.Count == 0
             ? "Nessun server rilevato (SQL Browser potrebbe essere disabilitato)."
             : null;
@@ -196,6 +209,61 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
                 .FirstOrDefault(s => string.Equals(s.Name, ServerName, StringComparison.OrdinalIgnoreCase))?
                 .IpAddress;
         }
+    }
+
+    /// <summary>Section label for previously-used server entries.</summary>
+    public const string RecentSection = "Usati di recente";
+
+    /// <summary>Section label for network scan results.</summary>
+    public const string ScanSection = "Risultati scansione";
+
+    /// <summary>
+    /// Prepends a set of "recently used" servers to <see cref="ServerSuggestions"/>.
+    /// Called once from <c>App</c> right after the connection-store load so the
+    /// modal opens with the user's known servers already visible — even before
+    /// a network scan completes.
+    /// </summary>
+    public void SeedRecentServers(IReadOnlyList<(string Name, string? IpAddress)> recents)
+    {
+        if (recents is null || recents.Count == 0) { return; }
+
+        // Strip any previous "recent" entries first so we don't duplicate them
+        // across multiple seedings.
+        for (int i = ServerSuggestions.Count - 1; i >= 0; i--)
+        {
+            if (string.Equals(ServerSuggestions[i].Section, RecentSection, StringComparison.Ordinal))
+            {
+                ServerSuggestions.RemoveAt(i);
+            }
+        }
+
+        // Insert recents at the top, marking the first as section-first.
+        for (int i = 0; i < recents.Count; i++)
+        {
+            (string name, string? ip) = recents[i];
+            ServerSuggestions.Insert(i, new DiscoveredServer(
+                Name: name,
+                IpAddress: ip,
+                Section: RecentSection,
+                IsSectionFirst: i == 0));
+        }
+
+        // First scan-section item may need its IsSectionFirst recomputed:
+        // it's the first row whose Section equals ScanSection.
+        bool firstScanSeen = false;
+        for (int i = 0; i < ServerSuggestions.Count; i++)
+        {
+            DiscoveredServer s = ServerSuggestions[i];
+            if (!string.Equals(s.Section, ScanSection, StringComparison.Ordinal)) { continue; }
+            bool shouldBeFirst = !firstScanSeen;
+            if (s.IsSectionFirst != shouldBeFirst)
+            {
+                ServerSuggestions[i] = s with { IsSectionFirst = shouldBeFirst };
+            }
+            firstScanSeen = true;
+        }
+
+        HasServerSuggestions = ServerSuggestions.Count > 0;
     }
 
     [RelayCommand]

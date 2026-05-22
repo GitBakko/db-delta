@@ -171,12 +171,20 @@ public class MainWindowViewModelTests
     }
 
     [AvaloniaFact]
-    public void LastModifiedDisplay_formats_correctly_when_present()
+    public void LastModifiedDisplay_formats_in_italian_locale_and_local_time()
     {
-        DateTime dt = new(2025, 11, 3, 14, 30, 0, DateTimeKind.Utc);
-        DifferenceRowViewModel row = MakeRowVm(new DifferenceDto("Table", "dbo", "X", "Different", dt, null));
+        // Updated UX rule (feedback round 4): user wants IT date format
+        // (dd/MM/yyyy HH:mm). DTO timestamp is in UTC and we convert to local
+        // time for display — pick a stable instant + compute the expected
+        // local-time string up-front so the test is host-timezone agnostic.
+        DateTime utc = new(2025, 11, 3, 14, 30, 0, DateTimeKind.Utc);
+        string expected = utc
+            .ToLocalTime()
+            .ToString("dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.GetCultureInfo("it-IT"));
 
-        row.LastModifiedSourceDisplay.Should().Be("2025-11-03 14:30");
+        DifferenceRowViewModel row = MakeRowVm(new DifferenceDto("Table", "dbo", "X", "Different", utc, null));
+
+        row.LastModifiedSourceDisplay.Should().Be(expected);
         row.LastModifiedTargetDisplay.Should().BeEmpty();
     }
 }

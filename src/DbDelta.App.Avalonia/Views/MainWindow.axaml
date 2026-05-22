@@ -291,24 +291,63 @@
 
       <!-- Populated state: project loaded, comparison ran -->
       <Grid RowDefinitions="Auto,*,Auto"
-            Margin="16,12,16,0"
             IsVisible="{Binding AppState.LastComparison, Converter={x:Static ObjectConverters.IsNotNull}}">
 
-        <!-- Action bar: selection counter + Genera script + Allinea destinazione -->
+        <!-- Action bar: counter + per-type badges + Genera script + Allinea destinazione -->
         <Border Grid.Row="0"
                 Background="{StaticResource BgMutedBrush}"
                 BorderBrush="{StaticResource BorderBrush}"
-                BorderThickness="1"
-                CornerRadius="6"
-                Padding="12,8"
-                Margin="0,0,0,8">
-          <Grid ColumnDefinitions="*,Auto,Auto">
+                BorderThickness="0,0,0,1"
+                Padding="12,8">
+          <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
             <TextBlock Grid.Column="0"
                        Text="{Binding SelectionSummary}"
                        FontSize="12"
                        Foreground="{StaticResource FgMutedBrush}"
-                       VerticalAlignment="Center" />
-            <Button Grid.Column="1" Classes="ghost-emerald"
+                       VerticalAlignment="Center"
+                       Margin="0,0,12,0" />
+
+            <!-- Status badges: pill with status colour + count, white text -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <Border Background="#0064C8" CornerRadius="10" Padding="8,2"
+                      IsVisible="{Binding DiffsModifiedCount, Converter={x:Static v:Converters.IsPositive}}">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                  <TextBlock Text="{Binding DiffsModifiedCount}" FontSize="11" FontWeight="Bold"
+                             Foreground="White" VerticalAlignment="Center" />
+                  <TextBlock Text="modificate" FontSize="11" Foreground="White"
+                             VerticalAlignment="Center" />
+                </StackPanel>
+              </Border>
+              <Border Background="#B31220" CornerRadius="10" Padding="8,2"
+                      IsVisible="{Binding DiffsOnlyDestCount, Converter={x:Static v:Converters.IsPositive}}">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                  <TextBlock Text="{Binding DiffsOnlyDestCount}" FontSize="11" FontWeight="Bold"
+                             Foreground="White" VerticalAlignment="Center" />
+                  <TextBlock Text="solo destinazione" FontSize="11" Foreground="White"
+                             VerticalAlignment="Center" />
+                </StackPanel>
+              </Border>
+              <Border Background="#007339" CornerRadius="10" Padding="8,2"
+                      IsVisible="{Binding DiffsOnlyProvCount, Converter={x:Static v:Converters.IsPositive}}">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                  <TextBlock Text="{Binding DiffsOnlyProvCount}" FontSize="11" FontWeight="Bold"
+                             Foreground="White" VerticalAlignment="Center" />
+                  <TextBlock Text="solo provenienza" FontSize="11" Foreground="White"
+                             VerticalAlignment="Center" />
+                </StackPanel>
+              </Border>
+              <Border Background="#9097A0" CornerRadius="10" Padding="8,2"
+                      IsVisible="{Binding IdenticalsCount, Converter={x:Static v:Converters.IsPositive}}">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                  <TextBlock Text="{Binding IdenticalsCount}" FontSize="11" FontWeight="Bold"
+                             Foreground="White" VerticalAlignment="Center" />
+                  <TextBlock Text="identiche" FontSize="11" Foreground="White"
+                             VerticalAlignment="Center" />
+                </StackPanel>
+              </Border>
+            </StackPanel>
+
+            <Button Grid.Column="3" Classes="ghost-emerald"
                     Command="{Binding DeployCommand}"
                     CommandParameter="{Binding $parent[Window]}"
                     ToolTip.Tip="Genera script SQL di allineamento per le righe selezionate"
@@ -322,7 +361,7 @@
                 <TextBlock Text="Genera script" VerticalAlignment="Center" FontSize="12" />
               </StackPanel>
             </Button>
-            <Button Grid.Column="2" Classes="primary"
+            <Button Grid.Column="4" Classes="primary"
                     Command="{Binding ExecuteOnTargetCommand}"
                     CommandParameter="{Binding $parent[Window]}"
                     ToolTip.Tip="Esegui lo script di allineamento direttamente sulla destinazione">
@@ -342,13 +381,15 @@
         <v:ResultsGridView Grid.Row="1"
                            DataContext="{Binding}" />
 
-        <!-- Diff viewer — collapsible auto row, only takes space when shown -->
+        <!-- Diff viewer — collapsible auto row, only takes space when shown.
+             Identical rows produce no diff so the pane stays collapsed even
+             when a row is selected (driven by ShouldShowDiffViewer). -->
         <Border Grid.Row="2"
                 BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="0,1,0,0"
                 Margin="0,8,0,0"
                 Height="280"
-                IsVisible="{Binding AppState.SelectedRow, Converter={x:Static ObjectConverters.IsNotNull}}">
+                IsVisible="{Binding AppState.ShouldShowDiffViewer}">
           <v:DiffViewerView DataContext="{Binding AppState.DiffViewer}" />
         </Border>
       </Grid>

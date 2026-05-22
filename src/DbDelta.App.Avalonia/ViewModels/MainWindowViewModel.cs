@@ -45,39 +45,40 @@ public sealed partial class MainWindowViewModel : ObservableObject
         };
     }
 
+    /// <summary>Count of rows with <c>Different</c> status (modified on both sides).</summary>
+    public int DiffsModifiedCount => Rows.Count(r => r.Status == "Different");
+
+    /// <summary>Count of rows present only on the target side.</summary>
+    public int DiffsOnlyDestCount => Rows.Count(r => r.IsTargetOnly);
+
+    /// <summary>Count of rows present only on the source side.</summary>
+    public int DiffsOnlyProvCount => Rows.Count(r => r.IsSourceOnly);
+
+    /// <summary>Count of rows that match on both sides (no diff to deploy).</summary>
+    public int IdenticalsCount => Rows.Count(r => r.IsIdentical);
+
+    /// <summary>Total differences excluding identical rows.</summary>
+    public int TotalDiffsCount => Rows.Count(r => !r.IsIdentical);
+
+    /// <summary>Count of currently selected rows in the grid.</summary>
+    public int SelectedCount => Rows.Count(r => r.IsSelected);
+
     /// <summary>
-    /// Human-readable counter shown in the results action bar. Excludes
-    /// identical rows from the differences total, surfaces per-type partials
-    /// (modificate / solo destinazione / solo provenienza) and ends with the
-    /// identical count. Example:
-    /// "3 di 12 differenze selezionate · 5 modificate, 4 solo destinazione,
-    ///  3 solo provenienza · 27 identiche".
+    /// Header text shown to the left of the per-type badges in the results
+    /// action bar. Examples: "Nessuna differenza." /
+    /// "12 differenze rilevate" / "3 di 12 differenze selezionate".
     /// </summary>
     public string SelectionSummary
     {
         get
         {
-            int totalDiffs = Rows.Count(r => !r.IsIdentical);
-            int identicals = Rows.Count(r => r.IsIdentical);
-            int selected = Rows.Count(r => r.IsSelected);
-            int diffModified = Rows.Count(r => r.Status == "Different");
-            int diffOnlyDest = Rows.Count(r => r.IsTargetOnly);
-            int diffOnlyProv = Rows.Count(r => r.IsSourceOnly);
-
-            if (totalDiffs == 0 && identicals == 0) { return "Nessuna differenza."; }
-
-            string header = selected == 0
-                ? $"{totalDiffs} differenze rilevate"
-                : $"{selected} di {totalDiffs} differenze selezionate";
-
-            List<string> partials = [];
-            if (diffModified > 0) { partials.Add($"{diffModified} modificate"); }
-            if (diffOnlyDest > 0) { partials.Add($"{diffOnlyDest} solo destinazione"); }
-            if (diffOnlyProv > 0) { partials.Add($"{diffOnlyProv} solo provenienza"); }
-            string detail = partials.Count > 0 ? $" · {string.Join(", ", partials)}" : string.Empty;
-
-            string tail = identicals > 0 ? $" · {identicals} identiche" : string.Empty;
-            return $"{header}{detail}{tail}.";
+            int total = TotalDiffsCount;
+            int selected = SelectedCount;
+            return total == 0 && IdenticalsCount == 0
+                ? "Nessuna differenza."
+                : selected == 0
+                    ? $"{total} differenze rilevate"
+                    : $"{selected} di {total} differenze selezionate";
         }
     }
 
@@ -91,6 +92,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         DeployCommand.NotifyCanExecuteChanged();
         ExecuteOnTargetCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(SelectionSummary));
+        OnPropertyChanged(nameof(SelectedCount));
     }
 
     public AppStateViewModel AppState { get; }
@@ -356,6 +358,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _rowsView?.Refresh();
         DeployCommand.NotifyCanExecuteChanged();
         ExecuteOnTargetCommand.NotifyCanExecuteChanged();
+        // Surface the new bucket counts to the badges in the results action bar.
+        OnPropertyChanged(nameof(SelectionSummary));
+        OnPropertyChanged(nameof(DiffsModifiedCount));
+        OnPropertyChanged(nameof(DiffsOnlyDestCount));
+        OnPropertyChanged(nameof(DiffsOnlyProvCount));
+        OnPropertyChanged(nameof(IdenticalsCount));
+        OnPropertyChanged(nameof(TotalDiffsCount));
+        OnPropertyChanged(nameof(SelectedCount));
     }
 
     // ── New topbar commands ──────────────────────────────────────────────────

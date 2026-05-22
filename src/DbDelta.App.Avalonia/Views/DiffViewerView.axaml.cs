@@ -18,6 +18,7 @@ public partial class DiffViewerView : UserControl
 
     private ScrollViewer? _sourceScroll;
     private ScrollViewer? _targetScroll;
+    private ScrollViewer? _centerScroll;
     private ScrollBar? _sharedScrollBar;
     private ItemsControl? _leftMinimap;
     private bool _suppressScrollSync;
@@ -60,11 +61,13 @@ public partial class DiffViewerView : UserControl
     {
         _sourceScroll = this.FindControl<ScrollViewer>("SourceScroll");
         _targetScroll = this.FindControl<ScrollViewer>("TargetScroll");
+        _centerScroll = this.FindControl<ScrollViewer>("CenterScroll");
         _sharedScrollBar = this.FindControl<ScrollBar>("SharedScrollBar");
         _leftMinimap = this.FindControl<ItemsControl>("LeftMinimap");
 
 #pragma warning disable IDE0031 // event +=/-= cannot use ?. conditional form
         if (_sourceScroll is not null) { _sourceScroll.ScrollChanged += OnSourceScrollChanged; }
+        if (_targetScroll is not null) { _targetScroll.ScrollChanged += OnTargetScrollChanged; }
         if (_sharedScrollBar is not null) { _sharedScrollBar.ValueChanged += OnSharedScrollBarChanged; }
         if (_leftMinimap is not null) { _leftMinimap.LayoutUpdated += OnMinimapLayoutUpdated; }
 #pragma warning restore IDE0031
@@ -74,6 +77,7 @@ public partial class DiffViewerView : UserControl
     {
 #pragma warning disable IDE0031 // event +=/-= cannot use ?. conditional form
         if (_sourceScroll is not null) { _sourceScroll.ScrollChanged -= OnSourceScrollChanged; }
+        if (_targetScroll is not null) { _targetScroll.ScrollChanged -= OnTargetScrollChanged; }
         if (_sharedScrollBar is not null) { _sharedScrollBar.ValueChanged -= OnSharedScrollBarChanged; }
         if (_leftMinimap is not null) { _leftMinimap.LayoutUpdated -= OnMinimapLayoutUpdated; }
 #pragma warning restore IDE0031
@@ -85,7 +89,53 @@ public partial class DiffViewerView : UserControl
 
         double offsetY = _sourceScroll.Offset.Y;
         SyncTargetScrollTo(offsetY);
+        SyncCenterScrollTo(offsetY);
         SyncScrollBarTo(offsetY);
+    }
+
+    /// <summary>
+    /// Mirror of <see cref="OnSourceScrollChanged"/> so a mouse wheel hit on
+    /// the target pane also drives the shared scrollbar, the source pane and
+    /// the centre actions column — keeps all four columns locked together.
+    /// </summary>
+    private void OnTargetScrollChanged(object? sender, ScrollChangedEventArgs e)
+    {
+        if (_suppressScrollSync || _targetScroll is null) { return; }
+
+        double offsetY = _targetScroll.Offset.Y;
+        SyncSourceScrollTo(offsetY);
+        SyncCenterScrollTo(offsetY);
+        SyncScrollBarTo(offsetY);
+    }
+
+    private void SyncSourceScrollTo(double offsetY)
+    {
+        if (_sourceScroll is null) { return; }
+
+        _suppressScrollSync = true;
+        try
+        {
+            _sourceScroll.Offset = new Vector(_sourceScroll.Offset.X, offsetY);
+        }
+        finally
+        {
+            _suppressScrollSync = false;
+        }
+    }
+
+    private void SyncCenterScrollTo(double offsetY)
+    {
+        if (_centerScroll is null) { return; }
+
+        _suppressScrollSync = true;
+        try
+        {
+            _centerScroll.Offset = new Vector(_centerScroll.Offset.X, offsetY);
+        }
+        finally
+        {
+            _suppressScrollSync = false;
+        }
     }
 
     private void OnSharedScrollBarChanged(object? sender, RangeBaseValueChangedEventArgs e)
@@ -123,6 +173,11 @@ public partial class DiffViewerView : UserControl
             if (_targetScroll is not null)
             {
                 _targetScroll.Offset = new Vector(_targetScroll.Offset.X, offsetY);
+            }
+
+            if (_centerScroll is not null)
+            {
+                _centerScroll.Offset = new Vector(_centerScroll.Offset.X, offsetY);
             }
 #pragma warning restore IDE0031
         }

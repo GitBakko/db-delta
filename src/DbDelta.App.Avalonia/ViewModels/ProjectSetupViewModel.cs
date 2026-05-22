@@ -111,6 +111,17 @@ public sealed partial class ProjectSetupViewModel : ObservableObject
     private bool CanScanServers() => !IsScanningServers;
 
     /// <summary>
+    /// Seeds both panels' suggestion lists with the "Usati di recente" section
+    /// derived from the connection store. Called once on dialog open before
+    /// the auto-scan kicks in, so the picker is never empty.
+    /// </summary>
+    public void SeedRecentServers(IReadOnlyList<(string Name, string? IpAddress)> recents)
+    {
+        Source.SeedRecentServers(recents);
+        Target.SeedRecentServers(recents);
+    }
+
+    /// <summary>
     /// Copies the source-panel connection fields into the target panel so the
     /// user can run a same-server compare with one click. Triggered by the
     /// "Clona configurazione" footer button.

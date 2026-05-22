@@ -7,8 +7,21 @@ using Microsoft.Data.SqlClient;
 namespace DbDelta.Persistence.Sql;
 
 /// <summary>One SQL Server reachable via the Browser service. <see cref="IpAddress"/>
-/// is the source IPv4 of the UDP response and is <c>null</c> for local aliases.</summary>
-public sealed record DiscoveredServer(string Name, string? IpAddress);
+/// is the source IPv4 of the UDP response and is <c>null</c> for local aliases.
+/// <para>
+/// <see cref="Section"/> / <see cref="IsSectionFirst"/> are presentation hints
+/// for the modal's server picker — they let the same list carry both
+/// "Usati di recente" and "Risultati scansione" entries while preserving a
+/// flat <c>ItemsSource</c> shape for <c>AutoCompleteBox</c>. The first item of
+/// each section flips <see cref="IsSectionFirst"/> so the item template can
+/// render a divider/header above it.
+/// </para>
+/// </summary>
+public sealed record DiscoveredServer(
+    string Name,
+    string? IpAddress,
+    string? Section = null,
+    bool IsSectionFirst = false);
 
 /// <summary>
 /// SQL Server discovery utilities.

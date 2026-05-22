@@ -38,6 +38,11 @@ public static class Converters
     public static readonly IValueConverter IsStatus = new FuncValueConverter<string?, string?, bool>(static (status, target) =>
         string.Equals(status, target, StringComparison.Ordinal));
 
+    /// <summary>True when the bound integer is greater than zero. Used to
+    /// drive <c>IsVisible</c> on per-type badges so empty buckets disappear.</summary>
+    public static readonly IValueConverter IsPositive =
+        new FuncValueConverter<int, bool>(static value => value > 0);
+
     /// <summary>
     /// Maps the raw <c>DifferenceStatus</c> name (e.g. <c>"OnlyInA"</c>) to a
     /// human-friendly Italian label shown in the badge.
@@ -139,13 +144,17 @@ public static class Converters
 
     /// <summary>
     /// Maps a <see cref="LineStatus"/> to the background brush for the SOURCE pane row.
-    /// Added → transparent; Removed → #FFCED3 (crimson soft); Modified → #CFE2FF (primary soft).
+    /// Source-side semantics (user spec): "additions" on the source pane are
+    /// painted GREEN. Both <see cref="LineStatus.Removed"/> (line present only
+    /// in source) and <see cref="LineStatus.Modified"/> (line differs between
+    /// sides) qualify — a substitution renders green-on-source and red-on-target
+    /// on the same row.
     /// </summary>
     public static readonly IValueConverter LineStatusToSourceBackground =
         new FuncValueConverter<LineStatus, IBrush?>(static status => status switch
         {
-            LineStatus.Removed => new SolidColorBrush(Color.Parse("#FFCED3")),
-            LineStatus.Modified => new SolidColorBrush(Color.Parse("#CFE2FF")),
+            LineStatus.Removed => new SolidColorBrush(Color.Parse("#CDFFD6")),  // emerald soft
+            LineStatus.Modified => new SolidColorBrush(Color.Parse("#CDFFD6")), // emerald soft
             LineStatus.Unchanged => Brushes.Transparent,
             LineStatus.Added => Brushes.Transparent,
             _ => Brushes.Transparent,
@@ -153,15 +162,42 @@ public static class Converters
 
     /// <summary>
     /// Maps a <see cref="LineStatus"/> to the background brush for the TARGET pane row.
-    /// Added → #CDFFD6 (emerald soft); Removed → transparent; Modified → #CFE2FF (primary soft).
+    /// Target-side semantics: "deletions" on the target pane (lines that
+    /// shouldn't be there) are painted RED. Both <see cref="LineStatus.Added"/>
+    /// (line present only in target) and <see cref="LineStatus.Modified"/>
+    /// qualify.
     /// </summary>
     public static readonly IValueConverter LineStatusToTargetBackground =
         new FuncValueConverter<LineStatus, IBrush?>(static status => status switch
         {
-            LineStatus.Added => new SolidColorBrush(Color.Parse("#CDFFD6")),
-            LineStatus.Modified => new SolidColorBrush(Color.Parse("#CFE2FF")),
+            LineStatus.Added => new SolidColorBrush(Color.Parse("#FFCED3")),    // crimson soft
+            LineStatus.Modified => new SolidColorBrush(Color.Parse("#FFCED3")), // crimson soft
             LineStatus.Unchanged => Brushes.Transparent,
             LineStatus.Removed => Brushes.Transparent,
             _ => Brushes.Transparent,
         });
+
+    /// <summary>
+    /// Returns the centre-column action icon kind for a given line status:
+    /// "arrow" for inserts/modifications coming FROM source TO target,
+    /// "x" for target-only lines that should be removed, "" otherwise.
+    /// Bound by the diff viewer's slim centre column.
+    /// </summary>
+    public static readonly IValueConverter LineStatusToCenterIcon =
+        new FuncValueConverter<LineStatus, string?>(static status => status switch
+        {
+            LineStatus.Removed => "arrow",
+            LineStatus.Modified => "arrow",
+            LineStatus.Added => "x",
+            LineStatus.Unchanged => null,
+            _ => null,
+        });
+
+    /// <summary>
+    /// True when the bound <c>string</c> equals the converter parameter.
+    /// Used to switch icon rendering in the diff viewer centre column.
+    /// </summary>
+    public static readonly IValueConverter StringEquals =
+        new FuncValueConverter<string?, string?, bool>(static (value, parameter) =>
+            string.Equals(value, parameter, StringComparison.Ordinal));
 }

@@ -37,6 +37,19 @@
                 HeadersVisibility="Column">
 
         <DataGrid.Styles>
+          <!-- Row hover/selected tints follow the row's status colour: blue
+               for Modified, red for Solo destinazione, green for Solo
+               provenienza, grey for Identici. Keeps the visual link between
+               group header stripe and row state consistent. -->
+          <Style Selector="DataGridRow:pointerover /template/ Rectangle#BackgroundRectangle">
+            <Setter Property="Fill" Value="{Binding ((vm:DifferenceRowViewModel)DataContext).RowHoverHex, RelativeSource={RelativeSource AncestorType=DataGridRow}, Converter={x:Static v:Converters.HexToBrush}}" />
+            <Setter Property="Opacity" Value="0.7" />
+          </Style>
+          <Style Selector="DataGridRow:selected /template/ Rectangle#BackgroundRectangle">
+            <Setter Property="Fill" Value="{Binding ((vm:DifferenceRowViewModel)DataContext).RowSelectedHex, RelativeSource={RelativeSource AncestorType=DataGridRow}, Converter={x:Static v:Converters.HexToBrush}}" />
+            <Setter Property="Opacity" Value="1" />
+          </Style>
+
           <!-- Group header: 6-px coloured stripe + italian label + item count.
                The stripe colour is derived from the grouping key (the italian
                status label) via StatusKeyToBrush converter. -->
@@ -123,16 +136,22 @@
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
 
-          <!-- Col 4: Deploy selection checkbox -->
+          <!-- Col 4: Deploy selection checkbox — the ONLY column with vertical
+               borders so it visually demarcates the boundary between source
+               and target name columns. -->
           <DataGridTemplateColumn Header="" Width="40" CanUserSort="False" CanUserResize="False">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:DifferenceRowViewModel">
-                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
-                          IsVisible="{Binding IsSelectable}"
-                          HorizontalAlignment="Center"
-                          VerticalAlignment="Center"
-                          Foreground="{Binding SelectionBrushHex,
-                                               Converter={x:Static v:Converters.HexToBrush}}" />
+                <Border BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1,0,1,0"
+                        Padding="0">
+                  <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                            IsVisible="{Binding IsSelectable}"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Foreground="{Binding SelectionBrushHex,
+                                                 Converter={x:Static v:Converters.HexToBrush}}" />
+                </Border>
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>

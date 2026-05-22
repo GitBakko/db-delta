@@ -114,9 +114,19 @@ public sealed partial class AppStateViewModel : ObservableObject
 
     partial void OnSelectedRowChanged(DifferenceRowViewModel? value)
     {
+        OnPropertyChanged(nameof(ShouldShowDiffViewer));
         if (value is null) { return; }
+        // Identical rows have nothing to diff — skip the viewer activation so
+        // the bottom pane stays collapsed.
+        if (value.IsIdentical) { return; }
         _ = DiffViewer.LoadAsync(value, CancellationToken.None);
     }
+
+    /// <summary>True when the diff viewer panel should be visible. Identical
+    /// rows are excluded — there is nothing to diff so the pane stays hidden
+    /// even though a row is "selected" in the grid.</summary>
+    public bool ShouldShowDiffViewer =>
+        SelectedRow is not null && !SelectedRow.IsIdentical;
 
     /// <summary>
     /// Diff viewer state. The resolver is injected by DI in the real app; in

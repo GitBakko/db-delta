@@ -43,6 +43,26 @@ public sealed partial class DifferenceRowViewModel(DifferencePair pair, Differen
         _ => "#9097A0", // neutral
     };
 
+    /// <summary>Soft tint hex for the row background on hover (subtle wash of
+    /// the status colour). Picked from the design-system 100-step ramps.</summary>
+    public string RowHoverHex => Dto.Status switch
+    {
+        "Different" => "#EAF1FB", // primary 100-ish
+        "OnlyInB" => "#FBE1E5",   // crimson 100-ish
+        "OnlyInA" => "#DAF3E1",   // emerald 100
+        _ => "#F4F5F8",            // neutral
+    };
+
+    /// <summary>Slightly more saturated tint than <see cref="RowHoverHex"/>
+    /// used when the row is selected — distinguishes selection from hover.</summary>
+    public string RowSelectedHex => Dto.Status switch
+    {
+        "Different" => "#CFE2FF", // primary 200-ish
+        "OnlyInB" => "#FFCED3",   // crimson 200
+        "OnlyInA" => "#ADDFBD",   // emerald 200
+        _ => "#E5E7EB",            // neutral
+    };
+
     // Convenience pass-throughs used by grid column bindings.
     public string Kind => Dto.Kind;
     public string SchemaName => Dto.SchemaName;
@@ -60,14 +80,17 @@ public sealed partial class DifferenceRowViewModel(DifferencePair pair, Differen
     public DateTime? LastModifiedSourceUtc => Dto.LastModifiedSourceUtc;
     public DateTime? LastModifiedTargetUtc => Dto.LastModifiedTargetUtc;
 
+    private static readonly System.Globalization.CultureInfo s_itIt =
+        System.Globalization.CultureInfo.GetCultureInfo("it-IT");
+
     public string LastModifiedSourceDisplay =>
         Dto.LastModifiedSourceUtc.HasValue
-            ? Dto.LastModifiedSourceUtc.Value.ToString("yyyy-MM-dd HH:mm")
+            ? Dto.LastModifiedSourceUtc.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm", s_itIt)
             : string.Empty;
 
     public string LastModifiedTargetDisplay =>
         Dto.LastModifiedTargetUtc.HasValue
-            ? Dto.LastModifiedTargetUtc.Value.ToString("yyyy-MM-dd HH:mm")
+            ? Dto.LastModifiedTargetUtc.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm", s_itIt)
             : string.Empty;
 
     /// <summary>Italian display label for <see cref="Kind"/>.</summary>
