@@ -25,6 +25,7 @@ public partial class App : Application
             MainWindow mainWindow = new()
             {
                 DataContext = new MainWindowViewModel(appState),
+                WindowState = Avalonia.Controls.WindowState.Maximized,
             };
             desktop.MainWindow = mainWindow;
 
@@ -63,6 +64,10 @@ public partial class App : Application
                 appState.TargetConnectionString =
                     dialog.LastTargetConnectionString
                     ?? (result.Target is not null ? BuildConnectionString(result.Target) : string.Empty);
+
+                // Publish the chosen project so the main shell's header strip
+                // can show the source/target server + database names.
+                appState.CurrentProject = result;
 
                 // Auto-run the comparison so the main view is no longer empty.
                 if (!string.IsNullOrWhiteSpace(appState.SourceConnectionString)

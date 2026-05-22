@@ -33,6 +33,15 @@ public sealed partial class AppStateViewModel : ObservableObject
     [ObservableProperty]
     private string _targetConnectionString = "";
 
+    /// <summary>
+    /// The project the user confirmed in the setup modal — non-null after OK,
+    /// carries the server/database names used by the top header strip and the
+    /// project header. Independent from <see cref="SourceConnectionString"/>
+    /// (which is the runtime-only string with the live password).
+    /// </summary>
+    [ObservableProperty]
+    private DbDeltaProject? _currentProject;
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CompareCommand))]
     [NotifyCanExecuteChangedFor(nameof(SwapCommand))]

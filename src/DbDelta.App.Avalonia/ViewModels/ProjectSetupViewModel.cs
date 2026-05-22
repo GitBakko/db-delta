@@ -42,40 +42,107 @@ public sealed partial class ProjectSetupViewModel : ObservableObject
 
     /// <summary>
     /// Runs a single network-wide SQL Server scan and pushes the result into
-    /// both source and target panels at once. Invoked from either panel's
-    /// "Scansiona" button — the user only needs to scan once.
+    /// both source and target panels. The <paramref name="initiator"/>
+    /// parameter ("source" / "target") is the panel whose "Scansiona" button
+    /// was clicked; ONLY that panel's <c>IsScanningServers</c> flag is toggled
+    /// so the spinner — and the deferred "open dropdown" UI hook — fires on
+    /// the originating side alone. Both panels still receive the resulting
+    /// <c>ServerSuggestions</c> via <c>ApplyScanResults</c>.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanScanServers))]
-    public async Task ScanServersAsync()
+    public async Task ScanForAsync(string? initiator)
     {
+        ProjectEndpointPanelViewModel? source = initiator == "target" ? null : Source;
+        ProjectEndpointPanelViewModel? target = initiator == "source" ? null : Target;
+
+        // Fallback: if no initiator was supplied, scan on behalf of both.
+        if (source is null && target is null)
+        {
+            source = Source;
+            target = Target;
+        }
+
         IsScanningServers = true;
-        Source.IsScanningServers = true;
-        Target.IsScanningServers = true;
-        Source.ScanStatusMessage = "Scansione in corso…";
-        Target.ScanStatusMessage = "Scansione in corso…";
+        BeginScan(source);
+        BeginScan(target);
+
         try
         {
             IReadOnlyList<DiscoveredServer> list =
                 await SqlServerDiscovery.EnumerateServersAsync(CancellationToken.None)
                                         .ConfigureAwait(true);
+            // Both panels always get the populated list, regardless of initiator.
             Source.ApplyScanResults(list);
             Target.ApplyScanResults(list);
         }
         catch (Exception ex)
         {
             string msg = $"Errore: {ex.Message}";
-            Source.ScanStatusMessage = msg;
-            Target.ScanStatusMessage = msg;
+            SetScanMessage(source, msg);
+            SetScanMessage(target, msg);
         }
         finally
         {
             IsScanningServers = false;
-            Source.IsScanningServers = false;
-            Target.IsScanningServers = false;
+            EndScan(source);
+            EndScan(target);
+        }
+
+        static void BeginScan(ProjectEndpointPanelViewModel? p)
+        {
+            if (p is null) { return; }
+            p.IsScanningServers = true;
+            p.ScanStatusMessage = "Scansione in corso…";
+        }
+
+        static void EndScan(ProjectEndpointPanelViewModel? p)
+        {
+            if (p is null) { return; }
+            p.IsScanningServers = false;
+        }
+
+        static void SetScanMessage(ProjectEndpointPanelViewModel? p, string message)
+        {
+            if (p is null) { return; }
+            p.ScanStatusMessage = message;
         }
     }
 
     private bool CanScanServers() => !IsScanningServers;
+
+    /// <summary>
+    /// Copies the source-panel connection fields into the target panel so the
+    /// user can run a same-server compare with one click. Triggered by the
+    /// "Clona configurazione" footer button.
+    /// </summary>
+    [RelayCommand]
+    private void CloneSourceToTarget()
+    {
+        Target.ServerName = Source.ServerName;
+        Target.AuthMode = Source.AuthMode;
+        Target.UserName = Source.UserName;
+        Target.Password = Source.Password;
+        Target.RememberCredentials = Source.RememberCredentials;
+        Target.Encrypt = Source.Encrypt;
+        Target.TrustServerCertificate = Source.TrustServerCertificate;
+        Target.DatabaseName = Source.DatabaseName;
+        Target.ServerIpAddress = Source.ServerIpAddress;
+        // Mirror the suggestions list so the Target combo isn't empty.
+        Target.ServerSuggestions.Clear();
+        foreach (DiscoveredServer s in Source.ServerSuggestions)
+        {
+            Target.ServerSuggestions.Add(s);
+        }
+        Target.HasServerSuggestions = Source.HasServerSuggestions;
+        Target.AvailableDatabases.Clear();
+        foreach (string db in Source.AvailableDatabases)
+        {
+            Target.AvailableDatabases.Add(db);
+        }
+        Target.HasDatabases = Source.HasDatabases;
+        Target.ServerVersion = Source.ServerVersion;
+        Target.ServerMajorVersion = Source.ServerMajorVersion;
+    }
 
     // ── Project-level fields ─────────────────────────────────────────────────
 

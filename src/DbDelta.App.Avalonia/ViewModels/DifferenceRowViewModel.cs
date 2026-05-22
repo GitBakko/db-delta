@@ -22,8 +22,14 @@ public sealed partial class DifferenceRowViewModel(DifferencePair pair, Differen
 
     public string EnvColorHex { get; } = envColorHex;
 
+    /// <summary>
+    /// Deploy-selection flag. Identical rows are non-selectable (they have
+    /// nothing to deploy) so the checkbox is hidden via
+    /// <see cref="IsSelectable"/>. Default for all other rows is unchecked —
+    /// the user opts in explicitly to what they want aligned.
+    /// </summary>
     [ObservableProperty]
-    private bool _isSelected = true;
+    private bool _isSelected;
 
     /// <summary>
     /// Accent hex for the row's checkbox, driven by diff status.
@@ -80,4 +86,13 @@ public sealed partial class DifferenceRowViewModel(DifferencePair pair, Differen
 
     /// <summary>True when the object exists only in the target database.</summary>
     public bool IsTargetOnly => Dto.Status == "OnlyInB";
+
+    /// <summary>True when the row represents a non-difference (object exists
+    /// and is identical on both sides). Used to hide the deploy checkbox —
+    /// identical rows have nothing to align.</summary>
+    public bool IsIdentical => Dto.Status == "Identical";
+
+    /// <summary>Inverse of <see cref="IsIdentical"/>. Drives the checkbox
+    /// <c>IsVisible</c> binding in the results grid.</summary>
+    public bool IsSelectable => !IsIdentical;
 }

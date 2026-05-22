@@ -89,6 +89,7 @@
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:DifferenceRowViewModel">
                 <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                          IsVisible="{Binding IsSelectable}"
                           HorizontalAlignment="Center"
                           VerticalAlignment="Center"
                           Foreground="{Binding SelectionBrushHex,

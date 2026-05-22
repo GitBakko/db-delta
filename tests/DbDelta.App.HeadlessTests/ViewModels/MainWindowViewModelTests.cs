@@ -105,27 +105,37 @@ public class MainWindowViewModelTests
     // ── IsSelected → deploy filter ───────────────────────────────────────────
 
     [AvaloniaFact]
-    public void Selected_rows_drive_deploy_filter_all_selected_by_default()
+    public void Rows_default_to_unselected()
     {
+        // Updated UX rule (feedback round 2): user explicitly opts in to what
+        // gets aligned; no row starts selected.
         MainWindowViewModel vm = BuildVm(
             MakeDto("Orders", "Different"),
             MakeDto("Customers", "Different"));
 
-        vm.Rows.Should().AllSatisfy(r => r.IsSelected.Should().BeTrue());
+        vm.Rows.Should().AllSatisfy(r => r.IsSelected.Should().BeFalse());
     }
 
     [AvaloniaFact]
-    public void Selected_rows_drive_deploy_filter_deselecting_one()
+    public void Selecting_rows_updates_filter()
     {
         MainWindowViewModel vm = BuildVm(
             MakeDto("Orders", "Different"),
             MakeDto("Customers", "Different"));
 
-        vm.Rows.First().IsSelected = false;
+        vm.Rows.First().IsSelected = true;
 
         IEnumerable<DifferenceRowViewModel> selected = vm.Rows.Where(r => r.IsSelected);
         selected.Count().Should().Be(1);
-        selected.Single().ObjectName.Should().Be("Customers");
+        selected.Single().ObjectName.Should().Be("Orders");
+    }
+
+    [AvaloniaFact]
+    public void Identical_rows_are_not_selectable()
+    {
+        DifferenceRowViewModel row = MakeRowVm(MakeDto("Tax", "Identical"));
+        row.IsSelectable.Should().BeFalse();
+        row.IsIdentical.Should().BeTrue();
     }
 
     // ── DifferenceRowViewModel helpers ───────────────────────────────────────

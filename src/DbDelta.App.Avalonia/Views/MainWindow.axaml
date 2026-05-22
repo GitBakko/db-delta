@@ -284,19 +284,64 @@
       </StackPanel>
 
       <!-- Populated state: project loaded, comparison ran -->
-      <Grid RowDefinitions="Auto,*,280"
-            Margin="24,24,24,0"
+      <Grid RowDefinitions="Auto,*,Auto"
+            Margin="16,12,16,0"
             IsVisible="{Binding AppState.LastComparison, Converter={x:Static ObjectConverters.IsNotNull}}">
-        <v:ConnectionPickerView Grid.Row="0"
-                                DataContext="{Binding AppState}"
-                                Margin="0,0,0,16" />
+
+        <!-- Action bar: selection counter + Genera script + Allinea destinazione -->
+        <Border Grid.Row="0"
+                Background="{StaticResource BgMutedBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="12,8"
+                Margin="0,0,0,8">
+          <Grid ColumnDefinitions="*,Auto,Auto">
+            <TextBlock Grid.Column="0"
+                       Text="{Binding SelectionSummary}"
+                       FontSize="12"
+                       Foreground="{StaticResource FgMutedBrush}"
+                       VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="ghost-emerald"
+                    Command="{Binding DeployCommand}"
+                    CommandParameter="{Binding $parent[Window]}"
+                    ToolTip.Tip="Genera script SQL di allineamento per le righe selezionate"
+                    Margin="0,0,8,0">
+              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                <Path Width="13" Height="13" Stretch="Uniform"
+                      Stroke="{Binding $parent[Button].Foreground}"
+                      StrokeThickness="1.7" StrokeLineCap="Round" StrokeJoin="Round"
+                      Fill="Transparent"
+                      Data="M 6,3 L 14,3 L 19,8 L 19,21 L 6,21 Z M 14,3 L 14,8 L 19,8 M 9,14 L 16,14 M 9,17 L 16,17" />
+                <TextBlock Text="Genera script" VerticalAlignment="Center" FontSize="12" />
+              </StackPanel>
+            </Button>
+            <Button Grid.Column="2" Classes="primary"
+                    Command="{Binding ExecuteOnTargetCommand}"
+                    CommandParameter="{Binding $parent[Window]}"
+                    ToolTip.Tip="Esegui lo script di allineamento direttamente sulla destinazione">
+              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                <Path Width="13" Height="13" Stretch="Uniform"
+                      Fill="{StaticResource PrimaryFgBrush}"
+                      Data="M 5,4 L 19,12 L 5,20 Z" />
+                <TextBlock Text="Allinea destinazione" VerticalAlignment="Center"
+                           FontSize="12" FontWeight="SemiBold"
+                           Foreground="{StaticResource PrimaryFgBrush}" />
+              </StackPanel>
+            </Button>
+          </Grid>
+        </Border>
+
+        <!-- Results grid takes ALL remaining space -->
         <v:ResultsGridView Grid.Row="1"
                            DataContext="{Binding}" />
-        <!-- Diff viewer — only visible when a row is selected -->
+
+        <!-- Diff viewer — collapsible auto row, only takes space when shown -->
         <Border Grid.Row="2"
                 BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="0,1,0,0"
-                Margin="0,0,0,0"
+                Margin="0,8,0,0"
+                Height="280"
                 IsVisible="{Binding AppState.SelectedRow, Converter={x:Static ObjectConverters.IsNotNull}}">
           <v:DiffViewerView DataContext="{Binding AppState.DiffViewer}" />
         </Border>

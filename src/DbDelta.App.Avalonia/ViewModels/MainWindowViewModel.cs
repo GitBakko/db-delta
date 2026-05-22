@@ -41,7 +41,39 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             DeployCommand.NotifyCanExecuteChanged();
             ExecuteOnTargetCommand.NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(SelectionSummary));
         };
+    }
+
+    /// <summary>
+    /// Human-readable counter shown in the results action bar, e.g.
+    /// "3 di 27 differenze selezionate". Recomputed when row selection
+    /// changes via <see cref="OnRowSelectionChanged"/>.
+    /// </summary>
+    public string SelectionSummary
+    {
+        get
+        {
+            int total = Rows.Count;
+            int selected = Rows.Count(r => r.IsSelected);
+            return total == 0
+                ? "Nessuna differenza."
+                : selected == 0
+                    ? $"{total} differenze rilevate. Seleziona quelle da allineare."
+                    : $"{selected} di {total} differenze selezionate.";
+        }
+    }
+
+    /// <summary>
+    /// Called by <see cref="DifferenceRowViewModel"/> whenever its
+    /// <c>IsSelected</c> flips, so the action bar counter and the deploy /
+    /// execute can-execute states refresh.
+    /// </summary>
+    internal void OnRowSelectionChanged()
+    {
+        DeployCommand.NotifyCanExecuteChanged();
+        ExecuteOnTargetCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(SelectionSummary));
     }
 
     public AppStateViewModel AppState { get; }
@@ -182,9 +214,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// <summary>
     /// Selected grouping mode. One of:
     /// "Tipo di differenza" / "Tipo di oggetto" / "Nessun gruppo".
+    /// Default groups by difference type so the user sees buckets immediately.
     /// </summary>
     [ObservableProperty]
-    private string _groupingMode = "Nessun gruppo";
+    private string _groupingMode = "Tipo di differenza";
 
     /// <summary>Flat observable source that backs <see cref="RowsView"/>.</summary>
     public ObservableCollection<DifferenceRowViewModel> Rows { get; } = [];
@@ -280,7 +313,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 if (pairMap.TryGetValue((dto.Kind, dto.SchemaName, dto.ObjectName), out DifferencePair? pair)
                     && pair is not null)
                 {
-                    Rows.Add(new DifferenceRowViewModel(pair, dto, envColor));
+                    DifferenceRowViewModel row = new(pair, dto, envColor);
+                    row.PropertyChanged += (_, e) =>
+                    {
+                        if (e.PropertyName == nameof(DifferenceRowViewModel.IsSelected))
+                        {
+                            OnRowSelectionChanged();
+                        }
+                    };
+                    Rows.Add(row);
                 }
             }
         }

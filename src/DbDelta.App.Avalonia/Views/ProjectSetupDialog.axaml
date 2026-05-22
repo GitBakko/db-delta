@@ -121,8 +121,9 @@
                       Fill="Transparent" Data="M 5,8 L 12,15 L 19,8" />
               </Button>
               <Button Grid.Column="2" Classes="ghost-violet" Margin="6,0,0,0"
-                      MinWidth="120"
-                      Command="{Binding $parent[Window].((vm:ProjectSetupViewModel)DataContext).ScanServersCommand}"
+                      MinWidth="120" MaxWidth="120"
+                      Command="{Binding $parent[Window].((vm:ProjectSetupViewModel)DataContext).ScanForCommand}"
+                      CommandParameter="source"
                       ToolTip.Tip="Cerca server SQL in rete (popola entrambi i pannelli)">
                 <Panel>
                   <!-- Idle: icon + label -->
@@ -134,9 +135,9 @@
                           Data="M 11,4 A 7,7 0 1 1 4,11 A 7,7 0 0 1 11,4 M 16,16 L 20,20" />
                     <TextBlock Text="Scansiona" VerticalAlignment="Center" />
                   </StackPanel>
-                  <!-- Busy: slim progress bar fills button -->
+                  <!-- Busy: slim progress bar centred in the button (≤ button width) -->
                   <ProgressBar IsIndeterminate="True" Height="6"
-                               HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                               MaxWidth="96" HorizontalAlignment="Center" VerticalAlignment="Center"
                                IsVisible="{Binding IsScanningServers}" ShowProgressText="False" />
                 </Panel>
               </Button>
@@ -183,7 +184,7 @@
                         IsChecked="{Binding Encrypt, Mode=TwoWay}" />
               <CheckBox Grid.Column="2" Content="Fidati del certificato" Margin="12,0,0,0"
                         IsChecked="{Binding TrustServerCertificate, Mode=TwoWay}" />
-              <Button Grid.Column="4" Classes="ghost-emerald" MinWidth="110"
+              <Button Grid.Column="4" Classes="ghost-emerald" MinWidth="110" MaxWidth="110"
                       Command="{Binding LoadDatabasesCommand}" ToolTip.Tip="Connetti e carica database">
                 <Panel>
                   <StackPanel Orientation="Horizontal" Spacing="6"
@@ -195,7 +196,7 @@
                     <TextBlock Text="Connetti" VerticalAlignment="Center" />
                   </StackPanel>
                   <ProgressBar IsIndeterminate="True" Height="6"
-                               HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                               MaxWidth="86" HorizontalAlignment="Center" VerticalAlignment="Center"
                                IsVisible="{Binding IsLoadingDatabases}" ShowProgressText="False" />
                 </Panel>
               </Button>
@@ -277,8 +278,9 @@
                       Fill="Transparent" Data="M 5,8 L 12,15 L 19,8" />
               </Button>
               <Button Grid.Column="2" Classes="ghost-violet" Margin="6,0,0,0"
-                      MinWidth="120"
-                      Command="{Binding $parent[Window].((vm:ProjectSetupViewModel)DataContext).ScanServersCommand}"
+                      MinWidth="120" MaxWidth="120"
+                      Command="{Binding $parent[Window].((vm:ProjectSetupViewModel)DataContext).ScanForCommand}"
+                      CommandParameter="target"
                       ToolTip.Tip="Cerca server SQL in rete (popola entrambi i pannelli)">
                 <Panel>
                   <StackPanel Orientation="Horizontal" Spacing="6"
@@ -290,7 +292,7 @@
                     <TextBlock Text="Scansiona" VerticalAlignment="Center" />
                   </StackPanel>
                   <ProgressBar IsIndeterminate="True" Height="6"
-                               HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                               MaxWidth="96" HorizontalAlignment="Center" VerticalAlignment="Center"
                                IsVisible="{Binding IsScanningServers}" ShowProgressText="False" />
                 </Panel>
               </Button>
@@ -336,7 +338,7 @@
                         IsChecked="{Binding Encrypt, Mode=TwoWay}" />
               <CheckBox Grid.Column="2" Content="Fidati del certificato" Margin="12,0,0,0"
                         IsChecked="{Binding TrustServerCertificate, Mode=TwoWay}" />
-              <Button Grid.Column="4" Classes="ghost-emerald" MinWidth="110"
+              <Button Grid.Column="4" Classes="ghost-emerald" MinWidth="110" MaxWidth="110"
                       Command="{Binding LoadDatabasesCommand}" ToolTip.Tip="Connetti e carica database">
                 <Panel>
                   <StackPanel Orientation="Horizontal" Spacing="6"
@@ -348,7 +350,7 @@
                     <TextBlock Text="Connetti" VerticalAlignment="Center" />
                   </StackPanel>
                   <ProgressBar IsIndeterminate="True" Height="6"
-                               HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                               MaxWidth="86" HorizontalAlignment="Center" VerticalAlignment="Center"
                                IsVisible="{Binding IsLoadingDatabases}" ShowProgressText="False" />
                 </Panel>
               </Button>
@@ -418,12 +420,25 @@
         </Button>
 
         <Button Classes="ghost" Command="{Binding SwapEndpointsCommand}"
-                ToolTip.Tip="Scambia origine e destinazione">
+                ToolTip.Tip="Scambia provenienza e destinazione">
           <Path Width="16" Height="16" Stretch="Uniform"
                 Stroke="{Binding $parent[Button].Foreground}"
                 StrokeThickness="1.7" StrokeLineCap="Round" StrokeJoin="Round"
                 Fill="Transparent"
                 Data="M 4,9 L 20,9 M 14,4 L 20,9 L 14,14 M 20,15 L 4,15 M 10,10 L 4,15 L 10,20" />
+        </Button>
+
+        <!-- Clona configurazione: copies all source-panel fields to target -->
+        <Button Classes="ghost" Command="{Binding CloneSourceToTargetCommand}"
+                ToolTip.Tip="Clona la configurazione di provenienza nella destinazione">
+          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <Path Width="14" Height="14" Stretch="Uniform"
+                  Stroke="{Binding $parent[Button].Foreground}"
+                  StrokeThickness="1.7" StrokeLineCap="Round" StrokeJoin="Round"
+                  Fill="Transparent"
+                  Data="M 8,4 L 16,4 L 16,14 L 8,14 Z M 5,8 L 5,18 L 13,18" />
+            <TextBlock Text="Clona" VerticalAlignment="Center" FontSize="12" />
+          </StackPanel>
         </Button>
 
         <Button Classes="primary" IsEnabled="{Binding IsValid}" Click="OnOkClick">
