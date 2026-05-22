@@ -10,8 +10,10 @@
         MinWidth="900" MinHeight="600"
         Background="{StaticResource BgBrush}">
 
-  <!-- Root: shell content + full-window busy overlay -->
-  <Panel>
+  <!-- Root: shell content + full-window busy overlay. ClipToBounds
+       prevents any inner control's padding/border rounding artefact from
+       triggering a stray horizontal scrollbar on the window. -->
+  <Panel ClipToBounds="True">
 
   <!-- App shell: 44px topbar / 56px header strip / flex middle / 24px statusbar -->
   <Grid RowDefinitions="44,56,*,24">
@@ -435,12 +437,16 @@
 
     </Panel>
 
-    <!-- Status bar -->
+    <!-- Status bar. ClipToBounds suppresses any minor pixel overflow from
+         the redacted connection strings that previously bubbled up into a
+         stray window-level horizontal scrollbar. -->
     <Border Grid.Row="3"
             Background="{StaticResource BgMutedBrush}"
             BorderBrush="{StaticResource BorderBrush}"
-            BorderThickness="0,1,0,0">
-      <StackPanel Orientation="Horizontal" Spacing="8" Margin="12,0" VerticalAlignment="Center">
+            BorderThickness="0,1,0,0"
+            ClipToBounds="True">
+      <StackPanel Orientation="Horizontal" Spacing="8" Margin="12,0" VerticalAlignment="Center"
+                  HorizontalAlignment="Left">
         <TextBlock Text="{Binding AppState.StatusText}"
                    FontSize="11"
                    Foreground="{StaticResource FgSubtleBrush}" />

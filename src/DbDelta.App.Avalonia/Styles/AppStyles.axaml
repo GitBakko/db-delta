@@ -150,6 +150,15 @@
     <Setter Property="Padding" Value="10,6" />
     <Setter Property="Cursor" Value="Hand" />
   </Style>
+  <!-- Switch Button.Foreground (not just template TextElement) so Path icons
+       bound to $parent[Button].Foreground flip to white on the saturated
+       accent bg. CLAUDE.md UI rule: icon contrast must follow bg. -->
+  <Style Selector="Button.ghost-violet:pointerover">
+    <Setter Property="Foreground" Value="{StaticResource FgOnAccentBrush}" />
+  </Style>
+  <Style Selector="Button.ghost-violet:pressed">
+    <Setter Property="Foreground" Value="{StaticResource FgOnAccentBrush}" />
+  </Style>
   <Style Selector="Button.ghost-violet:pointerover /template/ ContentPresenter">
     <Setter Property="Background" Value="{StaticResource SecondaryBrush}" />
     <Setter Property="TextElement.Foreground" Value="{StaticResource FgOnAccentBrush}" />
@@ -168,6 +177,12 @@
     <Setter Property="CornerRadius" Value="6" />
     <Setter Property="Padding" Value="10,6" />
     <Setter Property="Cursor" Value="Hand" />
+  </Style>
+  <Style Selector="Button.ghost-emerald:pointerover">
+    <Setter Property="Foreground" Value="{StaticResource FgOnAccentBrush}" />
+  </Style>
+  <Style Selector="Button.ghost-emerald:pressed">
+    <Setter Property="Foreground" Value="{StaticResource FgOnAccentBrush}" />
   </Style>
   <Style Selector="Button.ghost-emerald:pointerover /template/ ContentPresenter">
     <Setter Property="Background" Value="{StaticResource SuccessBrush}" />
@@ -188,6 +203,12 @@
     <Setter Property="Padding" Value="10,6" />
     <Setter Property="Cursor" Value="Hand" />
   </Style>
+  <Style Selector="Button.ghost-amber:pointerover">
+    <Setter Property="Foreground" Value="{StaticResource FgOnAccentBrush}" />
+  </Style>
+  <Style Selector="Button.ghost-amber:pressed">
+    <Setter Property="Foreground" Value="{StaticResource FgOnAccentBrush}" />
+  </Style>
   <Style Selector="Button.ghost-amber:pointerover /template/ ContentPresenter">
     <Setter Property="Background" Value="{StaticResource WarningBrush}" />
     <Setter Property="TextElement.Foreground" Value="{StaticResource FgOnAccentBrush}" />
@@ -207,6 +228,12 @@
     <Setter Property="Padding" Value="10,6" />
     <Setter Property="Cursor" Value="Hand" />
   </Style>
+  <Style Selector="Button.ghost-crimson:pointerover">
+    <Setter Property="Foreground" Value="{StaticResource FgOnAccentBrush}" />
+  </Style>
+  <Style Selector="Button.ghost-crimson:pressed">
+    <Setter Property="Foreground" Value="{StaticResource FgOnAccentBrush}" />
+  </Style>
   <Style Selector="Button.ghost-crimson:pointerover /template/ ContentPresenter">
     <Setter Property="Background" Value="{StaticResource DangerBrush}" />
     <Setter Property="TextElement.Foreground" Value="{StaticResource FgOnAccentBrush}" />
@@ -225,6 +252,12 @@
     <Setter Property="CornerRadius" Value="6" />
     <Setter Property="Padding" Value="10,6" />
     <Setter Property="Cursor" Value="Hand" />
+  </Style>
+  <Style Selector="Button.ghost-cobalt:pointerover">
+    <Setter Property="Foreground" Value="{StaticResource PrimaryFgBrush}" />
+  </Style>
+  <Style Selector="Button.ghost-cobalt:pressed">
+    <Setter Property="Foreground" Value="{StaticResource PrimaryFgBrush}" />
   </Style>
   <Style Selector="Button.ghost-cobalt:pointerover /template/ ContentPresenter">
     <Setter Property="Background" Value="{StaticResource PrimaryBrush}" />
