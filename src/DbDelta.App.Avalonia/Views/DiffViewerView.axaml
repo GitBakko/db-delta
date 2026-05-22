@@ -71,80 +71,90 @@
     </Grid>
 
     <!-- ── Diff body ─────────────────────────────────────────────────────── -->
-    <!-- 4-column layout: [source pane *][center actions 32][target pane *][shared scrollbar 16] -->
-    <Grid Grid.Row="1" ColumnDefinitions="*,32,*,16">
+    <!-- Layout (l-to-r):
+         [src-gutter 8][2 gap][tgt-gutter 8][source text *][centre actions 32]
+         [target text *][shared scrollbar 16]
 
-      <!-- ── Left (Source) pane ──────────────────────────────────────────── -->
-      <Grid Grid.Column="0" ColumnDefinitions="12,*">
+         The two gutters at the extreme left scroll in lockstep with the text
+         panes (synced via GuttersScroll wired in code-behind). Each row
+         renders a 4-px coloured rectangle when the row's LineStatus matches
+         the gutter's role — left gutter green for source-side adds/mods,
+         right gutter red for target-side adds/mods. -->
+    <Grid Grid.Row="1" ColumnDefinitions="8,2,8,*,32,*,16">
 
-        <!-- Left minimap (12px wide, sections highlighted in primary blue) -->
-        <ItemsControl Grid.Column="0"
-                      x:Name="LeftMinimap"
-                      ItemsSource="{Binding Sections}"
-                      Background="{StaticResource BgMutedBrush}"
-                      ClipToBounds="True">
+      <!-- Gutters wrapped in a single ScrollViewer so they scroll together
+           and a wheel hit anywhere on the gutter strip moves both panes. -->
+      <ScrollViewer Grid.Column="0" Grid.ColumnSpan="3"
+                    x:Name="GuttersScroll"
+                    HorizontalScrollBarVisibility="Disabled"
+                    VerticalScrollBarVisibility="Hidden">
+        <ItemsControl ItemsSource="{Binding Rows}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
-              <Canvas />
+              <StackPanel Orientation="Vertical" />
             </ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="diff:DiffSection">
-              <Border Width="8"
-                      Height="2"
-                      Background="{StaticResource PrimaryBrush}"
-                      CornerRadius="1"
-                      HorizontalAlignment="Center" />
+            <DataTemplate x:DataType="diff:LineDiff">
+              <Grid ColumnDefinitions="8,2,8" Height="18">
+                <!-- Source-side indicator (green) -->
+                <Rectangle Grid.Column="0"
+                           Fill="#35AF6D"
+                           Margin="1,2"
+                           RadiusX="1" RadiusY="1"
+                           IsVisible="{Binding Status, Converter={x:Static v:Converters.IsSourceIndicator}}" />
+                <!-- Target-side indicator (red) -->
+                <Rectangle Grid.Column="2"
+                           Fill="#DD2F44"
+                           Margin="1,2"
+                           RadiusX="1" RadiusY="1"
+                           IsVisible="{Binding Status, Converter={x:Static v:Converters.IsTargetIndicator}}" />
+              </Grid>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
+      </ScrollViewer>
 
-        <!-- Source text -->
-        <ScrollViewer Grid.Column="1"
-                      x:Name="SourceScroll"
-                      HorizontalScrollBarVisibility="Auto"
-                      VerticalScrollBarVisibility="Hidden">
-          <ItemsControl ItemsSource="{Binding Rows}">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate>
-                <StackPanel Orientation="Vertical" />
-              </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="diff:LineDiff">
-                <Grid ColumnDefinitions="36,*"
-                      Height="18"
-                      Background="{Binding Status,
-                                           Converter={x:Static v:Converters.LineStatusToSourceBackground}}">
-                  <TextBlock Grid.Column="0"
-                             Text="{Binding SourceLineNumber}"
-                             FontFamily="Cascadia Mono,Consolas,monospace"
-                             FontSize="11"
-                             Foreground="{StaticResource FgFaintBrush}"
-                             VerticalAlignment="Center"
-                             HorizontalAlignment="Right"
-                             Margin="0,0,6,0" />
-                  <SelectableTextBlock Grid.Column="1"
-                                       Text="{Binding SourceText}"
-                                       FontFamily="Cascadia Mono,Consolas,monospace"
-                                       FontSize="12"
-                                       VerticalAlignment="Center"
-                                       TextWrapping="NoWrap"
-                                       Padding="4,0" />
-                </Grid>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </ScrollViewer>
-
-      </Grid>
+      <!-- ── Source text pane ─────────────────────────────────────────────── -->
+      <ScrollViewer Grid.Column="3"
+                    x:Name="SourceScroll"
+                    HorizontalScrollBarVisibility="Auto"
+                    VerticalScrollBarVisibility="Hidden">
+        <ItemsControl ItemsSource="{Binding Rows}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Orientation="Vertical" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="diff:LineDiff">
+              <Grid ColumnDefinitions="36,*"
+                    Height="18"
+                    Background="{Binding Status,
+                                         Converter={x:Static v:Converters.LineStatusToSourceBackground}}">
+                <TextBlock Grid.Column="0"
+                           Text="{Binding SourceLineNumber}"
+                           FontFamily="Cascadia Mono,Consolas,monospace"
+                           FontSize="11"
+                           Foreground="{StaticResource FgFaintBrush}"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Right"
+                           Margin="0,0,6,0" />
+                <SelectableTextBlock Grid.Column="1"
+                                     Text="{Binding SourceText}"
+                                     FontFamily="Cascadia Mono,Consolas,monospace"
+                                     FontSize="12"
+                                     VerticalAlignment="Center"
+                                     TextWrapping="NoWrap"
+                                     Padding="4,0" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
 
       <!-- ── Centre actions column ───────────────────────────────────────── -->
-      <!-- 32-px slim column: per-row contextual icon (blue right arrow for
-           insert/modify from source to target, red X for target-only lines
-           that need to be removed). Scrolls in lockstep with both panes via
-           the shared scrollbar wiring in code-behind. -->
-      <Border Grid.Column="1"
+      <Border Grid.Column="4"
               BorderBrush="{StaticResource BorderBrush}"
               BorderThickness="1,0,1,0"
               Background="{StaticResource BgMutedBrush}">
@@ -161,21 +171,21 @@
               <DataTemplate x:DataType="diff:LineDiff">
                 <Panel Height="18" HorizontalAlignment="Center" VerticalAlignment="Center">
                   <!-- Blue right arrow: inserts and modifications flowing
-                       source → target. Shown for Removed (source-only line)
-                       and Modified (both sides differ). -->
+                       source → target. Shown only for Removed (source-only
+                       line) and Modified (both sides differ). -->
                   <Path Width="14" Height="10" Stretch="Uniform"
                         Stroke="{StaticResource PrimaryBrush}"
                         StrokeThickness="2" StrokeLineCap="Round" StrokeJoin="Round"
                         Fill="Transparent"
                         Data="M 4,8 L 16,8 M 12,4 L 16,8 L 12,12"
-                        IsVisible="{Binding Status, Converter={x:Static v:Converters.LineStatusToCenterIcon}, ConverterParameter=arrow}" />
+                        IsVisible="{Binding Status, Converter={x:Static v:Converters.LineStatusMatchesIcon}, ConverterParameter=arrow}" />
                   <!-- Red X: target-only line that should be deleted. -->
                   <Path Width="10" Height="10" Stretch="Uniform"
                         Stroke="{StaticResource DangerBrush}"
                         StrokeThickness="2" StrokeLineCap="Round"
                         Fill="Transparent"
                         Data="M 4,4 L 14,14 M 14,4 L 4,14"
-                        IsVisible="{Binding Status, Converter={x:Static v:Converters.LineStatusToCenterIcon}, ConverterParameter=x}" />
+                        IsVisible="{Binding Status, Converter={x:Static v:Converters.LineStatusMatchesIcon}, ConverterParameter=x}" />
                 </Panel>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
@@ -183,73 +193,46 @@
         </ScrollViewer>
       </Border>
 
-      <!-- ── Right (Target) pane ─────────────────────────────────────────── -->
-      <Grid Grid.Column="2" ColumnDefinitions="12,*">
-
-        <!-- Right minimap -->
-        <ItemsControl Grid.Column="0"
-                      x:Name="RightMinimap"
-                      ItemsSource="{Binding Sections}"
-                      Background="{StaticResource BgMutedBrush}"
-                      ClipToBounds="True">
+      <!-- ── Target text pane ────────────────────────────────────────────── -->
+      <ScrollViewer Grid.Column="5"
+                    x:Name="TargetScroll"
+                    HorizontalScrollBarVisibility="Auto"
+                    VerticalScrollBarVisibility="Hidden">
+        <ItemsControl ItemsSource="{Binding Rows}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
-              <Canvas />
+              <StackPanel Orientation="Vertical" />
             </ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="diff:DiffSection">
-              <Border Width="8"
-                      Height="2"
-                      Background="{StaticResource PrimaryBrush}"
-                      CornerRadius="1"
-                      HorizontalAlignment="Center" />
+            <DataTemplate x:DataType="diff:LineDiff">
+              <Grid ColumnDefinitions="*,36"
+                    Height="18"
+                    Background="{Binding Status,
+                                         Converter={x:Static v:Converters.LineStatusToTargetBackground}}">
+                <SelectableTextBlock Grid.Column="0"
+                                     Text="{Binding TargetText}"
+                                     FontFamily="Cascadia Mono,Consolas,monospace"
+                                     FontSize="12"
+                                     VerticalAlignment="Center"
+                                     TextWrapping="NoWrap"
+                                     Padding="4,0" />
+                <TextBlock Grid.Column="1"
+                           Text="{Binding TargetLineNumber}"
+                           FontFamily="Cascadia Mono,Consolas,monospace"
+                           FontSize="11"
+                           Foreground="{StaticResource FgFaintBrush}"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Left"
+                           Margin="6,0,0,0" />
+              </Grid>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
-
-        <!-- Target text -->
-        <ScrollViewer Grid.Column="1"
-                      x:Name="TargetScroll"
-                      HorizontalScrollBarVisibility="Auto"
-                      VerticalScrollBarVisibility="Hidden">
-          <ItemsControl ItemsSource="{Binding Rows}">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate>
-                <StackPanel Orientation="Vertical" />
-              </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="diff:LineDiff">
-                <Grid ColumnDefinitions="*,36"
-                      Height="18"
-                      Background="{Binding Status,
-                                           Converter={x:Static v:Converters.LineStatusToTargetBackground}}">
-                  <SelectableTextBlock Grid.Column="0"
-                                       Text="{Binding TargetText}"
-                                       FontFamily="Cascadia Mono,Consolas,monospace"
-                                       FontSize="12"
-                                       VerticalAlignment="Center"
-                                       TextWrapping="NoWrap"
-                                       Padding="4,0" />
-                  <TextBlock Grid.Column="1"
-                             Text="{Binding TargetLineNumber}"
-                             FontFamily="Cascadia Mono,Consolas,monospace"
-                             FontSize="11"
-                             Foreground="{StaticResource FgFaintBrush}"
-                             VerticalAlignment="Center"
-                             HorizontalAlignment="Left"
-                             Margin="6,0,0,0" />
-                </Grid>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </ScrollViewer>
-
-      </Grid>
+      </ScrollViewer>
 
       <!-- ── Shared vertical scrollbar (rightmost column) ────────────────── -->
-      <ScrollBar Grid.Column="3"
+      <ScrollBar Grid.Column="6"
                  x:Name="SharedScrollBar"
                  Orientation="Vertical"
                  HorizontalAlignment="Stretch"

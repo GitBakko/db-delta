@@ -178,26 +178,44 @@ public static class Converters
         });
 
     /// <summary>
-    /// Returns the centre-column action icon kind for a given line status:
-    /// "arrow" for inserts/modifications coming FROM source TO target,
-    /// "x" for target-only lines that should be removed, "" otherwise.
-    /// Bound by the diff viewer's slim centre column.
+    /// Returns <c>true</c> when the given <see cref="LineStatus"/> should
+    /// render the diff viewer's centre-column icon identified by the
+    /// <c>ConverterParameter</c> ("arrow" or "x"). The previous converter
+    /// returned a string which Avalonia's <c>IsVisible</c> binding coerces to
+    /// <c>true</c> for any non-null value — that made both icons visible on
+    /// every changed row. Use this bool converter instead.
     /// </summary>
-    public static readonly IValueConverter LineStatusToCenterIcon =
-        new FuncValueConverter<LineStatus, string?>(static status => status switch
+    public static readonly IValueConverter LineStatusMatchesIcon =
+        new FuncValueConverter<LineStatus, string?, bool>(static (status, target) =>
         {
-            LineStatus.Removed => "arrow",
-            LineStatus.Modified => "arrow",
-            LineStatus.Added => "x",
-            LineStatus.Unchanged => null,
-            _ => null,
+            string? icon = status switch
+            {
+                LineStatus.Removed => "arrow",
+                LineStatus.Modified => "arrow",
+                LineStatus.Added => "x",
+                LineStatus.Unchanged => null,
+                _ => null,
+            };
+            return string.Equals(icon, target, StringComparison.Ordinal);
         });
 
     /// <summary>
-    /// True when the bound <c>string</c> equals the converter parameter.
-    /// Used to switch icon rendering in the diff viewer centre column.
+    /// True when the bound <c>LineStatus</c> represents a source-side
+    /// "addition" (Removed or Modified — these are lines visible in the source
+    /// pane that need to flow to the target). Drives the per-row green
+    /// indicator in the source gutter.
     /// </summary>
-    public static readonly IValueConverter StringEquals =
-        new FuncValueConverter<string?, string?, bool>(static (value, parameter) =>
-            string.Equals(value, parameter, StringComparison.Ordinal));
+    public static readonly IValueConverter IsSourceIndicator =
+        new FuncValueConverter<LineStatus, bool>(static status =>
+            status is LineStatus.Removed or LineStatus.Modified);
+
+    /// <summary>
+    /// True when the bound <c>LineStatus</c> represents a target-side
+    /// "deletion" (Added or Modified — content currently in the target pane
+    /// that needs to be removed or replaced). Drives the per-row red indicator
+    /// in the target gutter.
+    /// </summary>
+    public static readonly IValueConverter IsTargetIndicator =
+        new FuncValueConverter<LineStatus, bool>(static status =>
+            status is LineStatus.Added or LineStatus.Modified);
 }

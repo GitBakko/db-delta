@@ -67,15 +67,15 @@ public partial class ProjectSetupDialog : Window
         string dbBoxName,
         ProjectEndpointPanelViewModel panel)
     {
-        if (propertyName == nameof(ProjectEndpointPanelViewModel.IsScanningServers)
-            && !panel.IsScanningServers
-            && panel.ServerSuggestions.Count > 0)
-        {
-            OpenDropdownDeferred(serverBoxName);
-        }
-        else if (propertyName == nameof(ProjectEndpointPanelViewModel.IsLoadingDatabases)
-                 && !panel.IsLoadingDatabases
-                 && panel.HasDatabases)
+        // Server scan no longer auto-opens its dropdown — the auto-scan now
+        // runs on dialog open, and popping the combo open on a background
+        // event was disruptive. The user opens the dropdown explicitly via
+        // the chevron button when they want to browse the list.
+        _ = serverBoxName; // kept for future use
+
+        if (propertyName == nameof(ProjectEndpointPanelViewModel.IsLoadingDatabases)
+            && !panel.IsLoadingDatabases
+            && panel.HasDatabases)
         {
             OpenDropdownDeferred(dbBoxName);
         }

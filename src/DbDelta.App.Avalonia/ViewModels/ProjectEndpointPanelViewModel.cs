@@ -15,6 +15,8 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
 {
     private readonly ICredentialStore? _credentialStore;
     private bool _autoFillFromCredentialsInFlight;
+    private CancellationTokenSource? _autoConnectCts;
+    private const int AutoConnectDebounceMs = 450;
 
     public ProjectEndpointPanelViewModel(string title, bool isTarget, ICredentialStore? credentialStore = null)
     {
@@ -108,10 +110,23 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
         OnPropertyChanged(nameof(DisplayBandName));
         LoadDatabasesCommand.NotifyCanExecuteChanged();
 
+        // Different server → forget the previously-loaded databases so the
+        // auto-connect heuristic doesn't skip the new connection.
+        HasDatabases = false;
+        AvailableDatabases.Clear();
+
         // Refresh IP from suggestions list (if any) and try DPAPI auto-fill.
         ServerIpAddress = ServerSuggestions
             .FirstOrDefault(s => string.Equals(s.Name, value, StringComparison.OrdinalIgnoreCase))?.IpAddress;
         _ = TryAutoFillCredentialsAsync(value);
+        ScheduleAutoConnect();
+    }
+
+    partial void OnAuthModeChanged(AuthenticationMode value)
+    {
+        OnPropertyChanged(nameof(IsValid));
+        LoadDatabasesCommand.NotifyCanExecuteChanged();
+        ScheduleAutoConnect();
     }
 
     partial void OnServerIpAddressChanged(string? value)
@@ -119,22 +134,18 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
 
     partial void OnDatabaseNameChanged(string value) => OnPropertyChanged(nameof(IsValid));
 
-    partial void OnAuthModeChanged(AuthenticationMode value)
-    {
-        OnPropertyChanged(nameof(IsValid));
-        LoadDatabasesCommand.NotifyCanExecuteChanged();
-    }
-
     partial void OnUserNameChanged(string value)
     {
         OnPropertyChanged(nameof(IsValid));
         LoadDatabasesCommand.NotifyCanExecuteChanged();
+        ScheduleAutoConnect();
     }
 
     partial void OnPasswordChanged(string value)
     {
         OnPropertyChanged(nameof(IsValid));
         LoadDatabasesCommand.NotifyCanExecuteChanged();
+        ScheduleAutoConnect();
     }
 
     partial void OnIsScanningServersChanged(bool value) =>
@@ -364,6 +375,58 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
 
     private bool CanLoadDatabases() =>
         !IsLoadingDatabases
+        && !string.IsNullOrWhiteSpace(ServerName)
+        && (AuthMode == AuthenticationMode.WindowsIntegrated
+            || (!string.IsNullOrWhiteSpace(UserName) && !string.IsNullOrWhiteSpace(Password)));
+
+    // ── Auto-connect debounce ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Debounced auto-connect. When all required connection fields are filled
+    /// (server + auth credentials) AND no databases have been loaded yet, fire
+    /// <see cref="LoadDatabasesAsync"/> after a short quiet period so the user
+    /// doesn't have to click "Connetti" manually. Each change cancels the
+    /// previous pending attempt — a single connection is fired per quiescent
+    /// burst of edits.
+    /// </summary>
+    private void ScheduleAutoConnect()
+    {
+        _autoConnectCts?.Cancel();
+        if (!IsAutoConnectEligible()) { return; }
+
+        CancellationTokenSource cts = new();
+        _autoConnectCts = cts;
+        _ = AutoConnectAfterDelayAsync(cts.Token);
+    }
+
+    private async Task AutoConnectAfterDelayAsync(CancellationToken ct)
+    {
+        try
+        {
+            await Task.Delay(AutoConnectDebounceMs, ct).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (ct.IsCancellationRequested || !IsAutoConnectEligible()) { return; }
+
+        // LoadDatabasesAsync already handles the IsLoadingDatabases flag and
+        // surfaces errors via ConnectionStatusMessage, so we can fire-and-forget.
+        try
+        {
+            await LoadDatabasesAsync().ConfigureAwait(true);
+        }
+        catch
+        {
+            // Swallow — manual Connetti remains available if auto-connect fails.
+        }
+    }
+
+    private bool IsAutoConnectEligible() =>
+        !IsLoadingDatabases
+        && !HasDatabases
         && !string.IsNullOrWhiteSpace(ServerName)
         && (AuthMode == AuthenticationMode.WindowsIntegrated
             || (!string.IsNullOrWhiteSpace(UserName) && !string.IsNullOrWhiteSpace(Password)));

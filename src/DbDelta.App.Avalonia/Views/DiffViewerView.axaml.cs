@@ -19,8 +19,8 @@ public partial class DiffViewerView : UserControl
     private ScrollViewer? _sourceScroll;
     private ScrollViewer? _targetScroll;
     private ScrollViewer? _centerScroll;
+    private ScrollViewer? _guttersScroll;
     private ScrollBar? _sharedScrollBar;
-    private ItemsControl? _leftMinimap;
     private bool _suppressScrollSync;
 
     public DiffViewerView()
@@ -62,14 +62,13 @@ public partial class DiffViewerView : UserControl
         _sourceScroll = this.FindControl<ScrollViewer>("SourceScroll");
         _targetScroll = this.FindControl<ScrollViewer>("TargetScroll");
         _centerScroll = this.FindControl<ScrollViewer>("CenterScroll");
+        _guttersScroll = this.FindControl<ScrollViewer>("GuttersScroll");
         _sharedScrollBar = this.FindControl<ScrollBar>("SharedScrollBar");
-        _leftMinimap = this.FindControl<ItemsControl>("LeftMinimap");
 
 #pragma warning disable IDE0031 // event +=/-= cannot use ?. conditional form
         if (_sourceScroll is not null) { _sourceScroll.ScrollChanged += OnSourceScrollChanged; }
         if (_targetScroll is not null) { _targetScroll.ScrollChanged += OnTargetScrollChanged; }
         if (_sharedScrollBar is not null) { _sharedScrollBar.ValueChanged += OnSharedScrollBarChanged; }
-        if (_leftMinimap is not null) { _leftMinimap.LayoutUpdated += OnMinimapLayoutUpdated; }
 #pragma warning restore IDE0031
     }
 
@@ -79,7 +78,6 @@ public partial class DiffViewerView : UserControl
         if (_sourceScroll is not null) { _sourceScroll.ScrollChanged -= OnSourceScrollChanged; }
         if (_targetScroll is not null) { _targetScroll.ScrollChanged -= OnTargetScrollChanged; }
         if (_sharedScrollBar is not null) { _sharedScrollBar.ValueChanged -= OnSharedScrollBarChanged; }
-        if (_leftMinimap is not null) { _leftMinimap.LayoutUpdated -= OnMinimapLayoutUpdated; }
 #pragma warning restore IDE0031
     }
 
@@ -90,6 +88,7 @@ public partial class DiffViewerView : UserControl
         double offsetY = _sourceScroll.Offset.Y;
         SyncTargetScrollTo(offsetY);
         SyncCenterScrollTo(offsetY);
+        SyncGuttersScrollTo(offsetY);
         SyncScrollBarTo(offsetY);
     }
 
@@ -105,7 +104,23 @@ public partial class DiffViewerView : UserControl
         double offsetY = _targetScroll.Offset.Y;
         SyncSourceScrollTo(offsetY);
         SyncCenterScrollTo(offsetY);
+        SyncGuttersScrollTo(offsetY);
         SyncScrollBarTo(offsetY);
+    }
+
+    private void SyncGuttersScrollTo(double offsetY)
+    {
+        if (_guttersScroll is null) { return; }
+
+        _suppressScrollSync = true;
+        try
+        {
+            _guttersScroll.Offset = new Vector(_guttersScroll.Offset.X, offsetY);
+        }
+        finally
+        {
+            _suppressScrollSync = false;
+        }
     }
 
     private void SyncSourceScrollTo(double offsetY)
@@ -179,6 +194,11 @@ public partial class DiffViewerView : UserControl
             {
                 _centerScroll.Offset = new Vector(_centerScroll.Offset.X, offsetY);
             }
+
+            if (_guttersScroll is not null)
+            {
+                _guttersScroll.Offset = new Vector(_guttersScroll.Offset.X, offsetY);
+            }
 #pragma warning restore IDE0031
         }
         finally
@@ -214,48 +234,6 @@ public partial class DiffViewerView : UserControl
             SyncBothScrollsTo(targetOffset);
             SyncScrollBarTo(targetOffset);
         });
-    }
-
-    private void OnMinimapLayoutUpdated(object? sender, EventArgs e)
-    {
-        if (DataContext is not DiffViewerViewModel vm) { return; }
-
-        PositionMinimapItems(_leftMinimap, vm);
-
-        ItemsControl? rightMinimap = this.FindControl<ItemsControl>("RightMinimap");
-        PositionMinimapItems(rightMinimap, vm);
-    }
-
-    private static void PositionMinimapItems(ItemsControl? minimap, DiffViewerViewModel vm)
-    {
-        if (minimap is null) { return; }
-
-        double canvasHeight = minimap.Bounds.Height;
-        if (canvasHeight <= 0 || vm.Rows.Count == 0) { return; }
-
-        double totalContentHeight = vm.Rows.Count * LineHeight;
-        double scale = canvasHeight / totalContentHeight;
-
-        int itemIndex = 0;
-        foreach (DiffSection section in vm.Sections)
-        {
-            if (minimap.ContainerFromIndex(itemIndex) is not Control container)
-            {
-                itemIndex++;
-                continue;
-            }
-
-            double top = section.StartIndex * LineHeight * scale;
-            double height = Math.Max(2, section.Length * LineHeight * scale);
-
-            Canvas.SetTop(container, top);
-            Canvas.SetLeft(container, 2);
-
-            // Resize the container itself to match the section height in the minimap.
-            container.Height = height;
-
-            itemIndex++;
-        }
     }
 
     /// <summary>
