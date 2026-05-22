@@ -93,13 +93,16 @@ public sealed partial class DifferenceRowViewModel(DifferencePair pair, Differen
             ? Dto.LastModifiedTargetUtc.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm", s_itIt)
             : string.Empty;
 
-    /// <summary>Italian display label for <see cref="Kind"/>.</summary>
+    /// <summary>Italian display label for <see cref="Kind"/>. Plural forms
+    /// chosen so the same label reads correctly in the "Tipo di oggetto"
+    /// group header (e.g. "Tabelle (5)") and stays consistent across the
+    /// per-row "Tipo entità" column.</summary>
     public string KindDisplayName => Kind switch
     {
-        "Table" => "Tabella",
-        "View" => "Vista",
-        "Procedure" => "Procedura",
-        "Function" => "Funzione",
+        "Table" => "Tabelle",
+        "View" => "Viste",
+        "Procedure" => "Procedure",
+        "Function" => "Funzioni",
         "Trigger" => "Trigger",
         _ => Kind,
     };
