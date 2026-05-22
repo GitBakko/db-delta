@@ -10,6 +10,9 @@
         MinWidth="900" MinHeight="600"
         Background="{StaticResource BgBrush}">
 
+  <!-- Root: shell content + full-window busy overlay -->
+  <Panel>
+
   <!-- App shell: 44px topbar / 56px header strip / flex middle / 24px statusbar -->
   <Grid RowDefinitions="44,56,*,24">
 
@@ -259,18 +262,28 @@
         <!-- 8: divider -->
         <Border Grid.Column="8" Classes="topbar-divider" />
 
-        <!-- 9: theme toggle -->
+        <!-- 9: theme toggle — moon when light (click → go dark), sun when dark -->
         <Button Grid.Column="9"
                 Classes="ghost"
                 Command="{Binding ToggleThemeCommand}"
                 ToolTip.Tip="Tema chiaro / scuro"
                 VerticalAlignment="Center">
-          <Path Width="16" Height="16"
-                Stretch="Uniform"
-                Stroke="{Binding $parent[Button].Foreground}"
-                StrokeThickness="1.6"
-                StrokeLineCap="Round"
-                Data="M 12,4 A 8,8 0 1 0 20,12 A 6,6 0 0 1 12,4 Z" />
+          <Panel>
+            <!-- Moon icon (visible in light mode — invites switch to dark) -->
+            <Path Width="16" Height="16" Stretch="Uniform"
+                  Stroke="{Binding $parent[Button].Foreground}"
+                  StrokeThickness="1.6" StrokeLineCap="Round"
+                  Fill="Transparent"
+                  IsVisible="{Binding !IsDarkTheme}"
+                  Data="M 12,4 A 8,8 0 1 0 20,12 A 6,6 0 0 1 12,4 Z" />
+            <!-- Sun icon (visible in dark mode — invites switch to light) -->
+            <Path Width="16" Height="16" Stretch="Uniform"
+                  Stroke="{Binding $parent[Button].Foreground}"
+                  StrokeThickness="1.6" StrokeLineCap="Round"
+                  Fill="Transparent"
+                  IsVisible="{Binding IsDarkTheme}"
+                  Data="M 12,5 A 7,7 0 1 1 11.99,5 M 12,1 L 12,3 M 12,21 L 12,23 M 4.2,4.2 L 5.6,5.6 M 18.4,18.4 L 19.8,19.8 M 1,12 L 3,12 M 21,12 L 23,12 M 4.2,19.8 L 5.6,18.4 M 18.4,5.6 L 19.8,4.2" />
+          </Panel>
         </Button>
 
       </Grid>
@@ -449,5 +462,40 @@
     </Border>
 
   </Grid>
+
+  <!-- Busy overlay — covers the whole window while a compare/load is in
+       flight so the user can't trigger destructive follow-up actions while
+       the grid is still rebuilding. -->
+  <Border IsVisible="{Binding AppState.IsBusy}"
+          Background="#80000000"
+          ZIndex="100">
+    <Border Background="{StaticResource BgRaisedBrush}"
+            BorderBrush="{StaticResource BorderStrongBrush}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="24,20"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center">
+      <StackPanel Orientation="Vertical" Spacing="14" MinWidth="280">
+        <TextBlock Text="Operazione in corso…"
+                   FontSize="14"
+                   FontWeight="SemiBold"
+                   Foreground="{StaticResource FgStrongBrush}"
+                   HorizontalAlignment="Center" />
+        <ProgressBar IsIndeterminate="True"
+                     Height="6"
+                     MinWidth="240"
+                     Foreground="{StaticResource PrimaryBrush}"
+                     Background="{StaticResource PrimarySoftBrush}"
+                     ShowProgressText="False" />
+        <TextBlock Text="{Binding AppState.StatusText}"
+                   FontSize="11"
+                   Foreground="{StaticResource FgSubtleBrush}"
+                   HorizontalAlignment="Center" />
+      </StackPanel>
+    </Border>
+  </Border>
+
+  </Panel>
 
 </Window>

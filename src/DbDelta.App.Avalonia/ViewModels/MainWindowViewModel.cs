@@ -61,6 +61,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         // Fire-and-forget initial MRU load; failures are silent (empty combo).
         _ = RefreshProjectMruAsync();
+
+        // Live refresh: any AddOrTouchAsync (modal save, EditProject, ...)
+        // fires this static event so the topbar combo updates without
+        // requiring an app restart.
+        JsonRecentProjectsStore.RecentProjectsChanged += OnRecentProjectsChanged;
+    }
+
+    private async void OnRecentProjectsChanged(object? sender, EventArgs e)
+    {
+        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(RefreshProjectMruAsync).ConfigureAwait(true);
     }
 
     /// <summary>
@@ -521,12 +531,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    /// <summary>Re-runs the comparison and rebuilds the grid.</summary>
+    /// <summary>Re-runs the comparison and rebuilds the grid. Bypasses the
+    /// CompareCommand's CanExecute gate (which can transiently return false
+    /// during state transitions) by invoking the underlying method directly.</summary>
     [RelayCommand]
     public async Task RefreshAsync()
     {
-        await AppState.CompareCommand.ExecuteAsync(null).ConfigureAwait(true);
-        RebuildRows();
+        if (string.IsNullOrWhiteSpace(AppState.SourceConnectionString)
+            || string.IsNullOrWhiteSpace(AppState.TargetConnectionString))
+        {
+            AppState.LastError = "Apri o crea un progetto prima di poter aggiornare il confronto.";
+            return;
+        }
+        if (AppState.IsBusy) { return; }
+        await AppState.CompareAsync(CancellationToken.None).ConfigureAwait(true);
     }
 
     /// <summary>

@@ -3,6 +3,24 @@
 
   <!-- Domain control styles for DbDelta — mirror the design system. -->
 
+  <!-- ===== Invariable rule: uniform 32-px monoline height =====
+       Single-line interactive controls (Button / TextBox / ComboBox /
+       AutoCompleteBox / CheckBox) all share the same MinHeight so rows of
+       mixed controls read as a clean horizontal strip. See CLAUDE.md
+       "UI/UX Invariable Rules" for context. -->
+  <Style Selector="Button">
+    <Setter Property="MinHeight" Value="32" />
+  </Style>
+  <Style Selector="TextBox">
+    <Setter Property="MinHeight" Value="32" />
+  </Style>
+  <Style Selector="ComboBox">
+    <Setter Property="MinHeight" Value="32" />
+  </Style>
+  <Style Selector="AutoCompleteBox">
+    <Setter Property="MinHeight" Value="32" />
+  </Style>
+
   <!-- ===== Border surfaces ===== -->
 
   <Style Selector="Border.endpoint">
@@ -71,22 +89,27 @@
     <Setter Property="FontSize" Value="14" />
   </Style>
 
+  <!-- "Ghost" no longer means transparent — per CLAUDE.md UI rule #1,
+       every button must have a visible fill or border. The ghost class is
+       now a NEUTRAL filled button (raised bg + subtle border) used for
+       utility actions (Salva, Carica, Annulla, Modifica, navigation icons).
+       Class name preserved to avoid touching every consumer XAML. -->
   <Style Selector="Button.ghost">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="Foreground" Value="{StaticResource FgMutedBrush}" />
-    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Background" Value="{StaticResource BgRaisedBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource FgStrongBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="6" />
-    <Setter Property="Padding" Value="6" />
+    <Setter Property="Padding" Value="10,6" />
     <Setter Property="Cursor" Value="Hand" />
   </Style>
   <Style Selector="Button.ghost:pointerover /template/ ContentPresenter">
-    <Setter Property="Background" Value="{StaticResource BgSubtleBrush}" />
-    <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+    <Setter Property="Background" Value="{StaticResource BgMutedBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
     <Setter Property="TextElement.Foreground" Value="{StaticResource FgStrongBrush}" />
   </Style>
   <Style Selector="Button.ghost:pressed /template/ ContentPresenter">
-    <Setter Property="Background" Value="{StaticResource BgMutedBrush}" />
+    <Setter Property="Background" Value="{StaticResource BgSubtleBrush}" />
     <Setter Property="TextElement.Foreground" Value="{StaticResource FgStrongBrush}" />
   </Style>
 
@@ -113,98 +136,104 @@
     <Setter Property="TextElement.Foreground" Value="{StaticResource FgStrongBrush}" />
   </Style>
 
-  <!-- Colored ghost variants — pair icon + label with the DS semantic colour.
-       Each variant overrides the ghost Foreground + hover background. The
-       border + base background remain transparent (ghost contract). -->
+  <!-- Coloured semantic variants — per CLAUDE.md UI rule #1, every variant
+       carries a SOLID accent fill at rest (no naked-transparent buttons).
+       Class names ghost-* preserved for backwards-compat with existing
+       consumer XAML; the styling is now "soft filled accent". -->
 
   <Style Selector="Button.ghost-violet">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="Foreground" Value="{StaticResource SecondaryBrush}" />
-    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Background" Value="{StaticResource SecondarySoftBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource SecondarySoftFgBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource SecondaryBrush}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="6" />
-    <Setter Property="Padding" Value="8,6" />
+    <Setter Property="Padding" Value="10,6" />
     <Setter Property="Cursor" Value="Hand" />
   </Style>
   <Style Selector="Button.ghost-violet:pointerover /template/ ContentPresenter">
-    <Setter Property="Background" Value="{StaticResource SecondarySoftBrush}" />
-    <Setter Property="TextElement.Foreground" Value="{StaticResource SecondarySoftFgBrush}" />
+    <Setter Property="Background" Value="{StaticResource SecondaryBrush}" />
+    <Setter Property="TextElement.Foreground" Value="{StaticResource FgOnAccentBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource SecondaryBrush}" />
   </Style>
   <Style Selector="Button.ghost-violet:pressed /template/ ContentPresenter">
-    <Setter Property="Background" Value="{StaticResource SecondarySoftBrush}" />
-    <Setter Property="TextElement.Foreground" Value="{StaticResource SecondarySoftFgBrush}" />
+    <Setter Property="Background" Value="{StaticResource SecondaryBrush}" />
+    <Setter Property="TextElement.Foreground" Value="{StaticResource FgOnAccentBrush}" />
   </Style>
 
   <Style Selector="Button.ghost-emerald">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="Foreground" Value="{StaticResource SuccessBrush}" />
-    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Background" Value="{StaticResource SuccessSoftBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource SuccessFgBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource SuccessBrush}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="6" />
-    <Setter Property="Padding" Value="8,6" />
+    <Setter Property="Padding" Value="10,6" />
     <Setter Property="Cursor" Value="Hand" />
   </Style>
   <Style Selector="Button.ghost-emerald:pointerover /template/ ContentPresenter">
-    <Setter Property="Background" Value="{StaticResource SuccessSoftBrush}" />
-    <Setter Property="TextElement.Foreground" Value="{StaticResource SuccessFgBrush}" />
+    <Setter Property="Background" Value="{StaticResource SuccessBrush}" />
+    <Setter Property="TextElement.Foreground" Value="{StaticResource FgOnAccentBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource SuccessBrush}" />
   </Style>
   <Style Selector="Button.ghost-emerald:pressed /template/ ContentPresenter">
-    <Setter Property="Background" Value="{StaticResource SuccessSoftBrush}" />
-    <Setter Property="TextElement.Foreground" Value="{StaticResource SuccessFgBrush}" />
+    <Setter Property="Background" Value="{StaticResource SuccessBrush}" />
+    <Setter Property="TextElement.Foreground" Value="{StaticResource FgOnAccentBrush}" />
   </Style>
 
   <Style Selector="Button.ghost-amber">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="Foreground" Value="{StaticResource WarningBrush}" />
-    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Background" Value="{StaticResource WarningSoftBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource WarningFgBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource WarningBrush}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="6" />
-    <Setter Property="Padding" Value="8,6" />
+    <Setter Property="Padding" Value="10,6" />
     <Setter Property="Cursor" Value="Hand" />
   </Style>
   <Style Selector="Button.ghost-amber:pointerover /template/ ContentPresenter">
-    <Setter Property="Background" Value="{StaticResource WarningSoftBrush}" />
-    <Setter Property="TextElement.Foreground" Value="{StaticResource WarningFgBrush}" />
+    <Setter Property="Background" Value="{StaticResource WarningBrush}" />
+    <Setter Property="TextElement.Foreground" Value="{StaticResource FgOnAccentBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource WarningBrush}" />
   </Style>
   <Style Selector="Button.ghost-amber:pressed /template/ ContentPresenter">
-    <Setter Property="Background" Value="{StaticResource WarningSoftBrush}" />
-    <Setter Property="TextElement.Foreground" Value="{StaticResource WarningFgBrush}" />
+    <Setter Property="Background" Value="{StaticResource WarningBrush}" />
+    <Setter Property="TextElement.Foreground" Value="{StaticResource FgOnAccentBrush}" />
   </Style>
 
   <Style Selector="Button.ghost-crimson">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
-    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Background" Value="{StaticResource DangerSoftBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource DangerFgBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="6" />
-    <Setter Property="Padding" Value="8,6" />
+    <Setter Property="Padding" Value="10,6" />
     <Setter Property="Cursor" Value="Hand" />
   </Style>
   <Style Selector="Button.ghost-crimson:pointerover /template/ ContentPresenter">
-    <Setter Property="Background" Value="{StaticResource DangerSoftBrush}" />
-    <Setter Property="TextElement.Foreground" Value="{StaticResource DangerFgBrush}" />
+    <Setter Property="Background" Value="{StaticResource DangerBrush}" />
+    <Setter Property="TextElement.Foreground" Value="{StaticResource FgOnAccentBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}" />
   </Style>
   <Style Selector="Button.ghost-crimson:pressed /template/ ContentPresenter">
-    <Setter Property="Background" Value="{StaticResource DangerSoftBrush}" />
-    <Setter Property="TextElement.Foreground" Value="{StaticResource DangerFgBrush}" />
+    <Setter Property="Background" Value="{StaticResource DangerBrush}" />
+    <Setter Property="TextElement.Foreground" Value="{StaticResource FgOnAccentBrush}" />
   </Style>
 
   <Style Selector="Button.ghost-cobalt">
-    <Setter Property="Background" Value="Transparent" />
-    <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}" />
-    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Background" Value="{StaticResource PrimarySoftBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource PrimarySoftFgBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="6" />
-    <Setter Property="Padding" Value="8,6" />
+    <Setter Property="Padding" Value="10,6" />
     <Setter Property="Cursor" Value="Hand" />
   </Style>
   <Style Selector="Button.ghost-cobalt:pointerover /template/ ContentPresenter">
-    <Setter Property="Background" Value="{StaticResource PrimarySoftBrush}" />
-    <Setter Property="TextElement.Foreground" Value="{StaticResource PrimarySoftFgBrush}" />
+    <Setter Property="Background" Value="{StaticResource PrimaryBrush}" />
+    <Setter Property="TextElement.Foreground" Value="{StaticResource PrimaryFgBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}" />
   </Style>
   <Style Selector="Button.ghost-cobalt:pressed /template/ ContentPresenter">
-    <Setter Property="Background" Value="{StaticResource PrimarySoftBrush}" />
-    <Setter Property="TextElement.Foreground" Value="{StaticResource PrimarySoftFgBrush}" />
+    <Setter Property="Background" Value="{StaticResource PrimaryBrush}" />
+    <Setter Property="TextElement.Foreground" Value="{StaticResource PrimaryFgBrush}" />
   </Style>
 
   <!-- Solid filled variants — for "primary action" semantics other than cobalt -->

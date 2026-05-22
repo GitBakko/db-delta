@@ -11,6 +11,36 @@
 - Keep files under 500 lines
 - Validate input at system boundaries
 
+## UI / UX Invariable Rules (DbDelta Avalonia app)
+
+These are **non-negotiable** styling rules. Apply on every UI change.
+
+1. **No naked buttons.** Every button MUST have a visible background fill OR a
+   visible border. "Ghost" buttons that only reveal on hover are banned. Pick
+   the fill colour by semantic meaning of the action:
+   - `primary` (cobalt) — confirmation / commit / "go forward" actions (OK,
+     Connetti, Allinea destinazione)
+   - `secondary` (violet) — informational / discovery actions (Scansiona)
+   - `success` (emerald) — read-only success path (Genera script, Connetti
+     test-only)
+   - `danger` (crimson) — destructive / irreversible (Esegui, Drop)
+   - `neutral` (raised-grey filled) — secondary / utility actions (Salva,
+     Carica, Annulla, Modifica, navigation icons)
+   Refer to the design-system brushes in `Styles/Tokens.axaml` (Primary,
+   Secondary, Emerald, Danger, BgRaised ramps).
+
+2. **Uniform monoline height.** All single-line interactive controls in the
+   same surface share the SAME height. Default for app shell + dialogs:
+   **32 px** (Min + Max). Includes:
+   - `Button`
+   - `TextBox`
+   - `AutoCompleteBox`
+   - `ComboBox`
+   - `CheckBox` (visual height; checkbox itself is 16 but row height is 32)
+   The shared height makes rows of mixed controls (Cerca + Raggruppa +
+   Tema, panel forms, footer action bars) read as a single elegant strip.
+   When introducing a new control, set `Height="32"` or use a shared style.
+
 ## Agent Comms — Reality-Based Coordination
 
 **Tool-availability asymmetry:** `SendMessage` works **lead↔subagent** and lead↔lead, but **NOT subagent↔subagent**. Subagents spawned via the `Agent` tool are stateless one-shot workers — they have no inbox, cannot wait for events, and `SendMessage`/`TaskUpdate` are typically not in their tool allowlists. The `hive-mind_*` MCP tools provide coordination **metadata** (registry, consensus state) but do NOT grant subagents communication channels. Patterns that assume peer messaging will silently fail — agents either abort cleanly or run open-loop with stale assumptions. (See ruvnet/ruflo#2028 for the diagnosis.)

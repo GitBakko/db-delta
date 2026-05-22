@@ -177,10 +177,9 @@ public partial class ProjectSetupDialog : Window
         }
     }
 
-    // Quick save: delegates to Save-as flow when no path is associated.
+    // Round-9: a single "Salva" button drives the name-only save flow —
+    // "Salva con nome" was redundant once paths became implicit.
     private void OnSaveClick(object? sender, RoutedEventArgs e) => _ = SaveAsAsync();
-
-    private void OnSaveAsClick(object? sender, RoutedEventArgs e) => _ = SaveAsAsync();
 
     private async Task SaveAsAsync()
     {

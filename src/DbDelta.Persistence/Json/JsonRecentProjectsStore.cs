@@ -15,6 +15,14 @@ namespace DbDelta.Persistence.Json;
 /// </summary>
 public sealed class JsonRecentProjectsStore
 {
+    /// <summary>
+    /// Static "changed" notification — any caller that writes to the recent
+    /// projects file fires this so live subscribers (e.g. the topbar combo
+    /// in MainWindowViewModel) can refresh themselves. Async by default
+    /// because handlers typically reload the JSON from disk.
+    /// </summary>
+    public static event EventHandler? RecentProjectsChanged;
+
     private const int CurrentSchemaVersion = 1;
     private const int MaxEntries = 10;
     private static readonly JsonSerializerOptions s_json = new(JsonSerializerDefaults.Web)
@@ -73,6 +81,7 @@ public sealed class JsonRecentProjectsStore
         }
 
         await WriteAtomicAsync(new Document(CurrentSchemaVersion, next), ct).ConfigureAwait(false);
+        RecentProjectsChanged?.Invoke(this, EventArgs.Empty);
         return next;
     }
 

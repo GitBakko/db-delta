@@ -458,64 +458,55 @@
     </Grid>
 
     <!-- ── Action bar ─────────────────────────────────────────────────────── -->
+    <!-- Three-zone footer (round-9 spec):
+         LEFT  : persistence actions   (Salva, Carica)
+         MID   : endpoint manipulation (Scambia, Clona)
+         RIGHT : modal closure         (OK, Annulla)
+         All buttons text-only with semantic colours per CLAUDE.md UI rule #1. -->
     <Border Grid.Row="1"
             Background="{StaticResource BgMutedBrush}"
             BorderBrush="{StaticResource BorderBrush}"
             BorderThickness="0,1,0,0"
             Padding="12,8">
-      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Grid ColumnDefinitions="Auto,*,Auto,*,Auto">
 
-        <Button Classes="ghost" Click="OnSaveClick" ToolTip.Tip="Salva progetto">
-          <TextBlock Text="Salva" />
-        </Button>
+        <!-- Persistence (left) -->
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+          <Button Classes="ghost" Click="OnSaveClick"
+                  ToolTip.Tip="Salva il progetto nella cartella centrale di DbDelta">
+            <TextBlock Text="Salva" />
+          </Button>
+          <Button Classes="ghost" Click="OnLoadClick"
+                  ToolTip.Tip="Carica un progetto esistente">
+            <TextBlock Text="Carica" />
+          </Button>
+        </StackPanel>
 
-        <Button Classes="ghost" Click="OnSaveAsClick" ToolTip.Tip="Salva progetto con nome">
-          <TextBlock Text="Salva con nome…" />
-        </Button>
+        <!-- Endpoint manipulation (middle) -->
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8"
+                    HorizontalAlignment="Center">
+          <Button Classes="ghost-violet" Command="{Binding SwapEndpointsCommand}"
+                  ToolTip.Tip="Scambia provenienza e destinazione">
+            <TextBlock Text="Scambia" />
+          </Button>
+          <Button Classes="ghost-violet" Command="{Binding CloneSourceToTargetCommand}"
+                  ToolTip.Tip="Clona la configurazione di provenienza nella destinazione">
+            <TextBlock Text="Clona" />
+          </Button>
+        </StackPanel>
 
-        <Button Classes="ghost" Click="OnLoadClick" ToolTip.Tip="Carica un progetto esistente">
-          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-            <Path Width="14" Height="14" Stretch="Uniform"
-                  Stroke="{Binding $parent[Button].Foreground}"
-                  StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
-                  Fill="Transparent"
-                  VerticalAlignment="Center"
-                  Data="M 4,7 L 4,18 L 20,18 L 20,9 L 12,9 L 10,7 Z" />
-            <TextBlock Text="Carica…" VerticalAlignment="Center" />
-          </StackPanel>
-        </Button>
+        <!-- Modal closure (right) -->
+        <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="8"
+                    HorizontalAlignment="Right">
+          <Button Classes="ghost" Click="OnCancelClick">
+            <TextBlock Text="Annulla" />
+          </Button>
+          <Button Classes="primary" IsEnabled="{Binding IsValid}" Click="OnOkClick">
+            <TextBlock Text="OK" />
+          </Button>
+        </StackPanel>
 
-        <Button Classes="ghost" Command="{Binding SwapEndpointsCommand}"
-                ToolTip.Tip="Scambia provenienza e destinazione">
-          <Path Width="16" Height="16" Stretch="Uniform"
-                Stroke="{Binding $parent[Button].Foreground}"
-                StrokeThickness="1.7" StrokeLineCap="Round" StrokeJoin="Round"
-                Fill="Transparent"
-                Data="M 4,9 L 20,9 M 14,4 L 20,9 L 14,14 M 20,15 L 4,15 M 10,10 L 4,15 L 10,20" />
-        </Button>
-
-        <!-- Clona configurazione: copies all source-panel fields to target -->
-        <Button Classes="ghost" Command="{Binding CloneSourceToTargetCommand}"
-                ToolTip.Tip="Clona la configurazione di provenienza nella destinazione">
-          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-            <Path Width="14" Height="14" Stretch="Uniform"
-                  Stroke="{Binding $parent[Button].Foreground}"
-                  StrokeThickness="1.7" StrokeLineCap="Round" StrokeJoin="Round"
-                  Fill="Transparent"
-                  Data="M 8,4 L 16,4 L 16,14 L 8,14 Z M 5,8 L 5,18 L 13,18" />
-            <TextBlock Text="Clona" VerticalAlignment="Center" FontSize="12" />
-          </StackPanel>
-        </Button>
-
-        <Button Classes="primary" IsEnabled="{Binding IsValid}" Click="OnOkClick">
-          <TextBlock Text="OK" />
-        </Button>
-
-        <Button Classes="ghost" Click="OnCancelClick">
-          <TextBlock Text="Annulla" />
-        </Button>
-
-      </StackPanel>
+      </Grid>
     </Border>
 
   </Grid>
