@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:DbDelta.App.ViewModels"
              xmlns:v="using:DbDelta.App.Views"
+             xmlns:ag="using:Avalonia.Collections"
              x:Class="DbDelta.App.Views.ResultsGridView"
              x:DataType="vm:MainWindowViewModel">
 
@@ -34,6 +35,41 @@
                 CanUserSortColumns="True"
                 GridLinesVisibility="Horizontal"
                 HeadersVisibility="Column">
+
+        <DataGrid.Styles>
+          <!-- Group header: 6-px coloured stripe + italian label + item count.
+               The stripe colour is derived from the grouping key (the italian
+               status label) via StatusKeyToBrush converter. -->
+          <Style Selector="DataGridRowGroupHeader">
+            <Setter Property="Background" Value="{StaticResource BgMutedBrush}" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="Template">
+              <ControlTemplate x:DataType="ag:DataGridCollectionViewGroup">
+                <Border BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="0,0,0,1"
+                        Background="{TemplateBinding Background}">
+                  <Grid ColumnDefinitions="6,Auto,*">
+                    <Border Grid.Column="0"
+                            Background="{Binding Key, Converter={x:Static v:Converters.StatusKeyToBrush}}" />
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding Key}"
+                               Margin="12,0,0,0"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource FgStrongBrush}"
+                               VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2"
+                               Text="{Binding ItemCount, StringFormat='({0})'}"
+                               Margin="6,0,0,0"
+                               FontSize="11"
+                               Foreground="{StaticResource FgSubtleBrush}"
+                               VerticalAlignment="Center" />
+                  </Grid>
+                </Border>
+              </ControlTemplate>
+            </Setter>
+          </Style>
+        </DataGrid.Styles>
 
         <DataGrid.Columns>
 
@@ -70,11 +106,14 @@
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
 
-          <!-- Col 3: Source object name (bold when source-only) -->
+          <!-- Col 3: Source object name. Hidden when the row exists only on
+               the target — leaves the cell empty to make the missing side
+               visually obvious. -->
           <DataGridTemplateColumn Header="Nome (orig)" Width="*" CanUserSort="True">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:DifferenceRowViewModel">
                 <TextBlock Text="{Binding QualifiedName}"
+                           IsVisible="{Binding HasSourceName}"
                            FontWeight="{Binding IsSourceOnly,
                                                 Converter={x:Static v:Converters.BoolToFontWeight}}"
                            VerticalAlignment="Center"
@@ -98,11 +137,13 @@
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
 
-          <!-- Col 5: Target object name (bold when target-only) -->
+          <!-- Col 5: Target object name. Hidden when the row exists only on
+               the source — leaves the cell empty to surface the missing side. -->
           <DataGridTemplateColumn Header="Nome (dest)" Width="*" CanUserSort="True">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:DifferenceRowViewModel">
                 <TextBlock Text="{Binding QualifiedName}"
+                           IsVisible="{Binding HasTargetName}"
                            FontWeight="{Binding IsTargetOnly,
                                                 Converter={x:Static v:Converters.BoolToFontWeight}}"
                            VerticalAlignment="Center"

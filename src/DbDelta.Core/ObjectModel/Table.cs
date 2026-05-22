@@ -9,7 +9,8 @@ public sealed record Table(
     string Name,
     IReadOnlyList<Column> Columns,
     IReadOnlyList<Constraint> Constraints,
-    IReadOnlyList<TableIndex> Indexes)
+    IReadOnlyList<TableIndex> Indexes,
+    DateTime? ModifyDate = null)
 {
     /// <summary>
     /// Convenience constructor that creates a table with no constraints or

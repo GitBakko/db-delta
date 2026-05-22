@@ -95,4 +95,36 @@ public sealed partial class DifferenceRowViewModel(DifferencePair pair, Differen
     /// <summary>Inverse of <see cref="IsIdentical"/>. Drives the checkbox
     /// <c>IsVisible</c> binding in the results grid.</summary>
     public bool IsSelectable => !IsIdentical;
+
+    /// <summary>True iff the "Nome (orig)" cell should display the object name.
+    /// Hidden when the object exists only in the target — keeps the missing
+    /// side empty so the gap is visually obvious.</summary>
+    public bool HasSourceName => !IsTargetOnly;
+
+    /// <summary>Mirror of <see cref="HasSourceName"/> for the target column.</summary>
+    public bool HasTargetName => !IsSourceOnly;
+
+    /// <summary>
+    /// Deterministic sort key used to order status groups in the results grid:
+    /// Diversi (0), Solo destinazione (1), Solo provenienza (2), Identici (3).
+    /// </summary>
+    public int StatusOrder => Dto.Status switch
+    {
+        "Different" => 0,
+        "OnlyInB" => 1,
+        "OnlyInA" => 2,
+        "Identical" => 3,
+        _ => 99,
+    };
+
+    /// <summary>Italian display label for the row's status — used as the
+    /// grouping key so the headers render localised text directly.</summary>
+    public string StatusDisplayItalian => Dto.Status switch
+    {
+        "Different" => "Diversi",
+        "OnlyInB" => "Solo destinazione",
+        "OnlyInA" => "Solo provenienza",
+        "Identical" => "Identici",
+        _ => Dto.Status,
+    };
 }

@@ -42,6 +42,15 @@ public sealed partial class AppStateViewModel : ObservableObject
     [ObservableProperty]
     private DbDeltaProject? _currentProject;
 
+    /// <summary>IPv4 address of the source server (when known — populated from
+    /// the modal scan list or DNS fallback). Shown in the project header strip.</summary>
+    [ObservableProperty]
+    private string? _sourceServerIp;
+
+    /// <summary>IPv4 address of the target server (when known).</summary>
+    [ObservableProperty]
+    private string? _targetServerIp;
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CompareCommand))]
     [NotifyCanExecuteChangedFor(nameof(SwapCommand))]

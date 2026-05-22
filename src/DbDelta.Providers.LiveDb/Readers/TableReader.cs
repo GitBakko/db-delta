@@ -11,9 +11,10 @@ internal sealed class TableReader
 {
     private const string TablesQuery = """
         SELECT
-            s.name      AS SchemaName,
-            t.name      AS TableName,
-            t.object_id AS ObjectId
+            s.name        AS SchemaName,
+            t.name        AS TableName,
+            t.object_id   AS ObjectId,
+            t.modify_date AS ModifyDate
         FROM sys.tables AS t
         INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
         WHERE t.is_ms_shipped = 0
@@ -50,7 +51,7 @@ internal sealed class TableReader
 
     public async Task<IReadOnlyList<Table>> ReadAsync(SqlConnection connection, CancellationToken ct)
     {
-        Dictionary<int, (string Schema, string Name)> tableShells = [];
+        Dictionary<int, (string Schema, string Name, DateTime? ModifyDate)> tableShells = [];
         await using (var tablesCmd = new SqlCommand(TablesQuery, connection))
         await using (SqlDataReader tablesReader = await tablesCmd.ExecuteReaderAsync(ct).ConfigureAwait(false))
         {
@@ -59,7 +60,12 @@ internal sealed class TableReader
                 string schemaName = tablesReader.GetString(0);
                 string tableName = tablesReader.GetString(1);
                 int objectId = tablesReader.GetInt32(2);
-                tableShells[objectId] = (schemaName, tableName);
+                // sys.tables.modify_date is server local time; treat as UTC for
+                // display consistency with sys.sql_modules pipeline (same caveat).
+                DateTime? modifyDate = tablesReader.IsDBNull(3)
+                    ? null
+                    : DateTime.SpecifyKind(tablesReader.GetDateTime(3), DateTimeKind.Utc);
+                tableShells[objectId] = (schemaName, tableName, modifyDate);
             }
         }
 
@@ -109,10 +115,16 @@ internal sealed class TableReader
         }
 
         var tables = new List<Table>(tableShells.Count);
-        foreach (KeyValuePair<int, (string Schema, string Name)> kv in tableShells)
+        foreach (KeyValuePair<int, (string Schema, string Name, DateTime? ModifyDate)> kv in tableShells)
         {
             columnsByObjectId.TryGetValue(kv.Key, out List<Column>? cols);
-            tables.Add(new Table(kv.Value.Schema, kv.Value.Name, cols ?? []));
+            tables.Add(new Table(
+                Schema: kv.Value.Schema,
+                Name: kv.Value.Name,
+                Columns: cols ?? [],
+                Constraints: [],
+                Indexes: [],
+                ModifyDate: kv.Value.ModifyDate));
         }
         return tables;
     }

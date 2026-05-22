@@ -232,6 +232,14 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
             // Persist credentials if user opted in.
             await TryPersistCredentialsAsync().ConfigureAwait(true);
 
+            // Fallback: if we still don't have an IP (user typed server name
+            // without running the network scan), resolve it via DNS so the band
+            // header can always show "Server (192.168.x.x)".
+            if (string.IsNullOrWhiteSpace(ServerIpAddress))
+            {
+                ServerIpAddress = await TryResolveIpAsync(ServerName).ConfigureAwait(true);
+            }
+
             // Best-effort version detection — failure is silently suppressed.
             try
             {
@@ -389,6 +397,44 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
         ServerIpAddress = null;
         ScanStatusMessage = null;
         ConnectionStatusMessage = null;
+    }
+
+    // ── DNS resolution (IP fallback) ─────────────────────────────────────────
+
+    /// <summary>
+    /// Best-effort DNS lookup to surface the IPv4 of a server typed manually
+    /// (i.e. not picked from the scan list). Strips any "\instance" suffix
+    /// and any "tcp:" prefix. Returns null on lookup failure.
+    /// </summary>
+    private static async Task<string?> TryResolveIpAsync(string serverName)
+    {
+        if (string.IsNullOrWhiteSpace(serverName)) { return null; }
+        string host = serverName.Trim();
+        if (host.StartsWith("tcp:", StringComparison.OrdinalIgnoreCase)) { host = host[4..]; }
+        int comma = host.IndexOf(',');           // strip ",port"
+        if (comma > 0) { host = host[..comma]; }
+        int slash = host.IndexOf('\\');          // strip "\instance"
+        if (slash > 0) { host = host[..slash]; }
+        if (string.IsNullOrWhiteSpace(host)) { return null; }
+
+        // If the user already typed an IP literal, just keep it.
+        if (System.Net.IPAddress.TryParse(host, out System.Net.IPAddress? literal))
+        {
+            return literal.ToString();
+        }
+
+        try
+        {
+            System.Net.IPHostEntry entry =
+                await System.Net.Dns.GetHostEntryAsync(host).ConfigureAwait(true);
+            System.Net.IPAddress? v4 = entry.AddressList.FirstOrDefault(
+                a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+            return v4?.ToString();
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     // ── DPAPI credential persistence ─────────────────────────────────────────

@@ -34,12 +34,20 @@
             <TextBlock Text="PROVENIENZA"
                        FontSize="10" FontWeight="Bold" LetterSpacing="0.6"
                        Foreground="{StaticResource SecondaryBrush}" />
-            <TextBlock Text="{Binding AppState.CurrentProject.Source.Connection.ServerName, FallbackValue='—'}"
-                       FontSize="13"
-                       FontWeight="SemiBold"
-                       Foreground="{StaticResource FgStrongBrush}"
-                       TextTrimming="CharacterEllipsis"
-                       MaxWidth="380" />
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Text="{Binding AppState.CurrentProject.Source.Connection.ServerName, FallbackValue='—'}"
+                         FontSize="13"
+                         FontWeight="SemiBold"
+                         Foreground="{StaticResource FgStrongBrush}"
+                         TextTrimming="CharacterEllipsis"
+                         MaxWidth="320" />
+              <TextBlock Text="{Binding AppState.SourceServerIp, StringFormat='({0})'}"
+                         FontSize="11"
+                         FontFamily="Cascadia Mono,Consolas,monospace"
+                         Foreground="{StaticResource FgSubtleBrush}"
+                         VerticalAlignment="Center"
+                         IsVisible="{Binding AppState.SourceServerIp, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
             <TextBlock Text="{Binding AppState.CurrentProject.Source.Connection.DatabaseName, FallbackValue='Nessuna provenienza selezionata'}"
                        FontSize="11"
                        Foreground="{StaticResource FgSubtleBrush}"
@@ -68,13 +76,22 @@
                        FontSize="10" FontWeight="Bold" LetterSpacing="0.6"
                        Foreground="{StaticResource PrimaryBrush}"
                        HorizontalAlignment="Right" />
-            <TextBlock Text="{Binding AppState.CurrentProject.Target.Connection.ServerName, FallbackValue='—'}"
-                       FontSize="13"
-                       FontWeight="SemiBold"
-                       Foreground="{StaticResource PrimarySoftFgBrush}"
-                       TextTrimming="CharacterEllipsis"
-                       MaxWidth="380"
-                       TextAlignment="Right" />
+            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+              <TextBlock Text="{Binding AppState.TargetServerIp, StringFormat='({0})'}"
+                         FontSize="11"
+                         FontFamily="Cascadia Mono,Consolas,monospace"
+                         Foreground="{StaticResource PrimarySoftFgBrush}"
+                         Opacity="0.7"
+                         VerticalAlignment="Center"
+                         IsVisible="{Binding AppState.TargetServerIp, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              <TextBlock Text="{Binding AppState.CurrentProject.Target.Connection.ServerName, FallbackValue='—'}"
+                         FontSize="13"
+                         FontWeight="SemiBold"
+                         Foreground="{StaticResource PrimarySoftFgBrush}"
+                         TextTrimming="CharacterEllipsis"
+                         MaxWidth="320"
+                         TextAlignment="Right" />
+            </StackPanel>
             <TextBlock Text="{Binding AppState.CurrentProject.Target.Connection.DatabaseName, FallbackValue='Nessuna destinazione selezionata'}"
                        FontSize="11"
                        Foreground="{StaticResource PrimarySoftFgBrush}"

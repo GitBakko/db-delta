@@ -138,6 +138,8 @@
                   <!-- Busy: slim progress bar centred in the button (≤ button width) -->
                   <ProgressBar IsIndeterminate="True" Height="6"
                                MaxWidth="96" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Foreground="{StaticResource Violet500Brush}"
+                               Background="{StaticResource Violet100Brush}"
                                IsVisible="{Binding IsScanningServers}" ShowProgressText="False" />
                 </Panel>
               </Button>
@@ -197,6 +199,8 @@
                   </StackPanel>
                   <ProgressBar IsIndeterminate="True" Height="6"
                                MaxWidth="86" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Foreground="{StaticResource Emerald500Brush}"
+                               Background="{StaticResource Emerald100Brush}"
                                IsVisible="{Binding IsLoadingDatabases}" ShowProgressText="False" />
                 </Panel>
               </Button>
@@ -293,6 +297,8 @@
                   </StackPanel>
                   <ProgressBar IsIndeterminate="True" Height="6"
                                MaxWidth="96" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Foreground="{StaticResource Violet500Brush}"
+                               Background="{StaticResource Violet100Brush}"
                                IsVisible="{Binding IsScanningServers}" ShowProgressText="False" />
                 </Panel>
               </Button>
@@ -351,6 +357,8 @@
                   </StackPanel>
                   <ProgressBar IsIndeterminate="True" Height="6"
                                MaxWidth="86" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Foreground="{StaticResource Emerald500Brush}"
+                               Background="{StaticResource Emerald100Brush}"
                                IsVisible="{Binding IsLoadingDatabases}" ShowProgressText="False" />
                 </Panel>
               </Button>

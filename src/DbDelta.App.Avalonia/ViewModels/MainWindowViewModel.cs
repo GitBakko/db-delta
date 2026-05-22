@@ -46,21 +46,38 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Human-readable counter shown in the results action bar, e.g.
-    /// "3 di 27 differenze selezionate". Recomputed when row selection
-    /// changes via <see cref="OnRowSelectionChanged"/>.
+    /// Human-readable counter shown in the results action bar. Excludes
+    /// identical rows from the differences total, surfaces per-type partials
+    /// (modificate / solo destinazione / solo provenienza) and ends with the
+    /// identical count. Example:
+    /// "3 di 12 differenze selezionate · 5 modificate, 4 solo destinazione,
+    ///  3 solo provenienza · 27 identiche".
     /// </summary>
     public string SelectionSummary
     {
         get
         {
-            int total = Rows.Count;
+            int totalDiffs = Rows.Count(r => !r.IsIdentical);
+            int identicals = Rows.Count(r => r.IsIdentical);
             int selected = Rows.Count(r => r.IsSelected);
-            return total == 0
-                ? "Nessuna differenza."
-                : selected == 0
-                    ? $"{total} differenze rilevate. Seleziona quelle da allineare."
-                    : $"{selected} di {total} differenze selezionate.";
+            int diffModified = Rows.Count(r => r.Status == "Different");
+            int diffOnlyDest = Rows.Count(r => r.IsTargetOnly);
+            int diffOnlyProv = Rows.Count(r => r.IsSourceOnly);
+
+            if (totalDiffs == 0 && identicals == 0) { return "Nessuna differenza."; }
+
+            string header = selected == 0
+                ? $"{totalDiffs} differenze rilevate"
+                : $"{selected} di {totalDiffs} differenze selezionate";
+
+            List<string> partials = [];
+            if (diffModified > 0) { partials.Add($"{diffModified} modificate"); }
+            if (diffOnlyDest > 0) { partials.Add($"{diffOnlyDest} solo destinazione"); }
+            if (diffOnlyProv > 0) { partials.Add($"{diffOnlyProv} solo provenienza"); }
+            string detail = partials.Count > 0 ? $" · {string.Join(", ", partials)}" : string.Empty;
+
+            string tail = identicals > 0 ? $" · {identicals} identiche" : string.Empty;
+            return $"{header}{detail}{tail}.";
         }
     }
 
@@ -236,6 +253,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             Filter = SearchPredicate
         };
+        // Stable status order — Diversi → Solo destinazione → Solo provenienza
+        // → Identici — drives the order groups appear in when grouping is on,
+        // and the row order when no grouping is selected.
+        view.SortDescriptions.Add(Avalonia.Collections.DataGridSortDescription
+            .FromPath(nameof(DifferenceRowViewModel.StatusOrder)));
+        view.SortDescriptions.Add(Avalonia.Collections.DataGridSortDescription
+            .FromPath(nameof(DifferenceRowViewModel.KindDisplayName)));
+        view.SortDescriptions.Add(Avalonia.Collections.DataGridSortDescription
+            .FromPath(nameof(DifferenceRowViewModel.QualifiedName)));
         ApplyGrouping(view);
         return view;
     }
@@ -246,10 +272,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         switch (GroupingMode)
         {
             case "Tipo di differenza":
-                view.GroupDescriptions.Add(new DataGridPathGroupDescription(nameof(DifferenceRowViewModel.Status)));
+                view.GroupDescriptions.Add(
+                    new DataGridPathGroupDescription(nameof(DifferenceRowViewModel.StatusDisplayItalian)));
                 break;
             case "Tipo di oggetto":
-                view.GroupDescriptions.Add(new DataGridPathGroupDescription(nameof(DifferenceRowViewModel.Kind)));
+                view.GroupDescriptions.Add(
+                    new DataGridPathGroupDescription(nameof(DifferenceRowViewModel.KindDisplayName)));
                 break;
             case "Nessun gruppo":
             default:

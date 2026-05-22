@@ -26,7 +26,7 @@ public static class Mapper
     private static DateTime? ExtractModifyDate(object? side) => side switch
     {
         Module m => m.ModifyDate,
-        // TODO M10: surface table modify_date
+        Table t => t.ModifyDate,
         _ => null,
     };
 }

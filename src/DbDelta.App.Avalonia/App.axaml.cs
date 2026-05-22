@@ -68,6 +68,8 @@ public partial class App : Application
                 // Publish the chosen project so the main shell's header strip
                 // can show the source/target server + database names.
                 appState.CurrentProject = result;
+                appState.SourceServerIp = setupVm.Source.ServerIpAddress;
+                appState.TargetServerIp = setupVm.Target.ServerIpAddress;
 
                 // Auto-run the comparison so the main view is no longer empty.
                 if (!string.IsNullOrWhiteSpace(appState.SourceConnectionString)

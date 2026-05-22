@@ -112,6 +112,32 @@ public static class Converters
     });
 
     /// <summary>
+    /// Maps an italian status group key ("Diversi", "Solo destinazione",
+    /// "Solo provenienza", "Identici") to the matching status colour brush
+    /// used on the left stripe of grouped row headers.
+    /// Anything else falls through to the neutral grey identical brush.
+    /// </summary>
+    public static readonly IValueConverter StatusKeyToBrush = new FuncValueConverter<object?, IBrush?>(static key =>
+    {
+        string hex = (key as string) switch
+        {
+            "Diversi" => "#0064C8",            // cyan (matches DifferenceRow Different)
+            "Solo destinazione" => "#B31220",  // crimson
+            "Solo provenienza" => "#007339",   // emerald
+            "Identici" => "#9097A0",           // neutral grey
+            _ => "#9097A0",
+        };
+        try
+        {
+            return new SolidColorBrush(Color.Parse(hex));
+        }
+        catch
+        {
+            return Brushes.Transparent;
+        }
+    });
+
+    /// <summary>
     /// Maps a <see cref="LineStatus"/> to the background brush for the SOURCE pane row.
     /// Added → transparent; Removed → #FFCED3 (crimson soft); Modified → #CFE2FF (primary soft).
     /// </summary>
