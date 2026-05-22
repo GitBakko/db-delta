@@ -240,4 +240,32 @@ public static class SqlServerDiscovery
         }
         return result;
     }
+
+    /// <summary>Queries SERVERPROPERTY('ProductMajorVersion') + ('Edition') and
+    /// returns a friendly string like "SQL Server 2022 Developer Edition", or
+    /// null if the connection fails.</summary>
+    public static async Task<string?> GetServerVersionAsync(string connectionString, CancellationToken ct)
+    {
+        SqlConnectionStringBuilder b = new(connectionString) { ConnectTimeout = 5 };
+        await using SqlConnection cn = new(b.ConnectionString);
+        await cn.OpenAsync(ct).ConfigureAwait(false);
+        const string sql = "SELECT CAST(SERVERPROPERTY('ProductMajorVersion') AS INT), CAST(SERVERPROPERTY('Edition') AS NVARCHAR(128));";
+        await using SqlCommand cmd = new(sql, cn);
+        await using SqlDataReader r = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        if (!await r.ReadAsync(ct).ConfigureAwait(false)) { return null; }
+        int major = r.IsDBNull(0) ? 0 : r.GetInt32(0);
+        string edition = r.IsDBNull(1) ? "" : r.GetString(1);
+        string product = major switch
+        {
+            16 => "SQL Server 2022",
+            15 => "SQL Server 2019",
+            14 => "SQL Server 2017",
+            13 => "SQL Server 2016",
+            12 => "SQL Server 2014",
+            11 => "SQL Server 2012",
+            10 => "SQL Server 2008",
+            _ => $"SQL Server (v{major})",
+        };
+        return $"{product} — {edition}";
+    }
 }

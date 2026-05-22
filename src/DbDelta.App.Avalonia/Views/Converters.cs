@@ -86,6 +86,32 @@ public static class Converters
         static bold => bold ? FontWeight.Bold : FontWeight.Normal);
 
     /// <summary>
+    /// Maps a SQL Server major version number to a version-branded stroke colour
+    /// for the DB-cylinder icon. Returns the default cobalt brush when the version
+    /// is null or unrecognised.
+    /// </summary>
+    public static readonly IValueConverter MajorVersionToBrush = new FuncValueConverter<int?, IBrush?>(static major =>
+    {
+        string hex = major switch
+        {
+            16 => "#DD2F44",
+            15 => "#B81E5C",
+            14 => "#2E84CB",
+            13 => "#1B6CA1",
+            12 => "#2E7A2E",
+            _ => "#5C6BC0",
+        };
+        try
+        {
+            return new SolidColorBrush(Color.Parse(hex));
+        }
+        catch
+        {
+            return new SolidColorBrush(Color.Parse("#5C6BC0"));
+        }
+    });
+
+    /// <summary>
     /// Maps a <see cref="LineStatus"/> to the background brush for the SOURCE pane row.
     /// Added → transparent; Removed → #FFCED3 (crimson soft); Modified → #CFE2FF (primary soft).
     /// </summary>
