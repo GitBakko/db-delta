@@ -4,6 +4,7 @@
         x:Class="DbDelta.App.Views.ConfirmExecuteDialog"
         x:DataType="vm:ConfirmExecuteViewModel"
         Title="Conferma esecuzione"
+        Icon="/Assets/app-icon.png"
         Width="480" Height="220"
         WindowStartupLocation="CenterOwner"
         CanResize="False"

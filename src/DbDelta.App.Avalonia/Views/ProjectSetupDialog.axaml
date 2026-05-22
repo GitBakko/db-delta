@@ -6,6 +6,7 @@
         x:Class="DbDelta.App.Views.ProjectSetupDialog"
         x:DataType="vm:ProjectSetupViewModel"
         Title="Nuovo progetto"
+        Icon="/Assets/app-icon.png"
         Width="1180" Height="560"
         MinWidth="900" MinHeight="480"
         WindowStartupLocation="CenterOwner"

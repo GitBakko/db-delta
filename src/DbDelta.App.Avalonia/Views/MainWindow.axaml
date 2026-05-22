@@ -6,6 +6,7 @@
         x:Class="DbDelta.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="DbDelta"
+        Icon="/Assets/app-icon.png"
         Width="1280" Height="800"
         MinWidth="900" MinHeight="600"
         Background="{StaticResource BgBrush}">
