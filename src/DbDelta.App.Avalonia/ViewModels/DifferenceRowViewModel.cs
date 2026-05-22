@@ -107,6 +107,23 @@ public sealed partial class DifferenceRowViewModel(DifferencePair pair, Differen
         _ => Kind,
     };
 
+    /// <summary>
+    /// Deterministic sort key for the "Tipo di oggetto" column / group
+    /// ordering. User-requested fixed order:
+    ///   0 Tabelle → 1 Viste → 2 Procedure → 3 Funzioni → 4 Trigger → 99 rest.
+    /// Used by the grid's SortDescriptions so alphabetical sorting cannot
+    /// re-order these categories.
+    /// </summary>
+    public int KindOrder => Kind switch
+    {
+        "Table" => 0,
+        "View" => 1,
+        "Procedure" => 2,
+        "Function" => 3,
+        "Trigger" => 4,
+        _ => 99,
+    };
+
     /// <summary>True when the object exists only in the source database.</summary>
     public bool IsSourceOnly => Dto.Status == "OnlyInA";
 

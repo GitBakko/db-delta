@@ -67,6 +67,15 @@ public static class Converters
         new FuncValueConverter<string?, string?>(static path =>
             string.IsNullOrWhiteSpace(path) ? path : System.IO.Path.GetFileNameWithoutExtension(path));
 
+    /// <summary>Formats a UTC timestamp as Italian local-time
+    /// <c>dd/MM/yyyy HH:mm</c>. Used by the MRU list and the load dialog
+    /// to show "salvato il …" timestamps.</summary>
+    public static readonly IValueConverter DateToItalianLocal =
+        new FuncValueConverter<DateTime, string?>(static utc =>
+            utc.ToLocalTime().ToString(
+                "dd/MM/yyyy HH:mm",
+                System.Globalization.CultureInfo.GetCultureInfo("it-IT")));
+
     /// <summary>
     /// Converts a hex colour string (e.g. <c>"#0054BD"</c>) to a fresh
     /// <see cref="SolidColorBrush"/>. Returns <c>null</c> for null / empty

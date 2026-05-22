@@ -20,13 +20,13 @@ public partial class MainWindow : Window
     {
         if (sender is not ComboBox combo) { return; }
         if (DataContext is not MainWindowViewModel vm) { return; }
-        if (combo.SelectedItem is not string path) { return; }
+        if (combo.SelectedItem is not DbDelta.Persistence.Json.RecentProject rp) { return; }
 
         // Reset the combo so the same entry can be re-selected later.
         combo.SelectedItem = null;
 
         await vm.OpenRecentProjectCommand
-            .ExecuteAsync((this, path))
+            .ExecuteAsync((this, rp.Path))
             .ConfigureAwait(true);
     }
 }

@@ -77,7 +77,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ProjectMru.Clear();
             foreach (RecentProject e in list)
             {
-                ProjectMru.Add(e.Path);
+                ProjectMru.Add(e);
             }
         }
         catch
@@ -167,21 +167,19 @@ public sealed partial class MainWindowViewModel : ObservableObject
             return;
         }
 
-        IStorageProvider sp = window.StorageProvider;
-        IStorageFile? file = await sp.SaveFilePickerAsync(new FilePickerSaveOptions
-        {
-            Title = "Salva progetto DbDelta",
-            DefaultExtension = "dbd",
-            SuggestedFileName = (AppState.CurrentProject.Name ?? "progetto") + ".dbd",
-            FileTypeChoices =
-            [
-                new FilePickerFileType("Progetto DbDelta") { Patterns = ["*.dbd"] },
-            ],
-        });
-        if (file is null) { return; }
+        // Name-only dialog — path is computed under %LOCALAPPDATA%\DbDelta\Projects
+        // (user feedback round 7: don't pop the OS save-file picker, just ask
+        // for the project name).
+        Views.SaveProjectDialog dialog = new();
+        dialog.SetInitialName(AppState.CurrentProject.Name ?? "Nuovo progetto");
+        dialog.SetHint($"Verrà salvato in: {ProjectsFolder.GetOrCreate()}");
+        string? name = await dialog.ShowDialog<string?>(window).ConfigureAwait(true);
+        if (string.IsNullOrWhiteSpace(name)) { return; }
+
+        string path = ProjectsFolder.ResolvePath(name);
 
         // Snapshot current grid selection into the project's Selections map so
-        // it round-trips on reload (matches the spec's schema v2 contract).
+        // it round-trips on reload (matches schema v2 contract).
         Dictionary<ObjectSelectionKey, bool> selections = [];
         foreach (DifferenceRowViewModel row in Rows.Where(r => r.IsSelectable))
         {
@@ -191,18 +189,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
         DbDeltaProject p = AppState.CurrentProject;
         DbDeltaProject toSave = p with
         {
-            Name = Path.GetFileNameWithoutExtension(file.Path.LocalPath),
+            Name = name,
             LastModifiedUtc = DateTime.UtcNow,
             Selections = selections.ToFrozenDictionary(),
         };
 
         Persistence.Xml.XmlProjectStore store = new();
-        await store.SaveAsync(file.Path.LocalPath, toSave, CancellationToken.None).ConfigureAwait(true);
+        await store.SaveAsync(path, toSave, CancellationToken.None).ConfigureAwait(true);
         AppState.CurrentProject = toSave;
-        ProjectFilePath = file.Path.LocalPath;
+        ProjectFilePath = path;
 
-        // Touch the MRU so the topbar combo lists it first next session.
-        await _recentProjects.AddOrTouchAsync(file.Path.LocalPath, CancellationToken.None).ConfigureAwait(true);
+        await _recentProjects.AddOrTouchAsync(path, CancellationToken.None).ConfigureAwait(true);
         await RefreshProjectMruAsync().ConfigureAwait(true);
     }
 
@@ -222,19 +219,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         if (window is null) { return; }
 
-        IStorageProvider sp = window.StorageProvider;
-        IReadOnlyList<IStorageFile> picked = await sp.OpenFilePickerAsync(new FilePickerOpenOptions
-        {
-            Title = "Carica progetto DbDelta",
-            AllowMultiple = false,
-            FileTypeFilter =
-            [
-                new FilePickerFileType("Progetto DbDelta") { Patterns = ["*.dbd"] },
-            ],
-        });
-        if (picked.Count == 0) { return; }
+        // Round-7 UX: show MRU list + browse-from-disk option, instead of
+        // jumping straight into the OS file picker.
+        IReadOnlyList<RecentProject> recents =
+            await _recentProjects.LoadAsync(CancellationToken.None).ConfigureAwait(true);
 
-        await LoadProjectFromPathAsync(window, picked[0].Path.LocalPath).ConfigureAwait(true);
+        Views.LoadProjectDialog dialog = new();
+        dialog.SetRecentProjects(recents);
+
+        string? path = await dialog.ShowDialog<string?>(window).ConfigureAwait(true);
+        if (string.IsNullOrWhiteSpace(path)) { return; }
+
+        await LoadProjectFromPathAsync(window, path).ConfigureAwait(true);
     }
 
     /// <summary>
@@ -306,7 +302,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     /// <summary>Opens the project at the given path. Invoked when the user
-    /// picks an entry from the topbar MRU combo.</summary>
+    /// picks an entry from the topbar MRU combo. Accepts a tuple so XAML
+    /// (which cannot easily compose multi-arg CommandParameters) can still
+    /// pass both the owning Window and the chosen file path.</summary>
     [RelayCommand]
     public async Task OpenRecentProjectAsync((Window? Window, string? Path) args)
     {
@@ -323,10 +321,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
     // ── Results grid state ───────────────────────────────────────────────────
 
     /// <summary>
-    /// Recent project paths shown in the "I miei progetti" drop-down.
-    /// Populated lazily by Wave 2B; empty for now.
+    /// Recent project entries shown in the "I miei progetti" topbar combo.
+    /// Each entry carries the full path + save-date so the dropdown can show
+    /// both filename and "salvato il …" timestamp.
     /// </summary>
-    public ObservableCollection<string> ProjectMru { get; } = [];
+    public ObservableCollection<RecentProject> ProjectMru { get; } = [];
 
     /// <summary>Grouping options shown in the topbar ComboBox.</summary>
     public IReadOnlyList<string> GroupingOptions { get; } =
@@ -370,8 +369,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
         // and the row order when no grouping is selected.
         view.SortDescriptions.Add(Avalonia.Collections.DataGridSortDescription
             .FromPath(nameof(DifferenceRowViewModel.StatusOrder)));
+        // KindOrder (Tabelle → Viste → Procedure → Funzioni → Trigger → rest)
+        // — KindDisplayName alphabetical was producing the wrong order
+        // (Funzioni / Procedure / Tabelle / Trigger / Viste).
         view.SortDescriptions.Add(Avalonia.Collections.DataGridSortDescription
-            .FromPath(nameof(DifferenceRowViewModel.KindDisplayName)));
+            .FromPath(nameof(DifferenceRowViewModel.KindOrder)));
         view.SortDescriptions.Add(Avalonia.Collections.DataGridSortDescription
             .FromPath(nameof(DifferenceRowViewModel.QualifiedName)));
         ApplyGrouping(view);

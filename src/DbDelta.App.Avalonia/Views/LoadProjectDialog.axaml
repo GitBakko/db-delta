@@ -1,0 +1,76 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:json="using:DbDelta.Persistence.Json"
+        xmlns:v="using:DbDelta.App.Views"
+        x:Class="DbDelta.App.Views.LoadProjectDialog"
+        Title="Carica progetto"
+        Width="560" Height="440"
+        WindowStartupLocation="CenterOwner"
+        CanResize="True"
+        Background="{StaticResource BgBrush}">
+  <Grid RowDefinitions="Auto,*,Auto" Margin="16">
+    <TextBlock Grid.Row="0"
+               Text="Seleziona un progetto salvato oppure sfoglia un file dal disco"
+               FontWeight="SemiBold"
+               Foreground="{StaticResource FgStrongBrush}"
+               Margin="0,0,0,10" />
+
+    <Border Grid.Row="1"
+            BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="6"
+            Background="{StaticResource BgMutedBrush}"
+            ClipToBounds="True">
+      <ListBox x:Name="ProjectsList"
+               Background="Transparent"
+               BorderThickness="0"
+               DoubleTapped="OnListDoubleTapped">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="json:RecentProject">
+            <Grid ColumnDefinitions="*,Auto" Margin="4,2">
+              <StackPanel Grid.Column="0" Spacing="2">
+                <TextBlock Text="{Binding Path, Converter={x:Static v:Converters.PathToFileName}}"
+                           FontSize="13" FontWeight="SemiBold"
+                           Foreground="{StaticResource FgStrongBrush}" />
+                <TextBlock Text="{Binding Path}"
+                           FontSize="10" FontFamily="Cascadia Mono,Consolas,monospace"
+                           Foreground="{StaticResource FgFaintBrush}"
+                           TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+              <TextBlock Grid.Column="1"
+                         Text="{Binding LastUsedUtc, Converter={x:Static v:Converters.DateToItalianLocal}}"
+                         FontSize="11"
+                         FontFamily="Cascadia Mono,Consolas,monospace"
+                         Foreground="{StaticResource FgSubtleBrush}"
+                         VerticalAlignment="Center" />
+            </Grid>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </Border>
+
+    <StackPanel Grid.Row="2"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="8"
+                Margin="0,12,0,0">
+      <Button Classes="ghost" Click="OnBrowseClick"
+              ToolTip.Tip="Sfoglia un file di progetto sul disco">
+        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <Path Width="14" Height="14" Stretch="Uniform"
+                Stroke="{Binding $parent[Button].Foreground}"
+                StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
+                Fill="Transparent"
+                Data="M 3,7 L 9,7 L 11,9 L 21,9 L 21,17 L 3,17 Z" />
+          <TextBlock Text="Sfoglia dal disco…" VerticalAlignment="Center" />
+        </StackPanel>
+      </Button>
+      <Button Classes="ghost" Click="OnCancelClick">
+        <TextBlock Text="Annulla" />
+      </Button>
+      <Button x:Name="OkButton" Classes="primary" Click="OnOkClick">
+        <TextBlock Text="Carica" />
+      </Button>
+    </StackPanel>
+  </Grid>
+</Window>

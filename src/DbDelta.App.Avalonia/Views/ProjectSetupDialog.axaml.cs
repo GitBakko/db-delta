@@ -2,7 +2,6 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
-using Avalonia.Threading;
 using DbDelta.App.ViewModels;
 using DbDelta.Core.Abstractions;
 using DbDelta.Persistence.Sql;
@@ -67,30 +66,16 @@ public partial class ProjectSetupDialog : Window
         string dbBoxName,
         ProjectEndpointPanelViewModel panel)
     {
-        // Server scan no longer auto-opens its dropdown — the auto-scan now
-        // runs on dialog open, and popping the combo open on a background
-        // event was disruptive. The user opens the dropdown explicitly via
-        // the chevron button when they want to browse the list.
-        _ = serverBoxName; // kept for future use
-
-        if (propertyName == nameof(ProjectEndpointPanelViewModel.IsLoadingDatabases)
-            && !panel.IsLoadingDatabases
-            && panel.HasDatabases)
-        {
-            OpenDropdownDeferred(dbBoxName);
-        }
+        // Neither the server scan nor the database load auto-opens its
+        // dropdown anymore — popping a combo open on a background event is
+        // disruptive. The user clicks the chevron explicitly when they want
+        // to browse the list.
+        _ = propertyName;
+        _ = serverBoxName;
+        _ = dbBoxName;
+        _ = panel;
     }
 
-    private void OpenDropdownDeferred(string boxName)
-    {
-        Dispatcher.UIThread.Post(() =>
-        {
-            AutoCompleteBox? box = this.FindControl<AutoCompleteBox>(boxName);
-            if (box is null) { return; }
-            box.Focus();
-            box.IsDropDownOpen = true;
-        }, DispatcherPriority.Background);
-    }
 
     // ── Server chevron clicks ─────────────────────────────────────────────────
 
@@ -205,23 +190,22 @@ public partial class ProjectSetupDialog : Window
 
     private async void OnLoadClick(object? sender, RoutedEventArgs e)
     {
-        FilePickerOpenOptions opts = new()
-        {
-            Title = "Carica progetto DbDelta",
-            AllowMultiple = false,
-            FileTypeFilter =
-            [
-                new FilePickerFileType("Progetto DbDelta") { Patterns = ["*.dbd"] },
-            ],
-        };
-        IReadOnlyList<IStorageFile> files =
-            await StorageProvider.OpenFilePickerAsync(opts).ConfigureAwait(true);
-        if (files.Count == 0) { return; }
-        IStorageFile file = files[0];
+        // Round-7 UX: show the MRU dialog (with browse-from-disk fallback)
+        // instead of jumping straight into the OS file picker.
+        Persistence.Json.JsonRecentProjectsStore recents =
+            Persistence.Json.JsonRecentProjectsStore.CreateDefault();
+        IReadOnlyList<Persistence.Json.RecentProject> list =
+            await recents.LoadAsync(CancellationToken.None).ConfigureAwait(true);
+
+        LoadProjectDialog loadDialog = new();
+        loadDialog.SetRecentProjects(list);
+
+        string? pickedPath = await loadDialog.ShowDialog<string?>(this).ConfigureAwait(true);
+        if (string.IsNullOrWhiteSpace(pickedPath)) { return; }
 
         Persistence.Xml.XmlProjectStore store = new();
         DbDeltaProject project =
-            await store.LoadAsync(file.Path.LocalPath, CancellationToken.None)
+            await store.LoadAsync(pickedPath, CancellationToken.None)
                        .ConfigureAwait(true);
 
         if (DataContext is ProjectSetupViewModel vm)
