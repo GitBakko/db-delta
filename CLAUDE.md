@@ -41,6 +41,24 @@ These are **non-negotiable** styling rules. Apply on every UI change.
    Tema, panel forms, footer action bars) read as a single elegant strip.
    When introducing a new control, set `Height="32"` or use a shared style.
 
+3. **DRY — Don't Repeat Yourself, ALWAYS.** This is the single binding rule
+   for every future change. Any UI pattern (XAML markup, code-behind logic,
+   view-model boilerplate) that would be duplicated more than **once**
+   MUST be extracted before the second copy ships:
+   - Repeated XAML: extract to a `UserControl` under `Views/Controls/` (or
+     a `Style` in `AppStyles.axaml` when it is purely visual).
+   - Repeated behaviour: extract to a method, base class, or `behavior`.
+   - Repeated view-model logic: extract to a shared service or partial
+     base view-model.
+   - When tempted to copy-paste a snippet "just this once" — STOP, create
+     the abstraction first, then use it from both call sites.
+   Violation example we've already paid for: the in-button "busy" markup
+   (spinner + label) was copy-pasted into 4 buttons; one was missed in a
+   refactor and shipped in an inconsistent state. The lesson: a reusable
+   `LoadingContent` UserControl is mandatory — see
+   `Views/Controls/LoadingContent.axaml`. Apply the same principle to
+   every future repeated pattern. No spaghetti programming.
+
 ## Agent Comms — Reality-Based Coordination
 
 **Tool-availability asymmetry:** `SendMessage` works **lead↔subagent** and lead↔lead, but **NOT subagent↔subagent**. Subagents spawned via the `Agent` tool are stateless one-shot workers — they have no inbox, cannot wait for events, and `SendMessage`/`TaskUpdate` are typically not in their tool allowlists. The `hive-mind_*` MCP tools provide coordination **metadata** (registry, consensus state) but do NOT grant subagents communication channels. Patterns that assume peer messaging will silently fail — agents either abort cleanly or run open-loop with stale assumptions. (See ruvnet/ruflo#2028 for the diagnosis.)

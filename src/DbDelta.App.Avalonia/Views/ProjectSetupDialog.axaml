@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:DbDelta.App.ViewModels"
         xmlns:v="using:DbDelta.App.Views"
+        xmlns:c="using:DbDelta.App.Views.Controls"
         xmlns:sql="using:DbDelta.Persistence.Sql"
         x:Class="DbDelta.App.Views.ProjectSetupDialog"
         x:DataType="vm:ProjectSetupViewModel"
@@ -156,26 +157,9 @@
                       Command="{Binding $parent[Window].((vm:ProjectSetupViewModel)DataContext).ScanForCommand}"
                       CommandParameter="source"
                       ToolTip.Tip="Cerca server SQL in rete (popola entrambi i pannelli)">
-                <Panel>
-                  <!-- Idle: icon + label -->
-                  <StackPanel Orientation="Horizontal" Spacing="6"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"
-                              IsVisible="{Binding !IsScanningServers}">
-                    <Path Width="14" Height="14" Stretch="Uniform"
-                          Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.7" StrokeLineCap="Round"
-                          Data="M 11,4 A 7,7 0 1 1 4,11 A 7,7 0 0 1 11,4 M 16,16 L 20,20" />
-                    <TextBlock Text="Scansiona" VerticalAlignment="Center" />
-                  </StackPanel>
-                  <!-- Busy: compact slim ProgressBar + "In corso…" label.
-                       The shared "spinner" class fixes the bar to 42×4 so
-                       it reads as a deliberate state, not a chunky strip. -->
-                  <StackPanel Orientation="Horizontal" Spacing="8"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"
-                              IsVisible="{Binding IsScanningServers}">
-                    <ProgressBar Classes="spinner" />
-                    <TextBlock Text="In corso…" VerticalAlignment="Center" />
-                  </StackPanel>
-                </Panel>
+                <c:LoadingContent IdleText="Scansiona"
+                                  IsBusy="{Binding IsScanningServers}"
+                                  IconPath="M 11,4 A 7,7 0 1 1 4,11 A 7,7 0 0 1 11,4 M 16,16 L 20,20" />
               </Button>
             </Grid>
             <!-- Error-only scan status (counter is inline above) -->
@@ -222,22 +206,9 @@
                         IsChecked="{Binding TrustServerCertificate, Mode=TwoWay}" />
               <Button Grid.Column="4" Classes="ghost-emerald" MinWidth="110" MaxWidth="110"
                       Command="{Binding LoadDatabasesCommand}" ToolTip.Tip="Connetti e carica database">
-                <Panel>
-                  <StackPanel Orientation="Horizontal" Spacing="6"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"
-                              IsVisible="{Binding !IsLoadingDatabases}">
-                    <Path Width="14" Height="14" Stretch="Uniform"
-                          Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.7" StrokeLineCap="Round"
-                          Data="M 5,12 L 19,12 M 13,6 L 19,12 L 13,18" />
-                    <TextBlock Text="Connetti" VerticalAlignment="Center" />
-                  </StackPanel>
-                  <StackPanel Orientation="Horizontal" Spacing="8"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"
-                              IsVisible="{Binding IsLoadingDatabases}">
-                    <ProgressBar Classes="spinner" />
-                    <TextBlock Text="In corso…" VerticalAlignment="Center" />
-                  </StackPanel>
-                </Panel>
+                <c:LoadingContent IdleText="Connetti"
+                                  IsBusy="{Binding IsLoadingDatabases}"
+                                  IconPath="M 5,12 L 19,12 M 13,6 L 19,12 L 13,18" />
               </Button>
             </Grid>
 
@@ -349,21 +320,9 @@
                       Command="{Binding $parent[Window].((vm:ProjectSetupViewModel)DataContext).ScanForCommand}"
                       CommandParameter="target"
                       ToolTip.Tip="Cerca server SQL in rete (popola entrambi i pannelli)">
-                <Panel>
-                  <StackPanel Orientation="Horizontal" Spacing="6"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"
-                              IsVisible="{Binding !IsScanningServers}">
-                    <Path Width="14" Height="14" Stretch="Uniform"
-                          Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.7" StrokeLineCap="Round"
-                          Data="M 11,4 A 7,7 0 1 1 4,11 A 7,7 0 0 1 11,4 M 16,16 L 20,20" />
-                    <TextBlock Text="Scansiona" VerticalAlignment="Center" />
-                  </StackPanel>
-                  <ProgressBar IsIndeterminate="True" Height="6"
-                               MaxWidth="96" HorizontalAlignment="Center" VerticalAlignment="Center"
-                               Foreground="{StaticResource Violet500Brush}"
-                               Background="{StaticResource Violet100Brush}"
-                               IsVisible="{Binding IsScanningServers}" ShowProgressText="False" />
-                </Panel>
+                <c:LoadingContent IdleText="Scansiona"
+                                  IsBusy="{Binding IsScanningServers}"
+                                  IconPath="M 11,4 A 7,7 0 1 1 4,11 A 7,7 0 0 1 11,4 M 16,16 L 20,20" />
               </Button>
             </Grid>
             <TextBlock Text="{Binding ScanStatusMessage}" FontSize="11"
@@ -409,22 +368,9 @@
                         IsChecked="{Binding TrustServerCertificate, Mode=TwoWay}" />
               <Button Grid.Column="4" Classes="ghost-emerald" MinWidth="110" MaxWidth="110"
                       Command="{Binding LoadDatabasesCommand}" ToolTip.Tip="Connetti e carica database">
-                <Panel>
-                  <StackPanel Orientation="Horizontal" Spacing="6"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"
-                              IsVisible="{Binding !IsLoadingDatabases}">
-                    <Path Width="14" Height="14" Stretch="Uniform"
-                          Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.7" StrokeLineCap="Round"
-                          Data="M 5,12 L 19,12 M 13,6 L 19,12 L 13,18" />
-                    <TextBlock Text="Connetti" VerticalAlignment="Center" />
-                  </StackPanel>
-                  <StackPanel Orientation="Horizontal" Spacing="8"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"
-                              IsVisible="{Binding IsLoadingDatabases}">
-                    <ProgressBar Classes="spinner" />
-                    <TextBlock Text="In corso…" VerticalAlignment="Center" />
-                  </StackPanel>
-                </Panel>
+                <c:LoadingContent IdleText="Connetti"
+                                  IsBusy="{Binding IsLoadingDatabases}"
+                                  IconPath="M 5,12 L 19,12 M 13,6 L 19,12 L 13,18" />
               </Button>
             </Grid>
 

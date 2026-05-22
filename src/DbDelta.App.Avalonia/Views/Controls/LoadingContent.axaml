@@ -1,0 +1,38 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:DbDelta.App.Views.Controls"
+             x:Class="DbDelta.App.Views.Controls.LoadingContent"
+             x:DataType="c:LoadingContent"
+             x:Name="Self">
+
+  <!-- Two mutually-exclusive horizontal stacks: idle (icon + idle text) or
+       busy (slim ProgressBar.spinner + busy text). Bindings target the
+       owning UserControl so consumers only set the dependency properties:
+       IconPath, IdleText, BusyText (default "In corso…"), IsBusy. -->
+  <Panel>
+
+    <!-- Idle: icon (Path) + label -->
+    <StackPanel Orientation="Horizontal" Spacing="6"
+                HorizontalAlignment="Center" VerticalAlignment="Center"
+                IsVisible="{Binding !IsBusy, ElementName=Self}">
+      <Path Width="14" Height="14" Stretch="Uniform"
+            Stroke="{Binding $parent[Button].Foreground}"
+            StrokeThickness="1.7" StrokeLineCap="Round" StrokeJoin="Round"
+            Fill="Transparent"
+            Data="{Binding IconPath, ElementName=Self}" />
+      <TextBlock Text="{Binding IdleText, ElementName=Self}"
+                 VerticalAlignment="Center" />
+    </StackPanel>
+
+    <!-- Busy: shared "spinner" ProgressBar + busy text -->
+    <StackPanel Orientation="Horizontal" Spacing="8"
+                HorizontalAlignment="Center" VerticalAlignment="Center"
+                IsVisible="{Binding IsBusy, ElementName=Self}">
+      <ProgressBar Classes="spinner" />
+      <TextBlock Text="{Binding BusyText, ElementName=Self}"
+                 VerticalAlignment="Center" />
+    </StackPanel>
+
+  </Panel>
+
+</UserControl>
