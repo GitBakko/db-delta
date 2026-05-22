@@ -55,6 +55,24 @@
             <Color x:Key="Danger">#B31220</Color>
             <Color x:Key="DangerSoft">#FFE4E1</Color>
             <Color x:Key="DangerFg">#850513</Color>
+
+            <!-- Results-grid row hover / selected tints (per status). Used by
+                 the DataGrid :pointerover / :selected style on Rectangle#
+                 BackgroundRectangle so the row wash follows the diff status. -->
+            <Color x:Key="RowModifiedHover">#EAF1FB</Color>
+            <Color x:Key="RowModifiedSelected">#CFE2FF</Color>
+            <Color x:Key="RowOnlyDestHover">#FBE1E5</Color>
+            <Color x:Key="RowOnlyDestSelected">#FFCED3</Color>
+            <Color x:Key="RowOnlyProvHover">#DAF3E1</Color>
+            <Color x:Key="RowOnlyProvSelected">#ADDFBD</Color>
+            <Color x:Key="RowIdenticalHover">#F4F5F8</Color>
+            <Color x:Key="RowIdenticalSelected">#E5E7EB</Color>
+
+            <!-- Diff viewer line backgrounds — soft accent tints painted on
+                 the source pane (Removed/Modified) and target pane (Added/
+                 Modified) lines. -->
+            <Color x:Key="DiffSourceLine">#CDFFD6</Color>
+            <Color x:Key="DiffTargetLine">#FFCED3</Color>
         </ResourceDictionary>
 
         <!-- ============ DARK ============ -->
@@ -101,6 +119,25 @@
             <Color x:Key="Danger">#E55C7D</Color>
             <Color x:Key="DangerSoft">#3A1822</Color>
             <Color x:Key="DangerFg">#E89AAA</Color>
+
+            <!-- Dark-mode row hover / selected tints. Low-luminance status
+                 washes so the white text in dark mode stays legible (the
+                 light hex used in dark mode previously caused white-on-
+                 light row painting → illegible). -->
+            <Color x:Key="RowModifiedHover">#15233A</Color>
+            <Color x:Key="RowModifiedSelected">#1E325A</Color>
+            <Color x:Key="RowOnlyDestHover">#311720</Color>
+            <Color x:Key="RowOnlyDestSelected">#4A1E2E</Color>
+            <Color x:Key="RowOnlyProvHover">#142A1B</Color>
+            <Color x:Key="RowOnlyProvSelected">#1C3D26</Color>
+            <Color x:Key="RowIdenticalHover">#1B1E25</Color>
+            <Color x:Key="RowIdenticalSelected">#252A33</Color>
+
+            <!-- Diff viewer line backgrounds — deep emerald / crimson tints
+                 so the bright source/target chrome stays readable on the
+                 dark canvas while still conveying "this line changed". -->
+            <Color x:Key="DiffSourceLine">#0F2A1A</Color>
+            <Color x:Key="DiffTargetLine">#3A1822</Color>
         </ResourceDictionary>
 
     </ResourceDictionary.ThemeDictionaries>
@@ -149,5 +186,19 @@
     <SolidColorBrush x:Key="DangerBrush"          Color="{DynamicResource Danger}" />
     <SolidColorBrush x:Key="DangerSoftBrush"      Color="{DynamicResource DangerSoft}" />
     <SolidColorBrush x:Key="DangerFgBrush"        Color="{DynamicResource DangerFg}" />
+
+    <!-- Row status hover / selected brushes (theme-reactive) -->
+    <SolidColorBrush x:Key="RowModifiedHoverBrush"      Color="{DynamicResource RowModifiedHover}" />
+    <SolidColorBrush x:Key="RowModifiedSelectedBrush"   Color="{DynamicResource RowModifiedSelected}" />
+    <SolidColorBrush x:Key="RowOnlyDestHoverBrush"      Color="{DynamicResource RowOnlyDestHover}" />
+    <SolidColorBrush x:Key="RowOnlyDestSelectedBrush"   Color="{DynamicResource RowOnlyDestSelected}" />
+    <SolidColorBrush x:Key="RowOnlyProvHoverBrush"      Color="{DynamicResource RowOnlyProvHover}" />
+    <SolidColorBrush x:Key="RowOnlyProvSelectedBrush"   Color="{DynamicResource RowOnlyProvSelected}" />
+    <SolidColorBrush x:Key="RowIdenticalHoverBrush"     Color="{DynamicResource RowIdenticalHover}" />
+    <SolidColorBrush x:Key="RowIdenticalSelectedBrush"  Color="{DynamicResource RowIdenticalSelected}" />
+
+    <!-- Diff viewer per-line backgrounds (theme-reactive) -->
+    <SolidColorBrush x:Key="DiffSourceLineBrush"        Color="{DynamicResource DiffSourceLine}" />
+    <SolidColorBrush x:Key="DiffTargetLineBrush"        Color="{DynamicResource DiffTargetLine}" />
 
 </ResourceDictionary>

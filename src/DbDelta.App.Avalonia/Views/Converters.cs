@@ -159,39 +159,74 @@ public static class Converters
     });
 
     /// <summary>
-    /// Maps a <see cref="LineStatus"/> to the background brush for the SOURCE pane row.
-    /// Source-side semantics (user spec): "additions" on the source pane are
-    /// painted GREEN. Both <see cref="LineStatus.Removed"/> (line present only
-    /// in source) and <see cref="LineStatus.Modified"/> (line differs between
-    /// sides) qualify — a substitution renders green-on-source and red-on-target
-    /// on the same row.
+    /// Resolves a theme-aware brush from the application resources by key.
+    /// Returns Transparent when the key isn't found — used by the diff-line
+    /// and row-status converters below so a missing token never crashes.
+    /// </summary>
+    private static IBrush ResolveBrush(string key) =>
+        Avalonia.Application.Current?.Resources.TryGetResource(key, null, out object? value) == true
+        && value is IBrush brush
+            ? brush
+            : Brushes.Transparent;
+
+    /// <summary>
+    /// Maps a <see cref="LineStatus"/> to the background brush for the SOURCE
+    /// pane row. Theme-aware (round-15): looks up <c>DiffSourceLineBrush</c>
+    /// which resolves to a soft emerald tint in light mode and a deep
+    /// emerald shade in dark mode (so the white code text stays legible).
     /// </summary>
     public static readonly IValueConverter LineStatusToSourceBackground =
         new FuncValueConverter<LineStatus, IBrush?>(static status => status switch
         {
-            LineStatus.Removed => new SolidColorBrush(Color.Parse("#CDFFD6")),  // emerald soft
-            LineStatus.Modified => new SolidColorBrush(Color.Parse("#CDFFD6")), // emerald soft
+            LineStatus.Removed => ResolveBrush("DiffSourceLineBrush"),
+            LineStatus.Modified => ResolveBrush("DiffSourceLineBrush"),
             LineStatus.Unchanged => Brushes.Transparent,
             LineStatus.Added => Brushes.Transparent,
             _ => Brushes.Transparent,
         });
 
     /// <summary>
-    /// Maps a <see cref="LineStatus"/> to the background brush for the TARGET pane row.
-    /// Target-side semantics: "deletions" on the target pane (lines that
-    /// shouldn't be there) are painted RED. Both <see cref="LineStatus.Added"/>
-    /// (line present only in target) and <see cref="LineStatus.Modified"/>
-    /// qualify.
+    /// Mirror of <see cref="LineStatusToSourceBackground"/> for the TARGET
+    /// pane. Uses <c>DiffTargetLineBrush</c> — soft crimson in light mode,
+    /// deep crimson in dark.
     /// </summary>
     public static readonly IValueConverter LineStatusToTargetBackground =
         new FuncValueConverter<LineStatus, IBrush?>(static status => status switch
         {
-            LineStatus.Added => new SolidColorBrush(Color.Parse("#FFCED3")),    // crimson soft
-            LineStatus.Modified => new SolidColorBrush(Color.Parse("#FFCED3")), // crimson soft
+            LineStatus.Added => ResolveBrush("DiffTargetLineBrush"),
+            LineStatus.Modified => ResolveBrush("DiffTargetLineBrush"),
             LineStatus.Unchanged => Brushes.Transparent,
             LineStatus.Removed => Brushes.Transparent,
             _ => Brushes.Transparent,
         });
+
+    /// <summary>
+    /// Maps a <c>DifferenceRowViewModel.Status</c> string to the
+    /// theme-aware row-hover background brush. Used by the DataGrid
+    /// :pointerover style in <c>ResultsGridView</c>. The brushes themselves
+    /// are defined in <c>Themes.axaml</c> and re-resolve on theme change.
+    /// </summary>
+    public static readonly IValueConverter StatusToRowHoverBrush =
+        new FuncValueConverter<string?, IBrush?>(static status => ResolveBrush(status switch
+        {
+            "Different" => "RowModifiedHoverBrush",
+            "OnlyInB" => "RowOnlyDestHoverBrush",
+            "OnlyInA" => "RowOnlyProvHoverBrush",
+            _ => "RowIdenticalHoverBrush",
+        }));
+
+    /// <summary>
+    /// Mirror of <see cref="StatusToRowHoverBrush"/> for the :selected state.
+    /// Slightly more saturated tint than hover so selection stands out.
+    /// </summary>
+    public static readonly IValueConverter StatusToRowSelectedBrush =
+        new FuncValueConverter<string?, IBrush?>(static status => ResolveBrush(status switch
+        {
+            "Different" => "RowModifiedSelectedBrush",
+            "OnlyInB" => "RowOnlyDestSelectedBrush",
+            "OnlyInA" => "RowOnlyProvSelectedBrush",
+            _ => "RowIdenticalSelectedBrush",
+        }));
 
     /// <summary>
     /// Returns <c>true</c> when the given <see cref="LineStatus"/> should

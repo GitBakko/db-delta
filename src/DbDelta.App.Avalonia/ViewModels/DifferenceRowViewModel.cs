@@ -43,25 +43,10 @@ public sealed partial class DifferenceRowViewModel(DifferencePair pair, Differen
         _ => "#9097A0", // neutral
     };
 
-    /// <summary>Soft tint hex for the row background on hover (subtle wash of
-    /// the status colour). Picked from the design-system 100-step ramps.</summary>
-    public string RowHoverHex => Dto.Status switch
-    {
-        "Different" => "#EAF1FB", // primary 100-ish
-        "OnlyInB" => "#FBE1E5",   // crimson 100-ish
-        "OnlyInA" => "#DAF3E1",   // emerald 100
-        _ => "#F4F5F8",            // neutral
-    };
-
-    /// <summary>Slightly more saturated tint than <see cref="RowHoverHex"/>
-    /// used when the row is selected — distinguishes selection from hover.</summary>
-    public string RowSelectedHex => Dto.Status switch
-    {
-        "Different" => "#CFE2FF", // primary 200-ish
-        "OnlyInB" => "#FFCED3",   // crimson 200
-        "OnlyInA" => "#ADDFBD",   // emerald 200
-        _ => "#E5E7EB",            // neutral
-    };
+    // Row hover/selected tints moved to theme-aware brushes in Themes.axaml
+    // (round-15). The XAML side now uses StatusToRowHoverBrush /
+    // StatusToRowSelectedBrush converters on Status so light + dark modes
+    // both render legible row washes.
 
     // Convenience pass-throughs used by grid column bindings.
     public string Kind => Dto.Kind;

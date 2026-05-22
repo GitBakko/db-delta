@@ -39,14 +39,16 @@
         <DataGrid.Styles>
           <!-- Row hover/selected tints follow the row's status colour: blue
                for Modified, red for Solo destinazione, green for Solo
-               provenienza, grey for Identici. Keeps the visual link between
-               group header stripe and row state consistent. -->
+               provenienza, grey for Identici. Theme-aware (round-15) — the
+               converters resolve to soft tints in light mode and deep
+               accent shades in dark mode so text contrast is preserved
+               across themes. -->
           <Style Selector="DataGridRow:pointerover /template/ Rectangle#BackgroundRectangle">
-            <Setter Property="Fill" Value="{Binding ((vm:DifferenceRowViewModel)DataContext).RowHoverHex, RelativeSource={RelativeSource AncestorType=DataGridRow}, Converter={x:Static v:Converters.HexToBrush}}" />
-            <Setter Property="Opacity" Value="0.7" />
+            <Setter Property="Fill" Value="{Binding ((vm:DifferenceRowViewModel)DataContext).Status, RelativeSource={RelativeSource AncestorType=DataGridRow}, Converter={x:Static v:Converters.StatusToRowHoverBrush}}" />
+            <Setter Property="Opacity" Value="1" />
           </Style>
           <Style Selector="DataGridRow:selected /template/ Rectangle#BackgroundRectangle">
-            <Setter Property="Fill" Value="{Binding ((vm:DifferenceRowViewModel)DataContext).RowSelectedHex, RelativeSource={RelativeSource AncestorType=DataGridRow}, Converter={x:Static v:Converters.HexToBrush}}" />
+            <Setter Property="Fill" Value="{Binding ((vm:DifferenceRowViewModel)DataContext).Status, RelativeSource={RelativeSource AncestorType=DataGridRow}, Converter={x:Static v:Converters.StatusToRowSelectedBrush}}" />
             <Setter Property="Opacity" Value="1" />
           </Style>
 
