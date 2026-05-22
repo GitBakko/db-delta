@@ -72,51 +72,79 @@
 
     <!-- ── Diff body ─────────────────────────────────────────────────────── -->
     <!-- Layout (l-to-r):
-         [src-gutter 8][2 gap][tgt-gutter 8][source text *][centre actions 32]
-         [target text *][shared scrollbar 16]
+         [minimap strip 18][source text *][centre actions 32][target text *]
+         [shared scrollbar 16]
 
-         The two gutters at the extreme left scroll in lockstep with the text
-         panes (synced via GuttersScroll wired in code-behind). Each row
-         renders a 4-px coloured rectangle when the row's LineStatus matches
-         the gutter's role — left gutter green for source-side adds/mods,
-         right gutter red for target-side adds/mods. -->
-    <Grid Grid.Row="1" ColumnDefinitions="8,2,8,*,32,*,16">
+         The minimap strip on the extreme left is a SCALED overview of the
+         entire document — marks at fixed positions show where diffs live in
+         the file, and an overlay rectangle mirrors the scrollbar viewport so
+         you can see "you are here" at a glance (matches SQL Compare's
+         column-left indicator strip). Two contiguous narrow columns:
+           col 1 = source-side adds/mods (green)
+           col 2 = target-side adds/mods (red)
+         Separated by a 2-px gap. Marks are positioned by code-behind
+         (PositionMinimapItems) every time the Rows collection or strip
+         height changes; the viewport rectangle is repositioned on every
+         scroll event. -->
+    <Grid Grid.Row="1" ColumnDefinitions="20,*,32,*,16">
 
-      <!-- Gutters wrapped in a single ScrollViewer so they scroll together
-           and a wheel hit anywhere on the gutter strip moves both panes. -->
-      <ScrollViewer Grid.Column="0" Grid.ColumnSpan="3"
-                    x:Name="GuttersScroll"
-                    HorizontalScrollBarVisibility="Disabled"
-                    VerticalScrollBarVisibility="Hidden">
-        <ItemsControl ItemsSource="{Binding Rows}">
+      <!-- Minimap strip + viewport overlay (extreme left). -->
+      <Panel Grid.Column="0"
+             x:Name="MinimapStrip"
+             Background="{StaticResource BgMutedBrush}"
+             ClipToBounds="True">
+        <!-- Source-side marks (green, left half) -->
+        <ItemsControl x:Name="SourceMarks"
+                      ItemsSource="{Binding Rows}"
+                      ClipToBounds="True">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
-              <StackPanel Orientation="Vertical" />
+              <Canvas />
             </ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="diff:LineDiff">
-              <Grid ColumnDefinitions="8,2,8" Height="18">
-                <!-- Source-side indicator (green) -->
-                <Rectangle Grid.Column="0"
-                           Fill="#35AF6D"
-                           Margin="1,2"
-                           RadiusX="1" RadiusY="1"
-                           IsVisible="{Binding Status, Converter={x:Static v:Converters.IsSourceIndicator}}" />
-                <!-- Target-side indicator (red) -->
-                <Rectangle Grid.Column="2"
-                           Fill="#DD2F44"
-                           Margin="1,2"
-                           RadiusX="1" RadiusY="1"
-                           IsVisible="{Binding Status, Converter={x:Static v:Converters.IsTargetIndicator}}" />
-              </Grid>
+              <Rectangle Width="8" Height="2"
+                         Fill="#35AF6D"
+                         RadiusX="1" RadiusY="1"
+                         IsVisible="{Binding Status, Converter={x:Static v:Converters.IsSourceIndicator}}" />
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
-      </ScrollViewer>
+        <!-- Target-side marks (red, right half) -->
+        <ItemsControl x:Name="TargetMarks"
+                      ItemsSource="{Binding Rows}"
+                      ClipToBounds="True">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <Canvas />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="diff:LineDiff">
+              <Rectangle Width="8" Height="2"
+                         Fill="#DD2F44"
+                         RadiusX="1" RadiusY="1"
+                         IsVisible="{Binding Status, Converter={x:Static v:Converters.IsTargetIndicator}}" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <!-- Viewport overlay — mirrors the visible portion of the source
+             scroll viewer. Top + Height are set in code-behind on every
+             ScrollChanged event. -->
+        <Border x:Name="ViewportRect"
+                Background="#3300A4DC"
+                BorderBrush="#0096C8"
+                BorderThickness="1"
+                IsHitTestVisible="False"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Top"
+                Height="0"
+                Margin="0,0,0,0" />
+      </Panel>
 
       <!-- ── Source text pane ─────────────────────────────────────────────── -->
-      <ScrollViewer Grid.Column="3"
+      <ScrollViewer Grid.Column="1"
                     x:Name="SourceScroll"
                     HorizontalScrollBarVisibility="Auto"
                     VerticalScrollBarVisibility="Hidden">
@@ -154,7 +182,7 @@
       </ScrollViewer>
 
       <!-- ── Centre actions column ───────────────────────────────────────── -->
-      <Border Grid.Column="4"
+      <Border Grid.Column="2"
               BorderBrush="{StaticResource BorderBrush}"
               BorderThickness="1,0,1,0"
               Background="{StaticResource BgMutedBrush}">
@@ -194,7 +222,7 @@
       </Border>
 
       <!-- ── Target text pane ────────────────────────────────────────────── -->
-      <ScrollViewer Grid.Column="5"
+      <ScrollViewer Grid.Column="3"
                     x:Name="TargetScroll"
                     HorizontalScrollBarVisibility="Auto"
                     VerticalScrollBarVisibility="Hidden">
@@ -232,7 +260,7 @@
       </ScrollViewer>
 
       <!-- ── Shared vertical scrollbar (rightmost column) ────────────────── -->
-      <ScrollBar Grid.Column="6"
+      <ScrollBar Grid.Column="4"
                  x:Name="SharedScrollBar"
                  Orientation="Vertical"
                  HorizontalAlignment="Stretch"

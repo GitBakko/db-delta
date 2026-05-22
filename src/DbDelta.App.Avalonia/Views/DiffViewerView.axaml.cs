@@ -19,8 +19,11 @@ public partial class DiffViewerView : UserControl
     private ScrollViewer? _sourceScroll;
     private ScrollViewer? _targetScroll;
     private ScrollViewer? _centerScroll;
-    private ScrollViewer? _guttersScroll;
     private ScrollBar? _sharedScrollBar;
+    private Panel? _minimapStrip;
+    private ItemsControl? _sourceMarks;
+    private ItemsControl? _targetMarks;
+    private Border? _viewportRect;
     private bool _suppressScrollSync;
 
     public DiffViewerView()
@@ -62,13 +65,18 @@ public partial class DiffViewerView : UserControl
         _sourceScroll = this.FindControl<ScrollViewer>("SourceScroll");
         _targetScroll = this.FindControl<ScrollViewer>("TargetScroll");
         _centerScroll = this.FindControl<ScrollViewer>("CenterScroll");
-        _guttersScroll = this.FindControl<ScrollViewer>("GuttersScroll");
         _sharedScrollBar = this.FindControl<ScrollBar>("SharedScrollBar");
+        _minimapStrip = this.FindControl<Panel>("MinimapStrip");
+        _sourceMarks = this.FindControl<ItemsControl>("SourceMarks");
+        _targetMarks = this.FindControl<ItemsControl>("TargetMarks");
+        _viewportRect = this.FindControl<Border>("ViewportRect");
 
 #pragma warning disable IDE0031 // event +=/-= cannot use ?. conditional form
         if (_sourceScroll is not null) { _sourceScroll.ScrollChanged += OnSourceScrollChanged; }
         if (_targetScroll is not null) { _targetScroll.ScrollChanged += OnTargetScrollChanged; }
         if (_sharedScrollBar is not null) { _sharedScrollBar.ValueChanged += OnSharedScrollBarChanged; }
+        if (_minimapStrip is not null) { _minimapStrip.LayoutUpdated += OnMinimapStripLayoutUpdated; }
+        if (_sourceMarks is not null) { _sourceMarks.LayoutUpdated += OnMinimapStripLayoutUpdated; }
 #pragma warning restore IDE0031
     }
 
@@ -78,6 +86,8 @@ public partial class DiffViewerView : UserControl
         if (_sourceScroll is not null) { _sourceScroll.ScrollChanged -= OnSourceScrollChanged; }
         if (_targetScroll is not null) { _targetScroll.ScrollChanged -= OnTargetScrollChanged; }
         if (_sharedScrollBar is not null) { _sharedScrollBar.ValueChanged -= OnSharedScrollBarChanged; }
+        if (_minimapStrip is not null) { _minimapStrip.LayoutUpdated -= OnMinimapStripLayoutUpdated; }
+        if (_sourceMarks is not null) { _sourceMarks.LayoutUpdated -= OnMinimapStripLayoutUpdated; }
 #pragma warning restore IDE0031
     }
 
@@ -88,8 +98,8 @@ public partial class DiffViewerView : UserControl
         double offsetY = _sourceScroll.Offset.Y;
         SyncTargetScrollTo(offsetY);
         SyncCenterScrollTo(offsetY);
-        SyncGuttersScrollTo(offsetY);
         SyncScrollBarTo(offsetY);
+        UpdateViewportRect();
     }
 
     /// <summary>
@@ -104,23 +114,8 @@ public partial class DiffViewerView : UserControl
         double offsetY = _targetScroll.Offset.Y;
         SyncSourceScrollTo(offsetY);
         SyncCenterScrollTo(offsetY);
-        SyncGuttersScrollTo(offsetY);
         SyncScrollBarTo(offsetY);
-    }
-
-    private void SyncGuttersScrollTo(double offsetY)
-    {
-        if (_guttersScroll is null) { return; }
-
-        _suppressScrollSync = true;
-        try
-        {
-            _guttersScroll.Offset = new Vector(_guttersScroll.Offset.X, offsetY);
-        }
-        finally
-        {
-            _suppressScrollSync = false;
-        }
+        UpdateViewportRect();
     }
 
     private void SyncSourceScrollTo(double offsetY)
@@ -194,17 +189,86 @@ public partial class DiffViewerView : UserControl
             {
                 _centerScroll.Offset = new Vector(_centerScroll.Offset.X, offsetY);
             }
-
-            if (_guttersScroll is not null)
-            {
-                _guttersScroll.Offset = new Vector(_guttersScroll.Offset.X, offsetY);
-            }
 #pragma warning restore IDE0031
         }
         finally
         {
             _suppressScrollSync = false;
         }
+    }
+
+    /// <summary>
+    /// Layout pass on the minimap strip — re-positions per-row marks and
+    /// recomputes the viewport rectangle. Fires whenever the strip resizes
+    /// or new mark containers materialise from the ItemsControl.
+    /// </summary>
+    private void OnMinimapStripLayoutUpdated(object? sender, EventArgs e)
+    {
+        PositionMinimapMarks();
+        UpdateViewportRect();
+    }
+
+    /// <summary>
+    /// Lays out the per-row diff marks inside the minimap strip. Each diff
+    /// row maps to a Y position scaled by stripHeight / contentHeight. Source
+    /// marks sit at x=1 (left half), target marks at x=11 (right half) — both
+    /// 8 px wide, 2 px tall, with a 2 px gap. Non-diff rows have invisible
+    /// rectangles and are skipped here.
+    /// </summary>
+    private void PositionMinimapMarks()
+    {
+        if (_minimapStrip is null || DataContext is not DiffViewerViewModel vm) { return; }
+
+        double stripHeight = _minimapStrip.Bounds.Height;
+        if (stripHeight <= 0 || vm.Rows.Count == 0) { return; }
+
+        double contentHeight = vm.Rows.Count * LineHeight;
+        double scale = stripHeight / contentHeight;
+
+        if (_sourceMarks is not null)
+        {
+            PositionMarksColumn(_sourceMarks, vm.Rows.Count, scale, leftPx: 1);
+        }
+        if (_targetMarks is not null)
+        {
+            PositionMarksColumn(_targetMarks, vm.Rows.Count, scale, leftPx: 11);
+        }
+    }
+
+    private static void PositionMarksColumn(ItemsControl marks, int rowCount, double scale, double leftPx)
+    {
+        for (int i = 0; i < rowCount; i++)
+        {
+            if (marks.ContainerFromIndex(i) is not Control container) { continue; }
+            double top = i * LineHeight * scale;
+            Canvas.SetTop(container, top);
+            Canvas.SetLeft(container, leftPx);
+        }
+    }
+
+    /// <summary>
+    /// Repositions the semi-transparent overlay rectangle so it mirrors the
+    /// source pane's currently-visible viewport — analogous to SQL Compare's
+    /// "you are here" indicator. Top + Height are scaled from scroll offset
+    /// and viewport height against the minimap strip size.
+    /// </summary>
+    private void UpdateViewportRect()
+    {
+        if (_viewportRect is null || _minimapStrip is null || _sourceScroll is null) { return; }
+
+        double stripHeight = _minimapStrip.Bounds.Height;
+        double extent = _sourceScroll.Extent.Height;
+        if (stripHeight <= 0 || extent <= 0) { return; }
+
+        double scale = stripHeight / extent;
+        double top = Math.Max(0, _sourceScroll.Offset.Y * scale);
+        double height = Math.Max(8, _sourceScroll.Viewport.Height * scale);
+
+        // Clamp so the rectangle never spills past the strip.
+        if (top + height > stripHeight) { top = Math.Max(0, stripHeight - height); }
+
+        _viewportRect.Margin = new Thickness(0, top, 0, 0);
+        _viewportRect.Height = height;
     }
 
     private void SyncScrollBarTo(double offsetY)

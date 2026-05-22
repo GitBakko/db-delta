@@ -23,10 +23,11 @@
         <!-- Source half -->
         <Border Grid.Column="0" Background="{StaticResource BgMutedBrush}">
           <Grid ColumnDefinitions="Auto,*,Auto" Margin="16,8">
-            <!-- DB cylinder icon — stroke colour driven by SQL Server version -->
+            <!-- DB cylinder icon — neutral muted foreground (version-based
+                 colour coding removed per user feedback round 6) -->
             <Path Grid.Column="0"
                   Width="28" Height="28" Stretch="Uniform"
-                  Stroke="{Binding Source.ServerMajorVersion, Converter={x:Static v:Converters.MajorVersionToBrush}}"
+                  Stroke="{StaticResource FgMutedBrush}"
                   StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
                   Fill="Transparent" VerticalAlignment="Center"
                   Data="M 4,6 C 4,4 8,3 12,3 C 16,3 20,4 20,6 L 20,18 C 20,20 16,21 12,21 C 8,21 4,20 4,18 Z M 4,6 C 4,8 8,9 12,9 C 16,9 20,8 20,6 M 4,12 C 4,14 8,15 12,15 C 16,15 20,14 20,12" />
@@ -67,8 +68,9 @@
                          HorizontalAlignment="Right" Opacity="0.8"
                          IsVisible="{Binding Target.DatabaseName, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
             </StackPanel>
+            <!-- Neutral DB icon — version-based stroke colouring removed -->
             <Path Grid.Column="2" Width="28" Height="28" Stretch="Uniform"
-                  Stroke="{Binding Target.ServerMajorVersion, Converter={x:Static v:Converters.MajorVersionToBrush}}"
+                  Stroke="{StaticResource PrimaryFgBrush}"
                   StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
                   Fill="Transparent" VerticalAlignment="Center"
                   Data="M 4,6 C 4,4 8,3 12,3 C 16,3 20,4 20,6 L 20,18 C 20,20 16,21 12,21 C 8,21 4,20 4,18 Z M 4,6 C 4,8 8,9 12,9 C 16,9 20,8 20,6 M 4,12 C 4,14 8,15 12,15 C 16,15 20,14 20,12" />
