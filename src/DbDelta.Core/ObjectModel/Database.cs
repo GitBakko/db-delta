@@ -30,6 +30,15 @@ public sealed record Database(
     /// CLR UDTs are intentionally excluded — see <see cref="UserDefinedType"/>.</summary>
     public IReadOnlyList<UserDefinedType> UserDefinedTypes { get; init; } = [];
 
+    /// <summary>Database users (M6).</summary>
+    public IReadOnlyList<DatabaseUser> Users { get; init; } = [];
+
+    /// <summary>Custom database roles + their memberships (M6).</summary>
+    public IReadOnlyList<DatabaseRole> Roles { get; init; } = [];
+
+    /// <summary>Object-level GRANT/DENY permissions (M6).</summary>
+    public IReadOnlyList<Permission> Permissions { get; init; } = [];
+
     /// <summary>
     /// M3 ctor — tables + views + procedures. Kept so existing call sites still compile.
     /// </summary>

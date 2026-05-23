@@ -23,8 +23,113 @@ public sealed class ComparisonEngine
         pairs.AddRange(CompareSequences(a.Sequences, b.Sequences));
         pairs.AddRange(CompareSynonyms(a.Synonyms, b.Synonyms));
         pairs.AddRange(CompareUserDefinedTypes(a.UserDefinedTypes, b.UserDefinedTypes));
+        pairs.AddRange(CompareUsers(a.Users, b.Users));
+        pairs.AddRange(CompareRoles(a.Roles, b.Roles));
+        pairs.AddRange(ComparePermissions(a.Permissions, b.Permissions));
 
         return new ComparisonResult(pairs);
+    }
+
+    // ── M6: Users / Roles / Permissions ────────────────────────────────────
+
+    private static IEnumerable<DifferencePair> CompareUsers(
+        IReadOnlyList<DatabaseUser> ax, IReadOnlyList<DatabaseUser> bx)
+    {
+        var aByIdentity = ax.ToDictionary(u => u.Identity);
+        var bByIdentity = bx.ToDictionary(u => u.Identity);
+        HashSet<ObjectIdentity> all = [.. aByIdentity.Keys];
+        all.UnionWith(bByIdentity.Keys);
+
+        foreach (ObjectIdentity id in all.OrderBy(i => i.ObjectName, StringComparer.OrdinalIgnoreCase))
+        {
+            aByIdentity.TryGetValue(id, out DatabaseUser? sideA);
+            bByIdentity.TryGetValue(id, out DatabaseUser? sideB);
+            DifferenceStatus status = (sideA, sideB) switch
+            {
+                (null, null) => DifferenceStatus.Identical,
+                (null, _) => DifferenceStatus.OnlyInB,
+                (_, null) => DifferenceStatus.OnlyInA,
+                _ => UsersEqual(sideA, sideB) ? DifferenceStatus.Identical : DifferenceStatus.Different,
+            };
+            yield return new DifferencePair(id, status, sideA, sideB);
+        }
+    }
+
+    private static bool UsersEqual(DatabaseUser a, DatabaseUser b) =>
+        string.Equals(a.TypeCode, b.TypeCode, StringComparison.Ordinal)
+        && string.Equals(a.LoginName, b.LoginName, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(a.DefaultSchema, b.DefaultSchema, StringComparison.OrdinalIgnoreCase);
+
+    private static IEnumerable<DifferencePair> CompareRoles(
+        IReadOnlyList<DatabaseRole> ax, IReadOnlyList<DatabaseRole> bx)
+    {
+        var aByIdentity = ax.ToDictionary(r => r.Identity);
+        var bByIdentity = bx.ToDictionary(r => r.Identity);
+        HashSet<ObjectIdentity> all = [.. aByIdentity.Keys];
+        all.UnionWith(bByIdentity.Keys);
+
+        foreach (ObjectIdentity id in all.OrderBy(i => i.ObjectName, StringComparer.OrdinalIgnoreCase))
+        {
+            aByIdentity.TryGetValue(id, out DatabaseRole? sideA);
+            bByIdentity.TryGetValue(id, out DatabaseRole? sideB);
+            DifferenceStatus status = (sideA, sideB) switch
+            {
+                (null, null) => DifferenceStatus.Identical,
+                (null, _) => DifferenceStatus.OnlyInB,
+                (_, null) => DifferenceStatus.OnlyInA,
+                _ => RolesEqual(sideA, sideB) ? DifferenceStatus.Identical : DifferenceStatus.Different,
+            };
+            yield return new DifferencePair(id, status, sideA, sideB);
+        }
+    }
+
+    private static bool RolesEqual(DatabaseRole a, DatabaseRole b)
+    {
+        if (!string.Equals(a.OwnerName, b.OwnerName, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+        string[] aMembers = [.. a.Members.OrderBy(m => m, StringComparer.OrdinalIgnoreCase)];
+        string[] bMembers = [.. b.Members.OrderBy(m => m, StringComparer.OrdinalIgnoreCase)];
+        if (aMembers.Length != bMembers.Length) { return false; }
+        for (int i = 0; i < aMembers.Length; i++)
+        {
+            if (!string.Equals(aMembers[i], bMembers[i], StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static IEnumerable<DifferencePair> ComparePermissions(
+        IReadOnlyList<Permission> ax, IReadOnlyList<Permission> bx)
+    {
+        // Permissions are pure presence/absence — there's nothing to "modify"
+        // about a single row beyond the row existing on one side or both. Use
+        // the DiffKey string as the pairing identity so identical
+        // (Grantee+Action+Target) rows on both sides classify as Identical.
+        Dictionary<string, Permission> aByKey =
+            ax.GroupBy(p => p.DiffKey).ToDictionary(g => g.Key, g => g.First());
+        Dictionary<string, Permission> bByKey =
+            bx.GroupBy(p => p.DiffKey).ToDictionary(g => g.Key, g => g.First());
+        HashSet<string> allKeys = [.. aByKey.Keys];
+        allKeys.UnionWith(bByKey.Keys);
+
+        foreach (string key in allKeys.OrderBy(k => k, StringComparer.Ordinal))
+        {
+            aByKey.TryGetValue(key, out Permission? sideA);
+            bByKey.TryGetValue(key, out Permission? sideB);
+            Permission anchor = sideA ?? sideB!;
+            DifferenceStatus status = (sideA, sideB) switch
+            {
+                (null, null) => DifferenceStatus.Identical,
+                (null, _) => DifferenceStatus.OnlyInB,
+                (_, null) => DifferenceStatus.OnlyInA,
+                _ => DifferenceStatus.Identical,
+            };
+            yield return new DifferencePair(anchor.Identity, status, sideA, sideB);
+        }
     }
 
     // ── M5: Sequence / Synonym / UserDefinedType ──────────────────────────

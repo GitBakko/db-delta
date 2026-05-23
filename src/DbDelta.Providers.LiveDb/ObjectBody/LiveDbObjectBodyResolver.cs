@@ -40,6 +40,9 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
             "Sequence" => await ResolveSequenceBodyAsync(connection, schemaName, objectName, ct).ConfigureAwait(false),
             "Synonym" => await ResolveSynonymBodyAsync(connection, schemaName, objectName, ct).ConfigureAwait(false),
             "UserDefinedType" => await ResolveUserDefinedTypeBodyAsync(connection, schemaName, objectName, ct).ConfigureAwait(false),
+            "User" => await ResolveUserBodyAsync(connection, objectName, ct).ConfigureAwait(false),
+            "Role" => await ResolveRoleBodyAsync(connection, objectName, ct).ConfigureAwait(false),
+            "Permission" => Task.FromResult<string?>(null).Result, // permissions render as identity-only rows
             _ => await ResolveModuleBodyAsync(connection, schemaName, objectName, ct).ConfigureAwait(false),
         };
     }
@@ -98,6 +101,68 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
             Schema: schema, Name: name, BaseObjectName: (string)raw,
             TargetServer: null, TargetDatabase: null, TargetSchema: null, TargetObject: null);
         return new SynonymScriptEmitter().EmitCreate(syn);
+    }
+
+    private static async Task<string?> ResolveUserBodyAsync(
+        SqlConnection connection, string name, CancellationToken ct)
+    {
+        const string sql = """
+            SELECT p.type, sp.name AS LoginName, p.default_schema_name
+            FROM sys.database_principals AS p
+            LEFT JOIN sys.server_principals AS sp ON sp.sid = p.sid
+            WHERE p.name = @name;
+            """;
+        await using SqlCommand cmd = new(sql, connection);
+        cmd.Parameters.AddWithValue("@name", name);
+        await using SqlDataReader r = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        if (!await r.ReadAsync(ct).ConfigureAwait(false)) { return null; }
+        DatabaseUser user = new(
+            Name: name,
+            TypeCode: r.GetString(0).Trim(),
+            LoginName: r.IsDBNull(1) ? null : r.GetString(1),
+            DefaultSchema: r.IsDBNull(2) ? "dbo" : r.GetString(2));
+        return new UserScriptEmitter().EmitCreate(user);
+    }
+
+    private static async Task<string?> ResolveRoleBodyAsync(
+        SqlConnection connection, string name, CancellationToken ct)
+    {
+        const string ownerSql = """
+            SELECT o.name
+            FROM sys.database_principals AS r
+            LEFT JOIN sys.database_principals AS o ON o.principal_id = r.owning_principal_id
+            WHERE r.name = @name AND r.type = 'R';
+            """;
+        string? owner;
+        await using (SqlCommand cmd = new(ownerSql, connection))
+        {
+            cmd.Parameters.AddWithValue("@name", name);
+            object? scalar = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+            if (scalar is null) { return null; }
+            owner = scalar is DBNull ? "dbo" : (string)scalar;
+        }
+
+        const string membersSql = """
+            SELECT m.name
+            FROM sys.database_role_members AS rm
+            INNER JOIN sys.database_principals AS r ON r.principal_id = rm.role_principal_id
+            INNER JOIN sys.database_principals AS m ON m.principal_id = rm.member_principal_id
+            WHERE r.name = @name
+            ORDER BY m.name;
+            """;
+        List<string> members = [];
+        await using (SqlCommand cmd = new(membersSql, connection))
+        {
+            cmd.Parameters.AddWithValue("@name", name);
+            await using SqlDataReader r = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+            while (await r.ReadAsync(ct).ConfigureAwait(false))
+            {
+                members.Add(r.GetString(0));
+            }
+        }
+
+        DatabaseRole role = new(name, owner ?? "dbo", members);
+        return new RoleScriptEmitter().EmitCreate(role);
     }
 
     private static async Task<string?> ResolveUserDefinedTypeBodyAsync(

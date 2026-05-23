@@ -68,12 +68,20 @@ public sealed class LiveDbSource : ISchemaSource
             IReadOnlyList<Synonym> synonyms = await new SynonymReader().ReadAsync(connection, cancellationToken);
             IReadOnlyList<UserDefinedType> udts = await new UserDefinedTypeReader().ReadAsync(connection, cancellationToken);
 
+            // M6: users + roles + permissions
+            IReadOnlyList<DatabaseUser> users = await new UserReader().ReadAsync(connection, cancellationToken);
+            IReadOnlyList<DatabaseRole> roles = await new RoleReader().ReadAsync(connection, cancellationToken);
+            IReadOnlyList<Permission> permissions = await new PermissionReader().ReadAsync(connection, cancellationToken);
+
             string dbName = new SqlConnectionStringBuilder(_connectionString).InitialCatalog;
             Database db = new(dbName, schemas, tables, views, procs, functions, triggers)
             {
                 Sequences = sequences,
                 Synonyms = synonyms,
                 UserDefinedTypes = udts,
+                Users = users,
+                Roles = roles,
+                Permissions = permissions,
             };
             return Result<Database>.Success(db);
         }
