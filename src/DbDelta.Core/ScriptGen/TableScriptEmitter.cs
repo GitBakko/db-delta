@@ -157,42 +157,140 @@ public sealed class TableScriptEmitter : IScriptEmitter
     private static string EmitAlter(Table newT, Table oldT)
     {
         StringBuilder sb = new();
+        string qualifiedName = $"[{newT.Schema}].[{newT.Name}]";
+
+        Dictionary<string, Constraint> newConstraintsByName =
+            newT.Constraints.ToDictionary(c => c.Name, StringComparer.Ordinal);
+        Dictionary<string, Constraint> oldConstraintsByName =
+            oldT.Constraints.ToDictionary(c => c.Name, StringComparer.Ordinal);
         HashSet<string> colsWithNamedDefault =
             [.. newT.Constraints.OfType<DefaultConstraint>().Select(d => d.ColumnName)];
 
-        var existingColsByName =
+        Dictionary<string, Column> existingColsByName =
             oldT.Columns.ToDictionary(c => c.Name, StringComparer.Ordinal);
-        foreach (Column newCol in newT.Columns)
+        Dictionary<string, Column> newColsByName =
+            newT.Columns.ToDictionary(c => c.Name, StringComparer.Ordinal);
+
+        // ── 1) DROP non-FK constraints first (FKs handled by ForeignKeyScriptEmitter).
+        //       Dropping a constraint may also be a prerequisite for the column /
+        //       constraint shape changes below.
+        foreach (Constraint oldC in oldT.Constraints)
         {
-            if (!existingColsByName.ContainsKey(newCol.Name))
+            if (oldC is ForeignKey) { continue; }
+            // Constraint disappeared from source → drop on target.
+            // Constraint shape changed → drop now and re-create below.
+            bool stillPresent = newConstraintsByName.TryGetValue(oldC.Name, out Constraint? newSame);
+            bool shapeChanged = stillPresent && !ConstraintShapeEqual(oldC, newSame!);
+            if (!stillPresent || shapeChanged)
             {
-                sb.Append("ALTER TABLE [").Append(newT.Schema).Append("].[").Append(newT.Name)
-                  .Append("] ADD ")
-                  .Append(FormatColumn(newCol, colsWithNamedDefault.Contains(newCol.Name)))
-                  .AppendLine(";");
+                sb.Append("ALTER TABLE ").Append(qualifiedName)
+                  .Append(" DROP CONSTRAINT [").Append(oldC.Name).AppendLine("];");
             }
         }
 
-        HashSet<string> existingConstraintNames =
-            [.. oldT.Constraints.Select(c => c.Name)];
+        // ── 2) DROP columns present only on target. Any default constraint on
+        //       the column was already dropped above (system-named defaults
+        //       are part of the constraints list).
+        foreach (Column oldCol in oldT.Columns)
+        {
+            if (!newColsByName.ContainsKey(oldCol.Name))
+            {
+                sb.Append("ALTER TABLE ").Append(qualifiedName)
+                  .Append(" DROP COLUMN [").Append(oldCol.Name).AppendLine("];");
+            }
+        }
+
+        // ── 3) ALTER columns whose shape changed.
+        foreach (Column newCol in newT.Columns)
+        {
+            if (!existingColsByName.TryGetValue(newCol.Name, out Column? oldCol)) { continue; }
+            if (ColumnShapeEqual(oldCol, newCol)) { continue; }
+            // Computed columns require drop + add; same for identity changes.
+            if (newCol.ComputedExpression is not null || oldCol.ComputedExpression is not null
+                || newCol.IsIdentity != oldCol.IsIdentity)
+            {
+                sb.Append("ALTER TABLE ").Append(qualifiedName)
+                  .Append(" DROP COLUMN [").Append(newCol.Name).AppendLine("];");
+                sb.Append("ALTER TABLE ").Append(qualifiedName)
+                  .Append(" ADD ").Append(FormatColumn(newCol, colsWithNamedDefault.Contains(newCol.Name)))
+                  .AppendLine(";");
+                continue;
+            }
+            sb.Append("ALTER TABLE ").Append(qualifiedName)
+              .Append(" ALTER COLUMN [").Append(newCol.Name).Append("] ")
+              .Append(newCol.DataType)
+              .Append(newCol.IsNullable ? " NULL" : " NOT NULL")
+              .AppendLine(";");
+        }
+
+        // ── 4) ADD new columns (present in source but not target).
+        foreach (Column newCol in newT.Columns)
+        {
+            if (existingColsByName.ContainsKey(newCol.Name)) { continue; }
+            sb.Append("ALTER TABLE ").Append(qualifiedName)
+              .Append(" ADD ")
+              .Append(FormatColumn(newCol, colsWithNamedDefault.Contains(newCol.Name)))
+              .AppendLine(";");
+        }
+
+        // ── 5) ADD constraints — new ones AND the shape-changed ones we
+        //       dropped above. FKs are emitted standalone by
+        //       ForeignKeyScriptEmitter (see ScriptGenerator section 7).
         foreach (Constraint c in newT.Constraints)
         {
-            if (existingConstraintNames.Contains(c.Name))
-            {
-                continue;
-            }
+            if (c is ForeignKey) { continue; }
+            bool existsOnTarget = oldConstraintsByName.TryGetValue(c.Name, out Constraint? oldSame);
+            bool shapeChanged = existsOnTarget && !ConstraintShapeEqual(oldSame!, c);
+            if (existsOnTarget && !shapeChanged) { continue; }
             string body = FormatStandaloneConstraintBody(c);
-            if (body.Length == 0)
-            {
-                continue;
-            }
-            sb.Append("ALTER TABLE [").Append(newT.Schema).Append("].[").Append(newT.Name)
-              .Append("] ADD CONSTRAINT [").Append(c.Name).Append("] ")
+            if (body.Length == 0) { continue; }
+            sb.Append("ALTER TABLE ").Append(qualifiedName)
+              .Append(" ADD CONSTRAINT [").Append(c.Name).Append("] ")
               .Append(body).AppendLine(";");
         }
 
         return sb.ToString();
     }
+
+    /// <summary>
+    /// Shape-equality for columns: same data type, same nullability, same
+    /// identity flag (+ seed/increment when identity), same default
+    /// expression text, same computed expression text. Used by EmitAlter to
+    /// decide between ALTER COLUMN and DROP+ADD.
+    /// </summary>
+    private static bool ColumnShapeEqual(Column a, Column b)
+    {
+        if (!string.Equals(a.DataType, b.DataType, StringComparison.OrdinalIgnoreCase)) { return false; }
+        if (a.IsNullable != b.IsNullable) { return false; }
+        if (a.IsIdentity != b.IsIdentity) { return false; }
+        if (a.IsIdentity && b.IsIdentity)
+        {
+            if (a.IdentitySeed != b.IdentitySeed) { return false; }
+            if (a.IdentityIncrement != b.IdentityIncrement) { return false; }
+        }
+        return string.Equals(a.DefaultExpression, b.DefaultExpression, StringComparison.Ordinal)
+            && string.Equals(a.ComputedExpression, b.ComputedExpression, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Shape-equality for non-FK constraints (PK/UQ/CK/Default). Mirrors the
+    /// rules used by <c>ComparisonEngine.ConstraintShapeEqual</c> so EmitAlter
+    /// only emits DROP+ADD when ComparisonEngine would consider the constraint
+    /// to have changed.
+    /// </summary>
+    private static bool ConstraintShapeEqual(Constraint a, Constraint b) => (a, b) switch
+    {
+        (PrimaryKey pa, PrimaryKey pb) =>
+            pa.IsClustered == pb.IsClustered && pa.Columns.SequenceEqual(pb.Columns, StringComparer.Ordinal),
+        (UniqueConstraint ua, UniqueConstraint ub) =>
+            ua.IsClustered == ub.IsClustered && ua.Columns.SequenceEqual(ub.Columns, StringComparer.Ordinal),
+        (CheckConstraint ca, CheckConstraint cb) =>
+            string.Equals(ca.Expression, cb.Expression, StringComparison.Ordinal),
+        (DefaultConstraint da, DefaultConstraint db) =>
+            string.Equals(da.ColumnName, db.ColumnName, StringComparison.Ordinal)
+            && string.Equals(da.Expression, db.Expression, StringComparison.Ordinal),
+        _ => false,
+    };
 
     private static string FormatStandaloneConstraintBody(Constraint c) => c switch
     {

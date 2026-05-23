@@ -47,19 +47,37 @@ public sealed class ScriptGenerator
             }
         }
 
-        // 2. Indexes — emitted for newly created tables (OnlyInA).
-        //    Full add/drop index diff on Different tables lands in M8.
+        // 2. Indexes
+        //    - New table (OnlyInA): emit CREATE INDEX for every index.
+        //    - Existing table (Different): diff against the target side and
+        //      emit DROP / CREATE for the delta (M8 polish).
         foreach (DifferencePair pair in pairs.Where(p => p.Identity.Kind == "Table"))
         {
-            if (pair.Status != DifferenceStatus.OnlyInA || pair.SideA is not Table t || t.Indexes.Count == 0)
+            switch (pair.Status)
             {
-                continue;
+                case DifferenceStatus.OnlyInA when pair.SideA is Table tNew && tNew.Indexes.Count > 0:
+                    foreach (TableIndex ix in tNew.Indexes)
+                    {
+                        sb.AppendLine(_indexEmitter.EmitCreate(tNew.Schema, tNew.Name, ix));
+                    }
+                    sb.AppendLine("GO");
+                    break;
+
+                case DifferenceStatus.Different when pair.SideA is Table tSrc && pair.SideB is Table tTgt:
+                    string indexDelta = EmitIndexDelta(tSrc, tTgt);
+                    if (indexDelta.Length > 0)
+                    {
+                        sb.Append(indexDelta);
+                        sb.AppendLine("GO");
+                    }
+                    break;
+                case DifferenceStatus.OnlyInA:
+                case DifferenceStatus.OnlyInB:
+                case DifferenceStatus.Different:
+                case DifferenceStatus.Identical:
+                default:
+                    break;
             }
-            foreach (TableIndex ix in t.Indexes)
-            {
-                sb.AppendLine(_indexEmitter.EmitCreate(t.Schema, t.Name, ix));
-            }
-            sb.AppendLine("GO");
         }
 
         // 3. Views — alphabetical per schema for deterministic output.
@@ -121,22 +139,37 @@ public sealed class ScriptGenerator
         }
 
         // 7. Foreign keys — emitted last so referenced tables already exist.
+        //    OnlyInA: add every FK. Different: diff against target — drop
+        //    removed/changed FKs, add new/changed FKs (M8 polish).
         foreach (DifferencePair pair in pairs.Where(p => p.Identity.Kind == "Table"))
         {
-            if (pair.Status != DifferenceStatus.OnlyInA || pair.SideA is not Table t)
+            switch (pair.Status)
             {
-                continue;
+                case DifferenceStatus.OnlyInA when pair.SideA is Table tNew:
+                    List<ForeignKey> fksNew = [.. tNew.Constraints.OfType<ForeignKey>()];
+                    if (fksNew.Count == 0) { break; }
+                    foreach (ForeignKey fk in fksNew)
+                    {
+                        sb.AppendLine(_fkEmitter.EmitAdd(tNew.Schema, tNew.Name, fk));
+                    }
+                    sb.AppendLine("GO");
+                    break;
+
+                case DifferenceStatus.Different when pair.SideA is Table tSrc && pair.SideB is Table tTgt:
+                    string fkDelta = EmitFkDelta(tSrc, tTgt);
+                    if (fkDelta.Length > 0)
+                    {
+                        sb.Append(fkDelta);
+                        sb.AppendLine("GO");
+                    }
+                    break;
+                case DifferenceStatus.OnlyInA:
+                case DifferenceStatus.OnlyInB:
+                case DifferenceStatus.Different:
+                case DifferenceStatus.Identical:
+                default:
+                    break;
             }
-            List<ForeignKey> fks = [.. t.Constraints.OfType<ForeignKey>()];
-            if (fks.Count == 0)
-            {
-                continue;
-            }
-            foreach (ForeignKey fk in fks)
-            {
-                sb.AppendLine(_fkEmitter.EmitAdd(t.Schema, t.Name, fk));
-            }
-            sb.AppendLine("GO");
         }
 
         sb.AppendLine("COMMIT TRANSACTION;");
@@ -144,4 +177,89 @@ public sealed class ScriptGenerator
         return sb.ToString();
     }
 
+    /// <summary>
+    /// Builds DROP INDEX / CREATE INDEX statements for the delta between a
+    /// pair of versions of the same table. Indexes present only on the
+    /// target side are dropped; indexes present only on the source are
+    /// created; indexes whose shape differs (key columns / uniqueness /
+    /// clustering / filter) are dropped + recreated.
+    /// </summary>
+    private string EmitIndexDelta(Table src, Table tgt)
+    {
+        StringBuilder sb = new();
+        Dictionary<string, TableIndex> srcByName =
+            src.Indexes.ToDictionary(i => i.Name, StringComparer.Ordinal);
+        Dictionary<string, TableIndex> tgtByName =
+            tgt.Indexes.ToDictionary(i => i.Name, StringComparer.Ordinal);
+
+        // DROPs first so a rename-shaped change frees the slot before CREATE.
+        foreach (TableIndex t in tgt.Indexes)
+        {
+            bool stillThere = srcByName.TryGetValue(t.Name, out TableIndex? s);
+            bool shapeChanged = stillThere && !IndexShapeEqual(t, s!);
+            if (!stillThere || shapeChanged)
+            {
+                sb.AppendLine(_indexEmitter.EmitDrop(src.Schema, src.Name, t));
+            }
+        }
+        foreach (TableIndex s in src.Indexes)
+        {
+            bool existsOnTarget = tgtByName.TryGetValue(s.Name, out TableIndex? t);
+            bool shapeChanged = existsOnTarget && !IndexShapeEqual(s, t!);
+            if (existsOnTarget && !shapeChanged) { continue; }
+            sb.AppendLine(_indexEmitter.EmitCreate(src.Schema, src.Name, s));
+        }
+        return sb.ToString();
+    }
+
+    private static bool IndexShapeEqual(TableIndex a, TableIndex b) =>
+        a.IsUnique == b.IsUnique
+        && a.IsClustered == b.IsClustered
+        && string.Equals(a.FilterExpression, b.FilterExpression, StringComparison.Ordinal)
+        && a.KeyColumns.Select(k => $"{k.Name}|{k.IsDescending}")
+            .SequenceEqual(b.KeyColumns.Select(k => $"{k.Name}|{k.IsDescending}"), StringComparer.Ordinal)
+        && a.IncludedColumns.SequenceEqual(b.IncludedColumns, StringComparer.Ordinal);
+
+    /// <summary>
+    /// Builds DROP CONSTRAINT / ADD CONSTRAINT FOREIGN KEY statements for the
+    /// FK delta between source and target versions of a table. Mirrors
+    /// <see cref="EmitIndexDelta"/>: drops first, then adds; changed FKs are
+    /// dropped + re-added.
+    /// </summary>
+    private string EmitFkDelta(Table src, Table tgt)
+    {
+        StringBuilder sb = new();
+        Dictionary<string, ForeignKey> srcFks =
+            src.Constraints.OfType<ForeignKey>().ToDictionary(fk => fk.Name, StringComparer.Ordinal);
+        Dictionary<string, ForeignKey> tgtFks =
+            tgt.Constraints.OfType<ForeignKey>().ToDictionary(fk => fk.Name, StringComparer.Ordinal);
+
+        foreach (ForeignKey t in tgtFks.Values)
+        {
+            bool stillThere = srcFks.TryGetValue(t.Name, out ForeignKey? s);
+            bool shapeChanged = stillThere && !ForeignKeyShapeEqual(t, s!);
+            if (!stillThere || shapeChanged)
+            {
+                sb.AppendLine($"ALTER TABLE [{src.Schema}].[{src.Name}] DROP CONSTRAINT [{t.Name}];");
+            }
+        }
+        foreach (ForeignKey s in srcFks.Values)
+        {
+            bool existsOnTarget = tgtFks.TryGetValue(s.Name, out ForeignKey? t);
+            bool shapeChanged = existsOnTarget && !ForeignKeyShapeEqual(s, t!);
+            if (existsOnTarget && !shapeChanged) { continue; }
+            sb.AppendLine(_fkEmitter.EmitAdd(src.Schema, src.Name, s));
+        }
+        return sb.ToString();
+    }
+
+    private static bool ForeignKeyShapeEqual(ForeignKey a, ForeignKey b) =>
+        a.Columns.SequenceEqual(b.Columns, StringComparer.Ordinal)
+        && string.Equals(a.ReferencedSchema, b.ReferencedSchema, StringComparison.Ordinal)
+        && string.Equals(a.ReferencedTable, b.ReferencedTable, StringComparison.Ordinal)
+        && a.ReferencedColumns.SequenceEqual(b.ReferencedColumns, StringComparer.Ordinal)
+        && a.OnDelete == b.OnDelete
+        && a.OnUpdate == b.OnUpdate
+        && a.IsDisabled == b.IsDisabled
+        && a.IsNotForReplication == b.IsNotForReplication;
 }
