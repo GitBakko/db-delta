@@ -18,6 +18,15 @@ public sealed record Column
     public string? ComputedExpression { get; init; }
     public bool IsPersistedComputed { get; init; }
 
+    /// <summary>
+    /// Column collation name (sys.columns.collation_name). Populated only for
+    /// character / text base types (char, varchar, nchar, nvarchar, text,
+    /// ntext, sysname). Null for non-string columns. M13-PARITY.5 #32 — used
+    /// to detect divergence from the database default collation and emit an
+    /// explicit COLLATE clause when needed (Redgate parity scenarios 01, 11).
+    /// </summary>
+    public string? Collation { get; init; }
+
     public Column(
         string name,
         string dataType,
@@ -28,7 +37,8 @@ public sealed record Column
         long? identitySeed = null,
         long? identityIncrement = null,
         string? computedExpression = null,
-        bool isPersistedComputed = false)
+        bool isPersistedComputed = false,
+        string? collation = null)
     {
         Name = name;
         DataType = dataType;
@@ -40,5 +50,6 @@ public sealed record Column
         IdentityIncrement = identityIncrement;
         ComputedExpression = computedExpression;
         IsPersistedComputed = isPersistedComputed;
+        Collation = collation;
     }
 }

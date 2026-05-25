@@ -260,6 +260,9 @@ public sealed class ComparisonEngine
             if (!string.Equals(ac.DataType, bc.DataType, StringComparison.OrdinalIgnoreCase)) { return false; }
             if (ac.IsNullable != bc.IsNullable) { return false; }
             if (ac.Ordinal != bc.Ordinal) { return false; }
+            // M13-PARITY.5 #32 — UDTT column collation participates in equality
+            // for the same reason it does on plain tables.
+            if (!string.Equals(ac.Collation, bc.Collation, StringComparison.OrdinalIgnoreCase)) { return false; }
         }
         return true;
     }
@@ -404,6 +407,18 @@ public sealed class ComparisonEngine
             }
 
             if (col.IsPersistedComputed != other.IsPersistedComputed)
+            {
+                return false;
+            }
+
+            // M13-PARITY.5 #32 — explicit column collation must match. Compare
+            // the raw value; the DB-default fallback is the script generator's
+            // concern (it decides when to *emit* COLLATE). Two columns with the
+            // same explicit collation are equal regardless of either DB's
+            // default, and two columns with NULL collation are equal too
+            // (matches the previous "ignore collation" behaviour for
+            // non-string columns).
+            if (!string.Equals(col.Collation, other.Collation, StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }

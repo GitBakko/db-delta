@@ -581,7 +581,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             selected,
             AppState.SourceConnectionString ?? string.Empty,
             AppState.TargetConnectionString ?? string.Empty,
-            DateTime.UtcNow);
+            DateTime.UtcNow,
+            AppState.TargetDefaultCollation);
 
         await using Stream s = await file.OpenWriteAsync().ConfigureAwait(true);
         await using StreamWriter w = new(s, Encoding.UTF8);
@@ -619,7 +620,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             selected,
             AppState.SourceConnectionString ?? string.Empty,
             AppState.TargetConnectionString ?? string.Empty,
-            DateTime.UtcNow);
+            DateTime.UtcNow,
+            AppState.TargetDefaultCollation);
 
         StatusText = "Esecuzione in corso…";
         SqlBatchResult res = await SqlExecutor.ExecuteAsync(

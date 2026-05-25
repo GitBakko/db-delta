@@ -46,7 +46,8 @@ public sealed class ScriptGenerator
     public string Generate(
         ComparisonResult result,
         IEnumerable<DifferencePair>? selection = null,
-        ComparisonOptions options = ComparisonOptions.Default)
+        ComparisonOptions options = ComparisonOptions.Default,
+        string? targetDefaultCollation = null)
     {
         ArgumentNullException.ThrowIfNull(result);
         List<DifferencePair> pairs = [.. (selection ?? result.Differences)
@@ -63,14 +64,14 @@ public sealed class ScriptGenerator
         //    (DEFAULT NEXT VALUE FOR) and alias UDTs.
         EmitSequences(sb, pairs);
         EmitUserDefinedTypes(sb, pairs);
-        EmitTableTypeUdts(sb, pairs);
+        EmitTableTypeUdts(sb, pairs, targetDefaultCollation);
         EmitUsers(sb, pairs);
         EmitRoles(sb, pairs);
 
         // 1. Tables (CREATE / DROP / ALTER ADD COLUMN + ALTER ADD CONSTRAINT inline)
         foreach (DifferencePair pair in pairs.Where(p => p.Identity.Kind == "Table"))
         {
-            string ddl = _tableEmitter.Emit(pair);
+            string ddl = _tableEmitter.Emit(pair, targetDefaultCollation);
             if (!string.IsNullOrWhiteSpace(ddl))
             {
                 sb.AppendLine(ddl);
@@ -301,7 +302,7 @@ public sealed class ScriptGenerator
         }
     }
 
-    private void EmitTableTypeUdts(StringBuilder sb, IReadOnlyList<DifferencePair> pairs)
+    private void EmitTableTypeUdts(StringBuilder sb, IReadOnlyList<DifferencePair> pairs, string? targetDefaultCollation = null)
     {
         foreach (DifferencePair pair in pairs
             .Where(p => p.Identity.Kind == "TableType")
@@ -311,7 +312,7 @@ public sealed class ScriptGenerator
             switch (pair.Status)
             {
                 case DifferenceStatus.OnlyInA when pair.SideA is TableTypeUdt t:
-                    sb.AppendLine(_tableTypeEmitter.EmitCreate(t));
+                    sb.AppendLine(_tableTypeEmitter.EmitCreate(t, targetDefaultCollation));
                     sb.AppendLine("GO");
                     break;
                 case DifferenceStatus.OnlyInB when pair.SideB is TableTypeUdt t:
@@ -321,7 +322,7 @@ public sealed class ScriptGenerator
                 case DifferenceStatus.Different
                     when pair.SideA is TableTypeUdt srcT && pair.SideB is TableTypeUdt tgtT:
                     sb.AppendLine(_tableTypeEmitter.EmitDrop(tgtT));
-                    sb.AppendLine(_tableTypeEmitter.EmitCreate(srcT));
+                    sb.AppendLine(_tableTypeEmitter.EmitCreate(srcT, targetDefaultCollation));
                     sb.AppendLine("GO");
                     break;
                 case DifferenceStatus.OnlyInA:

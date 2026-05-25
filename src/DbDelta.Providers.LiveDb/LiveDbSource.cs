@@ -26,6 +26,9 @@ public sealed class LiveDbSource : ISchemaSource
         try
         {
             await using SqlConnection connection = await ConnectionFactory.OpenAsync(_connectionString, cancellationToken);
+            // M13-PARITY.5 #32 — capture DB default collation up-front so the
+            // emitter can skip COLLATE clauses on columns that match it.
+            string? defaultCollation = await ReadDefaultCollationAsync(connection, cancellationToken);
             IReadOnlyList<Schema> schemas = await new SchemaReader().ReadAsync(connection, cancellationToken);
 
             // Tables with their columns (M1)
@@ -87,6 +90,7 @@ public sealed class LiveDbSource : ISchemaSource
                 Users = users,
                 Roles = roles,
                 Permissions = permissions,
+                DefaultCollation = defaultCollation,
             };
             return Result<Database>.Success(db);
         }
@@ -110,6 +114,21 @@ public sealed class LiveDbSource : ISchemaSource
                 ErrorCode.CatalogQueryFailed,
                 ex.Message));
         }
+    }
+
+    /// <summary>
+    /// Reads the database default collation via <c>DATABASEPROPERTYEX</c>.
+    /// Falls back to null on any failure — the script generator treats a null
+    /// default as "no default known" and emits explicit COLLATE on every
+    /// string column with a non-null collation, matching Redgate's defensive
+    /// shape (M13-PARITY.5 #32).
+    /// </summary>
+    private static async Task<string?> ReadDefaultCollationAsync(SqlConnection connection, CancellationToken ct)
+    {
+        const string sql = "SELECT CAST(DATABASEPROPERTYEX(DB_NAME(), 'Collation') AS nvarchar(128));";
+        await using SqlCommand cmd = new(sql, connection);
+        object? result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        return result is string s && !string.IsNullOrEmpty(s) ? s : null;
     }
 
     private static async Task<IReadOnlyDictionary<(string Schema, string Name), int>> ReadTableObjectIdsAsync(

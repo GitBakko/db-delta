@@ -36,7 +36,8 @@ internal sealed class TableReader
             dc.definition          AS DefaultExpression,
             cc.definition          AS ComputedExpression,
             ISNULL(cc.is_persisted, 0)         AS IsPersistedComputed,
-            c.column_id            AS Ordinal
+            c.column_id            AS Ordinal,
+            c.collation_name       AS CollationName
         FROM sys.columns AS c
         INNER JOIN sys.tables AS t ON t.object_id = c.object_id
         LEFT JOIN sys.identity_columns AS ic ON ic.object_id = c.object_id
@@ -89,6 +90,7 @@ internal sealed class TableReader
                 string? computedExpr = columnsReader.IsDBNull(11) ? null : columnsReader.GetString(11);
                 bool isPersistedComputed = !columnsReader.IsDBNull(12) && columnsReader.GetBoolean(12);
                 int ordinal = columnsReader.GetInt32(13);
+                string? collation = columnsReader.IsDBNull(14) ? null : columnsReader.GetString(14);
 
                 if (!tableShells.ContainsKey(objectId))
                 {
@@ -110,7 +112,8 @@ internal sealed class TableReader
                     identitySeed: identitySeed,
                     identityIncrement: identityIncrement,
                     computedExpression: computedExpr,
-                    isPersistedComputed: isPersistedComputed));
+                    isPersistedComputed: isPersistedComputed,
+                    collation: collation));
             }
         }
 

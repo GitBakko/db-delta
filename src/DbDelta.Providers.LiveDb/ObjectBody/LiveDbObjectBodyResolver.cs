@@ -8,7 +8,7 @@ namespace DbDelta.Providers.LiveDb.ObjectBody;
 /// <summary>
 /// Resolves the SQL body for a single object from two live SQL Server databases.
 /// Modules (View/Procedure/Function/Trigger) return the raw <c>sys.sql_modules.definition</c>.
-/// Tables return a synthesised CREATE TABLE script via <see cref="TableScriptEmitter.GenerateCreateTable"/>.
+/// Tables return a synthesised CREATE TABLE script via <see cref="TableScriptEmitter.GenerateCreateTable(Table)"/>.
 /// </summary>
 public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, string targetConnectionString) : IObjectBodyResolver
 {

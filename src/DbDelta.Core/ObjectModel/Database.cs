@@ -45,6 +45,15 @@ public sealed record Database(
     public IReadOnlyList<Permission> Permissions { get; init; } = [];
 
     /// <summary>
+    /// Database default collation (sys.databases.collation_name). Null when
+    /// unknown (e.g. headless / unit-test fixtures). Used by the script
+    /// generator to decide when to emit an explicit COLLATE clause on
+    /// columns whose collation diverges from the database default
+    /// (M13-PARITY.5 #32).
+    /// </summary>
+    public string? DefaultCollation { get; init; }
+
+    /// <summary>
     /// M3 ctor — tables + views + procedures. Kept so existing call sites still compile.
     /// </summary>
     public Database(

@@ -71,6 +71,16 @@ public sealed partial class AppStateViewModel : ObservableObject
     private ComparisonResult? _lastComparisonRaw;
 
     /// <summary>
+    /// Default collation of the target database from the most recent Compare —
+    /// passed through to <c>DeployScriptBuilder</c> so emitted string columns
+    /// inherit the default instead of carrying redundant COLLATE clauses
+    /// (M13-PARITY.5 #32). Null when no comparison has run yet or the live
+    /// provider could not read it.
+    /// </summary>
+    [ObservableProperty]
+    private string? _targetDefaultCollation;
+
+    /// <summary>
     /// Active status filter for the result grid. <c>null</c> = no filter.
     /// Bound options match the raw <see cref="DifferenceDto.Status"/> string
     /// values ("Different" / "OnlyInA" / "OnlyInB" / "Identical").
@@ -199,6 +209,7 @@ public sealed partial class AppStateViewModel : ObservableObject
             ComparisonResult result = engine.Compare(srcRes.Value!, tgtRes.Value!, ComparisonOptions.Default);
             LastComparisonRaw = result;
             LastComparison = Mapper.ToDto(result);
+            TargetDefaultCollation = tgtRes.Value!.DefaultCollation;
 
             // Wire the diff viewer with a live resolver bound to the same
             // source/target connection strings so the bottom pane can fetch

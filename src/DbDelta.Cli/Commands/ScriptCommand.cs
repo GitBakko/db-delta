@@ -78,7 +78,11 @@ internal static class ScriptCommand
 
             ComparisonResult comparison = new ComparisonEngine()
                 .Compare(srcResult.Value!, tgtResult.Value!, ComparisonOptions.Default);
-            string script = new ScriptGenerator().Generate(comparison, selection: null, options: opts);
+            string script = new ScriptGenerator().Generate(
+                comparison,
+                selection: null,
+                options: opts,
+                targetDefaultCollation: tgtResult.Value!.DefaultCollation);
 
             if (string.Equals(output, "-", StringComparison.Ordinal))
             {
