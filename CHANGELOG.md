@@ -6,10 +6,78 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased] — heading toward v1.0.0 RC
 
+(Empty — pending M13-RC.3 BenchmarkDotNet perf suite, M13-RC.4 FsCheck
+property tests, M13-RC.5 compat matrix, M13-RC.7 formal Kahn dependency
+resolver, M13-RC.8 DocFX site, M13-RC.9 WiX MSI installer.)
+
+## [0.13.0] — 2026-05-25 — M13 wave 1 alpha (RC candidate)
+
+### Fixed
+- **Critical** — `ScriptGenerator` now emits DDL for every M5/M6 object
+  kind. Until this release `Sequence`, `Synonym`, alias `UserDefinedType`,
+  `User`, `Role`, and `Permission` emitters existed as classes but were
+  never called by the pipeline; deployment scripts for any schema using
+  those kinds silently shipped without the corresponding DDL. New
+  pipeline order: prologue (Sequence → UserDefinedType → TableType →
+  User → Role) → body (Table → Index → View → Function → Procedure →
+  Trigger) → epilogue (Synonym → FK → Permission, gated on
+  `!IgnorePermissions`).
+- `TableScriptEmitter` now performs the spec §3.4 temp-table rebuild
+  when an existing column's IDENTITY flag flips or its seed / increment
+  changes. Previously the path emitted `DROP COLUMN + ADD COLUMN`,
+  which silently erased every row's value in the affected column.
+
+### Added
+- **CLI `script` verb** — `dbdelta script --source --target [--out path | -]
+  [--include-permissions]` runs the comparison and writes a deployment
+  script to disk (or stdout). Closes the spec §1.2 CLI surface gap.
+- **CLI `apply` verb** — `dbdelta apply --target --script <path> [--dry-run]`
+  executes a pre-generated script via the existing `SqlExecutor`
+  GO-batched single-transaction runner; `--dry-run` parses the script
+  and reports its batch count without touching the target.
+- **Table-type UDT (UDTT) — 13th object kind.** New `TableTypeUdt`
+  record, comparison engine path, `TableTypeUdtScriptEmitter`
+  (CREATE TYPE … AS TABLE / DROP TYPE), and live-DB
+  `TableTypeUdtReader` over `sys.table_types`. `KindCatalog.KnownKinds`
+  grows from 11 → 12; new Italian display label "Tipi tabella".
+- **Hexagonal sharedness** — `Cli/CliErrorMapper` pulled up to centralise
+  the `Error → exit code + JSON stderr` mapping shared by `compare`,
+  `report`, `script`, and `apply` verbs.
+
+### Refactored
+- DRY: `Views/Controls/PasswordBox.axaml` extracted from three call
+  sites (`ProjectSetupDialog` Source + Target halves and
+  `ConnectionEditDialog`); the six hand-rolled
+  `PointerPressed/Released` reveal handlers now live inside the
+  control. CLAUDE.md UI rule #3.
+- DRY: shared `Styles/Templates.axaml` resource dictionary holds the
+  canonical `DiscoveredServerItemTemplate`; the three inline 40-line
+  copies in `ProjectSetupDialog` + `ConnectionEditDialog` collapse to
+  `<StaticResource ResourceKey="DiscoveredServerItemTemplate" />`. The
+  `ConnectionEditDialog` site automatically picks up the section-header
+  variant it had been missing.
+
 ### Documentation
-- README refreshed to reflect the Avalonia 11 GUI pivot (was Blazor Hybrid + WebView2 in the original spec).
-- New `docs/superpowers/specs/2026-05-25-avalonia-ui-pivot-addendum.md` capturing the rationale for the UI stack change.
-- `report` CLI verb documented with example invocation.
+- `README` refreshed to reflect the Avalonia 11 GUI pivot (away from
+  Blazor Hybrid + WebView2). Adds `report` / `script` / `apply` verb
+  examples and an architecture table.
+- New `docs/superpowers/specs/2026-05-25-avalonia-ui-pivot-addendum.md`
+  capturing the rationale for the UI stack change and superseding the
+  Blazor / WebView2 rows of the v1 design spec.
+- `scripts/SMOKE-RESULTS.md` — sanitised end-to-end smoke run against
+  the live PcrmV2Pl_test2 / PcrmV2Pl endpoints (680 objects compared,
+  4 TableType UDTTs surfaced, 4 691-line migration script generated).
+- `scripts/PUBLISH-SIZES.md` — measured single-file binary sizes
+  (framework-dependent 20 MB CLI / 28 MB App vs §6.1 budget), explains
+  why self-contained + trim is post-RC work.
+
+### Tests
+- 347 / 347 passing across nine projects: Core unit 207
+  (+8 TableType, +6 table-rebuild, +24 orphan-kind, +1 KindCatalog
+  TableType slot), Shared unit 4, Architecture 3, App Headless 39
+  (+4 PasswordBox), ScriptGen Golden 28, Persistence unit 30,
+  Persistence integration 6, LiveDb integration 14
+  (+1 TableTypeUdtReader), CLI acceptance 16 (+5 script/apply).
 
 ## [0.12.0] — 2026-05-25 — M12 Reports HTML + JSON
 
