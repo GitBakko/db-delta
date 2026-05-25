@@ -43,18 +43,19 @@ public class ScriptGeneratorOrphanedKindsTests
     }
 
     [Fact]
-    public void Different_Sequence_emits_DROP_then_CREATE()
+    public void Different_Sequence_with_same_data_type_emits_in_place_ALTER()
     {
+        // Parity 2026-05-25 scenario 08 fix (M13-FIX.5): when the data
+        // type is unchanged, ALTER SEQUENCE … preserves dependent
+        // DEFAULT NEXT VALUE FOR constraints. DROP+CREATE would break them.
         Sequence src = StubSeq("dbo", "OrderNo", start: 100);
         Sequence tgt = StubSeq("dbo", "OrderNo", start: 1);
         ComparisonResult result = new([Pair(src.Identity, DifferenceStatus.Different, src, tgt)]);
 
         string sql = Sut.Generate(result);
 
-        int dropIdx = sql.IndexOf("DROP SEQUENCE [dbo].[OrderNo]", StringComparison.Ordinal);
-        int createIdx = sql.IndexOf("CREATE SEQUENCE [dbo].[OrderNo]", StringComparison.Ordinal);
-        dropIdx.Should().BeGreaterThan(0);
-        createIdx.Should().BeGreaterThan(dropIdx);
+        sql.Should().Contain("ALTER SEQUENCE [dbo].[OrderNo] RESTART WITH 100");
+        sql.Should().NotContain("DROP SEQUENCE");
     }
 
     // ── UserDefinedType (alias) ─────────────────────────────────────────────

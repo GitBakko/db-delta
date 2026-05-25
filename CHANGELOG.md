@@ -6,9 +6,26 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased] — heading toward v1.0.0 RC
 
-(Empty — pending M13-RC.3 BenchmarkDotNet perf suite, M13-RC.4 FsCheck
-property tests, M13-RC.5 compat matrix, M13-RC.7 formal Kahn dependency
-resolver, M13-RC.8 DocFX site, M13-RC.9 WiX MSI installer.)
+### Fixed
+- **Sequence diff** — when only seed / increment / min / max / cycle /
+  cache differ (data type unchanged) `ScriptGenerator` now emits
+  `ALTER SEQUENCE [schema].[name] RESTART WITH n …` rather than
+  DROP + CREATE. The old DROP path broke any column with
+  `DEFAULT NEXT VALUE FOR <seq>` because the dependent default
+  constraint was dropped alongside the sequence. DROP + CREATE
+  remains the fallback when the base data type actually changes.
+  Caught by the 2026-05-25 Redgate SQL Compare parity run
+  (`docs/parity/redgate-2026-05-25.md`, scenario 08).
+
+### Tests
+- +8 `SequenceAlterTests` cover seed-only, increment-only,
+  combined, data-type fallback to DROP+CREATE, cycle toggle,
+  cache size change, cache disable, min/max change.
+
+(Still pending for v0.14 / v1.0 RC: BenchmarkDotNet perf suite,
+FsCheck property tests, compat matrix, column-collation diff
+coverage, identity-rebuild PK swap pattern, formal Kahn dependency
+resolver, DocFX site, WiX MSI installer.)
 
 ## [0.13.0] — 2026-05-25 — M13 wave 1 alpha (RC candidate)
 

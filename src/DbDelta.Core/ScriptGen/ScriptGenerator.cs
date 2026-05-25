@@ -241,12 +241,21 @@ public sealed class ScriptGenerator
                     break;
                 case DifferenceStatus.Different
                     when pair.SideA is Sequence srcSeq && pair.SideB is Sequence tgtSeq:
-                    // SQL Server allows ALTER SEQUENCE for most options, but
-                    // not the base data type. Take the safe shape for v1:
-                    // DROP + CREATE preserves all options without trying to
-                    // detect the data-type-changed case.
-                    sb.AppendLine(_sequenceEmitter.EmitDrop(tgtSeq));
-                    sb.AppendLine(_sequenceEmitter.EmitCreate(srcSeq));
+                    // SQL Server can ALTER every sequence property except the
+                    // base data type. Prefer in-place ALTER so dependent
+                    // `DEFAULT NEXT VALUE FOR` defaults survive (parity
+                    // scenario 08, 2026-05-25). Fall back to DROP + CREATE
+                    // only when the data type itself changed.
+                    string? alter = _sequenceEmitter.EmitAlter(srcSeq, tgtSeq);
+                    if (alter is null)
+                    {
+                        sb.AppendLine(_sequenceEmitter.EmitDrop(tgtSeq));
+                        sb.AppendLine(_sequenceEmitter.EmitCreate(srcSeq));
+                    }
+                    else if (alter.Length > 0)
+                    {
+                        sb.AppendLine(alter);
+                    }
                     sb.AppendLine("GO");
                     break;
                 case DifferenceStatus.OnlyInA:
