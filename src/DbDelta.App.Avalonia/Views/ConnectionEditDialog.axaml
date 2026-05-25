@@ -32,20 +32,8 @@
                            MinimumPopulateDelay="0"
                            PlaceholderText="Scrivi o seleziona un server SQL…">
             <AutoCompleteBox.ItemTemplate>
-              <DataTemplate DataType="sql:DiscoveredServer">
-                <Grid ColumnDefinitions="*,Auto">
-                  <TextBlock Grid.Column="0"
-                             Text="{Binding Name}"
-                             FontFamily="Cascadia Mono,Consolas,monospace"
-                             FontSize="12" />
-                  <TextBlock Grid.Column="1"
-                             Text="{Binding IpAddress}"
-                             FontSize="11"
-                             Margin="12,0,0,0"
-                             Foreground="{StaticResource FgSubtleBrush}"
-                             IsVisible="{Binding IpAddress, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                </Grid>
-              </DataTemplate>
+              <!-- Shared DataTemplate — see Styles/Templates.axaml. -->
+              <StaticResource ResourceKey="DiscoveredServerItemTemplate" />
             </AutoCompleteBox.ItemTemplate>
           </AutoCompleteBox>
           <Button Grid.Column="1" Classes="ghost" Margin="6,0,0,0"

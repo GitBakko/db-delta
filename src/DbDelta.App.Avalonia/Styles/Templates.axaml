@@ -1,0 +1,40 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sql="using:DbDelta.Persistence.Sql">
+
+  <!-- Shared item template for AutoCompleteBoxes that surface DiscoveredServer
+       suggestions. Two mutually-exclusive variants:
+       • HEADER (IsHeaderOnly=true): full-width divider strip emitted by the
+         VM to separate "Usati di recente" from "Risultati scansione". Picks
+         are rejected in code-behind so the strip stays informational.
+       • DATA (IsHeaderOnly=false): standard Name + IpAddress row.
+       CLAUDE.md UI rule #3 (DRY) — single source of truth for what every
+       server picker looks like. -->
+  <DataTemplate x:Key="DiscoveredServerItemTemplate" DataType="sql:DiscoveredServer">
+    <Panel>
+      <Border IsVisible="{Binding IsHeaderOnly}"
+              Background="{StaticResource BgMutedBrush}"
+              BorderBrush="{StaticResource BorderStrongBrush}"
+              BorderThickness="0,0,0,1"
+              Padding="10,3"
+              Margin="-8,0,-8,0">
+        <TextBlock Text="{Binding Section}"
+                   FontSize="9" FontWeight="Bold" LetterSpacing="1.2"
+                   Foreground="{StaticResource FgSubtleBrush}" />
+      </Border>
+
+      <Grid IsVisible="{Binding !IsHeaderOnly}"
+            ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0" Text="{Binding Name}"
+                   FontFamily="Cascadia Mono,Consolas,monospace" FontSize="12"
+                   VerticalAlignment="Center" />
+        <TextBlock Grid.Column="1" Text="{Binding IpAddress}"
+                   FontSize="11" Margin="12,0,0,0"
+                   Foreground="{StaticResource FgSubtleBrush}"
+                   VerticalAlignment="Center"
+                   IsVisible="{Binding IpAddress, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      </Grid>
+    </Panel>
+  </DataTemplate>
+
+</ResourceDictionary>
