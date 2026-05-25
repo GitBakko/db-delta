@@ -60,6 +60,9 @@ tmp/
 # Smoke-test output against live DBs (contains real schema names)
 scripts/smoke/
 
+# Parity-run output (DbDelta + Redgate scripts captured for diff analysis)
+scripts/parity/
+
 # Ruflo / agentdb local state
 agentdb.rvf
 agentdb.rvf-*
