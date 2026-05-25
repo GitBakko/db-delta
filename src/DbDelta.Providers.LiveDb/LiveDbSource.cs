@@ -68,6 +68,10 @@ public sealed class LiveDbSource : ISchemaSource
             IReadOnlyList<Synonym> synonyms = await new SynonymReader().ReadAsync(connection, cancellationToken);
             IReadOnlyList<UserDefinedType> udts = await new UserDefinedTypeReader().ReadAsync(connection, cancellationToken);
 
+            // M13-FIX.4: table-type UDTs (13th object kind).
+            IReadOnlyList<TableTypeUdt> tableTypes =
+                await new TableTypeUdtReader().ReadAsync(connection, cancellationToken);
+
             // M6: users + roles + permissions
             IReadOnlyList<DatabaseUser> users = await new UserReader().ReadAsync(connection, cancellationToken);
             IReadOnlyList<DatabaseRole> roles = await new RoleReader().ReadAsync(connection, cancellationToken);
@@ -79,6 +83,7 @@ public sealed class LiveDbSource : ISchemaSource
                 Sequences = sequences,
                 Synonyms = synonyms,
                 UserDefinedTypes = udts,
+                TableTypeUdts = tableTypes,
                 Users = users,
                 Roles = roles,
                 Permissions = permissions,

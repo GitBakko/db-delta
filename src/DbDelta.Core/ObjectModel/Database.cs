@@ -30,6 +30,11 @@ public sealed record Database(
     /// CLR UDTs are intentionally excluded — see <see cref="UserDefinedType"/>.</summary>
     public IReadOnlyList<UserDefinedType> UserDefinedTypes { get; init; } = [];
 
+    /// <summary>All table-type user-defined types (M13-FIX.4) — the
+    /// thirteenth object kind from spec §1.2, distinct from alias UDTs and
+    /// most often used as TVPs.</summary>
+    public IReadOnlyList<TableTypeUdt> TableTypeUdts { get; init; } = [];
+
     /// <summary>Database users (M6).</summary>
     public IReadOnlyList<DatabaseUser> Users { get; init; } = [];
 

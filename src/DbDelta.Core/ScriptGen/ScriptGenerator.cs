@@ -35,6 +35,7 @@ public sealed class ScriptGenerator
     private readonly SequenceScriptEmitter _sequenceEmitter = new();
     private readonly SynonymScriptEmitter _synonymEmitter = new();
     private readonly UserDefinedTypeScriptEmitter _udtEmitter = new();
+    private readonly TableTypeUdtScriptEmitter _tableTypeEmitter = new();
     private readonly UserScriptEmitter _userEmitter = new();
     private readonly RoleScriptEmitter _roleEmitter = new();
     private readonly PermissionScriptEmitter _permissionEmitter = new();
@@ -62,6 +63,7 @@ public sealed class ScriptGenerator
         //    (DEFAULT NEXT VALUE FOR) and alias UDTs.
         EmitSequences(sb, pairs);
         EmitUserDefinedTypes(sb, pairs);
+        EmitTableTypeUdts(sb, pairs);
         EmitUsers(sb, pairs);
         EmitRoles(sb, pairs);
 
@@ -278,6 +280,39 @@ public sealed class ScriptGenerator
                     when pair.SideA is UserDefinedType srcU && pair.SideB is UserDefinedType tgtU:
                     sb.AppendLine(_udtEmitter.EmitDrop(tgtU));
                     sb.AppendLine(_udtEmitter.EmitCreate(srcU));
+                    sb.AppendLine("GO");
+                    break;
+                case DifferenceStatus.OnlyInA:
+                case DifferenceStatus.OnlyInB:
+                case DifferenceStatus.Different:
+                case DifferenceStatus.Identical:
+                default:
+                    break;
+            }
+        }
+    }
+
+    private void EmitTableTypeUdts(StringBuilder sb, IReadOnlyList<DifferencePair> pairs)
+    {
+        foreach (DifferencePair pair in pairs
+            .Where(p => p.Identity.Kind == "TableType")
+            .OrderBy(p => p.Identity.SchemaName)
+            .ThenBy(p => p.Identity.ObjectName))
+        {
+            switch (pair.Status)
+            {
+                case DifferenceStatus.OnlyInA when pair.SideA is TableTypeUdt t:
+                    sb.AppendLine(_tableTypeEmitter.EmitCreate(t));
+                    sb.AppendLine("GO");
+                    break;
+                case DifferenceStatus.OnlyInB when pair.SideB is TableTypeUdt t:
+                    sb.AppendLine(_tableTypeEmitter.EmitDrop(t));
+                    sb.AppendLine("GO");
+                    break;
+                case DifferenceStatus.Different
+                    when pair.SideA is TableTypeUdt srcT && pair.SideB is TableTypeUdt tgtT:
+                    sb.AppendLine(_tableTypeEmitter.EmitDrop(tgtT));
+                    sb.AppendLine(_tableTypeEmitter.EmitCreate(srcT));
                     sb.AppendLine("GO");
                     break;
                 case DifferenceStatus.OnlyInA:

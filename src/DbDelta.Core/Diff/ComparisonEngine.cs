@@ -23,6 +23,7 @@ public sealed class ComparisonEngine
         pairs.AddRange(CompareSequences(a.Sequences, b.Sequences));
         pairs.AddRange(CompareSynonyms(a.Synonyms, b.Synonyms));
         pairs.AddRange(CompareUserDefinedTypes(a.UserDefinedTypes, b.UserDefinedTypes));
+        pairs.AddRange(CompareTableTypeUdts(a.TableTypeUdts, b.TableTypeUdts));
         pairs.AddRange(CompareUsers(a.Users, b.Users));
         pairs.AddRange(CompareRoles(a.Roles, b.Roles));
         pairs.AddRange(ComparePermissions(a.Permissions, b.Permissions));
@@ -224,6 +225,44 @@ public sealed class ComparisonEngine
         && a.Precision == b.Precision
         && a.Scale == b.Scale
         && a.IsNullable == b.IsNullable;
+
+    private static IEnumerable<DifferencePair> CompareTableTypeUdts(
+        IReadOnlyList<TableTypeUdt> ax,
+        IReadOnlyList<TableTypeUdt> bx)
+    {
+        var aByIdentity = ax.ToDictionary(t => t.Identity);
+        var bByIdentity = bx.ToDictionary(t => t.Identity);
+        HashSet<ObjectIdentity> allIdentities = [.. aByIdentity.Keys];
+        allIdentities.UnionWith(bByIdentity.Keys);
+
+        foreach (ObjectIdentity id in allIdentities.OrderBy(i => i.SchemaName).ThenBy(i => i.ObjectName))
+        {
+            aByIdentity.TryGetValue(id, out TableTypeUdt? sideA);
+            bByIdentity.TryGetValue(id, out TableTypeUdt? sideB);
+            DifferenceStatus status = (sideA, sideB) switch
+            {
+                (null, null) => DifferenceStatus.Identical,
+                (null, _) => DifferenceStatus.OnlyInB,
+                (_, null) => DifferenceStatus.OnlyInA,
+                _ => TableTypeUdtsEqual(sideA, sideB) ? DifferenceStatus.Identical : DifferenceStatus.Different,
+            };
+            yield return new DifferencePair(id, status, sideA, sideB);
+        }
+    }
+
+    private static bool TableTypeUdtsEqual(TableTypeUdt a, TableTypeUdt b)
+    {
+        if (a.Columns.Count != b.Columns.Count) { return false; }
+        Dictionary<string, Column> bByName = b.Columns.ToDictionary(c => c.Name, StringComparer.Ordinal);
+        foreach (Column ac in a.Columns)
+        {
+            if (!bByName.TryGetValue(ac.Name, out Column? bc)) { return false; }
+            if (!string.Equals(ac.DataType, bc.DataType, StringComparison.OrdinalIgnoreCase)) { return false; }
+            if (ac.IsNullable != bc.IsNullable) { return false; }
+            if (ac.Ordinal != bc.Ordinal) { return false; }
+        }
+        return true;
+    }
 
     private static IEnumerable<DifferencePair> CompareTables(Database a, Database b, ComparisonOptions options)
     {

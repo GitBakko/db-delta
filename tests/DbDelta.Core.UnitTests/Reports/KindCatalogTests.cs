@@ -16,9 +16,10 @@ public class KindCatalogTests
     [InlineData("Sequence", 5)]
     [InlineData("Synonym", 6)]
     [InlineData("UserDefinedType", 7)]
-    [InlineData("User", 8)]
-    [InlineData("Role", 9)]
-    [InlineData("Permission", 10)]
+    [InlineData("TableType", 8)]
+    [InlineData("User", 9)]
+    [InlineData("Role", 10)]
+    [InlineData("Permission", 11)]
     public void SortOrder_returns_canonical_index_for_known_kind(string kind, int expectedOrder)
     {
         KindCatalog.SortOrder(kind).Should().Be(expectedOrder);
@@ -39,6 +40,7 @@ public class KindCatalogTests
     [InlineData("Sequence", "Sequenze")]
     [InlineData("Synonym", "Sinonimi")]
     [InlineData("UserDefinedType", "Tipi utente")]
+    [InlineData("TableType", "Tipi tabella")]
     [InlineData("User", "Utenti")]
     [InlineData("Role", "Ruoli")]
     [InlineData("Permission", "Permessi")]
@@ -64,11 +66,11 @@ public class KindCatalogTests
     }
 
     [Fact]
-    public void KnownKinds_lists_all_eleven_in_canonical_order()
+    public void KnownKinds_lists_all_twelve_in_canonical_order()
     {
         KindCatalog.KnownKinds.Should().Equal(
             "Table", "View", "Procedure", "Function", "Trigger",
-            "Sequence", "Synonym", "UserDefinedType",
+            "Sequence", "Synonym", "UserDefinedType", "TableType",
             "User", "Role", "Permission");
     }
 }

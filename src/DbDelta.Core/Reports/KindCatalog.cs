@@ -3,7 +3,7 @@ using DbDelta.Core.Diff;
 namespace DbDelta.Core.Reports;
 
 /// <summary>
-/// Single source of truth for how the eleven supported object Kinds present
+/// Single source of truth for how the twelve supported object Kinds present
 /// themselves in user-facing artefacts (HTML report sections, JSON report
 /// ordering). Mirrors the canonical sort order documented in the M0 spec and
 /// the Italian display labels used throughout the Avalonia UI.
@@ -20,6 +20,7 @@ public static class KindCatalog
         "Sequence",
         "Synonym",
         "UserDefinedType",
+        "TableType",
         "User",
         "Role",
         "Permission",
@@ -37,6 +38,7 @@ public static class KindCatalog
         ["Sequence"] = "Sequenze",
         ["Synonym"] = "Sinonimi",
         ["UserDefinedType"] = "Tipi utente",
+        ["TableType"] = "Tipi tabella",
         ["User"] = "Utenti",
         ["Role"] = "Ruoli",
         ["Permission"] = "Permessi",
