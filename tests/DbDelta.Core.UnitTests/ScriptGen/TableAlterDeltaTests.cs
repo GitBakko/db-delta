@@ -55,14 +55,19 @@ public class TableAlterDeltaTests
     }
 
     [Fact]
-    public void EmitAlter_drops_and_readds_identity_column_change()
+    public void EmitAlter_rebuilds_table_when_identity_flag_changes_on_existing_column()
     {
+        // Spec §3.4: an identity-flag flip on an existing column cannot be
+        // expressed via ALTER COLUMN, and DROP+ADD COLUMN would lose every
+        // row's value. The emitter produces a temp-table rebuild instead.
         Table src = T("X", new Column("Id", "int", false, 1, isIdentity: true));
         Table tgt = T("X", new Column("Id", "int", false, 1, isIdentity: false));
 
         string sql = new TableScriptEmitter().Emit(Diff(src, tgt));
-        sql.Should().Contain("DROP COLUMN [Id]")
-           .And.Contain("ADD [Id] int IDENTITY NOT NULL");
+        sql.Should().Contain("CREATE TABLE [dbo].[X_tmp]")
+           .And.Contain("INSERT INTO [dbo].[X_tmp] ([Id]) SELECT [Id] FROM [dbo].[X];")
+           .And.Contain("EXEC sp_rename '[dbo].[X_tmp]', 'X';")
+           .And.NotContain("DROP COLUMN [Id]");
     }
 
     // ── EmitAlter — constraints ────────────────────────────────────────────

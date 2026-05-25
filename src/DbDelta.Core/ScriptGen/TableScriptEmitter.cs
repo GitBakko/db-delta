@@ -156,6 +156,15 @@ public sealed class TableScriptEmitter : IScriptEmitter
 
     private static string EmitAlter(Table newT, Table oldT)
     {
+        // Spec §3.4: identity column changes on an EXISTING column require a
+        // full temp-table rebuild — you cannot ALTER an IDENTITY flag or its
+        // seed/increment in place, and DROP COLUMN + ADD COLUMN would erase
+        // the data we are trying to migrate.
+        if (RequiresFullRebuild(newT, oldT))
+        {
+            return EmitRebuild(newT, oldT);
+        }
+
         StringBuilder sb = new();
         string qualifiedName = $"[{newT.Schema}].[{newT.Name}]";
 
@@ -249,6 +258,81 @@ public sealed class TableScriptEmitter : IScriptEmitter
               .Append(body).AppendLine(";");
         }
 
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Detects whether the alter from <paramref name="oldT"/> to
+    /// <paramref name="newT"/> needs a full temp-table rebuild rather than
+    /// per-column ALTER statements. Triggered when an existing column's
+    /// IDENTITY flag flips (on or off) or when its seed/increment changes —
+    /// none of those are expressible via ALTER COLUMN, and DROP COLUMN +
+    /// ADD COLUMN would silently lose row data.
+    /// </summary>
+    private static bool RequiresFullRebuild(Table newT, Table oldT)
+    {
+        Dictionary<string, Column> oldByName =
+            oldT.Columns.ToDictionary(c => c.Name, StringComparer.Ordinal);
+        foreach (Column newCol in newT.Columns)
+        {
+            if (!oldByName.TryGetValue(newCol.Name, out Column? oldCol)) { continue; }
+            if (oldCol.IsIdentity != newCol.IsIdentity) { return true; }
+            if (oldCol.IsIdentity && newCol.IsIdentity)
+            {
+                if (oldCol.IdentitySeed != newCol.IdentitySeed) { return true; }
+                if (oldCol.IdentityIncrement != newCol.IdentityIncrement) { return true; }
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Emits the spec §3.4 temp-table dance: CREATE a parallel <c>_tmp</c>
+    /// table with the new shape, optionally <c>SET IDENTITY_INSERT … ON</c>,
+    /// copy the rows over (excluding computed columns, which re-derive),
+    /// DROP the original, then <c>sp_rename</c> the temp table into place.
+    /// </summary>
+    private static string EmitRebuild(Table newT, Table oldT)
+    {
+        string qualifiedOld = $"[{newT.Schema}].[{newT.Name}]";
+        string tmpName = $"{newT.Name}_tmp";
+        string qualifiedTmp = $"[{newT.Schema}].[{tmpName}]";
+
+        HashSet<string> oldColNames =
+            new(oldT.Columns.Select(c => c.Name), StringComparer.Ordinal);
+        List<string> commonInsertable =
+        [
+            .. newT.Columns
+                .Where(c => oldColNames.Contains(c.Name) && c.ComputedExpression is null)
+                .OrderBy(c => c.Ordinal)
+                .Select(c => $"[{c.Name}]")
+        ];
+
+        StringBuilder sb = new();
+        sb.Append(EmitCreate(newT with { Name = tmpName }));
+
+        bool newHasIdentity = newT.Columns.Any(c => c.IsIdentity);
+        if (newHasIdentity)
+        {
+            sb.Append("SET IDENTITY_INSERT ").Append(qualifiedTmp).AppendLine(" ON;");
+        }
+
+        if (commonInsertable.Count > 0)
+        {
+            string colList = string.Join(", ", commonInsertable);
+            sb.Append("INSERT INTO ").Append(qualifiedTmp)
+              .Append(" (").Append(colList).Append(") SELECT ")
+              .Append(colList).Append(" FROM ").Append(qualifiedOld).AppendLine(";");
+        }
+
+        if (newHasIdentity)
+        {
+            sb.Append("SET IDENTITY_INSERT ").Append(qualifiedTmp).AppendLine(" OFF;");
+        }
+
+        sb.Append("DROP TABLE ").Append(qualifiedOld).AppendLine(";");
+        sb.Append("EXEC sp_rename '").Append(qualifiedTmp).Append("', '")
+          .Append(newT.Name).AppendLine("';");
         return sb.ToString();
     }
 
