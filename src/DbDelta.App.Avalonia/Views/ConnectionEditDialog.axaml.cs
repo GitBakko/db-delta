@@ -13,10 +13,6 @@ public partial class ConnectionEditDialog : Window
     {
         InitializeComponent();
 
-        Button reveal = this.FindControl<Button>("RevealButton")!;
-        reveal.AddHandler(PointerPressedEvent, OnRevealPressed, RoutingStrategies.Tunnel);
-        reveal.AddHandler(PointerReleasedEvent, OnRevealReleased, RoutingStrategies.Tunnel);
-
         // After the VM finishes its scan, pop the server dropdown via the
         // dispatcher so layout has a chance to settle. The inline ListBox
         // fallback below the input is the guaranteed visibility path; the
@@ -69,18 +65,6 @@ public partial class ConnectionEditDialog : Window
         if (box is null) { return; }
         box.Focus();
         box.IsDropDownOpen = !box.IsDropDownOpen;
-    }
-
-    private void OnRevealPressed(object? sender, PointerPressedEventArgs e)
-    {
-        TextBox box = this.FindControl<TextBox>("PasswordBox")!;
-        box.PasswordChar = '\0';
-    }
-
-    private void OnRevealReleased(object? sender, PointerReleasedEventArgs e)
-    {
-        TextBox box = this.FindControl<TextBox>("PasswordBox")!;
-        box.PasswordChar = '•';
     }
 
     private void OnColorSwatchTapped(object? sender, TappedEventArgs e)

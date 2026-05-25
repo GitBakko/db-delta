@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:DbDelta.App.ViewModels"
         xmlns:v="using:DbDelta.App.Views"
+        xmlns:c="using:DbDelta.App.Views.Controls"
         xmlns:sql="using:DbDelta.Persistence.Sql"
         x:Class="DbDelta.App.Views.ConnectionEditDialog"
         x:DataType="vm:ConnectionEditViewModel"
@@ -83,18 +84,10 @@
         <TextBox Text="{Binding UserName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
         <TextBlock Text="Password" FontWeight="SemiBold" Foreground="{StaticResource FgStrongBrush}" />
-        <Grid ColumnDefinitions="*,Auto,Auto">
-          <TextBox x:Name="PasswordBox" Grid.Column="0"
-                   Text="{Binding Password, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                   PasswordChar="&#x2022;" />
-          <Button x:Name="RevealButton" Grid.Column="1" Classes="ghost" Margin="6,0,0,0"
-                  ToolTip.Tip="Tieni premuto per mostrare la password">
-            <Path Width="14" Height="14" Stretch="Uniform"
-                  Stroke="{Binding $parent[Button].Foreground}"
-                  StrokeThickness="1.7" StrokeLineCap="Round"
-                  Data="M 2,12 C 4,7 8,4 12,4 C 16,4 20,7 22,12 C 20,17 16,20 12,20 C 8,20 4,17 2,12 Z M 12,9 A 3,3 0 1 0 12,15 A 3,3 0 0 0 12,9 Z" />
-          </Button>
-          <Button Grid.Column="2" Classes="ghost-emerald" Margin="6,0,0,0"
+        <Grid ColumnDefinitions="*,Auto">
+          <!-- Password row: PasswordBox UserControl (DRY — CLAUDE.md UI rule #3) -->
+          <c:PasswordBox Grid.Column="0" Password="{Binding Password, Mode=TwoWay}" />
+          <Button Grid.Column="1" Classes="ghost-emerald" Margin="6,0,0,0"
                   Command="{Binding LoadDatabasesCommand}"
                   IsEnabled="{Binding !IsLoadingDatabases}"
                   ToolTip.Tip="Verifica credenziali e carica i database disponibili">

@@ -1,5 +1,4 @@
 using Avalonia.Controls;
-using Avalonia.Input;
 using Avalonia.Interactivity;
 using DbDelta.App.ViewModels;
 using DbDelta.Core.Abstractions;
@@ -17,16 +16,6 @@ public partial class ProjectSetupDialog : Window
     public ProjectSetupDialog()
     {
         InitializeComponent();
-
-        // Wire hold-to-reveal for Source password box.
-        Button srcReveal = this.FindControl<Button>("SrcRevealButton")!;
-        srcReveal.AddHandler(PointerPressedEvent, OnSrcRevealPressed, RoutingStrategies.Tunnel);
-        srcReveal.AddHandler(PointerReleasedEvent, OnSrcRevealReleased, RoutingStrategies.Tunnel);
-
-        // Wire hold-to-reveal for Target password box.
-        Button tgtReveal = this.FindControl<Button>("TgtRevealButton")!;
-        tgtReveal.AddHandler(PointerPressedEvent, OnTgtRevealPressed, RoutingStrategies.Tunnel);
-        tgtReveal.AddHandler(PointerReleasedEvent, OnTgtRevealReleased, RoutingStrategies.Tunnel);
 
         // Wire custom item filters for the server AutoCompleteBoxes.
         // TextFilter is typed AutoCompleteFilterPredicate<string?> (matches by
@@ -127,32 +116,6 @@ public partial class ProjectSetupDialog : Window
         if (box is null) { return; }
         box.Focus();
         box.IsDropDownOpen = !box.IsDropDownOpen;
-    }
-
-    // ── Password reveal ───────────────────────────────────────────────────────
-
-    private void OnSrcRevealPressed(object? sender, PointerPressedEventArgs e)
-    {
-        TextBox box = this.FindControl<TextBox>("SrcPasswordBox")!;
-        box.PasswordChar = '\0';
-    }
-
-    private void OnSrcRevealReleased(object? sender, PointerReleasedEventArgs e)
-    {
-        TextBox box = this.FindControl<TextBox>("SrcPasswordBox")!;
-        box.PasswordChar = '•';
-    }
-
-    private void OnTgtRevealPressed(object? sender, PointerPressedEventArgs e)
-    {
-        TextBox box = this.FindControl<TextBox>("TgtPasswordBox")!;
-        box.PasswordChar = '\0';
-    }
-
-    private void OnTgtRevealReleased(object? sender, PointerReleasedEventArgs e)
-    {
-        TextBox box = this.FindControl<TextBox>("TgtPasswordBox")!;
-        box.PasswordChar = '•';
     }
 
     // ── Action bar ────────────────────────────────────────────────────────────
