@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using FluentAssertions;
 using Microsoft.Data.SqlClient;
 using Testcontainers.MsSql;
@@ -66,25 +65,9 @@ public class CompareCommandTests(CliFixture fixture)
         exitCode.Should().Be(ExpectedExitCodes.SuccessNoDifferences);
     }
 
-    private string ConnectionFor(string db) =>
-        new SqlConnectionStringBuilder(fixture.ConnectionString) { InitialCatalog = db }.ConnectionString;
-
-    private async Task CreateDb(string db, CancellationToken ct)
-    {
-        await using SqlConnection c = new(fixture.ConnectionString);
-        await c.OpenAsync(ct);
-        await using SqlCommand cmd = new($"IF DB_ID('{db}') IS NULL CREATE DATABASE [{db}];", c);
-        await cmd.ExecuteNonQueryAsync(ct);
-    }
-
-    private async Task CreateCustomerTable(string db, CancellationToken ct)
-    {
-        await using SqlConnection c = new(ConnectionFor(db));
-        await c.OpenAsync(ct);
-        await using SqlCommand cmd = new(
-            "IF OBJECT_ID('dbo.Customer') IS NULL CREATE TABLE dbo.Customer(Id int);", c);
-        await cmd.ExecuteNonQueryAsync(ct);
-    }
+    private string ConnectionFor(string db) => CliRunner.ConnectionFor(fixture.ConnectionString, db);
+    private Task CreateDb(string db, CancellationToken ct) => CliRunner.CreateDb(fixture.ConnectionString, db, ct);
+    private Task CreateCustomerTable(string db, CancellationToken ct) => CliRunner.CreateCustomerTable(fixture.ConnectionString, db, ct);
 
     [Fact]
     public async Task Returns_exit_code_1_when_target_is_missing_a_primary_key()
@@ -135,34 +118,7 @@ public class CompareCommandTests(CliFixture fixture)
         await cmd.ExecuteNonQueryAsync(ct);
     }
 
-    private static async Task<int> RunCli(string[] args, CancellationToken ct)
-    {
-        // AppContext.BaseDirectory => <repo>/tests/DbDelta.Cli.AcceptanceTests/bin/<Config>/net10.0/
-        // Walk up to repo root, then locate the CLI DLL under the SAME configuration.
-        string testBin = AppContext.BaseDirectory;
-        string configuration = new DirectoryInfo(testBin).Parent!.Name; // Debug or Release
-        string repoRoot = Path.GetFullPath(Path.Combine(testBin, "..", "..", "..", "..", ".."));
-        string cliDll = Path.Combine(repoRoot, "src", "DbDelta.Cli", "bin", configuration, "net10.0", "dbdelta.dll");
-
-        // Invoke via `dotnet <dll>` so the same code path works on Windows (.exe apphost)
-        // and Linux/macOS (no .exe; apphost name has no extension).
-        ProcessStartInfo psi = new("dotnet")
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-        };
-        psi.ArgumentList.Add(cliDll);
-        foreach (string a in args)
-        {
-            psi.ArgumentList.Add(a);
-        }
-
-        using Process p = Process.Start(psi)!;
-        await p.WaitForExitAsync(ct);
-        return p.ExitCode;
-    }
+    private static Task<int> RunCli(string[] args, CancellationToken ct) => CliRunner.Run(args, ct);
 
     [Fact]
     public async Task Returns_exit_code_1_when_source_has_an_extra_view()
@@ -286,4 +242,5 @@ internal static class ExpectedExitCodes
 {
     public const int SuccessNoDifferences = 0;
     public const int SuccessDifferencesFound = 1;
+    public const int InternalError = 99;
 }

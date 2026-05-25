@@ -1,18 +1,20 @@
 using System.CommandLine;
-using DbDelta.Cli.Output;
 using DbDelta.Core.Abstractions;
 using DbDelta.Core.Diff;
 using DbDelta.Core.ObjectModel;
 using DbDelta.Core.Options;
+using DbDelta.Core.Reports;
 using DbDelta.Providers.LiveDb;
+using DbDelta.Shared.Reports;
 
 namespace DbDelta.Cli.Commands;
 
 /// <summary>
-/// `dbdelta compare` — load source/target via <see cref="LiveDbSource"/>, run
-/// <see cref="ComparisonEngine"/>, emit text or JSON, return spec §4.3 exit code.
+/// <c>dbdelta report</c> — load source/target, compare, and emit an HTML
+/// and/or JSON report to disk. At least one of <c>--html</c> / <c>--json</c>
+/// is required; both can be supplied at once.
 /// </summary>
-internal static class CompareCommand
+internal static class ReportCommand
 {
     public static Command Build()
     {
@@ -26,24 +28,35 @@ internal static class CompareCommand
             Description = "Target SQL Server connection string",
             Required = true
         };
-        Option<string> format = new("--format")
+        Option<string?> htmlPath = new("--html")
         {
-            Description = "Output format: text | json",
-            DefaultValueFactory = _ => "text"
+            Description = "Output path for the self-contained HTML report"
+        };
+        Option<string?> jsonPath = new("--json")
+        {
+            Description = "Output path for the JSON report"
         };
 
-        Command command = new("compare", "Compare two databases and print the differences")
+        Command command = new("report", "Run a comparison and write an HTML and/or JSON report to disk")
         {
             source,
             target,
-            format
+            htmlPath,
+            jsonPath
         };
 
         command.SetAction(async (parseResult, ct) =>
         {
             string srcConn = parseResult.GetValue(source)!;
             string tgtConn = parseResult.GetValue(target)!;
-            string fmt = parseResult.GetValue(format) ?? "text";
+            string? html = parseResult.GetValue(htmlPath);
+            string? json = parseResult.GetValue(jsonPath);
+
+            if (string.IsNullOrWhiteSpace(html) && string.IsNullOrWhiteSpace(json))
+            {
+                Console.Error.WriteLine("{\"code\":\"missing_output\",\"message\":\"At least one of --html or --json must be specified.\",\"remediation\":\"Pass --html=<path> and/or --json=<path>.\"}");
+                return ExitCodes.InternalError;
+            }
 
             LiveDbSource srcSource = new(srcConn, "source");
             LiveDbSource tgtSource = new(tgtConn, "target");
@@ -65,11 +78,18 @@ internal static class CompareCommand
             ComparisonResult comparison = new ComparisonEngine()
                 .Compare(srcResult.Value!, tgtResult.Value!, ComparisonOptions.Default);
 
-            string output = fmt.Equals("json", StringComparison.OrdinalIgnoreCase)
-                ? JsonFormatter.Format(comparison)
-                : TextFormatter.Format(comparison);
-
-            Console.Out.WriteLine(output);
+            if (!string.IsNullOrWhiteSpace(html))
+            {
+                string htmlText = new HtmlReportGenerator().Generate(comparison);
+                EnsureParentDirectoryExists(html);
+                await File.WriteAllTextAsync(html, htmlText, ct);
+            }
+            if (!string.IsNullOrWhiteSpace(json))
+            {
+                string jsonText = new JsonReportGenerator().Generate(comparison);
+                EnsureParentDirectoryExists(json);
+                await File.WriteAllTextAsync(json, jsonText, ct);
+            }
 
             bool hasDifferences = comparison.Differences
                 .Any(d => d.Status is DifferenceStatus.Different
@@ -82,4 +102,14 @@ internal static class CompareCommand
 
         return command;
     }
+
+    private static void EnsureParentDirectoryExists(string path)
+    {
+        string? dir = Path.GetDirectoryName(Path.GetFullPath(path));
+        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+        {
+            Directory.CreateDirectory(dir);
+        }
+    }
+
 }
