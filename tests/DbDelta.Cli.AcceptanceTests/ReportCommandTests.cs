@@ -112,6 +112,7 @@ internal sealed class TempFile : IDisposable
     private TempFile(string path) { Path = path; }
     public static TempFile Html() => new(System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"dbdelta-{Guid.NewGuid():N}.html"));
     public static TempFile Json() => new(System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"dbdelta-{Guid.NewGuid():N}.json"));
+    public static TempFile Sql() => new(System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"dbdelta-{Guid.NewGuid():N}.sql"));
 
     public void Dispose()
     {

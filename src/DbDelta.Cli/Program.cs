@@ -4,7 +4,9 @@ using DbDelta.Cli.Commands;
 RootCommand root = new("DbDelta — open-source SQL Server schema compare and deployment tool")
 {
     CompareCommand.Build(),
-    ReportCommand.Build()
+    ReportCommand.Build(),
+    ScriptCommand.Build(),
+    ApplyCommand.Build()
 };
 
 return await root.Parse(args).InvokeAsync();

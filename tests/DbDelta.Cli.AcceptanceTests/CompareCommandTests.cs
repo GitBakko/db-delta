@@ -242,5 +242,6 @@ internal static class ExpectedExitCodes
 {
     public const int SuccessNoDifferences = 0;
     public const int SuccessDifferencesFound = 1;
+    public const int ProjectFileError = 60;
     public const int InternalError = 99;
 }
