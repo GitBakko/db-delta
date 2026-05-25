@@ -1,15 +1,27 @@
 using System.Text;
 using DbDelta.Core.Diff;
 using DbDelta.Core.ObjectModel;
+using DbDelta.Core.Options;
 
 namespace DbDelta.Core.ScriptGen;
 
 /// <summary>
 /// Orchestrates per-object emitters and wraps the output in a deployment-ready
-/// batch. Order: tables (with PK/UQ/CK/DF/identity/computed inline) → standalone
-/// CREATE INDEX → views (CREATE OR ALTER) → functions (CREATE OR ALTER) →
-/// procedures (CREATE OR ALTER) → triggers (CREATE OR ALTER) → ALTER TABLE
-/// ADD CONSTRAINT … FOREIGN KEY.
+/// batch. Order:
+/// <list type="number">
+///   <item>Prologue — Sequences, UserDefinedTypes (alias), Users, Roles
+///       (referenced by columns / procedures / role memberships)</item>
+///   <item>Tables (with PK / UQ / CK / DF / identity / computed inline)</item>
+///   <item>Indexes (CREATE / DROP / delta)</item>
+///   <item>Views (CREATE OR ALTER)</item>
+///   <item>Functions (CREATE OR ALTER)</item>
+///   <item>Procedures (CREATE OR ALTER)</item>
+///   <item>Triggers (CREATE OR ALTER)</item>
+///   <item>Synonyms (CREATE / DROP — placed after the modules they may alias)</item>
+///   <item>FOREIGN KEYS — appended last so referenced tables already exist</item>
+///   <item>Permissions — GRANT / REVOKE, gated on
+///       <see cref="ComparisonOptions.IgnorePermissions"/> (default ON)</item>
+/// </list>
 /// </summary>
 public sealed class ScriptGenerator
 {
@@ -20,11 +32,20 @@ public sealed class ScriptGenerator
     private readonly ProcedureScriptEmitter _procEmitter = new();
     private readonly FunctionScriptEmitter _functionEmitter = new();
     private readonly TriggerScriptEmitter _triggerEmitter = new();
+    private readonly SequenceScriptEmitter _sequenceEmitter = new();
+    private readonly SynonymScriptEmitter _synonymEmitter = new();
+    private readonly UserDefinedTypeScriptEmitter _udtEmitter = new();
+    private readonly UserScriptEmitter _userEmitter = new();
+    private readonly RoleScriptEmitter _roleEmitter = new();
+    private readonly PermissionScriptEmitter _permissionEmitter = new();
 
     /// <summary>
     /// Generates a complete T-SQL migration script for the given comparison result.
     /// </summary>
-    public string Generate(ComparisonResult result, IEnumerable<DifferencePair>? selection = null)
+    public string Generate(
+        ComparisonResult result,
+        IEnumerable<DifferencePair>? selection = null,
+        ComparisonOptions options = ComparisonOptions.Default)
     {
         ArgumentNullException.ThrowIfNull(result);
         List<DifferencePair> pairs = [.. (selection ?? result.Differences)
@@ -35,6 +56,14 @@ public sealed class ScriptGenerator
         sb.AppendLine("SET XACT_ABORT ON;");
         sb.AppendLine("BEGIN TRANSACTION;");
         sb.AppendLine("GO");
+
+        // 0. Prologue: Sequences + UserDefinedTypes + Users + Roles.
+        //    Must come before tables because columns can reference sequences
+        //    (DEFAULT NEXT VALUE FOR) and alias UDTs.
+        EmitSequences(sb, pairs);
+        EmitUserDefinedTypes(sb, pairs);
+        EmitUsers(sb, pairs);
+        EmitRoles(sb, pairs);
 
         // 1. Tables (CREATE / DROP / ALTER ADD COLUMN + ALTER ADD CONSTRAINT inline)
         foreach (DifferencePair pair in pairs.Where(p => p.Identity.Kind == "Table"))
@@ -138,6 +167,10 @@ public sealed class ScriptGenerator
             }
         }
 
+        // 6.5 Synonyms — placed after the modules they may alias but before
+        //     FKs to keep the constraint phase tight at the bottom.
+        EmitSynonyms(sb, pairs);
+
         // 7. Foreign keys — emitted last so referenced tables already exist.
         //    OnlyInA: add every FK. Different: diff against target — drop
         //    removed/changed FKs, add new/changed FKs (M8 polish).
@@ -172,9 +205,257 @@ public sealed class ScriptGenerator
             }
         }
 
+        // 8. Permissions — last, gated on options. Default (Redgate-parity)
+        //    skips permissions entirely; consumers can clear the flag to
+        //    include GRANT / REVOKE statements.
+        if (!options.HasFlag(ComparisonOptions.IgnorePermissions))
+        {
+            EmitPermissions(sb, pairs);
+        }
+
         sb.AppendLine("COMMIT TRANSACTION;");
         sb.AppendLine("GO");
         return sb.ToString();
+    }
+
+    // ── Prologue emitters ───────────────────────────────────────────────────
+
+    private void EmitSequences(StringBuilder sb, IReadOnlyList<DifferencePair> pairs)
+    {
+        foreach (DifferencePair pair in pairs
+            .Where(p => p.Identity.Kind == "Sequence")
+            .OrderBy(p => p.Identity.SchemaName)
+            .ThenBy(p => p.Identity.ObjectName))
+        {
+            switch (pair.Status)
+            {
+                case DifferenceStatus.OnlyInA when pair.SideA is Sequence s:
+                    sb.AppendLine(_sequenceEmitter.EmitCreate(s));
+                    sb.AppendLine("GO");
+                    break;
+                case DifferenceStatus.OnlyInB when pair.SideB is Sequence s:
+                    sb.AppendLine(_sequenceEmitter.EmitDrop(s));
+                    sb.AppendLine("GO");
+                    break;
+                case DifferenceStatus.Different
+                    when pair.SideA is Sequence srcSeq && pair.SideB is Sequence tgtSeq:
+                    // SQL Server allows ALTER SEQUENCE for most options, but
+                    // not the base data type. Take the safe shape for v1:
+                    // DROP + CREATE preserves all options without trying to
+                    // detect the data-type-changed case.
+                    sb.AppendLine(_sequenceEmitter.EmitDrop(tgtSeq));
+                    sb.AppendLine(_sequenceEmitter.EmitCreate(srcSeq));
+                    sb.AppendLine("GO");
+                    break;
+                case DifferenceStatus.OnlyInA:
+                case DifferenceStatus.OnlyInB:
+                case DifferenceStatus.Different:
+                case DifferenceStatus.Identical:
+                default:
+                    break;
+            }
+        }
+    }
+
+    private void EmitUserDefinedTypes(StringBuilder sb, IReadOnlyList<DifferencePair> pairs)
+    {
+        foreach (DifferencePair pair in pairs
+            .Where(p => p.Identity.Kind == "UserDefinedType")
+            .OrderBy(p => p.Identity.SchemaName)
+            .ThenBy(p => p.Identity.ObjectName))
+        {
+            switch (pair.Status)
+            {
+                case DifferenceStatus.OnlyInA when pair.SideA is UserDefinedType u:
+                    sb.AppendLine(_udtEmitter.EmitCreate(u));
+                    sb.AppendLine("GO");
+                    break;
+                case DifferenceStatus.OnlyInB when pair.SideB is UserDefinedType u:
+                    sb.AppendLine(_udtEmitter.EmitDrop(u));
+                    sb.AppendLine("GO");
+                    break;
+                case DifferenceStatus.Different
+                    when pair.SideA is UserDefinedType srcU && pair.SideB is UserDefinedType tgtU:
+                    sb.AppendLine(_udtEmitter.EmitDrop(tgtU));
+                    sb.AppendLine(_udtEmitter.EmitCreate(srcU));
+                    sb.AppendLine("GO");
+                    break;
+                case DifferenceStatus.OnlyInA:
+                case DifferenceStatus.OnlyInB:
+                case DifferenceStatus.Different:
+                case DifferenceStatus.Identical:
+                default:
+                    break;
+            }
+        }
+    }
+
+    private void EmitUsers(StringBuilder sb, IReadOnlyList<DifferencePair> pairs)
+    {
+        foreach (DifferencePair pair in pairs
+            .Where(p => p.Identity.Kind == "User")
+            .OrderBy(p => p.Identity.ObjectName, StringComparer.OrdinalIgnoreCase))
+        {
+            switch (pair.Status)
+            {
+                case DifferenceStatus.OnlyInA when pair.SideA is DatabaseUser u:
+                    sb.AppendLine(_userEmitter.EmitCreate(u));
+                    sb.AppendLine("GO");
+                    break;
+                case DifferenceStatus.OnlyInB when pair.SideB is DatabaseUser u:
+                    sb.AppendLine(_userEmitter.EmitDrop(u));
+                    sb.AppendLine("GO");
+                    break;
+                case DifferenceStatus.Different
+                    when pair.SideA is DatabaseUser srcU && pair.SideB is DatabaseUser tgtU:
+                    if (DefaultSchemaIsOnlyDifference(srcU, tgtU))
+                    {
+                        sb.AppendLine(_userEmitter.EmitAlterDefaultSchema(srcU));
+                        sb.AppendLine("GO");
+                    }
+                    else
+                    {
+                        sb.AppendLine(_userEmitter.EmitDrop(tgtU));
+                        sb.AppendLine(_userEmitter.EmitCreate(srcU));
+                        sb.AppendLine("GO");
+                    }
+                    break;
+                case DifferenceStatus.OnlyInA:
+                case DifferenceStatus.OnlyInB:
+                case DifferenceStatus.Different:
+                case DifferenceStatus.Identical:
+                default:
+                    break;
+            }
+        }
+    }
+
+    private static bool DefaultSchemaIsOnlyDifference(DatabaseUser a, DatabaseUser b) =>
+        string.Equals(a.TypeCode, b.TypeCode, StringComparison.Ordinal)
+        && string.Equals(a.LoginName, b.LoginName, StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(a.DefaultSchema, b.DefaultSchema, StringComparison.OrdinalIgnoreCase);
+
+    private void EmitRoles(StringBuilder sb, IReadOnlyList<DifferencePair> pairs)
+    {
+        foreach (DifferencePair pair in pairs
+            .Where(p => p.Identity.Kind == "Role")
+            .OrderBy(p => p.Identity.ObjectName, StringComparer.OrdinalIgnoreCase))
+        {
+            switch (pair.Status)
+            {
+                case DifferenceStatus.OnlyInA when pair.SideA is DatabaseRole r:
+                    sb.AppendLine(_roleEmitter.EmitCreate(r));
+                    sb.AppendLine("GO");
+                    break;
+                case DifferenceStatus.OnlyInB when pair.SideB is DatabaseRole r:
+                    sb.AppendLine(_roleEmitter.EmitDrop(r));
+                    sb.AppendLine("GO");
+                    break;
+                case DifferenceStatus.Different
+                    when pair.SideA is DatabaseRole srcR && pair.SideB is DatabaseRole tgtR:
+                    EmitRoleDelta(sb, srcR, tgtR);
+                    break;
+                case DifferenceStatus.OnlyInA:
+                case DifferenceStatus.OnlyInB:
+                case DifferenceStatus.Different:
+                case DifferenceStatus.Identical:
+                default:
+                    break;
+            }
+        }
+    }
+
+    private void EmitRoleDelta(StringBuilder sb, DatabaseRole src, DatabaseRole tgt)
+    {
+        if (!string.Equals(src.OwnerName, tgt.OwnerName, StringComparison.OrdinalIgnoreCase))
+        {
+            // Owner change requires DROP + CREATE — ALTER AUTHORIZATION exists
+            // but ownership swaps are rare enough that DROP + CREATE is the
+            // honest path: it surfaces dependent-object failures clearly.
+            sb.AppendLine(_roleEmitter.EmitDrop(tgt));
+            sb.AppendLine(_roleEmitter.EmitCreate(src));
+            sb.AppendLine("GO");
+            return;
+        }
+
+        HashSet<string> srcMembers = new(src.Members, StringComparer.OrdinalIgnoreCase);
+        HashSet<string> tgtMembers = new(tgt.Members, StringComparer.OrdinalIgnoreCase);
+        bool wroteAnything = false;
+        foreach (string drop in tgtMembers.Except(srcMembers, StringComparer.OrdinalIgnoreCase)
+                                          .OrderBy(m => m, StringComparer.OrdinalIgnoreCase))
+        {
+            sb.AppendLine(_roleEmitter.EmitDropMember(src.Name, drop));
+            wroteAnything = true;
+        }
+        foreach (string add in srcMembers.Except(tgtMembers, StringComparer.OrdinalIgnoreCase)
+                                         .OrderBy(m => m, StringComparer.OrdinalIgnoreCase))
+        {
+            sb.AppendLine(_roleEmitter.EmitAddMember(src.Name, add));
+            wroteAnything = true;
+        }
+        if (wroteAnything)
+        {
+            sb.AppendLine("GO");
+        }
+    }
+
+    // ── Epilogue emitters ───────────────────────────────────────────────────
+
+    private void EmitSynonyms(StringBuilder sb, IReadOnlyList<DifferencePair> pairs)
+    {
+        foreach (DifferencePair pair in pairs
+            .Where(p => p.Identity.Kind == "Synonym")
+            .OrderBy(p => p.Identity.SchemaName)
+            .ThenBy(p => p.Identity.ObjectName))
+        {
+            switch (pair.Status)
+            {
+                case DifferenceStatus.OnlyInA when pair.SideA is Synonym s:
+                    sb.AppendLine(_synonymEmitter.EmitCreate(s));
+                    sb.AppendLine("GO");
+                    break;
+                case DifferenceStatus.OnlyInB when pair.SideB is Synonym s:
+                    sb.AppendLine(_synonymEmitter.EmitDrop(s));
+                    sb.AppendLine("GO");
+                    break;
+                case DifferenceStatus.Different
+                    when pair.SideA is Synonym srcS && pair.SideB is Synonym tgtS:
+                    sb.AppendLine(_synonymEmitter.EmitDrop(tgtS));
+                    sb.AppendLine(_synonymEmitter.EmitCreate(srcS));
+                    sb.AppendLine("GO");
+                    break;
+                case DifferenceStatus.OnlyInA:
+                case DifferenceStatus.OnlyInB:
+                case DifferenceStatus.Different:
+                case DifferenceStatus.Identical:
+                default:
+                    break;
+            }
+        }
+    }
+
+    private void EmitPermissions(StringBuilder sb, IReadOnlyList<DifferencePair> pairs)
+    {
+        foreach (DifferencePair pair in pairs
+            .Where(p => p.Identity.Kind == "Permission")
+            .OrderBy(p => p.Identity.ObjectName, StringComparer.Ordinal))
+        {
+            switch (pair.Status)
+            {
+                case DifferenceStatus.OnlyInA when pair.SideA is Permission p:
+                    sb.AppendLine(_permissionEmitter.EmitGrantOrDeny(p));
+                    break;
+                case DifferenceStatus.OnlyInB when pair.SideB is Permission p:
+                    sb.AppendLine(_permissionEmitter.EmitRevoke(p));
+                    break;
+                case DifferenceStatus.OnlyInA:
+                case DifferenceStatus.OnlyInB:
+                case DifferenceStatus.Different:
+                case DifferenceStatus.Identical:
+                default:
+                    break;
+            }
+        }
     }
 
     /// <summary>
