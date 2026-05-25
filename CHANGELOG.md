@@ -6,6 +6,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased] — heading toward v1.0.0 RC
 
+(Empty — pending v0.14 column-collation diff coverage + identity
+rebuild PK swap, BenchmarkDotNet perf suite, FsCheck property tests,
+compat matrix, formal Kahn dependency resolver, DocFX site, WiX MSI.)
+
+## [0.13.1] — 2026-05-25 — Redgate parity patch
+
 ### Fixed
 - **Sequence diff** — when only seed / increment / min / max / cycle /
   cache differ (data type unchanged) `ScriptGenerator` now emits
@@ -21,11 +27,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - +8 `SequenceAlterTests` cover seed-only, increment-only,
   combined, data-type fallback to DROP+CREATE, cycle toggle,
   cache size change, cache disable, min/max change.
+- 355 / 355 passing (+8).
 
-(Still pending for v0.14 / v1.0 RC: BenchmarkDotNet perf suite,
-FsCheck property tests, compat matrix, column-collation diff
-coverage, identity-rebuild PK swap pattern, formal Kahn dependency
-resolver, DocFX site, WiX MSI installer.)
+### Documentation
+- `docs/parity/redgate-2026-05-25.md` records the full 11-scenario
+  parity matrix (6 match + 4 cosmetic + 1 bug, all triaged).
+- `tests/Fixtures/Parity/` ships the deterministic 11-scenario
+  fixture so anyone can rerun the parity audit against Redgate
+  SQL Compare 16.x.
 
 ## [0.13.0] — 2026-05-25 — M13 wave 1 alpha (RC candidate)
 
