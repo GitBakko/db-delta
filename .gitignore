@@ -57,6 +57,9 @@ coverage/
 # Local scratch (draft outputs from subagents, etc.)
 tmp/
 
+# Smoke-test output against live DBs (contains real schema names)
+scripts/smoke/
+
 # Ruflo / agentdb local state
 agentdb.rvf
 agentdb.rvf-*
