@@ -33,13 +33,17 @@ public sealed class TableScriptEmitter : IScriptEmitter
         };
     }
 
-    private static string EmitCreate(Table table, string? targetDefaultCollation = null)
+    private static string EmitCreate(
+        Table table,
+        string? targetDefaultCollation = null,
+        bool includeNamedConstraints = true)
     {
         StringBuilder sb = new();
         sb.Append("CREATE TABLE [").Append(table.Schema).Append("].[").Append(table.Name).AppendLine("] (");
 
-        HashSet<string> colsWithNamedDefault =
-            [.. table.Constraints.OfType<DefaultConstraint>().Select(d => d.ColumnName)];
+        HashSet<string> colsWithNamedDefault = includeNamedConstraints
+            ? [.. table.Constraints.OfType<DefaultConstraint>().Select(d => d.ColumnName)]
+            : [];
 
         bool firstLine = true;
         for (int i = 0; i < table.Columns.Count; i++)
@@ -49,37 +53,40 @@ public sealed class TableScriptEmitter : IScriptEmitter
             sb.Append("    ").Append(FormatColumn(col, colsWithNamedDefault.Contains(col.Name), targetDefaultCollation));
         }
 
-        foreach (Constraint c in table.Constraints)
+        if (includeNamedConstraints)
         {
-            switch (c)
+            foreach (Constraint c in table.Constraints)
             {
-                case PrimaryKey pk:
-                    AppendLineSeparator(sb, ref firstLine);
-                    sb.Append("    CONSTRAINT [").Append(pk.Name).Append("] PRIMARY KEY ")
-                      .Append(pk.IsClustered ? "CLUSTERED " : "NONCLUSTERED ")
-                      .Append('(').Append(string.Join(", ", pk.Columns.Select(Bracket))).Append(')');
-                    break;
-                case UniqueConstraint uq:
-                    AppendLineSeparator(sb, ref firstLine);
-                    sb.Append("    CONSTRAINT [").Append(uq.Name).Append("] UNIQUE ")
-                      .Append(uq.IsClustered ? "CLUSTERED " : "NONCLUSTERED ")
-                      .Append('(').Append(string.Join(", ", uq.Columns.Select(Bracket))).Append(')');
-                    break;
-                case CheckConstraint ck:
-                    AppendLineSeparator(sb, ref firstLine);
-                    sb.Append("    CONSTRAINT [").Append(ck.Name).Append("] CHECK ")
-                      .Append(ck.Expression);
-                    break;
-                case DefaultConstraint df:
-                    AppendLineSeparator(sb, ref firstLine);
-                    sb.Append("    CONSTRAINT [").Append(df.Name).Append("] DEFAULT ")
-                      .Append(df.Expression).Append(" FOR [").Append(df.ColumnName).Append(']');
-                    break;
-                case ForeignKey:
-                    // FK is emitted standalone by ForeignKeyScriptEmitter.
-                    break;
-                default:
-                    break;
+                switch (c)
+                {
+                    case PrimaryKey pk:
+                        AppendLineSeparator(sb, ref firstLine);
+                        sb.Append("    CONSTRAINT [").Append(pk.Name).Append("] PRIMARY KEY ")
+                          .Append(pk.IsClustered ? "CLUSTERED " : "NONCLUSTERED ")
+                          .Append('(').Append(string.Join(", ", pk.Columns.Select(Bracket))).Append(')');
+                        break;
+                    case UniqueConstraint uq:
+                        AppendLineSeparator(sb, ref firstLine);
+                        sb.Append("    CONSTRAINT [").Append(uq.Name).Append("] UNIQUE ")
+                          .Append(uq.IsClustered ? "CLUSTERED " : "NONCLUSTERED ")
+                          .Append('(').Append(string.Join(", ", uq.Columns.Select(Bracket))).Append(')');
+                        break;
+                    case CheckConstraint ck:
+                        AppendLineSeparator(sb, ref firstLine);
+                        sb.Append("    CONSTRAINT [").Append(ck.Name).Append("] CHECK ")
+                          .Append(ck.Expression);
+                        break;
+                    case DefaultConstraint df:
+                        AppendLineSeparator(sb, ref firstLine);
+                        sb.Append("    CONSTRAINT [").Append(df.Name).Append("] DEFAULT ")
+                          .Append(df.Expression).Append(" FOR [").Append(df.ColumnName).Append(']');
+                        break;
+                    case ForeignKey:
+                        // FK is emitted standalone by ForeignKeyScriptEmitter.
+                        break;
+                    default:
+                        break;
+                }
             }
         }
 
@@ -291,7 +298,7 @@ public sealed class TableScriptEmitter : IScriptEmitter
     /// none of those are expressible via ALTER COLUMN, and DROP COLUMN +
     /// ADD COLUMN would silently lose row data.
     /// </summary>
-    private static bool RequiresFullRebuild(Table newT, Table oldT)
+    internal static bool RequiresFullRebuild(Table newT, Table oldT)
     {
         Dictionary<string, Column> oldByName =
             oldT.Columns.ToDictionary(c => c.Name, StringComparer.Ordinal);
@@ -331,7 +338,29 @@ public sealed class TableScriptEmitter : IScriptEmitter
         ];
 
         StringBuilder sb = new();
-        sb.Append(EmitCreate(newT with { Name = tmpName }, targetDefaultCollation));
+
+        // M13-PARITY.6 #33 — PK-around-swap pattern. SQL Server constraint
+        // names are DB-scoped, so creating `[X_tmp]` with the same PK name
+        // as `[X]` collides. Drop the existing non-FK named constraints
+        // (PK / UQ / CK / named DEFAULT) before the rebuild and re-create
+        // them after `sp_rename`. This also mirrors Redgate SQL Compare's
+        // shape for scenario 03 — the safer pattern when other tables hold
+        // FKs pointing AT this PK (inbound-FK lifecycle is orchestrated by
+        // <see cref="ScriptGenerator"/>).
+        List<Constraint> namedNonFkConstraintsOnOld =
+            [.. oldT.Constraints.Where(IsNamedNonFkConstraint)];
+        foreach (Constraint oldC in namedNonFkConstraintsOnOld)
+        {
+            sb.Append("ALTER TABLE ").Append(qualifiedOld)
+              .Append(" DROP CONSTRAINT [").Append(oldC.Name).AppendLine("];");
+        }
+
+        // _tmp is created *without* named constraints; we add them back
+        // after the rename so their names are restored on the final table.
+        sb.Append(EmitCreate(
+            newT with { Name = tmpName },
+            targetDefaultCollation,
+            includeNamedConstraints: false));
 
         bool newHasIdentity = newT.Columns.Any(c => c.IsIdentity);
         if (newHasIdentity)
@@ -355,8 +384,28 @@ public sealed class TableScriptEmitter : IScriptEmitter
         sb.Append("DROP TABLE ").Append(qualifiedOld).AppendLine(";");
         sb.Append("EXEC sp_rename '").Append(qualifiedTmp).Append("', '")
           .Append(newT.Name).AppendLine("';");
+
+        // Re-add the named non-FK constraints from the source-side table
+        // (newT) — these are the constraints the final shape requires.
+        foreach (Constraint c in newT.Constraints.Where(IsNamedNonFkConstraint))
+        {
+            string body = FormatStandaloneConstraintBody(c);
+            if (body.Length == 0) { continue; }
+            sb.Append("ALTER TABLE ").Append(qualifiedOld)
+              .Append(" ADD CONSTRAINT [").Append(c.Name).Append("] ")
+              .Append(body).AppendLine(";");
+        }
         return sb.ToString();
     }
+
+    private static bool IsNamedNonFkConstraint(Constraint c) => c switch
+    {
+        PrimaryKey => true,
+        UniqueConstraint => true,
+        CheckConstraint => true,
+        DefaultConstraint => true,
+        _ => false,
+    };
 
     /// <summary>
     /// Shape-equality for columns: same data type, same nullability, same
