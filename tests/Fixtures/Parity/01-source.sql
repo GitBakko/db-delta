@@ -125,3 +125,30 @@ CREATE TYPE dbo.OrderItemTvp AS TABLE
     Notes     nvarchar(100) NULL
 );
 GO
+
+-- =========================================================================
+-- Scenario 12 — Table.IdentityFlip with inbound FK (M13-PARITY.6 #33)
+-- Source [Order].Id is IDENTITY(1,1); Target is plain int. Source has
+-- [OrderLine] with FK → [Order].Id (matching FK on target, table is
+-- Identical so it never appears in the diff pairs by itself).
+-- Expected DbDelta: DROP inbound FK → DROP PK → temp-table rebuild
+-- without inline PK → DROP old → sp_rename → ADD PK → ADD inbound FK.
+-- Expected Redgate: same dance with [RG_Recovery_N_Order] naming.
+-- =========================================================================
+CREATE TABLE dbo.[Order]
+(
+    Id     int           IDENTITY(1, 1) NOT NULL,
+    Total  decimal(18, 2) NOT NULL,
+    CONSTRAINT PK_Order PRIMARY KEY CLUSTERED (Id)
+);
+GO
+CREATE TABLE dbo.OrderLine
+(
+    Id        int           IDENTITY(1, 1) NOT NULL,
+    OrderId   int           NOT NULL,
+    SkuCode   nvarchar(40)  NOT NULL,
+    CONSTRAINT PK_OrderLine PRIMARY KEY CLUSTERED (Id),
+    CONSTRAINT FK_OrderLine_Order
+        FOREIGN KEY (OrderId) REFERENCES dbo.[Order] (Id)
+);
+GO

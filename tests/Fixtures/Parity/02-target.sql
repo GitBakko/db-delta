@@ -81,3 +81,24 @@ CREATE TYPE dbo.OrderItemTvp AS TABLE
     Quantity  int NOT NULL
 );
 GO
+
+-- Scenario 12 — Table.IdentityFlip with inbound FK (M13-PARITY.6 #33).
+-- Target [Order].Id is plain int (NO IDENTITY). OrderLine.FK points at
+-- it — must be dropped before the rebuild and re-added after.
+CREATE TABLE dbo.[Order]
+(
+    Id     int           NOT NULL,
+    Total  decimal(18, 2) NOT NULL,
+    CONSTRAINT PK_Order PRIMARY KEY CLUSTERED (Id)
+);
+GO
+CREATE TABLE dbo.OrderLine
+(
+    Id        int           IDENTITY(1, 1) NOT NULL,
+    OrderId   int           NOT NULL,
+    SkuCode   nvarchar(40)  NOT NULL,
+    CONSTRAINT PK_OrderLine PRIMARY KEY CLUSTERED (Id),
+    CONSTRAINT FK_OrderLine_Order
+        FOREIGN KEY (OrderId) REFERENCES dbo.[Order] (Id)
+);
+GO
