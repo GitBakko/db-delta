@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+    <TieredCompilation>true</TieredCompilation>
+    <!-- BenchmarkDotNet emits warnings as analyzer messages that get
+         promoted to errors under TreatWarningsAsErrors. Relax that for
+         the bench project so a transient analyzer churn doesn't break
+         the build alongside the other 9 projects. -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DbDelta.Core\DbDelta.Core.csproj" />
+  </ItemGroup>
+</Project>
