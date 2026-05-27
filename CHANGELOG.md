@@ -13,8 +13,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   published to GitHub Pages and auto-deployed on every push to `main`
   (`.github/workflows/docs.yml`). DocFX is pinned as a dotnet local tool.
   Live at <https://gitbakko.github.io/db-delta/>.
-
-_Pending: WiX MSI installer._
+- **Windows MSI installer (WiX v5)** — a per-machine MSI installs the DbDelta
+  desktop app (Start-Menu shortcut) and the `dbdelta` CLI (added to the system
+  `PATH`), self-contained `win-x64`. Built and attached to the GitHub Release on
+  `v*` tags (`.github/workflows/release.yml`). The MSI is **unsigned** (no
+  code-signing certificate yet), so Windows SmartScreen / UAC shows an "unknown
+  publisher" prompt on first run.
 
 ## [0.15.0] — 2026-05-27 — #24 dependency resolver
 
