@@ -6,7 +6,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased] — heading toward v1.0.0 RC
 
-(Empty — pending DocFX site, WiX MSI.)
+### Added
+- **DocFX documentation site (#25)** — API reference auto-generated from the
+  XML docs of the four library projects (`Core`, `Shared`, `Persistence`,
+  `Providers.LiveDb`) plus getting-started / CLI / comparison-options guides,
+  published to GitHub Pages and auto-deployed on every push to `main`
+  (`.github/workflows/docs.yml`). DocFX is pinned as a dotnet local tool.
+  Live at <https://gitbakko.github.io/db-delta/>.
+
+_Pending: WiX MSI installer._
 
 ## [0.15.0] — 2026-05-27 — #24 dependency resolver
 

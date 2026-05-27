@@ -1,6 +1,6 @@
 # #25 — DocFX API site + GitHub Pages (v1.0 RC)
 
-**Status:** design approved 2026-05-27 · target: spec invariant #5
+**Status:** implemented 2026-05-27 · live at <https://gitbakko.github.io/db-delta/>
 **Driver:** spec §1.x invariant 5 — "XML doc comments on all public types;
 DocFX-rendered API site published to GitHub Pages." XML docs are already
 emitted (`Directory.Build.props` → `GenerateDocumentationFile=true`); this task
