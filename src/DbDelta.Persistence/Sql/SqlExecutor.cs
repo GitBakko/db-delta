@@ -15,8 +15,8 @@ public sealed record SqlBatchResult(
     int TotalDurationMs);
 
 /// <summary>
-/// Runs a T-SQL script (potentially containing GO batch separators) inside a
-/// single transaction against a SQL Server target.
+/// Runs a T-SQL script (potentially containing GO batch separators) against a
+/// SQL Server target, optionally inside a single owned transaction.
 /// </summary>
 public static partial class SqlExecutor
 {

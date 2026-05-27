@@ -1,6 +1,6 @@
 # Self-contained verbose deploy script with per-step error handling
 
-**Status:** design approved 2026-05-27 · target tag `v0.17.0`
+**Status:** implemented 2026-05-27 · tag v0.17.0 (pending) · error handling proven standalone (sqlcmd) + via apply
 **Driver:** the generated deploy script is **silent** and has no per-step error
 handling — only `SET XACT_ABORT ON` + a final implicit rollback. Redgate SQL
 Compare's script is **self-managing**: it prints the exact phase it is in, gates

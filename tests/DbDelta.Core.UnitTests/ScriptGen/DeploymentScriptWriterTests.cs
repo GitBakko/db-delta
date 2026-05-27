@@ -35,10 +35,7 @@ public class DeploymentScriptWriterTests
     }
 
     [Fact]
-    public void WriteBatch_skips_empty_body()
-    {
-        Render(w => w.WriteBatch("noop", "   ")).Should().BeEmpty();
-    }
+    public void WriteBatch_skips_empty_body() => Render(w => w.WriteBatch("noop", "   ")).Should().BeEmpty();
 
     [Fact]
     public void Preamble_with_transaction_emits_sets_and_begin()

@@ -6,7 +6,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased] — heading toward v1.0.0 RC
 
-(Empty — next: code signing, public alpha announcement.)
+### Changed
+- **Deploy scripts are now self-contained and verbose (Redgate-style).** Every
+  operation is preceded by a `PRINT` of the exact phase and followed by an
+  `IF @@ERROR <> 0 SET NOEXEC ON` gate, framed by a full `SET` preamble +
+  transaction and a final `The database update succeeded`/`failed` verdict that
+  rolls back on failure — so a deploy aborts at the first failing step with the
+  native error as the reason, instead of running silently. Proven both via
+  `dbdelta apply` and standalone (sqlcmd/SSMS). The `NoTransactions` option is
+  now honoured. `dbdelta apply` (and the app's execute path) run the
+  self-managing script without an outer transaction (`SqlExecutor` gained a
+  `useOwnTransaction` flag).
 
 ## [0.16.0] — 2026-05-27 — docs site + Windows installer
 
