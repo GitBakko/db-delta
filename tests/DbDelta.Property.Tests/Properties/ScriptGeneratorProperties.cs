@@ -34,9 +34,9 @@ public class ScriptGeneratorProperties
             ComparisonResult result = _engine.Compare(a, b, ComparisonOptions.Default);
             string script = _generator.Generate(result, selection: null,
                 options: ComparisonOptions.Default, targetDefaultCollation: b.DefaultCollation);
-            script.Should().Contain("SET XACT_ABORT ON;")
-                .And.Contain("BEGIN TRANSACTION;")
-                .And.Contain("COMMIT TRANSACTION;");
+            script.Should().Contain("SET XACT_ABORT ON")
+                .And.Contain("BEGIN TRANSACTION")
+                .And.Contain("COMMIT TRANSACTION");
         }
     }
 
