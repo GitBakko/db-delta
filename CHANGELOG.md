@@ -6,9 +6,43 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased] — heading toward v1.0.0 RC
 
-(Empty — pending v0.14 column-collation diff coverage + identity
-rebuild PK swap, BenchmarkDotNet perf suite, FsCheck property tests,
-compat matrix, formal Kahn dependency resolver, DocFX site, WiX MSI.)
+(Empty — pending formal Kahn dependency resolver, DocFX site, WiX MSI.)
+
+## [0.14.0] — 2026-05-27 — M13 wave 2 — parity hardening + quality bar
+
+### Added
+- **Column collation diff** (#32, M13-PARITY.5) — `Column.Collation` +
+  `Database.DefaultCollation` are now read (`sys.columns.collation_name`
+  + `DATABASEPROPERTYEX`) and `TableScriptEmitter` emits a diff-aware
+  `COLLATE` clause: skipped when it matches the target DB default,
+  defensively explicit when the default is unknown.
+- **PK-around-swap identity rebuild + inbound-FK lifecycle** (#33,
+  M13-PARITY.6) — `EmitRebuild` drops named non-FK constraints before the
+  `_tmp` table; `ScriptGenerator` orchestrates inbound FKs onto rebuilt
+  tables via new pipeline sections 0.9 (drop) + 7.9 (re-add), name-deduped
+  against the section-7 pair-level FK delta.
+
+### Tests
+- **BenchmarkDotNet perf suite** (#19, M13-PERF.1) — `bench/DbDelta.Benchmarks`
+  (`ComparisonBench` + `ScriptGenBench`, `SchemaFixtureBuilder`) calibrates
+  against spec §6.1. Baseline 2026-05-26: `ComparisonBench.Compare` 10k tables
+  = 17.8 ms vs the 3000 ms budget (~170× under).
+- **FsCheck property suite** (#20, M13-PERF.2) — `tests/DbDelta.Property.Tests`
+  drives FsCheck 3.0 invariants over generated schemas (6 comparison-engine
+  + 5 script-generator properties): determinism, ordering, idempotence.
+- **Nightly compat matrix** (#21, M13-PERF.3) — `tests/DbDelta.Compat.Tests`
+  round-trips read→diff→script→apply against real SQL Server 2017/2019/2022
+  images via Testcontainers; self-skips unless `DBDELTA_COMPAT=1` + Docker.
+  SQL Server 2016 has no Linux container (SQL-on-Linux began at 2017) so it
+  remains a min-compat target exercised on live Windows instances only.
+  `ci.yml` gains a `schedule` (cron 03:17 UTC) + scheduled-only
+  `nightly-compat-matrix` job.
+- 385 / 385 passing across 11 test projects (compat cases skipped by default).
+
+### Documentation
+- `docs/parity/redgate-2026-05-25.md` updated with the #31..#33 follow-up
+  status table; `tests/Fixtures/Parity/` ships scenario 12 (`dbo.[Order]`
+  identity-flip + `dbo.OrderLine` inbound FK).
 
 ## [0.13.1] — 2026-05-25 — Redgate parity patch
 
