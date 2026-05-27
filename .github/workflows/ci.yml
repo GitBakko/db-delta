@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  schedule:
+    # Nightly compat matrix — 03:17 UTC (off the hour to dodge runner contention).
+    - cron: '17 3 * * *'
 
 permissions:
   contents: read
@@ -92,4 +95,42 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: linux-test-results
+          path: '**/TestResults/*.trx'
+
+  nightly-compat-matrix:
+    name: nightly compat matrix (SQL Server 2017/2019/2022)
+    # Scheduled-only — too heavy (multi-version image pulls) for per-PR runs.
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/Directory.Packages.props') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Build compat matrix project
+        run: dotnet build tests/DbDelta.Compat.Tests/DbDelta.Compat.Tests.csproj --configuration Release
+
+      - name: Run compat matrix (Testcontainers MS SQL 2017/2019/2022)
+        env:
+          DBDELTA_COMPAT: '1'
+        run: dotnet test tests/DbDelta.Compat.Tests/DbDelta.Compat.Tests.csproj --no-build --configuration Release --logger "trx;LogFileName=compat.trx"
+
+      - name: Upload compat matrix results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compat-matrix-results
           path: '**/TestResults/*.trx'
