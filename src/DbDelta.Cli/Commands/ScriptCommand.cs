@@ -82,7 +82,8 @@ internal static class ScriptCommand
                 comparison,
                 selection: null,
                 options: opts,
-                targetDefaultCollation: tgtResult.Value!.DefaultCollation);
+                targetDefaultCollation: tgtResult.Value!.DefaultCollation,
+                dependencies: srcResult.Value!.Dependencies);
 
             if (string.Equals(output, "-", StringComparison.Ordinal))
             {
