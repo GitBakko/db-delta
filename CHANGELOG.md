@@ -6,7 +6,46 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased] — heading toward v1.0.0 RC
 
-(Empty — pending formal Kahn dependency resolver, DocFX site, WiX MSI.)
+(Empty — pending DocFX site, WiX MSI.)
+
+## [0.15.0] — 2026-05-27 — #24 dependency resolver
+
+### Added
+- **Object-level dependency resolver** (#24, spec M7) — a pure
+  `DbDelta.Core/Dependency/` module (`DependencyEdge`, `DependencyResolver`)
+  topologically orders deploy-script emission via Kahn's algorithm with a
+  deterministic `(kind-rank, schema, name)` tiebreak. `LiveDbSource` populates
+  `Database.Dependencies` from `sys.sql_expression_dependencies`.
+- **Cross-kind CREATE ordering** — `ScriptGenerator` now emits objects in
+  dependency order, fixing scripts that previously failed when a computed
+  column referenced a scalar function, a view selected from another view, a
+  view referenced a function, or a schemabound TVF referenced a table. With an
+  empty edge list the order is byte-identical to the previous
+  kind-then-alphabetical output, so existing fixtures are unaffected.
+- **Reverse-topological DROP pass** — removed objects are dropped
+  dependent-first (e.g. a table is dropped before a sequence it references).
+  Foreign-key cycles continue to be handled by the existing final FK phase
+  (FK edges are excluded from the topo graph).
+
+### Fixed
+- **Module body trailing-semicolon parity** — `BodyNormalizer` strips a single
+  trailing `;` so a module whose stored definition lacks the semicolon the
+  script generator appends no longer reports a spurious `Different`.
+
+### Tests
+- Pure resolver unit tests (Kahn ordering, FK-edge exclusion, deferred-kind
+  cycle tolerance, create-validated cycle throw); a live cross-kind round-trip
+  integration test (generate → apply on a Testcontainers SQL Server → converge);
+  and an FsCheck property asserting valid topological linearization +
+  determinism. The `Sequences_Precede_Tables` property was split into the two
+  real directional invariants (CREATE sequence-before-table; DROP
+  table-before-sequence).
+
+### Known limitations
+- DROP ordering uses the source database's dependency edges, so removed
+  (target-only) objects are dropped in reverse kind-rank order rather than by
+  their target-side dependencies. Safe for standard schemas; supplying
+  target-side edges would tighten within-kind drop chains.
 
 ## [0.14.0] — 2026-05-27 — M13 wave 2 — parity hardening + quality bar
 

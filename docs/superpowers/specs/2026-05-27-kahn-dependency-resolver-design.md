@@ -1,6 +1,6 @@
 # #24 — Kahn dependency resolver (v0.15.0, spec M7)
 
-**Status:** design approved 2026-05-27 · target tag `v0.15.0`
+**Status:** released 2026-05-27 · tag v0.15.0
 **Driver:** correctness — the script generator currently orders objects
 alphabetically within each kind, which breaks any schema whose objects
 reference each other out of alphabetical order, and emits whole kinds in a
