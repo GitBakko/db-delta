@@ -1,3 +1,5 @@
+using DbDelta.Core.Dependency;
+
 namespace DbDelta.Core.ObjectModel;
 
 /// <summary>
@@ -43,6 +45,15 @@ public sealed record Database(
 
     /// <summary>Object-level GRANT/DENY permissions (M6).</summary>
     public IReadOnlyList<Permission> Permissions { get; init; } = [];
+
+    /// <summary>
+    /// Object-level dependency edges (#24). Populated by the provider from
+    /// catalog metadata; consumed by the script generator to topologically
+    /// order CREATE emission. Empty ⇒ the generator falls back to its stable
+    /// kind-then-alphabetical order (current behaviour). Foreign-key edges may
+    /// be present but are ignored by the topological sort.
+    /// </summary>
+    public IReadOnlyList<DependencyEdge> Dependencies { get; init; } = [];
 
     /// <summary>
     /// Database default collation (sys.databases.collation_name). Null when
