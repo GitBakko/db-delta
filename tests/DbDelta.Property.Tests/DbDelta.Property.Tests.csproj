@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <!-- The csproj name contains "Property" which collides with
+         `FsCheck.Xunit.PropertyAttribute` because the implicit
+         <RootNamespace> derives from the assembly name and the C#
+         compiler resolves `[Property(...)]` against the namespace
+         segments before the attribute namespaces. Pin the root to a
+         non-colliding name so every `[Property]` / `[Properties]`
+         attribute resolves to the FsCheck.Xunit ones. -->
+    <RootNamespace>DbDelta.PropertyTests</RootNamespace>
+    <AssemblyName>DbDelta.PropertyTests</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="FsCheck" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DbDelta.Core\DbDelta.Core.csproj" />
+  </ItemGroup>
+</Project>
