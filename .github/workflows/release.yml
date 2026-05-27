@@ -44,7 +44,9 @@ jobs:
       - name: Smoke install / uninstall
         shell: pwsh
         run: |
-          $msi = "installer/bin/Release/DbDelta-${{ steps.ver.outputs.version }}-win-x64.msi"
+          # msiexec runs server-side and needs an absolute, backslash path —
+          # a CWD-relative forward-slash path fails to open (error 1619).
+          $msi = (Resolve-Path "installer/bin/Release/DbDelta-${{ steps.ver.outputs.version }}-win-x64.msi").Path
           $i = Start-Process msiexec -ArgumentList "/i `"$msi`" /quiet /qn /norestart /l*v install.log" -Wait -PassThru
           if ($i.ExitCode -ne 0) { if (Test-Path install.log) { Get-Content install.log -Tail 40 }; throw "install failed (exit $($i.ExitCode))" }
           $app = Join-Path $env:ProgramFiles 'DbDelta\DbDelta.App.exe'
