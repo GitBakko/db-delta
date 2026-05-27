@@ -133,12 +133,7 @@ public sealed class ScriptGenerator
         // 1. Tables (CREATE / DROP / ALTER ADD COLUMN + ALTER ADD CONSTRAINT inline)
         foreach (DifferencePair pair in pairs.Where(p => p.Identity.Kind == "Table"))
         {
-            string ddl = _tableEmitter.Emit(pair, targetDefaultCollation);
-            if (!string.IsNullOrWhiteSpace(ddl))
-            {
-                sb.AppendLine(ddl);
-                sb.AppendLine("GO");
-            }
+            EmitOneTable(sb, pair, targetDefaultCollation);
         }
 
         // 2. Indexes
@@ -180,12 +175,7 @@ public sealed class ScriptGenerator
             .OrderBy(p => p.Identity.SchemaName)
             .ThenBy(p => p.Identity.ObjectName))
         {
-            string ddl = _viewEmitter.Emit(pair);
-            if (!string.IsNullOrWhiteSpace(ddl))
-            {
-                sb.AppendLine(ddl);
-                sb.AppendLine("GO");
-            }
+            EmitOneView(sb, pair);
         }
 
         // 4. Functions — alphabetical per schema for deterministic output.
@@ -195,12 +185,7 @@ public sealed class ScriptGenerator
             .OrderBy(p => p.Identity.SchemaName)
             .ThenBy(p => p.Identity.ObjectName))
         {
-            string ddl = _functionEmitter.Emit(pair);
-            if (!string.IsNullOrWhiteSpace(ddl))
-            {
-                sb.AppendLine(ddl);
-                sb.AppendLine("GO");
-            }
+            EmitOneFunction(sb, pair);
         }
 
         // 5. Procedures — alphabetical per schema for deterministic output.
@@ -209,12 +194,7 @@ public sealed class ScriptGenerator
             .OrderBy(p => p.Identity.SchemaName)
             .ThenBy(p => p.Identity.ObjectName))
         {
-            string ddl = _procEmitter.Emit(pair);
-            if (!string.IsNullOrWhiteSpace(ddl))
-            {
-                sb.AppendLine(ddl);
-                sb.AppendLine("GO");
-            }
+            EmitOneProcedure(sb, pair);
         }
 
         // 6. Triggers — alphabetical per schema for deterministic output.
@@ -224,12 +204,7 @@ public sealed class ScriptGenerator
             .OrderBy(p => p.Identity.SchemaName)
             .ThenBy(p => p.Identity.ObjectName))
         {
-            string ddl = _triggerEmitter.Emit(pair);
-            if (!string.IsNullOrWhiteSpace(ddl))
-            {
-                sb.AppendLine(ddl);
-                sb.AppendLine("GO");
-            }
+            EmitOneTrigger(sb, pair);
         }
 
         // 6.5 Synonyms — placed after the modules they may alias but before
@@ -300,6 +275,179 @@ public sealed class ScriptGenerator
         return sb.ToString();
     }
 
+    // ── Per-pair helpers ────────────────────────────────────────────────────
+
+    private void EmitOneSequence(StringBuilder sb, DifferencePair pair)
+    {
+        switch (pair.Status)
+        {
+            case DifferenceStatus.OnlyInA when pair.SideA is Sequence s:
+                sb.AppendLine(_sequenceEmitter.EmitCreate(s));
+                sb.AppendLine("GO");
+                break;
+            case DifferenceStatus.OnlyInB when pair.SideB is Sequence s:
+                sb.AppendLine(_sequenceEmitter.EmitDrop(s));
+                sb.AppendLine("GO");
+                break;
+            case DifferenceStatus.Different
+                when pair.SideA is Sequence srcSeq && pair.SideB is Sequence tgtSeq:
+                // SQL Server can ALTER every sequence property except the
+                // base data type. Prefer in-place ALTER so dependent
+                // `DEFAULT NEXT VALUE FOR` defaults survive (parity
+                // scenario 08, 2026-05-25). Fall back to DROP + CREATE
+                // only when the data type itself changed.
+                string? alter = _sequenceEmitter.EmitAlter(srcSeq, tgtSeq);
+                if (alter is null)
+                {
+                    sb.AppendLine(_sequenceEmitter.EmitDrop(tgtSeq));
+                    sb.AppendLine(_sequenceEmitter.EmitCreate(srcSeq));
+                }
+                else if (alter.Length > 0)
+                {
+                    sb.AppendLine(alter);
+                }
+                sb.AppendLine("GO");
+                break;
+            case DifferenceStatus.OnlyInA:
+            case DifferenceStatus.OnlyInB:
+            case DifferenceStatus.Different:
+            case DifferenceStatus.Identical:
+            default:
+                break;
+        }
+    }
+
+    private void EmitOneUserDefinedType(StringBuilder sb, DifferencePair pair)
+    {
+        switch (pair.Status)
+        {
+            case DifferenceStatus.OnlyInA when pair.SideA is UserDefinedType u:
+                sb.AppendLine(_udtEmitter.EmitCreate(u));
+                sb.AppendLine("GO");
+                break;
+            case DifferenceStatus.OnlyInB when pair.SideB is UserDefinedType u:
+                sb.AppendLine(_udtEmitter.EmitDrop(u));
+                sb.AppendLine("GO");
+                break;
+            case DifferenceStatus.Different
+                when pair.SideA is UserDefinedType srcU && pair.SideB is UserDefinedType tgtU:
+                sb.AppendLine(_udtEmitter.EmitDrop(tgtU));
+                sb.AppendLine(_udtEmitter.EmitCreate(srcU));
+                sb.AppendLine("GO");
+                break;
+            case DifferenceStatus.OnlyInA:
+            case DifferenceStatus.OnlyInB:
+            case DifferenceStatus.Different:
+            case DifferenceStatus.Identical:
+            default:
+                break;
+        }
+    }
+
+    private void EmitOneTableTypeUdt(StringBuilder sb, DifferencePair pair, string? targetDefaultCollation)
+    {
+        switch (pair.Status)
+        {
+            case DifferenceStatus.OnlyInA when pair.SideA is TableTypeUdt t:
+                sb.AppendLine(_tableTypeEmitter.EmitCreate(t, targetDefaultCollation));
+                sb.AppendLine("GO");
+                break;
+            case DifferenceStatus.OnlyInB when pair.SideB is TableTypeUdt t:
+                sb.AppendLine(_tableTypeEmitter.EmitDrop(t));
+                sb.AppendLine("GO");
+                break;
+            case DifferenceStatus.Different
+                when pair.SideA is TableTypeUdt srcT && pair.SideB is TableTypeUdt tgtT:
+                sb.AppendLine(_tableTypeEmitter.EmitDrop(tgtT));
+                sb.AppendLine(_tableTypeEmitter.EmitCreate(srcT, targetDefaultCollation));
+                sb.AppendLine("GO");
+                break;
+            case DifferenceStatus.OnlyInA:
+            case DifferenceStatus.OnlyInB:
+            case DifferenceStatus.Different:
+            case DifferenceStatus.Identical:
+            default:
+                break;
+        }
+    }
+
+    private void EmitOneTable(StringBuilder sb, DifferencePair pair, string? targetDefaultCollation)
+    {
+        string ddl = _tableEmitter.Emit(pair, targetDefaultCollation);
+        if (!string.IsNullOrWhiteSpace(ddl))
+        {
+            sb.AppendLine(ddl);
+            sb.AppendLine("GO");
+        }
+    }
+
+    private void EmitOneView(StringBuilder sb, DifferencePair pair)
+    {
+        string ddl = _viewEmitter.Emit(pair);
+        if (!string.IsNullOrWhiteSpace(ddl))
+        {
+            sb.AppendLine(ddl);
+            sb.AppendLine("GO");
+        }
+    }
+
+    private void EmitOneFunction(StringBuilder sb, DifferencePair pair)
+    {
+        string ddl = _functionEmitter.Emit(pair);
+        if (!string.IsNullOrWhiteSpace(ddl))
+        {
+            sb.AppendLine(ddl);
+            sb.AppendLine("GO");
+        }
+    }
+
+    private void EmitOneProcedure(StringBuilder sb, DifferencePair pair)
+    {
+        string ddl = _procEmitter.Emit(pair);
+        if (!string.IsNullOrWhiteSpace(ddl))
+        {
+            sb.AppendLine(ddl);
+            sb.AppendLine("GO");
+        }
+    }
+
+    private void EmitOneTrigger(StringBuilder sb, DifferencePair pair)
+    {
+        string ddl = _triggerEmitter.Emit(pair);
+        if (!string.IsNullOrWhiteSpace(ddl))
+        {
+            sb.AppendLine(ddl);
+            sb.AppendLine("GO");
+        }
+    }
+
+    private void EmitOneSynonym(StringBuilder sb, DifferencePair pair)
+    {
+        switch (pair.Status)
+        {
+            case DifferenceStatus.OnlyInA when pair.SideA is Synonym s:
+                sb.AppendLine(_synonymEmitter.EmitCreate(s));
+                sb.AppendLine("GO");
+                break;
+            case DifferenceStatus.OnlyInB when pair.SideB is Synonym s:
+                sb.AppendLine(_synonymEmitter.EmitDrop(s));
+                sb.AppendLine("GO");
+                break;
+            case DifferenceStatus.Different
+                when pair.SideA is Synonym srcS && pair.SideB is Synonym tgtS:
+                sb.AppendLine(_synonymEmitter.EmitDrop(tgtS));
+                sb.AppendLine(_synonymEmitter.EmitCreate(srcS));
+                sb.AppendLine("GO");
+                break;
+            case DifferenceStatus.OnlyInA:
+            case DifferenceStatus.OnlyInB:
+            case DifferenceStatus.Different:
+            case DifferenceStatus.Identical:
+            default:
+                break;
+        }
+    }
+
     // ── Prologue emitters ───────────────────────────────────────────────────
 
     private void EmitSequences(StringBuilder sb, IReadOnlyList<DifferencePair> pairs)
@@ -309,42 +457,7 @@ public sealed class ScriptGenerator
             .OrderBy(p => p.Identity.SchemaName)
             .ThenBy(p => p.Identity.ObjectName))
         {
-            switch (pair.Status)
-            {
-                case DifferenceStatus.OnlyInA when pair.SideA is Sequence s:
-                    sb.AppendLine(_sequenceEmitter.EmitCreate(s));
-                    sb.AppendLine("GO");
-                    break;
-                case DifferenceStatus.OnlyInB when pair.SideB is Sequence s:
-                    sb.AppendLine(_sequenceEmitter.EmitDrop(s));
-                    sb.AppendLine("GO");
-                    break;
-                case DifferenceStatus.Different
-                    when pair.SideA is Sequence srcSeq && pair.SideB is Sequence tgtSeq:
-                    // SQL Server can ALTER every sequence property except the
-                    // base data type. Prefer in-place ALTER so dependent
-                    // `DEFAULT NEXT VALUE FOR` defaults survive (parity
-                    // scenario 08, 2026-05-25). Fall back to DROP + CREATE
-                    // only when the data type itself changed.
-                    string? alter = _sequenceEmitter.EmitAlter(srcSeq, tgtSeq);
-                    if (alter is null)
-                    {
-                        sb.AppendLine(_sequenceEmitter.EmitDrop(tgtSeq));
-                        sb.AppendLine(_sequenceEmitter.EmitCreate(srcSeq));
-                    }
-                    else if (alter.Length > 0)
-                    {
-                        sb.AppendLine(alter);
-                    }
-                    sb.AppendLine("GO");
-                    break;
-                case DifferenceStatus.OnlyInA:
-                case DifferenceStatus.OnlyInB:
-                case DifferenceStatus.Different:
-                case DifferenceStatus.Identical:
-                default:
-                    break;
-            }
+            EmitOneSequence(sb, pair);
         }
     }
 
@@ -355,29 +468,7 @@ public sealed class ScriptGenerator
             .OrderBy(p => p.Identity.SchemaName)
             .ThenBy(p => p.Identity.ObjectName))
         {
-            switch (pair.Status)
-            {
-                case DifferenceStatus.OnlyInA when pair.SideA is UserDefinedType u:
-                    sb.AppendLine(_udtEmitter.EmitCreate(u));
-                    sb.AppendLine("GO");
-                    break;
-                case DifferenceStatus.OnlyInB when pair.SideB is UserDefinedType u:
-                    sb.AppendLine(_udtEmitter.EmitDrop(u));
-                    sb.AppendLine("GO");
-                    break;
-                case DifferenceStatus.Different
-                    when pair.SideA is UserDefinedType srcU && pair.SideB is UserDefinedType tgtU:
-                    sb.AppendLine(_udtEmitter.EmitDrop(tgtU));
-                    sb.AppendLine(_udtEmitter.EmitCreate(srcU));
-                    sb.AppendLine("GO");
-                    break;
-                case DifferenceStatus.OnlyInA:
-                case DifferenceStatus.OnlyInB:
-                case DifferenceStatus.Different:
-                case DifferenceStatus.Identical:
-                default:
-                    break;
-            }
+            EmitOneUserDefinedType(sb, pair);
         }
     }
 
@@ -388,29 +479,7 @@ public sealed class ScriptGenerator
             .OrderBy(p => p.Identity.SchemaName)
             .ThenBy(p => p.Identity.ObjectName))
         {
-            switch (pair.Status)
-            {
-                case DifferenceStatus.OnlyInA when pair.SideA is TableTypeUdt t:
-                    sb.AppendLine(_tableTypeEmitter.EmitCreate(t, targetDefaultCollation));
-                    sb.AppendLine("GO");
-                    break;
-                case DifferenceStatus.OnlyInB when pair.SideB is TableTypeUdt t:
-                    sb.AppendLine(_tableTypeEmitter.EmitDrop(t));
-                    sb.AppendLine("GO");
-                    break;
-                case DifferenceStatus.Different
-                    when pair.SideA is TableTypeUdt srcT && pair.SideB is TableTypeUdt tgtT:
-                    sb.AppendLine(_tableTypeEmitter.EmitDrop(tgtT));
-                    sb.AppendLine(_tableTypeEmitter.EmitCreate(srcT, targetDefaultCollation));
-                    sb.AppendLine("GO");
-                    break;
-                case DifferenceStatus.OnlyInA:
-                case DifferenceStatus.OnlyInB:
-                case DifferenceStatus.Different:
-                case DifferenceStatus.Identical:
-                default:
-                    break;
-            }
+            EmitOneTableTypeUdt(sb, pair, targetDefaultCollation);
         }
     }
 
@@ -532,29 +601,7 @@ public sealed class ScriptGenerator
             .OrderBy(p => p.Identity.SchemaName)
             .ThenBy(p => p.Identity.ObjectName))
         {
-            switch (pair.Status)
-            {
-                case DifferenceStatus.OnlyInA when pair.SideA is Synonym s:
-                    sb.AppendLine(_synonymEmitter.EmitCreate(s));
-                    sb.AppendLine("GO");
-                    break;
-                case DifferenceStatus.OnlyInB when pair.SideB is Synonym s:
-                    sb.AppendLine(_synonymEmitter.EmitDrop(s));
-                    sb.AppendLine("GO");
-                    break;
-                case DifferenceStatus.Different
-                    when pair.SideA is Synonym srcS && pair.SideB is Synonym tgtS:
-                    sb.AppendLine(_synonymEmitter.EmitDrop(tgtS));
-                    sb.AppendLine(_synonymEmitter.EmitCreate(srcS));
-                    sb.AppendLine("GO");
-                    break;
-                case DifferenceStatus.OnlyInA:
-                case DifferenceStatus.OnlyInB:
-                case DifferenceStatus.Different:
-                case DifferenceStatus.Identical:
-                default:
-                    break;
-            }
+            EmitOneSynonym(sb, pair);
         }
     }
 
@@ -592,9 +639,9 @@ public sealed class ScriptGenerator
     private string EmitIndexDelta(Table src, Table tgt)
     {
         StringBuilder sb = new();
-        Dictionary<string, TableIndex> srcByName =
+        var srcByName =
             src.Indexes.ToDictionary(i => i.Name, StringComparer.Ordinal);
-        Dictionary<string, TableIndex> tgtByName =
+        var tgtByName =
             tgt.Indexes.ToDictionary(i => i.Name, StringComparer.Ordinal);
 
         // DROPs first so a rename-shaped change frees the slot before CREATE.
@@ -634,9 +681,9 @@ public sealed class ScriptGenerator
     private string EmitFkDelta(Table src, Table tgt, HashSet<string>? skipNames = null)
     {
         StringBuilder sb = new();
-        Dictionary<string, ForeignKey> srcFks =
+        var srcFks =
             src.Constraints.OfType<ForeignKey>().ToDictionary(fk => fk.Name, StringComparer.Ordinal);
-        Dictionary<string, ForeignKey> tgtFks =
+        var tgtFks =
             tgt.Constraints.OfType<ForeignKey>().ToDictionary(fk => fk.Name, StringComparer.Ordinal);
 
         foreach (ForeignKey t in tgtFks.Values)
