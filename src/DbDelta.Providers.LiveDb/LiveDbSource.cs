@@ -1,4 +1,5 @@
 using DbDelta.Core.Abstractions;
+using DbDelta.Core.Dependency;
 using DbDelta.Core.ObjectModel;
 using DbDelta.Providers.LiveDb.Readers;
 using Microsoft.Data.SqlClient;
@@ -80,6 +81,10 @@ public sealed class LiveDbSource : ISchemaSource
             IReadOnlyList<DatabaseRole> roles = await new RoleReader().ReadAsync(connection, cancellationToken);
             IReadOnlyList<Permission> permissions = await new PermissionReader().ReadAsync(connection, cancellationToken);
 
+            // #24: object-level dependency edges (sys.sql_expression_dependencies).
+            IReadOnlyList<DependencyEdge> dependencies =
+                await new DependencyReader().ReadAsync(connection, cancellationToken);
+
             string dbName = new SqlConnectionStringBuilder(_connectionString).InitialCatalog;
             Database db = new(dbName, schemas, tables, views, procs, functions, triggers)
             {
@@ -90,6 +95,7 @@ public sealed class LiveDbSource : ISchemaSource
                 Users = users,
                 Roles = roles,
                 Permissions = permissions,
+                Dependencies = dependencies,
                 DefaultCollation = defaultCollation,
             };
             return Result<Database>.Success(db);
