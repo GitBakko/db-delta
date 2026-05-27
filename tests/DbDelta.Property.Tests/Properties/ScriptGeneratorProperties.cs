@@ -73,6 +73,21 @@ public class ScriptGeneratorProperties
         }
     }
 
+    /// <summary>
+    /// Verifies two directional ordering invariants introduced by the
+    /// reverse-topological DROP pass (#24):
+    /// <list type="bullet">
+    ///   <item>CREATE pass: a sequence must be created/altered before any table
+    ///       that may reference it via a DEFAULT NEXT VALUE FOR constraint.</item>
+    ///   <item>DROP pass: a table that references a sequence must be dropped
+    ///       before that sequence (reverse-dependency order), otherwise the
+    ///       DROP SEQUENCE fails with a dependency error.</item>
+    /// </list>
+    /// The old conflated assertion (first seq keyword globally before first
+    /// table keyword globally) produced a false positive when a legitimate
+    /// DROP TABLE (drop pass, early) appeared before a later CREATE SEQUENCE
+    /// (create pass). The two invariants are now asserted separately.
+    /// </summary>
     [Fact]
     public void Sequences_Precede_Tables()
     {
@@ -84,11 +99,25 @@ public class ScriptGeneratorProperties
             ComparisonResult result = _engine.Compare(a, b, ComparisonOptions.Default);
             string script = _generator.Generate(result, selection: null,
                 options: ComparisonOptions.Default, targetDefaultCollation: b.DefaultCollation);
-            int firstSeq = FirstIndexOfAny(script, "CREATE SEQUENCE", "DROP SEQUENCE", "ALTER SEQUENCE");
-            int firstTable = FirstIndexOfAny(script, "CREATE TABLE", "DROP TABLE", "ALTER TABLE");
-            if (firstSeq < 0 || firstTable < 0) { continue; }
-            firstSeq.Should().BeLessThan(firstTable,
-                "any DEFAULT NEXT VALUE FOR seq → table relationship requires the sequence to exist first");
+
+            // Sequence must be CREATED/ALTERED before a table that may default to it.
+            int firstSeqCreate = FirstIndexOfAny(script, "CREATE SEQUENCE", "ALTER SEQUENCE");
+            int firstTableCreate = FirstIndexOfAny(script, "CREATE TABLE", "ALTER TABLE");
+            if (firstSeqCreate >= 0 && firstTableCreate >= 0)
+            {
+                firstSeqCreate.Should().BeLessThan(firstTableCreate,
+                    "a sequence must exist before a table whose DEFAULT references NEXT VALUE FOR it");
+            }
+
+            // Conversely, on teardown a table must be DROPPED before the sequence it
+            // references (reverse-dependency order), else the DROP SEQUENCE fails.
+            int firstTableDrop = script.IndexOf("DROP TABLE", StringComparison.Ordinal);
+            int firstSeqDrop = script.IndexOf("DROP SEQUENCE", StringComparison.Ordinal);
+            if (firstTableDrop >= 0 && firstSeqDrop >= 0)
+            {
+                firstTableDrop.Should().BeLessThan(firstSeqDrop,
+                    "a table referencing a sequence must be dropped before that sequence");
+            }
         }
     }
 
