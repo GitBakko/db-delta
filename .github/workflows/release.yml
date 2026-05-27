@@ -41,6 +41,23 @@ jobs:
       - name: Build MSI
         run: dotnet build installer/DbDelta.Installer.wixproj -c Release -p:Version=${{ steps.ver.outputs.version }}
 
+      - name: Smoke install / uninstall
+        shell: pwsh
+        run: |
+          $msi = "installer/bin/Release/DbDelta-${{ steps.ver.outputs.version }}-win-x64.msi"
+          $i = Start-Process msiexec -ArgumentList "/i `"$msi`" /quiet /qn /norestart /l*v install.log" -Wait -PassThru
+          if ($i.ExitCode -ne 0) { if (Test-Path install.log) { Get-Content install.log -Tail 40 }; throw "install failed (exit $($i.ExitCode))" }
+          $app = Join-Path $env:ProgramFiles 'DbDelta\DbDelta.App.exe'
+          $cli = Join-Path $env:ProgramFiles 'DbDelta\cli\dbdelta.exe'
+          if (-not (Test-Path $app)) { throw "app missing: $app" }
+          if (-not (Test-Path $cli)) { throw "cli missing: $cli" }
+          $machinePath = [Environment]::GetEnvironmentVariable('PATH','Machine')
+          if ($machinePath -notlike '*DbDelta\cli*') { throw "cli dir not on machine PATH" }
+          $x = Start-Process msiexec -ArgumentList "/x `"$msi`" /quiet /qn /norestart" -Wait -PassThru
+          if ($x.ExitCode -ne 0) { throw "uninstall failed (exit $($x.ExitCode))" }
+          if (Test-Path $app) { throw "app still present after uninstall: $app" }
+          Write-Host "Smoke install/uninstall OK"
+
       - name: Attach MSI to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
