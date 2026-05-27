@@ -1,0 +1,34 @@
+{
+  "metadata": [
+    {
+      "src": [
+        {
+          "src": "../src",
+          "files": [
+            "DbDelta.Core/DbDelta.Core.csproj",
+            "DbDelta.Shared/DbDelta.Shared.csproj",
+            "DbDelta.Persistence/DbDelta.Persistence.csproj",
+            "DbDelta.Providers.LiveDb/DbDelta.Providers.LiveDb.csproj"
+          ]
+        }
+      ],
+      "dest": "api",
+      "outputFormat": "mref",
+      "disableGitFeatures": false
+    }
+  ],
+  "build": {
+    "content": [
+      { "files": [ "api/**.yml", "api/index.md" ] },
+      { "files": [ "index.md", "toc.yml", "articles/**.md", "articles/**/toc.yml" ] }
+    ],
+    "output": "_site",
+    "template": [ "default", "modern" ],
+    "globalMetadata": {
+      "_appName": "DbDelta",
+      "_appTitle": "DbDelta — open-source SQL Server schema compare",
+      "_enableSearch": true,
+      "_disableContribution": true
+    }
+  }
+}

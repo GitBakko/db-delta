@@ -68,3 +68,8 @@ scripts/parity/
 agentdb.rvf
 agentdb.rvf-*
 agentdb.rvf.lock
+
+# DocFX generated output
+docfx/api/*.yml
+docfx/api/.manifest
+docfx/_site/
