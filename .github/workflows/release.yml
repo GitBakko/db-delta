@@ -1,0 +1,48 @@
+name: release
+
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version x.y.z (no leading v)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-msi:
+    name: build MSI + attach to release
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Resolve version
+        id: ver
+        shell: pwsh
+        run: |
+          $v = "${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}"
+          $v = $v -replace '^v',''
+          "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Publish desktop app (self-contained win-x64)
+        run: dotnet publish src/DbDelta.App.Avalonia/DbDelta.App.Avalonia.csproj -c Release -r win-x64 --self-contained true -o installer/staging/app
+
+      - name: Publish CLI (self-contained win-x64)
+        run: dotnet publish src/DbDelta.Cli/DbDelta.Cli.csproj -c Release -r win-x64 --self-contained true -o installer/staging/cli
+
+      - name: Build MSI
+        run: dotnet build installer/DbDelta.Installer.wixproj -c Release -p:Version=${{ steps.ver.outputs.version }}
+
+      - name: Attach MSI to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: installer/bin/Release/DbDelta-${{ steps.ver.outputs.version }}-win-x64.msi
+          fail_on_unmatched_files: true
