@@ -78,7 +78,7 @@ public sealed class CompatMatrixTests
         string script = new ScriptGenerator().Generate(initial);
         script.Should().NotBeNullOrWhiteSpace();
 
-        SqlBatchResult apply = await SqlExecutor.ExecuteAsync(tgtConn, script, ct);
+        SqlBatchResult apply = await SqlExecutor.ExecuteAsync(tgtConn, script, ct, useOwnTransaction: false);
         apply.Success.Should().BeTrue(apply.ErrorMessage ?? "deploy script failed to apply");
         apply.BatchesExecuted.Should().BeGreaterThan(0);
 

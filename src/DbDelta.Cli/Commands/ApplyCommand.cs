@@ -64,7 +64,7 @@ internal static class ApplyCommand
                 return ExitCodes.SuccessNoDifferences;
             }
 
-            SqlBatchResult result = await SqlExecutor.ExecuteAsync(tgtConn, script, ct).ConfigureAwait(false);
+            SqlBatchResult result = await SqlExecutor.ExecuteAsync(tgtConn, script, ct, useOwnTransaction: false).ConfigureAwait(false);
 
             JsonSerializerOptions opts = new() { WriteIndented = true };
             await Console.Out.WriteLineAsync(JsonSerializer.Serialize(new

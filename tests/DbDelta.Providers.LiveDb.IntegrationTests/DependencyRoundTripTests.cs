@@ -38,7 +38,7 @@ public class DependencyRoundTripTests(LiveDbFixture fixture)
             diff, selection: null, options: ComparisonOptions.Default,
             targetDefaultCollation: target.DefaultCollation, dependencies: source.Dependencies);
 
-        SqlBatchResult apply = await SqlExecutor.ExecuteAsync(tgt, script, ct);
+        SqlBatchResult apply = await SqlExecutor.ExecuteAsync(tgt, script, ct, useOwnTransaction: false);
         apply.Success.Should().BeTrue(apply.ErrorMessage ?? "ordered script failed to apply");
 
         Database after = (await new LiveDbSource(tgt).LoadAsync(ct)).Value!;

@@ -624,7 +624,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         SqlBatchResult res = await SqlExecutor.ExecuteAsync(
             AppState.TargetConnectionString!,
             script,
-            CancellationToken.None).ConfigureAwait(true);
+            CancellationToken.None,
+            useOwnTransaction: false).ConfigureAwait(true);
 
         StatusText = res.Success
             ? $"Esecuzione completata — {res.BatchesExecuted} batch in {res.TotalDurationMs} ms."
