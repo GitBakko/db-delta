@@ -104,6 +104,34 @@ public sealed class SqlExecutorTests : IAsyncLifetime
         checkResult.Success.Should().BeTrue("table should have been rolled back");
     }
 
+    [Fact]
+    public async Task ExecuteAsync_without_own_transaction_lets_script_self_manage_rollback()
+    {
+        if (_connectionString is null) { Assert.Skip("Docker not available."); }
+
+        const string script = """
+            SET XACT_ABORT ON;
+            BEGIN TRANSACTION;
+            GO
+            CREATE TABLE t_selfmanage_test (id INT NOT NULL);
+            GO
+            INSERT INTO t_selfmanage_test VALUES (NULL);
+            GO
+            COMMIT TRANSACTION;
+            GO
+            """;
+
+        SqlBatchResult result = await SqlExecutor.ExecuteAsync(
+            _connectionString!, script, CancellationToken.None, useOwnTransaction: false);
+
+        result.Success.Should().BeFalse();
+        SqlBatchResult check = await SqlExecutor.ExecuteAsync(
+            _connectionString!,
+            "IF OBJECT_ID(N'dbo.t_selfmanage_test') IS NOT NULL THROW 50000, 'leaked', 1;",
+            CancellationToken.None);
+        check.Success.Should().BeTrue("the script's own XACT_ABORT must have rolled back");
+    }
+
     private static async Task<bool> IsDockerAvailableAsync()
     {
         try

@@ -26,14 +26,26 @@ public static partial class SqlExecutor
     /// <summary>
     /// Splits <paramref name="script"/> on <c>GO</c> statements (case-insensitive,
     /// on its own line, optional trailing whitespace) and executes each non-empty
-    /// batch inside a single transaction.
+    /// batch, optionally inside a single transaction owned by this method.
     /// Returns success only when every batch succeeds; on the first failure the
-    /// transaction is rolled back and the error message is returned.
+    /// transaction (when owned) is rolled back and the error message is returned.
     /// </summary>
+    /// <param name="connectionString">Target connection string.</param>
+    /// <param name="script">T-SQL script, optionally containing GO separators.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <param name="useOwnTransaction">
+    /// When <see langword="true"/> (the default) this method wraps all batches in a
+    /// single transaction it owns and rolls back on failure.  Set to
+    /// <see langword="false"/> when the script manages its own transaction (e.g. a
+    /// self-contained deploy script with <c>BEGIN TRANSACTION … ROLLBACK</c>); in
+    /// that case no outer transaction is started so the script's own
+    /// <c>XACT_ABORT</c>/<c>ROLLBACK</c> logic takes full effect.
+    /// </param>
     public static async Task<SqlBatchResult> ExecuteAsync(
         string connectionString,
         string script,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool useOwnTransaction = true)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
         ArgumentNullException.ThrowIfNull(script);
@@ -62,28 +74,37 @@ public static partial class SqlExecutor
         {
             await using SqlConnection cn = new(builder.ConnectionString);
             await cn.OpenAsync(ct).ConfigureAwait(false);
-            await using var tx = (SqlTransaction)await cn.BeginTransactionAsync(ct).ConfigureAwait(false);
+
+            SqlTransaction? tx = useOwnTransaction
+                ? (SqlTransaction)await cn.BeginTransactionAsync(ct).ConfigureAwait(false)
+                : null;
             int executed = 0;
             try
             {
                 foreach (string batch in batches)
                 {
-                    await using SqlCommand cmd = new(batch, cn, tx)
-                    {
-                        CommandTimeout = CommandTimeoutSeconds,
-                    };
+                    await using SqlCommand cmd = tx is null
+                        ? new(batch, cn) { CommandTimeout = CommandTimeoutSeconds }
+                        : new(batch, cn, tx) { CommandTimeout = CommandTimeoutSeconds };
                     await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                     executed++;
                 }
-                await tx.CommitAsync(ct).ConfigureAwait(false);
+                if (tx is not null) { await tx.CommitAsync(ct).ConfigureAwait(false); }
                 sw.Stop();
                 return new SqlBatchResult(true, null, executed, (int)sw.ElapsedMilliseconds);
             }
             catch (Exception ex)
             {
-                try { await tx.RollbackAsync(ct).ConfigureAwait(false); } catch { /* best-effort rollback */ }
+                if (tx is not null)
+                {
+                    try { await tx.RollbackAsync(ct).ConfigureAwait(false); } catch { /* best-effort */ }
+                }
                 sw.Stop();
                 return new SqlBatchResult(false, ConnectionStringRedactor.Redact(ex.Message), executed, (int)sw.ElapsedMilliseconds);
+            }
+            finally
+            {
+                if (tx is not null) { await tx.DisposeAsync().ConfigureAwait(false); }
             }
         }
         catch (Exception ex)
