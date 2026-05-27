@@ -49,6 +49,8 @@ BenchmarkDotNet.Artifacts/
 # WiX / installers
 *.wixobj
 *.wixpdb
+*.msi
+installer/staging/
 
 # Local environment
 .env
