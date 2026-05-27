@@ -28,4 +28,14 @@ public class BodyNormalizerTests
         string b = "CREATE  VIEW   dbo.v  AS  SELECT 1 AS Id;";
         BodyNormalizer.Normalize(a).Should().Be(BodyNormalizer.Normalize(b));
     }
+
+    [Fact]
+    public void Strips_trailing_semicolon_so_roundtrip_bodies_compare_equal()
+    {
+        // SQL Server may store a module body without a trailing ';' while the script
+        // generator appends one, or vice versa.  Both forms must normalise identically.
+        string withoutSemi = "CREATE FUNCTION dbo.fnTax(@x money) RETURNS money AS BEGIN RETURN @x*0.2 END";
+        string withSemi = withoutSemi + ";";
+        BodyNormalizer.Normalize(withoutSemi).Should().Be(BodyNormalizer.Normalize(withSemi));
+    }
 }

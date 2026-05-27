@@ -12,5 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\DbDelta.Providers.LiveDb\DbDelta.Providers.LiveDb.csproj" />
+    <ProjectReference Include="..\..\src\DbDelta.Persistence\DbDelta.Persistence.csproj" />
+    <ProjectReference Include="..\..\src\DbDelta.Core\DbDelta.Core.csproj" />
   </ItemGroup>
 </Project>

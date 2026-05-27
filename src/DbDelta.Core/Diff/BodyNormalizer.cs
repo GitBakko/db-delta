@@ -8,6 +8,9 @@ namespace DbDelta.Core.Diff;
 ///   <item>Replace CRLF + CR with LF.</item>
 ///   <item>Collapse any run of whitespace (spaces, tabs, newlines) into a single space.</item>
 ///   <item>Trim outer whitespace.</item>
+///   <item>Strip a trailing <c>;</c> — SQL Server sometimes appends one when storing a
+///       module body (e.g. after <c>CREATE OR ALTER FUNCTION ... END</c>), producing a
+///       cosmetic divergence on a round-trip that should compare as identical.</item>
 /// </list>
 /// Case is preserved — case-insensitive diffing is a future option.
 /// </summary>
@@ -30,6 +33,7 @@ public static partial class BodyNormalizer
         string lf = body.Replace("\r\n", "\n", StringComparison.Ordinal)
                         .Replace('\r', '\n');
         string collapsed = WhitespaceRun().Replace(lf, " ");
-        return collapsed.Trim();
+        string trimmed = collapsed.Trim();
+        return trimmed.EndsWith(';') ? trimmed[..^1].TrimEnd() : trimmed;
     }
 }
