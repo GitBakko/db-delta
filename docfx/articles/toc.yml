@@ -1,0 +1,6 @@
+- name: Getting Started
+  href: getting-started.md
+- name: CLI Reference
+  href: cli.md
+- name: Comparison Options
+  href: comparison-options.md
