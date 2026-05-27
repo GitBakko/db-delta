@@ -1,0 +1,14 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <OutputName>DbDelta-$(Version)-win-x64</OutputName>
+    <Version Condition="'$(Version)' == ''">0.0.0</Version>
+    <DefineConstants>Version=$(Version)</DefineConstants>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <!-- ICE03: WiX misinterprets locale subfolder names (cs, de, fr …) as invalid language IDs -->
+    <SuppressIces>ICE03</SuppressIces>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" />
+  </ItemGroup>
+</Project>

@@ -27,6 +27,9 @@
     <PackageVersion Include="Meziantou.Framework.Win32.CredentialManager" Version="1.7.0" />
     <PackageVersion Include="Xunit.SkippableFact" Version="1.5.23" />
   </ItemGroup>
+  <ItemGroup Label="WiX installer">
+    <PackageVersion Include="WixToolset.UI.wixext" Version="5.0.2" />
+  </ItemGroup>
   <ItemGroup Label="Test runtime">
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageVersion Include="xunit.v3" Version="3.2.2" />

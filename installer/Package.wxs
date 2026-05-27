@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="DbDelta"
+           Manufacturer="DbDelta"
+           Version="$(var.Version)"
+           UpgradeCode="19CE894B-6B34-4EF0-B0C4-D2E46C04124F"
+           Scope="perMachine">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of DbDelta is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="DbDelta">
+        <Directory Id="CLIFOLDER" Name="cli" />
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="AppShortcutFolder" Name="DbDelta" />
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="DbDelta" Level="1">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentGroupRef Id="CliFiles" />
+      <ComponentRef Id="AppShortcut" />
+      <ComponentRef Id="CliPathEntry" />
+    </Feature>
+
+    <!-- Start-Menu shortcut to the desktop app -->
+    <Component Id="AppShortcut" Directory="AppShortcutFolder" Guid="*">
+      <Shortcut Id="AppStartMenu"
+                Name="DbDelta"
+                Target="[INSTALLFOLDER]DbDelta.App.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RemoveFolder Id="RemoveAppShortcutFolder" Directory="AppShortcutFolder" On="uninstall" />
+      <!-- HKCU keypath is the standard WiX shortcut-component idiom; it keys MSI
+           component state, not install scope. The Package is perMachine and the
+           shortcut lands in the all-users Start Menu regardless. -->
+      <RegistryValue Root="HKCU" Key="Software\DbDelta" Name="installed"
+                     Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <!-- Append the CLI folder to the system PATH -->
+    <Component Id="CliPathEntry" Directory="CLIFOLDER" Guid="4061D0FA-428E-494C-8B64-6AF1A7C64B43">
+      <Environment Id="PathCli" Name="PATH" Value="[CLIFOLDER]"
+                   Permanent="no" Part="last" Action="set" System="yes" />
+      <RegistryValue Root="HKLM" Key="Software\DbDelta" Name="cliPath"
+                     Type="string" Value="[CLIFOLDER]" KeyPath="yes" />
+    </Component>
+  </Package>
+
+  <!-- Harvest the self-contained publish output (WiX v5 Files element auto-generates components per file). -->
+  <Fragment>
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Files Include="staging\app\**" />
+    </ComponentGroup>
+    <ComponentGroup Id="CliFiles" Directory="CLIFOLDER">
+      <Files Include="staging\cli\**" />
+    </ComponentGroup>
+  </Fragment>
+</Wix>
