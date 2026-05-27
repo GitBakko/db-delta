@@ -1,6 +1,6 @@
 # WiX MSI installer + release automation (v0.16.0 / v1.0 RC)
 
-**Status:** implemented 2026-05-27 · tag v0.16.0 (pending)
+**Status:** released 2026-05-27 · v0.16.0 (MSI smoke-tested on the runner, attached to the GitHub Release)
 **Driver:** the last remaining v1.0-RC code item. Spec §1 mandates distribution
 as a self-contained Windows artifact, and the tech-stack table mandates **WiX
 Toolset v5** for MSI authoring. Today there is **no packaging at all** (no RID /

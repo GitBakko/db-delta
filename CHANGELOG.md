@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased] — heading toward v1.0.0 RC
 
+(Empty — next: code signing, public alpha announcement.)
+
+## [0.16.0] — 2026-05-27 — docs site + Windows installer
+
 ### Added
 - **DocFX documentation site (#25)** — API reference auto-generated from the
   XML docs of the four library projects (`Core`, `Shared`, `Persistence`,
