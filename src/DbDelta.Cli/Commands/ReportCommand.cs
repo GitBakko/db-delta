@@ -54,7 +54,7 @@ internal static class ReportCommand
 
             if (string.IsNullOrWhiteSpace(html) && string.IsNullOrWhiteSpace(json))
             {
-                Console.Error.WriteLine("{\"code\":\"missing_output\",\"message\":\"At least one of --html or --json must be specified.\",\"remediation\":\"Pass --html=<path> and/or --json=<path>.\"}");
+                Console.Error.WriteLine(/*lang=json,strict*/ "{\"code\":\"missing_output\",\"message\":\"At least one of --html or --json must be specified.\",\"remediation\":\"Pass --html=<path> and/or --json=<path>.\"}");
                 return ExitCodes.InternalError;
             }
 

@@ -65,7 +65,7 @@ public static class Converters
     /// the tooltip shows the full path.</summary>
     public static readonly IValueConverter PathToFileName =
         new FuncValueConverter<string?, string?>(static path =>
-            string.IsNullOrWhiteSpace(path) ? path : System.IO.Path.GetFileNameWithoutExtension(path));
+            string.IsNullOrWhiteSpace(path) ? path : Path.GetFileNameWithoutExtension(path));
 
     /// <summary>Formats a UTC timestamp as Italian local-time
     /// <c>dd/MM/yyyy HH:mm</c>. Used by the MRU list and the load dialog
@@ -164,7 +164,7 @@ public static class Converters
     /// and row-status converters below so a missing token never crashes.
     /// </summary>
     private static IBrush ResolveBrush(string key) =>
-        Avalonia.Application.Current?.Resources.TryGetResource(key, null, out object? value) == true
+        Application.Current?.Resources.TryGetResource(key, null, out object? value) == true
         && value is IBrush brush
             ? brush
             : Brushes.Transparent;

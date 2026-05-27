@@ -22,7 +22,7 @@ public partial class App : Application
             ConnectionStoreViewModel connections = new(connectionStore, credentials);
             AppStateViewModel appState = new(connections);
 
-            Persistence.Json.JsonRecentProjectsStore recentProjects =
+            var recentProjects =
                 Persistence.Json.JsonRecentProjectsStore.CreateDefault();
             MainWindow mainWindow = new()
             {

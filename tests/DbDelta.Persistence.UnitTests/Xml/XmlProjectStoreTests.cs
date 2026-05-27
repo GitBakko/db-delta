@@ -68,7 +68,7 @@ public class XmlProjectStoreTests : IDisposable
     public async Task V2_round_trip_all_sections()
     {
         XmlProjectStore store = new();
-        Guid connId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+        var connId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
         DateTime created = new(2026, 5, 21, 12, 0, 0, DateTimeKind.Utc);
         DateTime modified = new(2026, 5, 21, 12, 34, 56, DateTimeKind.Utc);
 
@@ -176,8 +176,8 @@ public class XmlProjectStoreTests : IDisposable
     [Fact]
     public async Task Read_legacy_v1_xml_produces_valid_project_with_defaults()
     {
-        Guid srcId = Guid.Parse("9f2c1d76-1111-1111-1111-111111111111");
-        Guid tgtId = Guid.Parse("3a55ee99-2222-2222-2222-222222222222");
+        var srcId = Guid.Parse("9f2c1d76-1111-1111-1111-111111111111");
+        var tgtId = Guid.Parse("3a55ee99-2222-2222-2222-222222222222");
 
         // Hand-crafted v1 XML — no schema attribute, uses XmlSerializer layout.
         // Options element must use the named enum member; "None" = 0 is the

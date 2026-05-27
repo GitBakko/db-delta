@@ -62,7 +62,7 @@ public static partial class SqlExecutor
         {
             await using SqlConnection cn = new(builder.ConnectionString);
             await cn.OpenAsync(ct).ConfigureAwait(false);
-            await using SqlTransaction tx = (SqlTransaction)await cn.BeginTransactionAsync(ct).ConfigureAwait(false);
+            await using var tx = (SqlTransaction)await cn.BeginTransactionAsync(ct).ConfigureAwait(false);
             int executed = 0;
             try
             {

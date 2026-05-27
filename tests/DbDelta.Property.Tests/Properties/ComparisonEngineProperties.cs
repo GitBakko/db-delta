@@ -90,7 +90,7 @@ public class ComparisonEngineProperties
             ComparisonResult forward = _engine.Compare(a, b, ComparisonOptions.Default);
             ComparisonResult reverse = _engine.Compare(b, a, ComparisonOptions.Default);
 
-            Dictionary<ObjectIdentity, DifferenceStatus> reverseByIdentity =
+            var reverseByIdentity =
                 reverse.Differences.ToDictionary(d => d.Identity, d => d.Status);
 
             foreach (DifferencePair fwd in forward.Differences)

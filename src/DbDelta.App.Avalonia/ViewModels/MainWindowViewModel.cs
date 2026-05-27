@@ -68,10 +68,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         JsonRecentProjectsStore.RecentProjectsChanged += OnRecentProjectsChanged;
     }
 
-    private async void OnRecentProjectsChanged(object? sender, EventArgs e)
-    {
-        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(RefreshProjectMruAsync).ConfigureAwait(true);
-    }
+    private async void OnRecentProjectsChanged(object? sender, EventArgs e) => await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(RefreshProjectMruAsync).ConfigureAwait(true);
 
     /// <summary>
     /// Reloads <see cref="ProjectMru"/> from the JSON store. Called on startup
@@ -266,7 +263,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         // Reuse the setup dialog so the user can confirm credentials (DPAPI
         // auto-fill restores passwords for RememberCredentials endpoints).
-        ProjectSetupViewModel vm = ProjectSetupViewModel.FromProject(project, _credentials);
+        var vm = ProjectSetupViewModel.FromProject(project, _credentials);
         Views.ProjectSetupDialog dialog = new() { DataContext = vm };
 
         DbDeltaProject? result =
@@ -377,14 +374,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
         // Stable status order — Diversi → Solo destinazione → Solo provenienza
         // → Identici — drives the order groups appear in when grouping is on,
         // and the row order when no grouping is selected.
-        view.SortDescriptions.Add(Avalonia.Collections.DataGridSortDescription
+        view.SortDescriptions.Add(DataGridSortDescription
             .FromPath(nameof(DifferenceRowViewModel.StatusOrder)));
         // KindOrder (Tabelle → Viste → Procedure → Funzioni → Trigger → rest)
         // — KindDisplayName alphabetical was producing the wrong order
         // (Funzioni / Procedure / Tabelle / Trigger / Viste).
-        view.SortDescriptions.Add(Avalonia.Collections.DataGridSortDescription
+        view.SortDescriptions.Add(DataGridSortDescription
             .FromPath(nameof(DifferenceRowViewModel.KindOrder)));
-        view.SortDescriptions.Add(Avalonia.Collections.DataGridSortDescription
+        view.SortDescriptions.Add(DataGridSortDescription
             .FromPath(nameof(DifferenceRowViewModel.QualifiedName)));
         ApplyGrouping(view);
         return view;
@@ -513,7 +510,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             return;
         }
 
-        ProjectSetupViewModel vm = ProjectSetupViewModel.FromProject(AppState.CurrentProject, _credentials);
+        var vm = ProjectSetupViewModel.FromProject(AppState.CurrentProject, _credentials);
         Views.ProjectSetupDialog dialog = new() { DataContext = vm };
 
         DbDeltaProject? edited =

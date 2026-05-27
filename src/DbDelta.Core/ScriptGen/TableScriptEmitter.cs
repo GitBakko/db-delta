@@ -196,16 +196,16 @@ public sealed class TableScriptEmitter : IScriptEmitter
         StringBuilder sb = new();
         string qualifiedName = $"[{newT.Schema}].[{newT.Name}]";
 
-        Dictionary<string, Constraint> newConstraintsByName =
+        var newConstraintsByName =
             newT.Constraints.ToDictionary(c => c.Name, StringComparer.Ordinal);
-        Dictionary<string, Constraint> oldConstraintsByName =
+        var oldConstraintsByName =
             oldT.Constraints.ToDictionary(c => c.Name, StringComparer.Ordinal);
         HashSet<string> colsWithNamedDefault =
             [.. newT.Constraints.OfType<DefaultConstraint>().Select(d => d.ColumnName)];
 
-        Dictionary<string, Column> existingColsByName =
+        var existingColsByName =
             oldT.Columns.ToDictionary(c => c.Name, StringComparer.Ordinal);
-        Dictionary<string, Column> newColsByName =
+        var newColsByName =
             newT.Columns.ToDictionary(c => c.Name, StringComparer.Ordinal);
 
         // ── 1) DROP non-FK constraints first (FKs handled by ForeignKeyScriptEmitter).
@@ -300,7 +300,7 @@ public sealed class TableScriptEmitter : IScriptEmitter
     /// </summary>
     internal static bool RequiresFullRebuild(Table newT, Table oldT)
     {
-        Dictionary<string, Column> oldByName =
+        var oldByName =
             oldT.Columns.ToDictionary(c => c.Name, StringComparer.Ordinal);
         foreach (Column newCol in newT.Columns)
         {

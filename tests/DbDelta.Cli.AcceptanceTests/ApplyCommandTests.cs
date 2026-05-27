@@ -14,7 +14,7 @@ public class ApplyCommandTests(CliFixture fixture)
         const string tgtDb = "DbDeltaApplyDryTgt";
         await CreateDb(tgtDb, ct);
 
-        using TempFile sqlScript = TempFile.Sql();
+        using var sqlScript = TempFile.Sql();
         await File.WriteAllTextAsync(sqlScript.Path,
             "CREATE TABLE dbo.Probe (Id int NOT NULL);\nGO\n", ct);
 
@@ -34,7 +34,7 @@ public class ApplyCommandTests(CliFixture fixture)
         const string tgtDb = "DbDeltaApplyRealTgt";
         await CreateDb(tgtDb, ct);
 
-        using TempFile sqlScript = TempFile.Sql();
+        using var sqlScript = TempFile.Sql();
         await File.WriteAllTextAsync(sqlScript.Path,
             "CREATE TABLE dbo.AppliedByCli (Id int NOT NULL);\nGO\n", ct);
 

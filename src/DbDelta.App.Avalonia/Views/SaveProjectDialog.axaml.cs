@@ -7,7 +7,7 @@ namespace DbDelta.App.Views;
 /// <summary>
 /// Minimal name-only save dialog. The user supplies a project name; the
 /// caller resolves the on-disk path via
-/// <see cref="DbDelta.Persistence.Json.ProjectsFolder.ResolvePath(string)"/>.
+/// <see cref="Persistence.Json.ProjectsFolder.ResolvePath(string)"/>.
 /// Returns the typed name on OK, <see langword="null"/> on cancel.
 /// </summary>
 public partial class SaveProjectDialog : Window

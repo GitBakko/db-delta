@@ -110,9 +110,9 @@ public sealed class ComparisonEngine
         // about a single row beyond the row existing on one side or both. Use
         // the DiffKey string as the pairing identity so identical
         // (Grantee+Action+Target) rows on both sides classify as Identical.
-        Dictionary<string, Permission> aByKey =
+        var aByKey =
             ax.GroupBy(p => p.DiffKey).ToDictionary(g => g.Key, g => g.First());
-        Dictionary<string, Permission> bByKey =
+        var bByKey =
             bx.GroupBy(p => p.DiffKey).ToDictionary(g => g.Key, g => g.First());
         HashSet<string> allKeys = [.. aByKey.Keys];
         allKeys.UnionWith(bByKey.Keys);
@@ -253,7 +253,7 @@ public sealed class ComparisonEngine
     private static bool TableTypeUdtsEqual(TableTypeUdt a, TableTypeUdt b)
     {
         if (a.Columns.Count != b.Columns.Count) { return false; }
-        Dictionary<string, Column> bByName = b.Columns.ToDictionary(c => c.Name, StringComparer.Ordinal);
+        var bByName = b.Columns.ToDictionary(c => c.Name, StringComparer.Ordinal);
         foreach (Column ac in a.Columns)
         {
             if (!bByName.TryGetValue(ac.Name, out Column? bc)) { return false; }

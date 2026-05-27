@@ -20,16 +20,10 @@ public class KindCatalogTests
     [InlineData("User", 9)]
     [InlineData("Role", 10)]
     [InlineData("Permission", 11)]
-    public void SortOrder_returns_canonical_index_for_known_kind(string kind, int expectedOrder)
-    {
-        KindCatalog.SortOrder(kind).Should().Be(expectedOrder);
-    }
+    public void SortOrder_returns_canonical_index_for_known_kind(string kind, int expectedOrder) => KindCatalog.SortOrder(kind).Should().Be(expectedOrder);
 
     [Fact]
-    public void SortOrder_returns_max_value_for_unknown_kind_so_it_sorts_last()
-    {
-        KindCatalog.SortOrder("ZZUnknown").Should().Be(int.MaxValue);
-    }
+    public void SortOrder_returns_max_value_for_unknown_kind_so_it_sorts_last() => KindCatalog.SortOrder("ZZUnknown").Should().Be(int.MaxValue);
 
     [Theory]
     [InlineData("Table", "Tabelle")]
@@ -44,26 +38,17 @@ public class KindCatalogTests
     [InlineData("User", "Utenti")]
     [InlineData("Role", "Ruoli")]
     [InlineData("Permission", "Permessi")]
-    public void DisplayLabel_returns_italian_plural_for_known_kind(string kind, string expectedLabel)
-    {
-        KindCatalog.DisplayLabel(kind).Should().Be(expectedLabel);
-    }
+    public void DisplayLabel_returns_italian_plural_for_known_kind(string kind, string expectedLabel) => KindCatalog.DisplayLabel(kind).Should().Be(expectedLabel);
 
     [Fact]
-    public void DisplayLabel_falls_back_to_raw_kind_string_for_unknown_kind()
-    {
-        KindCatalog.DisplayLabel("Whatever").Should().Be("Whatever");
-    }
+    public void DisplayLabel_falls_back_to_raw_kind_string_for_unknown_kind() => KindCatalog.DisplayLabel("Whatever").Should().Be("Whatever");
 
     [Theory]
     [InlineData(DifferenceStatus.Different, 0)]
     [InlineData(DifferenceStatus.OnlyInB, 1)]
     [InlineData(DifferenceStatus.OnlyInA, 2)]
     [InlineData(DifferenceStatus.Identical, 3)]
-    public void StatusOrder_classifies_by_visual_importance(DifferenceStatus status, int expected)
-    {
-        KindCatalog.StatusOrder(status).Should().Be(expected);
-    }
+    public void StatusOrder_classifies_by_visual_importance(DifferenceStatus status, int expected) => KindCatalog.StatusOrder(status).Should().Be(expected);
 
     [Fact]
     public void KnownKinds_lists_all_twelve_in_canonical_order()

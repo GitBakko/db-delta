@@ -64,7 +64,7 @@ public partial class ProjectSetupDialog : Window
     /// they are dividers, not real servers. Resets the AutoCompleteBox text
     /// + selection back to whatever was active before the click.
     /// </summary>
-    private static void OnServerSelectionChanged(object? sender, Avalonia.Controls.SelectionChangedEventArgs e)
+    private static void OnServerSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (sender is not AutoCompleteBox box) { return; }
         if (box.SelectedItem is DiscoveredServer { IsHeaderOnly: true })
@@ -169,7 +169,7 @@ public partial class ProjectSetupDialog : Window
         await store.SaveAsync(path, project, CancellationToken.None).ConfigureAwait(true);
 
         // Touch the MRU so the next session lists this project first.
-        Persistence.Json.JsonRecentProjectsStore mru =
+        var mru =
             Persistence.Json.JsonRecentProjectsStore.CreateDefault();
         await mru.AddOrTouchAsync(path, CancellationToken.None).ConfigureAwait(true);
     }
@@ -180,7 +180,7 @@ public partial class ProjectSetupDialog : Window
     {
         // Round-7 UX: show the MRU dialog (with browse-from-disk fallback)
         // instead of jumping straight into the OS file picker.
-        Persistence.Json.JsonRecentProjectsStore recents =
+        var recents =
             Persistence.Json.JsonRecentProjectsStore.CreateDefault();
         IReadOnlyList<Persistence.Json.RecentProject> list =
             await recents.LoadAsync(CancellationToken.None).ConfigureAwait(true);

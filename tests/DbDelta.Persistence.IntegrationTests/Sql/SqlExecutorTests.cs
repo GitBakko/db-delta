@@ -115,7 +115,7 @@ public sealed class SqlExecutorTests : IAsyncLifetime
         catch
         {
             // Docker daemon not reachable on localhost:2375 — also try the named pipe.
-            return System.IO.File.Exists(@"\\.\pipe\docker_engine");
+            return File.Exists(@"\\.\pipe\docker_engine");
         }
     }
 }

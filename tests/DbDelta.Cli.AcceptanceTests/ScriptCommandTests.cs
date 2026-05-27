@@ -16,7 +16,7 @@ public class ScriptCommandTests(CliFixture fixture)
         await CreateDb(tgtDb, ct);
         await CreateCustomerTable(srcDb, ct);
 
-        using TempFile sqlOut = TempFile.Sql();
+        using var sqlOut = TempFile.Sql();
         int exit = await RunCli(["script",
             "--source", ConnectionFor(srcDb),
             "--target", ConnectionFor(tgtDb),
@@ -39,7 +39,7 @@ public class ScriptCommandTests(CliFixture fixture)
         await CreateDb(srcDb, ct);
         await CreateDb(tgtDb, ct);
 
-        using TempFile sqlOut = TempFile.Sql();
+        using var sqlOut = TempFile.Sql();
         int exit = await RunCli(["script",
             "--source", ConnectionFor(srcDb),
             "--target", ConnectionFor(tgtDb),

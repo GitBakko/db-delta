@@ -99,7 +99,7 @@ public static class SqlServerDiscovery
         {
             while (DateTime.UtcNow < deadline && !ct.IsCancellationRequested)
             {
-                using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 TimeSpan remaining = deadline - DateTime.UtcNow;
                 if (remaining <= TimeSpan.Zero)
                 {

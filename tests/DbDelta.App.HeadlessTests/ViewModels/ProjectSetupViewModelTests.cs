@@ -222,8 +222,8 @@ public class ProjectSetupViewModelTests
         ProjectEndpointPanelViewModel ep = new("Source", isTarget: false);
         ep.ServerCountText.Should().Be("(0 trovati)");
 
-        ep.ServerSuggestions.Add(new DbDelta.Persistence.Sql.DiscoveredServer("SRV1", null));
-        ep.ServerSuggestions.Add(new DbDelta.Persistence.Sql.DiscoveredServer("SRV2", "10.0.0.1"));
+        ep.ServerSuggestions.Add(new Persistence.Sql.DiscoveredServer("SRV1", null));
+        ep.ServerSuggestions.Add(new Persistence.Sql.DiscoveredServer("SRV2", "10.0.0.1"));
         ep.ServerCountText.Should().Be("(2 trovati)");
     }
 
@@ -259,7 +259,7 @@ public class ProjectSetupViewModelTests
     {
         ProjectSetupViewModel vm = new();
         // Simulate a server scan result existing before load.
-        vm.Source.ServerSuggestions.Add(new DbDelta.Persistence.Sql.DiscoveredServer("OLD", null));
+        vm.Source.ServerSuggestions.Add(new Persistence.Sql.DiscoveredServer("OLD", null));
         vm.Source.HasServerSuggestions = true;
 
         DbDeltaProject original = BuildFullProject();

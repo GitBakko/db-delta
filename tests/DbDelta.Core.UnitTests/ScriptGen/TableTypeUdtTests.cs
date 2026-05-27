@@ -104,7 +104,7 @@ public class TableTypeUdtTests
         Database a = new("Db", [new Schema("dbo")], []) { TableTypeUdts = [udt] };
         Database b = new("Db", [new Schema("dbo")], []) { TableTypeUdts = [udt] };
 
-        ComparisonResult result = new ComparisonEngine().Compare(a, b, Core.Options.ComparisonOptions.Default);
+        ComparisonResult result = new ComparisonEngine().Compare(a, b, Options.ComparisonOptions.Default);
         string sql = Sut.Generate(result);
 
         result.Differences.Should().ContainSingle(d => d.Identity.Kind == "TableType")
@@ -123,7 +123,7 @@ public class TableTypeUdtTests
         Database a = new("Db", [new Schema("dbo")], []) { TableTypeUdts = [src] };
         Database b = new("Db", [new Schema("dbo")], []) { TableTypeUdts = [tgt] };
 
-        ComparisonResult result = new ComparisonEngine().Compare(a, b, Core.Options.ComparisonOptions.Default);
+        ComparisonResult result = new ComparisonEngine().Compare(a, b, Options.ComparisonOptions.Default);
 
         result.Differences.Should().ContainSingle(d => d.Identity.Kind == "TableType")
             .Which.Status.Should().Be(DifferenceStatus.Different);

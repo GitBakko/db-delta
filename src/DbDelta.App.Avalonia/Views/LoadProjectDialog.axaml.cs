@@ -27,15 +27,9 @@ public partial class LoadProjectDialog : Window
         list.ItemsSource = projects;
     }
 
-    private void OnListDoubleTapped(object? sender, TappedEventArgs e)
-    {
-        AcceptSelection();
-    }
+    private void OnListDoubleTapped(object? sender, TappedEventArgs e) => AcceptSelection();
 
-    private void OnOkClick(object? sender, RoutedEventArgs e)
-    {
-        AcceptSelection();
-    }
+    private void OnOkClick(object? sender, RoutedEventArgs e) => AcceptSelection();
 
     private void AcceptSelection()
     {

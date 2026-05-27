@@ -17,7 +17,7 @@ public class ReportCommandTests(CliFixture fixture)
         await CreateDb(tgtDb, ct);
         await CreateCustomerTable(srcDb, ct);
 
-        using TempFile htmlOut = TempFile.Html();
+        using var htmlOut = TempFile.Html();
         int exit = await RunCli(["report",
             "--source", ConnectionFor(srcDb),
             "--target", ConnectionFor(tgtDb),
@@ -41,7 +41,7 @@ public class ReportCommandTests(CliFixture fixture)
         await CreateDb(tgtDb, ct);
         await CreateCustomerTable(srcDb, ct);
 
-        using TempFile jsonOut = TempFile.Json();
+        using var jsonOut = TempFile.Json();
         int exit = await RunCli(["report",
             "--source", ConnectionFor(srcDb),
             "--target", ConnectionFor(tgtDb),
@@ -50,7 +50,7 @@ public class ReportCommandTests(CliFixture fixture)
         exit.Should().Be(ExpectedExitCodes.SuccessDifferencesFound);
         File.Exists(jsonOut.Path).Should().BeTrue();
         string content = await File.ReadAllTextAsync(jsonOut.Path, ct);
-        using JsonDocument doc = JsonDocument.Parse(content);
+        using var doc = JsonDocument.Parse(content);
         JsonElement differences = doc.RootElement.GetProperty("differences");
         differences.GetArrayLength().Should().BeGreaterThan(0);
         differences[0].GetProperty("kind").GetString().Should().NotBeNull();
@@ -68,8 +68,8 @@ public class ReportCommandTests(CliFixture fixture)
         await CreateDb(srcDb, ct);
         await CreateDb(tgtDb, ct);
 
-        using TempFile htmlOut = TempFile.Html();
-        using TempFile jsonOut = TempFile.Json();
+        using var htmlOut = TempFile.Html();
+        using var jsonOut = TempFile.Json();
         int exit = await RunCli(["report",
             "--source", ConnectionFor(srcDb),
             "--target", ConnectionFor(tgtDb),

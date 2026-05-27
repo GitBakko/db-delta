@@ -18,7 +18,7 @@ public class JsonReportGeneratorTests
         string json = Sut.Generate(new ComparisonResult([]));
 
         json.Should().Contain("\"differences\"");
-        using JsonDocument doc = JsonDocument.Parse(json);
+        using var doc = JsonDocument.Parse(json);
         doc.RootElement.GetProperty("differences").GetArrayLength().Should().Be(0);
     }
 

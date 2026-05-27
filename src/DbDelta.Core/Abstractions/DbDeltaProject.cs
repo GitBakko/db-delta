@@ -35,10 +35,10 @@ public sealed record DbDeltaProject(
 
     /// <summary>
     /// Fine-grained project options; falls back to
-    /// <see cref="Abstractions.ProjectOptions.Default"/>.
+    /// <see cref="ProjectOptions.Default"/>.
     /// </summary>
     public ProjectOptions ProjectOptions { get; init; } =
-        ProjectOptions ?? Abstractions.ProjectOptions.Default;
+        ProjectOptions ?? ProjectOptions.Default;
 
     /// <summary>Per-object include/exclude selections; never null on a fully-loaded project.</summary>
     public IReadOnlyDictionary<ObjectSelectionKey, bool> Selections { get; init; } =

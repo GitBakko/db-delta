@@ -27,7 +27,7 @@ public sealed class XmlProjectStore : IProjectStore
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
 
         string xml = await File.ReadAllTextAsync(filePath, ct).ConfigureAwait(false);
-        XDocument doc = XDocument.Parse(xml);
+        var doc = XDocument.Parse(xml);
         XElement root = doc.Root
             ?? throw new InvalidDataException($"'{filePath}' is not a valid DbDelta project file.");
 
@@ -60,7 +60,7 @@ public sealed class XmlProjectStore : IProjectStore
                 NewLineHandling = NewLineHandling.Replace,
             };
             await using (FileStream fs = File.Create(tmp))
-            await using (XmlWriter writer = XmlWriter.Create(fs, settings))
+            await using (var writer = XmlWriter.Create(fs, settings))
             {
                 doc.WriteTo(writer);
                 await writer.FlushAsync().ConfigureAwait(false);
@@ -316,7 +316,7 @@ public sealed class XmlProjectStore : IProjectStore
             EnvironmentColorHex: (string?)connEl.Attribute("envColor") ?? string.Empty);
 
         string modeStr = (string?)authEl.Attribute("mode") ?? nameof(AuthenticationMode.SqlServer);
-        AuthenticationMode mode = Enum.TryParse<AuthenticationMode>(modeStr, out AuthenticationMode m)
+        AuthenticationMode mode = Enum.TryParse(modeStr, out AuthenticationMode m)
             ? m
             : AuthenticationMode.SqlServer;
 
