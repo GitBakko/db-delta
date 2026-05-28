@@ -25,6 +25,13 @@ announcement remain before v1.0.0 final.
 - `ScriptGenerator` role-emitter / phase-label cleanup — internal refactor, no
   behavioural change to generated scripts.
 
+### Fixed
+- The desktop app's "Salva/Build alignment script" path emitted a malformed
+  preamble (a dropped `SET NUMERIC_ROUNDABORT OFF` and an orphaned `GO`) because
+  the deploy builder still trimmed the pre-`0.17.0` two-line header. It now
+  reuses the generator's full self-contained envelope verbatim. The CLI
+  `dbdelta script` path was unaffected.
+
 ## [0.17.0] — 2026-05-28 — verbose self-contained deploy script
 
 ### Changed
