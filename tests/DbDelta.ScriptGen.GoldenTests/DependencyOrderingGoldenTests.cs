@@ -36,7 +36,7 @@ public class DependencyOrderingGoldenTests
         ComparisonResult result = new ComparisonEngine().Compare(source, target, ComparisonOptions.Default);
         string script = new ScriptGenerator().Generate(
             result, selection: null, options: ComparisonOptions.Default,
-            targetDefaultCollation: null, dependencies: source.Dependencies);
+            dependencies: source.Dependencies);
         return Verify(script);
     }
 }

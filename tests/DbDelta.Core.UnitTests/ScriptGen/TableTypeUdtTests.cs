@@ -30,8 +30,8 @@ public class TableTypeUdtTests
         string sql = Sut.Generate(result);
 
         sql.Should().Contain("CREATE TYPE [dbo].[OrderItemTvp] AS TABLE");
-        sql.Should().Contain("[ProductId] int NOT NULL");
-        sql.Should().Contain("[Quantity] int NOT NULL");
+        sql.Should().Contain("[ProductId] [int] NOT NULL");
+        sql.Should().Contain("[Quantity] [int] NOT NULL");
     }
 
     [Fact]

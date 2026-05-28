@@ -33,7 +33,7 @@ public class ScriptGeneratorProperties
             Database b = samples[i + 1];
             ComparisonResult result = _engine.Compare(a, b, ComparisonOptions.Default);
             string script = _generator.Generate(result, selection: null,
-                options: ComparisonOptions.Default, targetDefaultCollation: b.DefaultCollation);
+                options: ComparisonOptions.Default);
             script.Should().Contain("SET XACT_ABORT ON")
                 .And.Contain("BEGIN TRANSACTION")
                 .And.Contain("COMMIT TRANSACTION");
@@ -47,7 +47,7 @@ public class ScriptGeneratorProperties
         {
             ComparisonResult result = _engine.Compare(db, db, ComparisonOptions.Default);
             string script = _generator.Generate(result, selection: null,
-                options: ComparisonOptions.Default, targetDefaultCollation: db.DefaultCollation);
+                options: ComparisonOptions.Default);
             // Reflexive comparison: only the envelope text should remain.
             // Strip the boilerplate lines and assert nothing else survives.
             script.Should().NotContain("CREATE ");
@@ -66,9 +66,9 @@ public class ScriptGeneratorProperties
             Database b = samples[i + 1];
             ComparisonResult result = _engine.Compare(a, b, ComparisonOptions.Default);
             string s1 = _generator.Generate(result, selection: null,
-                options: ComparisonOptions.Default, targetDefaultCollation: b.DefaultCollation);
+                options: ComparisonOptions.Default);
             string s2 = _generator.Generate(result, selection: null,
-                options: ComparisonOptions.Default, targetDefaultCollation: b.DefaultCollation);
+                options: ComparisonOptions.Default);
             s1.Should().Be(s2, "ScriptGenerator must be a pure function");
         }
     }
@@ -98,7 +98,7 @@ public class ScriptGeneratorProperties
             Database b = samples[i + 1];
             ComparisonResult result = _engine.Compare(a, b, ComparisonOptions.Default);
             string script = _generator.Generate(result, selection: null,
-                options: ComparisonOptions.Default, targetDefaultCollation: b.DefaultCollation);
+                options: ComparisonOptions.Default);
 
             // Sequence must be CREATED/ALTERED before a table that may default to it.
             int firstSeqCreate = FirstIndexOfAny(script, "CREATE SEQUENCE", "ALTER SEQUENCE");
@@ -131,7 +131,7 @@ public class ScriptGeneratorProperties
             Database b = samples[i + 1];
             ComparisonResult result = _engine.Compare(a, b, ComparisonOptions.Default);
             string script = _generator.Generate(result, selection: null,
-                options: ComparisonOptions.Default, targetDefaultCollation: b.DefaultCollation);
+                options: ComparisonOptions.Default);
             int lastTableDdl = LastIndexOfAny(script, "CREATE TABLE", "DROP TABLE");
             int firstFkAdd = script.IndexOf("ADD CONSTRAINT [FK_", StringComparison.Ordinal);
             if (lastTableDdl < 0 || firstFkAdd < 0) { continue; }

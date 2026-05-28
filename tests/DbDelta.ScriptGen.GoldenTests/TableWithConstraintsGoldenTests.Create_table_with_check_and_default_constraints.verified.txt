@@ -1,8 +1,8 @@
 ﻿CREATE TABLE [dbo].[Person] (
-    [Id] int IDENTITY(1,1) NOT NULL,
-    [Age] int NOT NULL,
-    [CreatedAt] datetime2(7) NOT NULL,
-    CONSTRAINT [PK_Person] PRIMARY KEY CLUSTERED ([Id]),
+    [Id] [int] IDENTITY(1,1) NOT NULL,
+    [Age] [int] NOT NULL,
+    [CreatedAt] [datetime2] (7) NOT NULL,
     CONSTRAINT [CK_Person_Age] CHECK ([Age] >= 0),
     CONSTRAINT [DF_Person_CreatedAt] DEFAULT (sysutcdatetime()) FOR [CreatedAt]
 );
+ALTER TABLE [dbo].[Person] ADD CONSTRAINT [PK_Person] PRIMARY KEY CLUSTERED ([Id]);

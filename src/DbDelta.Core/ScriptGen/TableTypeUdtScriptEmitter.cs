@@ -10,14 +10,7 @@ namespace DbDelta.Core.ScriptGen;
 /// </summary>
 public sealed class TableTypeUdtScriptEmitter
 {
-    public string EmitCreate(TableTypeUdt udt) => EmitCreate(udt, targetDefaultCollation: null);
-
-    /// <summary>
-    /// Overload that accepts the target DB default collation so string
-    /// columns whose collation matches the default render without a
-    /// redundant <c>COLLATE</c> clause (Redgate parity, M13-PARITY.5 #32).
-    /// </summary>
-    public string EmitCreate(TableTypeUdt udt, string? targetDefaultCollation)
+    public string EmitCreate(TableTypeUdt udt)
     {
         ArgumentNullException.ThrowIfNull(udt);
         StringBuilder sb = new();
@@ -25,8 +18,8 @@ public sealed class TableTypeUdtScriptEmitter
         for (int i = 0; i < udt.Columns.Count; i++)
         {
             Column col = udt.Columns[i];
-            sb.Append("    [").Append(col.Name).Append("] ").Append(col.DataType);
-            AppendCollation(sb, col, targetDefaultCollation);
+            sb.Append("    [").Append(col.Name).Append("] ").Append(SqlTypeFormatter.FormatColumnType(col.DataType));
+            AppendCollation(sb, col);
             sb.Append(col.IsNullable ? " NULL" : " NOT NULL");
             if (i < udt.Columns.Count - 1)
             {
@@ -45,18 +38,13 @@ public sealed class TableTypeUdtScriptEmitter
     }
 
     /// <summary>
-    /// Appends <c>COLLATE &lt;name&gt;</c> to <paramref name="sb"/> when the
-    /// column's collation diverges from the target DB default. Mirrors the
+    /// Appends <c>COLLATE &lt;name&gt;</c> to <paramref name="sb"/> whenever the
+    /// column carries a collation (string type). Mirrors the always-explicit
     /// rule in <see cref="TableScriptEmitter"/>.
     /// </summary>
-    private static void AppendCollation(StringBuilder sb, Column c, string? targetDefaultCollation)
+    private static void AppendCollation(StringBuilder sb, Column c)
     {
         if (string.IsNullOrEmpty(c.Collation)) { return; }
-        if (targetDefaultCollation is not null
-            && string.Equals(c.Collation, targetDefaultCollation, StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
         sb.Append(" COLLATE ").Append(c.Collation);
     }
 }

@@ -36,7 +36,7 @@ public class DependencyRoundTripTests(LiveDbFixture fixture)
         ComparisonResult diff = new ComparisonEngine().Compare(source, target, ComparisonOptions.Default);
         string script = new ScriptGenerator().Generate(
             diff, selection: null, options: ComparisonOptions.Default,
-            targetDefaultCollation: target.DefaultCollation, dependencies: source.Dependencies);
+            dependencies: source.Dependencies);
 
         SqlBatchResult apply = await SqlExecutor.ExecuteAsync(tgt, script, ct, useOwnTransaction: false);
         apply.Success.Should().BeTrue(apply.ErrorMessage ?? "ordered script failed to apply");

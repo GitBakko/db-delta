@@ -19,7 +19,6 @@ namespace DbDelta.Benchmarks.Benchmarks;
 public class ScriptGenBench
 {
     private ComparisonResult _result = null!;
-    private string? _targetDefaultCollation;
     private readonly ScriptGenerator _generator = new();
 
     /// <summary>Number of objects on each side of the diff.</summary>
@@ -32,10 +31,9 @@ public class ScriptGenBench
         Database source = SchemaFixtureBuilder.BuildSource(ObjectCount);
         Database target = SchemaFixtureBuilder.BuildTarget(ObjectCount);
         _result = new ComparisonEngine().Compare(source, target, ComparisonOptions.Default);
-        _targetDefaultCollation = target.DefaultCollation;
     }
 
     [Benchmark]
     public string Generate() =>
-        _generator.Generate(_result, selection: null, options: ComparisonOptions.Default, targetDefaultCollation: _targetDefaultCollation);
+        _generator.Generate(_result, selection: null, options: ComparisonOptions.Default);
 }

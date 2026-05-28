@@ -41,7 +41,7 @@ public class TableAlterDeltaTests
         Table tgt = T("X", new Column("Id", "int", false, 1));
 
         string sql = new TableScriptEmitter().Emit(Diff(src, tgt));
-        sql.Should().Contain("ADD [Email] nvarchar(200) NULL");
+        sql.Should().Contain("ADD [Email] [nvarchar] (200) NULL");
     }
 
     [Fact]
@@ -51,7 +51,7 @@ public class TableAlterDeltaTests
         Table tgt = T("X", new Column("Name", "nvarchar(100)", true, 1));
 
         string sql = new TableScriptEmitter().Emit(Diff(src, tgt));
-        sql.Should().Contain("ALTER COLUMN [Name] nvarchar(200) NOT NULL");
+        sql.Should().Contain("ALTER COLUMN [Name] [nvarchar] (200) NOT NULL");
     }
 
     [Fact]

@@ -54,7 +54,6 @@ public sealed class ScriptGenerator
         ComparisonResult result,
         IEnumerable<DifferencePair>? selection = null,
         ComparisonOptions options = ComparisonOptions.Default,
-        string? targetDefaultCollation = null,
         IReadOnlyList<DependencyEdge>? dependencies = null)
     {
         ArgumentNullException.ThrowIfNull(result);
@@ -148,7 +147,7 @@ public sealed class ScriptGenerator
         {
             DifferencePair pair = pairById[id];
             if (pair.Status != DifferenceStatus.OnlyInB) { continue; }
-            string? body = DispatchBuild(id.Kind, pair, targetDefaultCollation);
+            string? body = DispatchBuild(id.Kind, pair);
             if (!string.IsNullOrWhiteSpace(body)) { writer.WriteBatch(PhaseLabel(pair), body); }
         }
 
@@ -172,7 +171,7 @@ public sealed class ScriptGenerator
         {
             DifferencePair pair = pairById[id];
             if (pair.Status == DifferenceStatus.OnlyInB) { continue; }
-            string? body = DispatchBuild(id.Kind, pair, targetDefaultCollation);
+            string? body = DispatchBuild(id.Kind, pair);
             if (!string.IsNullOrWhiteSpace(body)) { writer.WriteBatch(PhaseLabel(pair), body); }
         }
 
@@ -371,18 +370,18 @@ public sealed class ScriptGenerator
         return null;
     }
 
-    private string? BuildOneTableTypeUdt(DifferencePair pair, string? targetDefaultCollation)
+    private string? BuildOneTableTypeUdt(DifferencePair pair)
     {
         switch (pair.Status)
         {
             case DifferenceStatus.OnlyInA when pair.SideA is TableTypeUdt t:
-                return _tableTypeEmitter.EmitCreate(t, targetDefaultCollation);
+                return _tableTypeEmitter.EmitCreate(t);
             case DifferenceStatus.OnlyInB when pair.SideB is TableTypeUdt t:
                 return _tableTypeEmitter.EmitDrop(t);
             case DifferenceStatus.Different
                 when pair.SideA is TableTypeUdt srcT && pair.SideB is TableTypeUdt tgtT:
                 return _tableTypeEmitter.EmitDrop(tgtT) + Environment.NewLine
-                     + _tableTypeEmitter.EmitCreate(srcT, targetDefaultCollation);
+                     + _tableTypeEmitter.EmitCreate(srcT);
             case DifferenceStatus.Identical:
                 break;
             case DifferenceStatus.Different:
@@ -397,9 +396,9 @@ public sealed class ScriptGenerator
         return null;
     }
 
-    private string? BuildOneTable(DifferencePair pair, string? targetDefaultCollation)
+    private string? BuildOneTable(DifferencePair pair)
     {
-        string ddl = _tableEmitter.Emit(pair, targetDefaultCollation);
+        string ddl = _tableEmitter.Emit(pair);
         return string.IsNullOrWhiteSpace(ddl) ? null : ddl;
     }
 
@@ -455,13 +454,13 @@ public sealed class ScriptGenerator
 
     // ── Dispatch helper ─────────────────────────────────────────────────────
 
-    private string? DispatchBuild(string kind, DifferencePair pair, string? targetDefaultCollation) =>
+    private string? DispatchBuild(string kind, DifferencePair pair) =>
         kind switch
         {
             "Sequence" => BuildOneSequence(pair),
             "UserDefinedType" => BuildOneUserDefinedType(pair),
-            "TableType" => BuildOneTableTypeUdt(pair, targetDefaultCollation),
-            "Table" => BuildOneTable(pair, targetDefaultCollation),
+            "TableType" => BuildOneTableTypeUdt(pair),
+            "Table" => BuildOneTable(pair),
             "View" => BuildOneView(pair),
             "Function" => BuildOneFunction(pair),
             "Procedure" => BuildOneProcedure(pair),

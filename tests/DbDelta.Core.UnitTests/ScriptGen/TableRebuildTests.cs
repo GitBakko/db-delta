@@ -89,7 +89,7 @@ public class TableRebuildTests
 
         string sql = Sut.Generate(result);
 
-        sql.Should().Contain("ALTER TABLE [dbo].[Customer] ADD [Id] int IDENTITY(1,1) NOT NULL");
+        sql.Should().Contain("ALTER TABLE [dbo].[Customer] ADD [Id] [int] IDENTITY(1,1) NOT NULL");
         sql.Should().NotContain("Customer_tmp");
         sql.Should().NotContain("sp_rename");
     }

@@ -22,9 +22,9 @@ public class TableScriptEmitterTests
         string sql = new TableScriptEmitter().Emit(pair).Trim();
 
         sql.Should().StartWith("CREATE TABLE [dbo].[Customer]");
-        sql.Should().Contain("[Id] int IDENTITY NOT NULL");
-        sql.Should().Contain("[Name] nvarchar(100) NOT NULL");
-        sql.Should().Contain("[Email] nvarchar(200) NULL");
+        sql.Should().Contain("[Id] [int] IDENTITY NOT NULL");
+        sql.Should().Contain("[Name] [nvarchar] (100) NOT NULL");
+        sql.Should().Contain("[Email] [nvarchar] (200) NULL");
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public class TableScriptEmitterTests
 
         string sql = new TableScriptEmitter().Emit(pair).Trim();
 
-        sql.Should().Contain("ALTER TABLE [dbo].[Customer] ADD [Email] nvarchar(200) NULL;");
+        sql.Should().Contain("ALTER TABLE [dbo].[Customer] ADD [Email] [nvarchar] (200) NULL;");
         sql.Should().NotContain("DROP TABLE");
     }
 }

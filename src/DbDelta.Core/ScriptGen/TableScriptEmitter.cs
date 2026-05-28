@@ -10,24 +10,14 @@ namespace DbDelta.Core.ScriptGen;
 public sealed class TableScriptEmitter : IScriptEmitter
 {
     /// <inheritdoc />
-    public string Emit(DifferencePair pair) => Emit(pair, targetDefaultCollation: null);
-
-    /// <summary>
-    /// Overload of <see cref="Emit(DifferencePair)"/> that accepts the target
-    /// database's default collation so string columns whose collation matches
-    /// the default can be emitted without an explicit COLLATE clause (Redgate
-    /// parity, M13-PARITY.5 #32). Pass <c>null</c> to keep the legacy
-    /// behaviour (no COLLATE ever emitted unless the column's
-    /// <see cref="Column.Collation"/> is non-null).
-    /// </summary>
-    public string Emit(DifferencePair pair, string? targetDefaultCollation)
+    public string Emit(DifferencePair pair)
     {
         ArgumentNullException.ThrowIfNull(pair);
         return pair.Status switch
         {
-            DifferenceStatus.OnlyInA => EmitCreate((Table)pair.SideA!, targetDefaultCollation),
+            DifferenceStatus.OnlyInA => EmitCreate((Table)pair.SideA!),
             DifferenceStatus.OnlyInB => EmitDrop((Table)pair.SideB!),
-            DifferenceStatus.Different => EmitAlter((Table)pair.SideA!, (Table)pair.SideB!, targetDefaultCollation),
+            DifferenceStatus.Different => EmitAlter((Table)pair.SideA!, (Table)pair.SideB!),
             DifferenceStatus.Identical => string.Empty,
             _ => string.Empty,
         };
@@ -35,7 +25,6 @@ public sealed class TableScriptEmitter : IScriptEmitter
 
     private static string EmitCreate(
         Table table,
-        string? targetDefaultCollation = null,
         bool includeNamedConstraints = true)
     {
         StringBuilder sb = new();
@@ -50,7 +39,7 @@ public sealed class TableScriptEmitter : IScriptEmitter
         {
             Column col = table.Columns[i];
             AppendLineSeparator(sb, ref firstLine);
-            sb.Append("    ").Append(FormatColumn(col, colsWithNamedDefault.Contains(col.Name), targetDefaultCollation));
+            sb.Append("    ").Append(FormatColumn(col, colsWithNamedDefault.Contains(col.Name)));
         }
 
         if (includeNamedConstraints)
@@ -59,11 +48,9 @@ public sealed class TableScriptEmitter : IScriptEmitter
             {
                 switch (c)
                 {
-                    case PrimaryKey pk:
-                        AppendLineSeparator(sb, ref firstLine);
-                        sb.Append("    CONSTRAINT [").Append(pk.Name).Append("] PRIMARY KEY ")
-                          .Append(pk.IsClustered ? "CLUSTERED " : "NONCLUSTERED ")
-                          .Append('(').Append(string.Join(", ", pk.Columns.Select(Bracket))).Append(')');
+                    case PrimaryKey:
+                        // PK is emitted as a trailing ALTER TABLE ADD CONSTRAINT
+                        // statement (Redgate parity), not inline.
                         break;
                     case UniqueConstraint uq:
                         AppendLineSeparator(sb, ref firstLine);
@@ -92,6 +79,18 @@ public sealed class TableScriptEmitter : IScriptEmitter
 
         sb.AppendLine();
         sb.AppendLine(");");
+
+        // Primary key as a separate ALTER TABLE ADD CONSTRAINT (Redgate parity).
+        if (includeNamedConstraints)
+        {
+            foreach (PrimaryKey pk in table.Constraints.OfType<PrimaryKey>())
+            {
+                sb.Append("ALTER TABLE [").Append(table.Schema).Append("].[").Append(table.Name)
+                  .Append("] ADD CONSTRAINT [").Append(pk.Name).Append("] ")
+                  .Append(FormatStandaloneConstraintBody(pk)).AppendLine(";");
+            }
+        }
+
         return sb.ToString();
     }
 
@@ -115,17 +114,6 @@ public sealed class TableScriptEmitter : IScriptEmitter
     {
         ArgumentNullException.ThrowIfNull(table);
         return EmitCreate(table);
-    }
-
-    /// <summary>
-    /// Overload of <see cref="GenerateCreateTable(Table)"/> that takes the
-    /// target DB default collation so callers driving the diff viewer can
-    /// suppress redundant COLLATE clauses (M13-PARITY.5 #32).
-    /// </summary>
-    public static string GenerateCreateTable(Table table, string? targetDefaultCollation)
-    {
-        ArgumentNullException.ThrowIfNull(table);
-        return EmitCreate(table, targetDefaultCollation);
     }
 
     /// <summary>
@@ -182,7 +170,7 @@ public sealed class TableScriptEmitter : IScriptEmitter
     private static string EmitDrop(Table table) =>
         $"DROP TABLE [{table.Schema}].[{table.Name}];";
 
-    private static string EmitAlter(Table newT, Table oldT, string? targetDefaultCollation = null)
+    private static string EmitAlter(Table newT, Table oldT)
     {
         // Spec §3.4: identity column changes on an EXISTING column require a
         // full temp-table rebuild — you cannot ALTER an IDENTITY flag or its
@@ -190,7 +178,7 @@ public sealed class TableScriptEmitter : IScriptEmitter
         // the data we are trying to migrate.
         if (RequiresFullRebuild(newT, oldT))
         {
-            return EmitRebuild(newT, oldT, targetDefaultCollation);
+            return EmitRebuild(newT, oldT);
         }
 
         StringBuilder sb = new();
@@ -249,14 +237,14 @@ public sealed class TableScriptEmitter : IScriptEmitter
                 sb.Append("ALTER TABLE ").Append(qualifiedName)
                   .Append(" DROP COLUMN [").Append(newCol.Name).AppendLine("];");
                 sb.Append("ALTER TABLE ").Append(qualifiedName)
-                  .Append(" ADD ").Append(FormatColumn(newCol, colsWithNamedDefault.Contains(newCol.Name), targetDefaultCollation))
+                  .Append(" ADD ").Append(FormatColumn(newCol, colsWithNamedDefault.Contains(newCol.Name)))
                   .AppendLine(";");
                 continue;
             }
             sb.Append("ALTER TABLE ").Append(qualifiedName)
               .Append(" ALTER COLUMN [").Append(newCol.Name).Append("] ")
-              .Append(newCol.DataType);
-            AppendCollation(sb, newCol, targetDefaultCollation);
+              .Append(SqlTypeFormatter.FormatColumnType(newCol.DataType));
+            AppendCollation(sb, newCol);
             sb.Append(newCol.IsNullable ? " NULL" : " NOT NULL")
               .AppendLine(";");
         }
@@ -267,7 +255,7 @@ public sealed class TableScriptEmitter : IScriptEmitter
             if (existingColsByName.ContainsKey(newCol.Name)) { continue; }
             sb.Append("ALTER TABLE ").Append(qualifiedName)
               .Append(" ADD ")
-              .Append(FormatColumn(newCol, colsWithNamedDefault.Contains(newCol.Name), targetDefaultCollation))
+              .Append(FormatColumn(newCol, colsWithNamedDefault.Contains(newCol.Name)))
               .AppendLine(";");
         }
 
@@ -321,7 +309,7 @@ public sealed class TableScriptEmitter : IScriptEmitter
     /// copy the rows over (excluding computed columns, which re-derive),
     /// DROP the original, then <c>sp_rename</c> the temp table into place.
     /// </summary>
-    private static string EmitRebuild(Table newT, Table oldT, string? targetDefaultCollation = null)
+    private static string EmitRebuild(Table newT, Table oldT)
     {
         string qualifiedOld = $"[{newT.Schema}].[{newT.Name}]";
         string tmpName = $"{newT.Name}_tmp";
@@ -359,7 +347,6 @@ public sealed class TableScriptEmitter : IScriptEmitter
         // after the rename so their names are restored on the final table.
         sb.Append(EmitCreate(
             newT with { Name = tmpName },
-            targetDefaultCollation,
             includeNamedConstraints: false));
 
         bool newHasIdentity = newT.Columns.Any(c => c.IsIdentity);
@@ -458,7 +445,7 @@ public sealed class TableScriptEmitter : IScriptEmitter
         _ => string.Empty,
     };
 
-    private static string FormatColumn(Column c, bool hasNamedDefault, string? targetDefaultCollation = null)
+    private static string FormatColumn(Column c, bool hasNamedDefault)
     {
         StringBuilder sb = new();
         sb.Append('[').Append(c.Name).Append("] ");
@@ -477,7 +464,7 @@ public sealed class TableScriptEmitter : IScriptEmitter
             return sb.ToString();
         }
 
-        sb.Append(c.DataType);
+        sb.Append(SqlTypeFormatter.FormatColumnType(c.DataType));
         if (c.IsIdentity)
         {
             if (c.IdentitySeed is long seed && c.IdentityIncrement is long inc)
@@ -489,7 +476,7 @@ public sealed class TableScriptEmitter : IScriptEmitter
                 sb.Append(" IDENTITY");
             }
         }
-        AppendCollation(sb, c, targetDefaultCollation);
+        AppendCollation(sb, c);
         sb.Append(c.IsNullable ? " NULL" : " NOT NULL");
         if (!hasNamedDefault && !string.IsNullOrEmpty(c.DefaultExpression))
         {
@@ -499,23 +486,14 @@ public sealed class TableScriptEmitter : IScriptEmitter
     }
 
     /// <summary>
-    /// Appends an explicit <c>COLLATE &lt;name&gt;</c> clause when the
-    /// column's collation diverges from <paramref name="targetDefaultCollation"/>.
-    /// Skipped silently when the column has no collation (non-string types)
-    /// or when the column already matches the target's default (the implicit
-    /// inheritance covers it). When <paramref name="targetDefaultCollation"/>
-    /// is null the clause is emitted whenever the column has any collation —
-    /// the defensive shape used by Redgate when the default is unknown
-    /// (M13-PARITY.5 #32).
+    /// Appends an explicit <c>COLLATE &lt;name&gt;</c> clause whenever the
+    /// column carries a collation (i.e. is a string type). Mirrors Redgate SQL
+    /// Compare, which always emits the explicit collation on character columns.
+    /// Non-string columns (null collation) are skipped silently.
     /// </summary>
-    private static void AppendCollation(StringBuilder sb, Column c, string? targetDefaultCollation)
+    private static void AppendCollation(StringBuilder sb, Column c)
     {
         if (string.IsNullOrEmpty(c.Collation)) { return; }
-        if (targetDefaultCollation is not null
-            && string.Equals(c.Collation, targetDefaultCollation, StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
         sb.Append(" COLLATE ").Append(c.Collation);
     }
 }
