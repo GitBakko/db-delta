@@ -1,10 +1,11 @@
 # DbDelta — Backlog (task list for the next session)
 
-**State at update (2026-05-28, late session):** `main` = `6d378d2`, **6 commits AHEAD
-of `origin/main` (`b09c234`), NOT pushed** (push stays manual). All local tests
-green; CI not yet re-run (it validates on push — the GitHub Actions Node-24
-bumps below can ONLY be verified once pushed). v0.17.0 is the latest *released*
-tag; **v1.0.0-rc1 is prepped but NOT tagged/pushed**.
+**State at update (2026-05-28):** `main` = `12017f2`, **origin/main SYNCED
+(pushed)**. **`v1.0.0-rc1` is RELEASED** — GitHub Release published as
+prerelease (v0.17.0 stays "Latest") with the unsigned MSI attached, smoke
+install/uninstall green on the runner. CI (`ci.yml`) + docs (`docs.yml`) green
+on the Node-24 action bumps. Next released tag toward GA is `v1.0.0` final,
+gated on code signing + announcement (track A).
 
 Pick an item, then run it through the usual flow: brainstorm → spec →
 writing-plans → subagent-driven execution → finishing. Collaboration rules:
@@ -14,15 +15,6 @@ parity > invariants.
 
 ---
 
-## Unpushed commits this session (oldest → newest)
-
-- `0715a4c` ci: bump GitHub Actions to Node-24 majors (checkout v6, setup-dotnet v5, cache v5, upload-artifact v7, configure-pages v6, upload-pages-artifact v5, deploy-pages v5, action-gh-release v3)
-- `f31e6a9` refactor(scriptgen): PhaseLabel throws on invalid status; unify role emitter
-- `6d935c2` docs: cut [1.0.0-rc1] CHANGELOG section — v1.0 feature freeze
-- `0f11eb6` test(parity): add cross-kind #24 scenarios 13-17
-- `5cc62aa` docs(parity): 2026-05-28 run — cross-kind #24 (13-17) vs Redgate, zero bugs
-- `6d378d2` feat(scriptgen): align column cosmetics to Redgate (A/B/D)
-
 ## A. Non-code (need external input from the owner)
 
 - [ ] **Code signing** — Authenticode cert, then sign MSI + bundled `.exe`s in
@@ -30,14 +22,21 @@ parity > invariants.
 - [ ] **Public alpha announcement** — polish `README.md` (download link to the
       latest Release MSI + the DocFX site), draft Release notes, announce.
 
-## B. Release decision — RC PREPPED, ready to ship
+## B. Release — v1.0.0-rc1 SHIPPED (2026-05-28)
 
-- [ ] **Push `main` first** so CI validates the Node-24 action bumps + scriptgen
-      changes on a normal push. Watch `ci.yml` + `docs.yml` go green.
-- [ ] **Then tag `v1.0.0-rc1`** (`git tag -a v1.0.0-rc1 -m "…"; git push origin
-      v1.0.0-rc1`) — `release.yml` builds the MSI + smoke-tests + attaches it on
-      any `v*` tag. CHANGELOG `[1.0.0-rc1]` section already cut. Likely gate
-      behind code signing + announcement (A) if you want a clean first RC.
+- [x] **Pushed `main`** (now synced) — `ci.yml` (windows build+test, linux
+      testcontainers integration) + `docs.yml` (DocFX→Pages) green on the
+      Node-24 action bumps.
+- [x] **Tagged + published `v1.0.0-rc1`** on `12017f2` — GitHub Release as
+      **prerelease** (v0.17.0 stays "Latest") with `DbDelta-1.0.0-rc1-win-x64.msi`
+      (~94 MB, UNSIGNED), smoke install/uninstall green on the runner.
+      https://github.com/GitBakko/db-delta/releases/tag/v1.0.0-rc1
+      Two release-pipeline fixes were needed along the way: a `prerelease` flag
+      from the tag name (`00455c7`) and a numeric MSI ProductVersion for
+      hyphen/semver-label tags (`12017f2` — WiX rejects `1.0.0-rc1`).
+- [ ] **v1.0.0 FINAL** still gated on code signing (A, cert blocked) +
+      public announcement (A). When ready, tag `v1.0.0` — the pipeline now
+      publishes it as a non-prerelease "Latest" automatically.
 
 ## C. Optional / ongoing hardening
 
