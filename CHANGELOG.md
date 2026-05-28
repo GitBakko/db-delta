@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased] — heading toward v1.0.0 RC
 
+(Empty — next: code signing, public alpha announcement.)
+
+## [0.17.0] — 2026-05-28 — verbose self-contained deploy script
+
 ### Changed
 - **Deploy scripts are now self-contained and verbose (Redgate-style).** Every
   operation is preceded by a `PRINT` of the exact phase and followed by an
