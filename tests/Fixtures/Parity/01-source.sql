@@ -159,12 +159,7 @@ GO
 -- references the function, so the deploy script MUST CREATE the function
 -- before the table. Exercises EdgeKind.ComputedColumn topological ordering.
 -- =========================================================================
-CREATE FUNCTION dbo.fnLineTotal (@qty int, @price decimal(18, 2))
-    RETURNS decimal(18, 2)
-AS
-BEGIN
-    RETURN @qty * @price;
-END
+EXEC ('CREATE FUNCTION dbo.fnLineTotal (@qty int, @price decimal(18, 2)) RETURNS decimal(18, 2) AS BEGIN RETURN @qty * @price; END');
 GO
 CREATE TABLE dbo.PriceList
 (
