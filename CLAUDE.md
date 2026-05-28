@@ -216,12 +216,23 @@ Any string works as a custom agent type.
 
 ## Build & Test
 
+This is a **.NET 10** solution (`DbDelta.sln`), NOT a Node project.
+
 - ALWAYS run tests after code changes
 - ALWAYS verify build succeeds before committing
+- **CI gates hard on `dotnet format --verify-no-changes`** (windows-build job).
+  Run `dotnet format` on every file you touch before committing, or CI goes red.
+- DB-backed tests (LiveDb / Persistence integration / Cli acceptance / compat)
+  need Docker (Testcontainers). The nightly compat matrix self-skips unless
+  `DBDELTA_COMPAT=1`.
 
 ```bash
-npm run build && npm test
+dotnet build DbDelta.sln -c Debug
+dotnet test DbDelta.sln                       # or a specific tests/<project>
+dotnet format DbDelta.sln --verify-no-changes # CI gate — must exit 0
 ```
+
+Backlog / task list for new sessions: `docs/BACKLOG.md`.
 
 ## CLI Quick Reference
 
