@@ -1,60 +1,73 @@
 # DbDelta — Backlog (task list for the next session)
 
-**State at creation (2026-05-28):** `main` = `b09c234`, synced with origin, all CI
-workflows green. **v0.17.0 released** (GitHub Release + `DbDelta-0.17.0-win-x64.msi`).
-The entire v1.0-RC **code** backlog is done: M1–M13, #24 Kahn dependency resolver,
-#25 DocFX site (live at <https://gitbakko.github.io/db-delta/>), WiX MSI installer,
-and the self-contained verbose deploy script. 410 tests green.
+**State at update (2026-05-28, late session):** `main` = `6d378d2`, **6 commits AHEAD
+of `origin/main` (`b09c234`), NOT pushed** (push stays manual). All local tests
+green; CI not yet re-run (it validates on push — the GitHub Actions Node-24
+bumps below can ONLY be verified once pushed). v0.17.0 is the latest *released*
+tag; **v1.0.0-rc1 is prepped but NOT tagged/pushed**.
 
 Pick an item, then run it through the usual flow: brainstorm → spec →
 writing-plans → subagent-driven execution → finishing. Collaboration rules:
-terse Italian, default to the Recommended option, commit per phase, **push stays
-manual**, parity > invariants.
+terse Italian, default to the Recommended option, **one commit per phase EXCEPT
+when phases touch the same files/golden (then bundle)**, **push stays manual**,
+parity > invariants.
 
 ---
 
+## Unpushed commits this session (oldest → newest)
+
+- `0715a4c` ci: bump GitHub Actions to Node-24 majors (checkout v6, setup-dotnet v5, cache v5, upload-artifact v7, configure-pages v6, upload-pages-artifact v5, deploy-pages v5, action-gh-release v3)
+- `f31e6a9` refactor(scriptgen): PhaseLabel throws on invalid status; unify role emitter
+- `6d935c2` docs: cut [1.0.0-rc1] CHANGELOG section — v1.0 feature freeze
+- `0f11eb6` test(parity): add cross-kind #24 scenarios 13-17
+- `5cc62aa` docs(parity): 2026-05-28 run — cross-kind #24 (13-17) vs Redgate, zero bugs
+- `6d378d2` feat(scriptgen): align column cosmetics to Redgate (A/B/D)
+
 ## A. Non-code (need external input from the owner)
 
-- [ ] **Code signing** — acquire an Authenticode code-signing certificate, then
-      sign the MSI + bundled `.exe`s in `.github/workflows/release.yml` (e.g. a
-      `signtool`/`AzureSignTool` step before the WiX build or on the produced MSI).
-      Removes the Windows SmartScreen / "unknown publisher" prompt the unsigned
-      MSI currently shows. **Blocked: needs a certificate.**
+- [ ] **Code signing** — Authenticode cert, then sign MSI + bundled `.exe`s in
+      `release.yml`. **Blocked: needs a certificate.**
 - [ ] **Public alpha announcement** — polish `README.md` (download link to the
-      latest Release MSI + the DocFX site), draft the GitHub Release notes, and
-      announce. Non-code; owner's call on channel/wording.
+      latest Release MSI + the DocFX site), draft Release notes, announce.
 
-## B. Release decision
+## B. Release decision — RC PREPPED, ready to ship
 
-- [ ] **Cut v1.0.0 RC** — all milestones (M1–M13) + DocFX + MSI + verbose script
-      are shipped. Decide whether to tag `v1.0.0-rc1` (the release workflow builds
-      + smoke-tests + attaches the MSI on any `v*` tag). Likely gate this behind
-      code signing + the announcement above.
+- [ ] **Push `main` first** so CI validates the Node-24 action bumps + scriptgen
+      changes on a normal push. Watch `ci.yml` + `docs.yml` go green.
+- [ ] **Then tag `v1.0.0-rc1`** (`git tag -a v1.0.0-rc1 -m "…"; git push origin
+      v1.0.0-rc1`) — `release.yml` builds the MSI + smoke-tests + attaches it on
+      any `v*` tag. CHANGELOG `[1.0.0-rc1]` section already cut. Likely gate
+      behind code signing + announcement (A) if you want a clean first RC.
 
 ## C. Optional / ongoing hardening
 
-- [ ] **Expand Redgate parity scenarios** — the parity fixture
-      (`tests/Fixtures/Parity/`) covers 12 scenarios; add more (e.g. computed
-      columns referencing functions, filtered/columnstore indexes, check
-      constraints across tables, schema-bound views, extended properties) and
-      re-run the parity audit (`docs/parity/redgate-YYYY-MM-DD.md`). Note: Redgate
-      **CLI is license-blocked** on this host (exit 35) — use the GUI for the
-      Redgate side; DbDelta side via `dbdelta script`. Live instances:
-      `192.168.3.243` (source) + `192.168.3.242` (target); sa password asked each
-      session, never stored.
-- [ ] **ScriptGenerator review polish** (low value, from code-review findings):
-      remove the unreachable switch-arm fallthroughs in the `BuildOneX` helpers;
-      make `PhaseLabel`'s `_ =>` a throw for symmetry with the create-validated
-      arms; normalize `EmitUsers` (staged `body`) vs `EmitRoles` (inline
-      `WriteBatch`) onto one pattern.
-- [ ] **MSI size optimization** (optional) — the installer bundles two
-      self-contained .NET runtimes (~94 MB). Publishing app + CLI into a shared
-      runtime folder would roughly halve it. YAGNI unless size becomes a complaint.
-- [ ] **Workflow action Node-20 deprecation** — GitHub flagged `actions/*@v4` etc.
-      run on Node 20 (forced to Node 24 by 2026-06-02). Bump action versions when
-      newer majors are available, across `ci.yml` / `docs.yml` / `release.yml`.
+- [ ] **DeployScriptBuilder header bug (NEW, found 2026-05-28)** —
+      `DeployScriptBuilder.TrimGeneratorHeader` still assumes the OLD 2-line
+      generator header (`-- Generated by DbDelta` + `SET XACT_ABORT ON;`). Since
+      v0.17.0 the generator emits the verbose preamble (`SET NUMERIC_ROUNDABORT
+      OFF` / `GO` / …), so the app's "Salva/Build alignment script" path strips
+      the wrong 2 lines → orphan `GO` + malformed preamble. The CLI `dbdelta
+      script` path is fine (it doesn't trim). Fix: make TrimGeneratorHeader
+      robust to the new envelope, or drop the custom header entirely.
+- [ ] **More parity scenarios** — the fixture is 17 scenarios (12 base + 13–17
+      cross-kind #24, all CREATE-ordering). Gaps worth adding: reverse-topo DROP
+      ordering with schemabound objects (DROP is blocked while a schemabound
+      dependent exists — current cross-kind scenarios only stress CREATE order);
+      filtered/columnstore indexes; check constraints across tables; extended
+      properties. Redgate CLI is license-blocked (exit 35) → GUI for the Redgate
+      side. Live: `192.168.3.243` (single host, two DBs `DbDeltaParity_Source`/
+      `_Target`); sa password asked each session, never stored.
+- [ ] **Remaining cosmetic NOT aligned (deliberate)** — `CREATE OR ALTER`
+      (kept for idempotency; this was option "C" in the alignment and the owner
+      DESELECTED it), `[X_tmp]` rebuild naming, `IDENTITY(1,1)` comma spacing,
+      Redgate's trailing `xp_logevent` block. Revisit only if full byte-parity
+      becomes a goal.
+- [ ] **MSI size optimization** (optional, ~94 MB, shared runtime would ~halve). YAGNI.
 
-## D. v2 parking-lot (explicitly out of v1 scope — spec §6.3)
+## D. v2 parking-lot (explicitly out of v1 scope — spec §6.3) — BRAINSTORM PENDING
+
+The owner wanted to **analyze + brainstorm D** after the parity/cosmetic work
+(this session). Next session: run `superpowers:brainstorming` on these.
 
 - [ ] Scripts-Folder / Snapshot / Source-Control (LibGit2Sharp) providers.
 - [ ] Migration scripts (user-authored DDL overrides).
@@ -65,14 +78,37 @@ manual**, parity > invariants.
 
 ---
 
+## Done this session (2026-05-28)
+
+- **C — Node-20 action bump** (`0715a4c`): all workflow actions bumped to
+  Node-24 majors ahead of GitHub's 2026-06-02 cutover; versions verified via
+  `gh api` (no breaking input changes for our usage).
+- **C — ScriptGenerator polish** (`f31e6a9`): PhaseLabel `_ =>` throws;
+  EmitRoles unified onto the staged-body pattern. **Item "remove unreachable
+  switch fallthroughs" REJECTED** — IDE0010/IDE0072 under
+  `TreatWarningsAsErrors` REQUIRE every enum member named in switch
+  statements AND expressions; the fallthroughs are analyzer-mandated, not noise.
+- **B — v1.0.0-rc1 CHANGELOG cut** (`6d935c2`). Version is tag-driven (no
+  `<Version>` in props); nothing else to bump.
+- **C — parity #24 cross-kind** (`0f11eb6` + `5cc62aa`): fixture scenarios 13–17
+  (computed col→fn, view→view, view→fn, schemabound TVF→table, multi-hop
+  table→fn→view), live run vs Redgate SQL Compare 16 → **zero bugs**, #24 topo
+  ordering dependency-safe (clean apply + empty re-compare). Audit
+  `docs/parity/redgate-2026-05-28.md`.
+- **Cosmetic alignment A/B/D** (`6d378d2`): column type bracketing
+  (`[nvarchar] (200)`), PK as trailing `ALTER ADD CONSTRAINT`, always-explicit
+  COLLATE (reverted #31; removed `targetDefaultCollation` from
+  `ScriptGenerator.Generate` public API + `DeployScriptBuilder` + app + CLI).
+  New `SqlTypeFormatter`. Verified live (apply + empty re-compare).
+
 ## Pointers
 
 - Specs + plans: `docs/superpowers/{specs,plans}/`.
-- Parity audits: `docs/parity/`.
+- Parity audits: `docs/parity/`; fixtures `tests/Fixtures/Parity/` (17 scenarios).
 - CI: `.github/workflows/{ci.yml,docs.yml,release.yml}`. **CI gates hard on
-  `dotnet format --verify-no-changes`** under the `global.json`-pinned SDK — keep
-  every touched file formatted (run `dotnet format` before committing) or the
-  windows-build job goes red.
+  `dotnet format --verify-no-changes`** + `TreatWarningsAsErrors` (Style
+  analyzers IDE0010/IDE0072 etc. are errors) — run `dotnet format` and a full
+  build before committing, and keep enum switches exhaustively enumerated.
 - DocFX site source: `docfx/`; published by `docs.yml` on push to `main`.
 - Installer: `installer/DbDelta.Installer.wixproj` + `Package.wxs` (WiX v5);
   `installer/staging/` + `*.msi` are git-ignored; `installer/` is NOT in the `.sln`.
