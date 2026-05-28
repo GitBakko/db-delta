@@ -1,9 +1,10 @@
 # Parity fixture — DbDelta ↔ Redgate SQL Compare
 
 End-to-end calibration: same source / target schema diffed by **DbDelta**
-and **Redgate SQL Compare**. The 11-scenario fixture is small enough to
+and **Redgate SQL Compare**. The 17-scenario fixture is small enough to
 diff outputs line-by-line yet broad enough to surface real divergences
-across the kinds DbDelta has shipped (M0 – M13).
+across the kinds DbDelta has shipped (M0 – M13), including the #24
+cross-kind dependency-ordering edges (scenarios 13–17).
 
 ## Scenarios
 
@@ -20,6 +21,12 @@ across the kinds DbDelta has shipped (M0 – M13).
 | 09 | Synonym | base-object change (`Customer` vs `Product`) |
 | 10 | UDT alias | size change (`nvarchar(200)` vs `nvarchar(100)`) |
 | 11 | TableType (UDTT) | column added (`Notes` only on source) |
+| 12 | Table + inbound FK | identity flip on `Order` with `OrderLine` FK — M13-PARITY.6 #33 |
+| 13 | Computed col → fn | `fnLineTotal` + `PriceList.LineTotal` source-only — #24 CREATE order |
+| 14 | View → view | `vSalesBase` → `vSalesDerived` source-only — #24 CREATE order |
+| 15 | View → fn | `fnTaxRate` + `vTaxedItems` source-only — #24 CREATE order |
+| 16 | Schemabound TVF → table | `Region` + `tvfRegionLookup` source-only — #24 CREATE order |
+| 17 | Multi-hop | `Warehouse` → `fnStockValue` → `vStockReport` source-only — #24 transitive |
 
 Users / Roles / Permissions are deliberately out of scope for the v1
 parity run — they require server-level logins that complicate fixture

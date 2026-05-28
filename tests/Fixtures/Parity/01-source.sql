@@ -1,6 +1,6 @@
 -- DbDelta ↔ Redgate parity fixture — SOURCE schema
 -- Apply on DbDeltaParity_Source. Pair with 02-target.sql to produce
--- 11 deliberate, well-named divergences for line-by-line parity diff.
+-- 17 deliberate, well-named divergences for line-by-line parity diff.
 
 USE [DbDeltaParity_Source];
 GO
@@ -151,4 +151,82 @@ CREATE TABLE dbo.OrderLine
     CONSTRAINT FK_OrderLine_Order
         FOREIGN KEY (OrderId) REFERENCES dbo.[Order] (Id)
 );
+GO
+
+-- =========================================================================
+-- Scenario 13 — Cross-kind: computed column → scalar function (#24)
+-- Both [fnLineTotal] and [PriceList] are source-only. The computed column
+-- references the function, so the deploy script MUST CREATE the function
+-- before the table. Exercises EdgeKind.ComputedColumn topological ordering.
+-- =========================================================================
+CREATE FUNCTION dbo.fnLineTotal (@qty int, @price decimal(18, 2))
+    RETURNS decimal(18, 2)
+AS
+BEGIN
+    RETURN @qty * @price;
+END
+GO
+CREATE TABLE dbo.PriceList
+(
+    Id        int            IDENTITY(1, 1) NOT NULL,
+    Qty       int            NOT NULL,
+    Price     decimal(18, 2) NOT NULL,
+    LineTotal AS (dbo.fnLineTotal(Qty, Price)),
+    CONSTRAINT PK_PriceList PRIMARY KEY CLUSTERED (Id)
+);
+GO
+
+-- =========================================================================
+-- Scenario 14 — Cross-kind: view → view (#24)
+-- Both views source-only. [vSalesDerived] selects from [vSalesBase], so the
+-- base view MUST be created first (views have no deferred name resolution).
+-- Exercises EdgeKind.ModuleReference between two views.
+-- =========================================================================
+EXEC ('CREATE VIEW dbo.vSalesBase AS SELECT 1 AS Id, CAST(N''x'' AS nvarchar(10)) AS Label;');
+GO
+EXEC ('CREATE VIEW dbo.vSalesDerived AS SELECT Id, Label FROM dbo.vSalesBase;');
+GO
+
+-- =========================================================================
+-- Scenario 15 — Cross-kind: view → scalar function (#24)
+-- Both source-only. [vTaxedItems] invokes [fnTaxRate]; function must be
+-- created first. Exercises EdgeKind.ModuleReference (view → function).
+-- =========================================================================
+EXEC ('CREATE FUNCTION dbo.fnTaxRate (@amount decimal(18, 2)) RETURNS decimal(18, 2) AS BEGIN RETURN @amount * 0.22; END');
+GO
+EXEC ('CREATE VIEW dbo.vTaxedItems AS SELECT CAST(100 AS decimal(18, 2)) AS Amount, dbo.fnTaxRate(100) AS Tax;');
+GO
+
+-- =========================================================================
+-- Scenario 16 — Cross-kind: schemabound inline TVF → table (#24)
+-- Both source-only. [tvfRegionLookup] is WITH SCHEMABINDING over [Region],
+-- a hard dependency: the table MUST be created first and cannot be dropped
+-- while the TVF exists. Exercises EdgeKind.ModuleReference / FunctionOnTable.
+-- =========================================================================
+CREATE TABLE dbo.Region
+(
+    Id   int          IDENTITY(1, 1) NOT NULL,
+    Name nvarchar(60) NOT NULL,
+    CONSTRAINT PK_Region PRIMARY KEY CLUSTERED (Id)
+);
+GO
+EXEC ('CREATE FUNCTION dbo.tvfRegionLookup () RETURNS TABLE WITH SCHEMABINDING AS RETURN SELECT Id, Name FROM dbo.Region;');
+GO
+
+-- =========================================================================
+-- Scenario 17 — Cross-kind multi-hop: table → schemabound fn → view (#24)
+-- All three source-only. [fnStockValue] is schemabound over [Warehouse];
+-- [vStockReport] invokes [fnStockValue]. Correct topo order is
+-- Warehouse → fnStockValue → vStockReport. Stresses transitive ordering.
+-- =========================================================================
+CREATE TABLE dbo.Warehouse
+(
+    Id       int            IDENTITY(1, 1) NOT NULL,
+    Capacity decimal(18, 2) NOT NULL,
+    CONSTRAINT PK_Warehouse PRIMARY KEY CLUSTERED (Id)
+);
+GO
+EXEC ('CREATE FUNCTION dbo.fnStockValue (@id int) RETURNS decimal(18, 2) WITH SCHEMABINDING AS BEGIN RETURN (SELECT TOP (1) Capacity FROM dbo.Warehouse WHERE Id = @id); END');
+GO
+EXEC ('CREATE VIEW dbo.vStockReport AS SELECT 1 AS WarehouseId, dbo.fnStockValue(1) AS Value;');
 GO

@@ -1,5 +1,5 @@
 -- DbDelta ↔ Redgate parity fixture — TARGET schema
--- Apply on DbDeltaParity_Target. Pair with 01-source.sql.
+-- Apply on DbDeltaParity_Target. Pair with 01-source.sql (17 scenarios).
 
 USE [DbDeltaParity_Target];
 GO
@@ -102,3 +102,12 @@ CREATE TABLE dbo.OrderLine
         FOREIGN KEY (OrderId) REFERENCES dbo.[Order] (Id)
 );
 GO
+
+-- Scenarios 13–17 — Cross-kind dependency ordering (#24). All objects are
+-- SOURCE-ONLY, so the target intentionally defines none of them. After a
+-- successful deploy the target must gain them in dependency-safe CREATE order:
+--   13  dbo.fnLineTotal  →  dbo.PriceList (computed column)
+--   14  dbo.vSalesBase   →  dbo.vSalesDerived (view → view)
+--   15  dbo.fnTaxRate    →  dbo.vTaxedItems (view → function)
+--   16  dbo.Region       →  dbo.tvfRegionLookup (schemabound TVF → table)
+--   17  dbo.Warehouse    →  dbo.fnStockValue  →  dbo.vStockReport (multi-hop)
