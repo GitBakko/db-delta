@@ -31,6 +31,9 @@ jobs:
           $v = "${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}"
           $v = $v -replace '^v',''
           "version=$v" >> $env:GITHUB_OUTPUT
+          # MSI ProductVersion must be numeric (no -rc1 / +build label) — take
+          # the core before the first '-' for the WiX package version.
+          "msiversion=$($v -split '-' | Select-Object -First 1)" >> $env:GITHUB_OUTPUT
 
       - name: Publish desktop app (self-contained win-x64)
         run: dotnet publish src/DbDelta.App.Avalonia/DbDelta.App.Avalonia.csproj -c Release -r win-x64 --self-contained true -o installer/staging/app
@@ -39,7 +42,7 @@ jobs:
         run: dotnet publish src/DbDelta.Cli/DbDelta.Cli.csproj -c Release -r win-x64 --self-contained true -o installer/staging/cli
 
       - name: Build MSI
-        run: dotnet build installer/DbDelta.Installer.wixproj -c Release -p:Version=${{ steps.ver.outputs.version }}
+        run: dotnet build installer/DbDelta.Installer.wixproj -c Release -p:Version=${{ steps.ver.outputs.version }} -p:MsiVersion=${{ steps.ver.outputs.msiversion }}
 
       - name: Smoke install / uninstall
         shell: pwsh

@@ -3,7 +3,11 @@
     <OutputType>Package</OutputType>
     <OutputName>DbDelta-$(Version)-win-x64</OutputName>
     <Version Condition="'$(Version)' == ''">0.0.0</Version>
-    <DefineConstants>Version=$(Version)</DefineConstants>
+    <!-- MSI ProductVersion must be numeric major.minor.build (no semver label
+         like -rc1). Callers pass MsiVersion = the numeric core; the file name
+         keeps the full label via OutputName above. -->
+    <MsiVersion Condition="'$(MsiVersion)' == ''">$(Version)</MsiVersion>
+    <DefineConstants>Version=$(MsiVersion)</DefineConstants>
     <InstallerPlatform>x64</InstallerPlatform>
     <!-- ICE03: WiX misinterprets locale subfolder names (cs, de, fr …) as invalid language IDs -->
     <SuppressIces>ICE03</SuppressIces>
