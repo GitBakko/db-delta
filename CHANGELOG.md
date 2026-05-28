@@ -4,9 +4,26 @@ All notable changes to **DbDelta** are tracked in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Until the v1.0.0 RC is cut, the project is on an `0.x` series where each `M`-milestone bumps the minor.
 
-## [Unreleased] — heading toward v1.0.0 RC
+## [Unreleased]
 
-(Empty — next: code signing, public alpha announcement.)
+(Empty — next for v1.0.0 final: code signing, public alpha announcement.)
+
+## [1.0.0-rc1] — 2026-05-28 — first release candidate
+
+First release candidate for v1.0.0. The full v1.0 scope is feature-complete —
+milestones M1–M13, the #24 Kahn dependency resolver, the #25 DocFX docs site,
+the WiX MSI installer, and the verbose self-contained deploy script are all
+shipped (see the 0.x history below). This tag marks the v1.0 feature freeze and
+begins release-candidate stabilization; code signing and the public
+announcement remain before v1.0.0 final.
+
+### Changed
+- CI workflows bumped to Node-24 action majors (`checkout` v6, `setup-dotnet`
+  v5, `cache` v5, `upload-artifact` v7, `configure-pages` v6,
+  `upload-pages-artifact` v5, `deploy-pages` v5, `action-gh-release` v3) ahead
+  of GitHub's 2026-06-02 Node-20 runtime cutover.
+- `ScriptGenerator` role-emitter / phase-label cleanup — internal refactor, no
+  behavioural change to generated scripts.
 
 ## [0.17.0] — 2026-05-28 — verbose self-contained deploy script
 
