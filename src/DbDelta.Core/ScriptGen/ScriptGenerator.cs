@@ -297,8 +297,12 @@ public sealed class ScriptGenerator
             DifferenceStatus.OnlyInA => "Creating",
             DifferenceStatus.OnlyInB => "Dropping",
             DifferenceStatus.Different => "Altering",
-            DifferenceStatus.Identical => throw new NotImplementedException(),
-            _ => "Processing",
+            DifferenceStatus.Identical => throw new ArgumentOutOfRangeException(
+                nameof(pair), pair.Status,
+                "PhaseLabel is only defined for OnlyInA / OnlyInB / Different pairs."),
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(pair), pair.Status,
+                "PhaseLabel is only defined for OnlyInA / OnlyInB / Different pairs."),
         };
         return $"{verb} {id.Kind} {name}";
     }
@@ -511,17 +515,18 @@ public sealed class ScriptGenerator
             .Where(p => p.Identity.Kind == "Role")
             .OrderBy(p => p.Identity.ObjectName, StringComparer.OrdinalIgnoreCase))
         {
+            string? body = null;
             switch (pair.Status)
             {
                 case DifferenceStatus.OnlyInA when pair.SideA is DatabaseRole r:
-                    writer.WriteBatch(PhaseLabel(pair), _roleEmitter.EmitCreate(r));
+                    body = _roleEmitter.EmitCreate(r);
                     break;
                 case DifferenceStatus.OnlyInB when pair.SideB is DatabaseRole r:
-                    writer.WriteBatch(PhaseLabel(pair), _roleEmitter.EmitDrop(r));
+                    body = _roleEmitter.EmitDrop(r);
                     break;
                 case DifferenceStatus.Different
                     when pair.SideA is DatabaseRole srcR && pair.SideB is DatabaseRole tgtR:
-                    BuildRoleDelta(writer, pair, srcR, tgtR);
+                    body = BuildRoleDelta(srcR, tgtR);
                     break;
                 case DifferenceStatus.OnlyInA:
                 case DifferenceStatus.OnlyInB:
@@ -530,19 +535,18 @@ public sealed class ScriptGenerator
                 default:
                     break;
             }
+            if (!string.IsNullOrWhiteSpace(body)) { writer.WriteBatch(PhaseLabel(pair), body); }
         }
     }
 
-    private void BuildRoleDelta(DeploymentScriptWriter writer, DifferencePair pair, DatabaseRole src, DatabaseRole tgt)
+    private string? BuildRoleDelta(DatabaseRole src, DatabaseRole tgt)
     {
         if (!string.Equals(src.OwnerName, tgt.OwnerName, StringComparison.OrdinalIgnoreCase))
         {
             // Owner change requires DROP + CREATE — ALTER AUTHORIZATION exists
             // but ownership swaps are rare enough that DROP + CREATE is the
             // honest path: it surfaces dependent-object failures clearly.
-            string body = _roleEmitter.EmitDrop(tgt) + Environment.NewLine + _roleEmitter.EmitCreate(src);
-            writer.WriteBatch(PhaseLabel(pair), body);
-            return;
+            return _roleEmitter.EmitDrop(tgt) + Environment.NewLine + _roleEmitter.EmitCreate(src);
         }
 
         HashSet<string> srcMembers = new(src.Members, StringComparer.OrdinalIgnoreCase);
@@ -558,10 +562,7 @@ public sealed class ScriptGenerator
         {
             memberBody.AppendLine(_roleEmitter.EmitAddMember(src.Name, add));
         }
-        if (memberBody.Length > 0)
-        {
-            writer.WriteBatch(PhaseLabel(pair), memberBody.ToString());
-        }
+        return memberBody.Length > 0 ? memberBody.ToString() : null;
     }
 
     // ── Permission emitter ──────────────────────────────────────────────────
