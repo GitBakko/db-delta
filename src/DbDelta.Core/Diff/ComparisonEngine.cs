@@ -322,8 +322,13 @@ public sealed class ComparisonEngine
             return DifferenceStatus.Different;
         }
 
-        string? na = BodyNormalizer.Normalize(a.Body);
-        string? nb = BodyNormalizer.Normalize(b.Body);
+        // Reconcile the embedded CREATE-name with the catalog identity first: a
+        // module renamed via sp_rename keeps its pre-rename name frozen in the
+        // stored definition, which would otherwise read as a body difference even
+        // though the modules are semantically identical (SQL Server resolves by
+        // catalog identity, not by the name baked into the definition text).
+        string? na = BodyNormalizer.Normalize(ModuleHeader.CanonicalizeObjectName(a.Body, a.Schema, a.Name));
+        string? nb = BodyNormalizer.Normalize(ModuleHeader.CanonicalizeObjectName(b.Body, b.Schema, b.Name));
         return string.Equals(na, nb, StringComparison.Ordinal)
             ? DifferenceStatus.Identical
             : DifferenceStatus.Different;

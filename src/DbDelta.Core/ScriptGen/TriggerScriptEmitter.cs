@@ -34,7 +34,7 @@ public sealed class TriggerScriptEmitter
             return $"-- WARNING: trigger [{t.Schema}].[{t.Name}] is encrypted (WITH ENCRYPTION); body cannot be scripted.";
         }
 
-        string body = t.Body.TrimStart();
+        string body = ModuleHeader.AlignNameToCatalog(t.Body.TrimStart(), t.Schema, t.Name);
         const string create = "CREATE TRIGGER";
         const string createOrAlter = "CREATE OR ALTER TRIGGER";
         if (body.StartsWith(create, StringComparison.OrdinalIgnoreCase))
@@ -52,8 +52,8 @@ public sealed class TriggerScriptEmitter
     {
         bool bodiesMatch = !sideA.IsEncrypted && !sideB.IsEncrypted
             && string.Equals(
-                BodyNormalizer.Normalize(sideA.Body),
-                BodyNormalizer.Normalize(sideB.Body),
+                BodyNormalizer.Normalize(ModuleHeader.CanonicalizeObjectName(sideA.Body, sideA.Schema, sideA.Name)),
+                BodyNormalizer.Normalize(ModuleHeader.CanonicalizeObjectName(sideB.Body, sideB.Schema, sideB.Name)),
                 StringComparison.Ordinal);
 
         if (bodiesMatch && sideA.IsDisabled != sideB.IsDisabled)

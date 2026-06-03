@@ -31,7 +31,7 @@ public sealed class ProcedureScriptEmitter
             return $"-- WARNING: procedure [{p.Schema}].[{p.Name}] is encrypted (WITH ENCRYPTION); body cannot be scripted.";
         }
 
-        string body = p.Body.TrimStart();
+        string body = ModuleHeader.AlignNameToCatalog(p.Body.TrimStart(), p.Schema, p.Name);
         const string createProc = "CREATE PROCEDURE";
         const string createOrAlterProc = "CREATE OR ALTER PROCEDURE";
         const string createProcShort = "CREATE PROC";

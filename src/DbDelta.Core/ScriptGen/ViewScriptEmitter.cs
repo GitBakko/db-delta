@@ -37,7 +37,7 @@ public sealed class ViewScriptEmitter
 
         // Rewrite the leading CREATE VIEW (case-insensitive) to CREATE OR ALTER VIEW.
         // If the catalog returned a different shape (e.g. already CREATE OR ALTER VIEW), leave it.
-        string body = v.Body.TrimStart();
+        string body = ModuleHeader.AlignNameToCatalog(v.Body.TrimStart(), v.Schema, v.Name);
         const string createView = "CREATE VIEW";
         const string createOrAlterView = "CREATE OR ALTER VIEW";
         if (body.StartsWith(createView, StringComparison.OrdinalIgnoreCase))

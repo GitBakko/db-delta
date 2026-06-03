@@ -67,6 +67,41 @@ public class ModuleDiffTests
     }
 
     [Fact]
+    public void View_renamed_via_sp_rename_with_stale_embedded_name_is_Identical()
+    {
+        // sp_rename updated the catalog name to "v" on both sides, but the stored
+        // definition on side A still carries the pre-rename name. The modules are
+        // semantically identical — only the frozen embedded name differs, which
+        // must NOT be reported as a difference (regression: BCEVOLUTION_* views).
+        Database a = Db(new View("dbo", "v", "CREATE VIEW [dbo].[OldName] AS SELECT 1 AS Id", IsEncrypted: false));
+        Database b = Db(new View("dbo", "v", "CREATE VIEW [dbo].[v] AS SELECT 1 AS Id", IsEncrypted: false));
+        new ComparisonEngine().Compare(a, b, ComparisonOptions.None)
+            .Differences.Single(p => p.Identity.Kind == "View")
+            .Status.Should().Be(DifferenceStatus.Identical);
+    }
+
+    [Fact]
+    public void View_with_stale_embedded_name_AND_a_real_body_change_stays_Different()
+    {
+        // Name reconciliation must not mask a genuine body difference.
+        Database a = Db(new View("dbo", "v", "CREATE VIEW [dbo].[OldName] AS SELECT 1 AS Id", IsEncrypted: false));
+        Database b = Db(new View("dbo", "v", "CREATE VIEW [dbo].[v] AS SELECT 2 AS Id", IsEncrypted: false));
+        new ComparisonEngine().Compare(a, b, ComparisonOptions.None)
+            .Differences.Single(p => p.Identity.Kind == "View")
+            .Status.Should().Be(DifferenceStatus.Different);
+    }
+
+    [Fact]
+    public void Procedure_renamed_with_stale_embedded_name_is_Identical()
+    {
+        Database a = DbWithProcs(new StoredProcedure("dbo", "u", "CREATE PROCEDURE [dbo].[uOld] AS SELECT 1", IsEncrypted: false));
+        Database b = DbWithProcs(new StoredProcedure("dbo", "u", "CREATE PROCEDURE [dbo].[u] AS SELECT 1", IsEncrypted: false));
+        new ComparisonEngine().Compare(a, b, ComparisonOptions.None)
+            .Differences.Single(p => p.Identity.Kind == "Procedure")
+            .Status.Should().Be(DifferenceStatus.Identical);
+    }
+
+    [Fact]
     public void Encrypted_view_compared_to_encrypted_view_is_Different_because_bodies_are_opaque()
     {
         // We cannot prove equality of opaque bodies; the safe default is Different.

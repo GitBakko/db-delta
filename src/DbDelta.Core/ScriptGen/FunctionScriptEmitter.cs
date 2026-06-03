@@ -30,7 +30,7 @@ public sealed class FunctionScriptEmitter
             return $"-- WARNING: function [{f.Schema}].[{f.Name}] is encrypted (WITH ENCRYPTION); body cannot be scripted.";
         }
 
-        string body = f.Body.TrimStart();
+        string body = ModuleHeader.AlignNameToCatalog(f.Body.TrimStart(), f.Schema, f.Name);
         const string createFn = "CREATE FUNCTION";
         const string createOrAlterFn = "CREATE OR ALTER FUNCTION";
         if (body.StartsWith(createFn, StringComparison.OrdinalIgnoreCase))
