@@ -9,6 +9,10 @@
     <MajorUpgrade DowngradeErrorMessage="A newer version of DbDelta is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
+    <!-- App icon for the Apps & Features (ARP) entry and the Start-Menu shortcut. -->
+    <Icon Id="DbDeltaIcon.ico" SourceFile="..\src\DbDelta.App.Avalonia\Assets\app-icon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="DbDeltaIcon.ico" />
+
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="DbDelta">
         <Directory Id="CLIFOLDER" Name="cli" />
@@ -30,6 +34,7 @@
       <Shortcut Id="AppStartMenu"
                 Name="DbDelta"
                 Target="[INSTALLFOLDER]DbDelta.App.exe"
+                Icon="DbDeltaIcon.ico"
                 WorkingDirectory="INSTALLFOLDER" />
       <RemoveFolder Id="RemoveAppShortcutFolder" Directory="AppShortcutFolder" On="uninstall" />
       <!-- HKCU keypath is the standard WiX shortcut-component idiom; it keys MSI

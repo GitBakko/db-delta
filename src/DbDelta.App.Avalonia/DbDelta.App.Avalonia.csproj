@@ -7,6 +7,9 @@
     <RootNamespace>DbDelta.App</RootNamespace>
     <AssemblyName>DbDelta.App</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Win32 icon embedded in the exe (Explorer, taskbar, Alt-Tab). The PNG
+         below remains the in-app window icon; both derive from the same art. -->
+    <ApplicationIcon>Assets\app-icon.ico</ApplicationIcon>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
