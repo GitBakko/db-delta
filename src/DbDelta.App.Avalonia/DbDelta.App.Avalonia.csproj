@@ -10,6 +10,9 @@
     <!-- Win32 icon embedded in the exe (Explorer, taskbar, Alt-Tab). The PNG
          below remains the in-app window icon; both derive from the same art. -->
     <ApplicationIcon>Assets\app-icon.ico</ApplicationIcon>
+    <!-- Tag-driven versioning: CI passes -p:Version=<tag> at publish; local
+         builds get an honest dev marker instead of the SDK's default 1.0.0. -->
+    <Version Condition="'$(Version)' == ''">0.0.0-dev</Version>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
