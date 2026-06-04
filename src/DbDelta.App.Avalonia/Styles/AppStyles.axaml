@@ -454,6 +454,12 @@
   <Style Selector="Button.status-pill:pointerover /template/ ContentPresenter">
     <Setter Property="Background" Value="{StaticResource BgRaisedBrush}" />
     <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
+    <Setter Property="TextElement.Foreground" Value="{StaticResource FgStrongBrush}" />
+  </Style>
+  <Style Selector="Button.status-pill:pressed /template/ ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource BgRaisedBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
+    <Setter Property="TextElement.Foreground" Value="{StaticResource FgStrongBrush}" />
   </Style>
 
 </Styles>
