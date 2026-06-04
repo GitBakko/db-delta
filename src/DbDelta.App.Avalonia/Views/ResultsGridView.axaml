@@ -27,14 +27,16 @@
             IsVisible="{Binding AppState.LastComparison,
                                 Converter={x:Static ObjectConverters.IsNotNull}}">
 
-      <DataGrid ItemsSource="{Binding RowsView}"
+      <DataGrid x:Name="ResultsGrid"
+                ItemsSource="{Binding RowsView}"
                 SelectedItem="{Binding AppState.SelectedRow, Mode=TwoWay}"
                 AutoGenerateColumns="False"
                 IsReadOnly="False"
                 CanUserResizeColumns="True"
                 CanUserSortColumns="True"
                 GridLinesVisibility="Horizontal"
-                HeadersVisibility="Column">
+                HeadersVisibility="Column"
+                LoadingRowGroup="OnLoadingRowGroup">
 
         <DataGrid.Styles>
           <!-- Row hover/selected tints follow the row's status colour: blue
