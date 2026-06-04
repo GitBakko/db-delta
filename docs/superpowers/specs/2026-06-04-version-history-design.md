@@ -85,8 +85,9 @@ Make the project's version history consultable in two linked places:
 - Script: missing `CHANGELOG.md` → exit 1; zero version headings matched →
   exit 1 (malformed changelog must break the docs build, not publish an empty
   page).
-- App: browser launch failure → exception swallowed, message surfaced in
-  `AppState.StatusText`; missing version attribute → `dev` fallback.
+- App: browser launch failure → exception swallowed + `Debug.WriteLine`
+  (amended 2026-06-04: `StatusText` turned out to be computed from `IsBusy`,
+  not writable); missing version attribute → `dev` fallback.
 - Stale anchor (version absent from the page — theoretical, the changelog is
   append-only): browser lands at the top of the page; accepted degradation.
 

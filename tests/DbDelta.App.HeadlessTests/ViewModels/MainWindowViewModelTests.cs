@@ -187,4 +187,23 @@ public class MainWindowViewModelTests
         row.LastModifiedSourceDisplay.Should().Be(expected);
         row.LastModifiedTargetDisplay.Should().BeEmpty();
     }
+
+    // ── Version pill ─────────────────────────────────────────────────────────
+
+    [AvaloniaFact]
+    public void AppVersion_exposes_the_assembly_version_display()
+    {
+        MainWindowViewModel vm = BuildVm();
+        vm.AppVersion.Should().Be(AppVersionInfo.Display);
+        vm.AppVersion.Should().NotBeNullOrWhiteSpace();
+    }
+
+    [AvaloniaFact]
+    public void OpenVersionHistory_command_exists_and_can_execute()
+    {
+        MainWindowViewModel vm = BuildVm();
+        vm.OpenVersionHistoryCommand.Should().NotBeNull();
+        vm.OpenVersionHistoryCommand.CanExecute(null).Should().BeTrue();
+        // Deliberately NOT executed — it would open a real browser.
+    }
 }

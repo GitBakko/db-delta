@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Text;
 using Avalonia.Collections;
 using Avalonia.Controls;
@@ -147,6 +148,25 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     /// <summary>Build banner shown in the topbar.</summary>
     public string Version => "v0.1 alpha";
+
+    /// <summary>Display version for the status-bar pill (e.g. "v1.0.0-rc1").</summary>
+    public string AppVersion => AppVersionInfo.Display;
+
+    [RelayCommand]
+    private void OpenVersionHistory()
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(AppVersionInfo.HistoryUrl) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            // Browser launch failure is rare and non-actionable in-app; the
+            // status bar has no writable message channel (StatusText is
+            // computed from IsBusy), so log and move on.
+            Debug.WriteLine($"Failed to open version history: {ex.Message}");
+        }
+    }
 
     [ObservableProperty]
     private bool _isDarkTheme;

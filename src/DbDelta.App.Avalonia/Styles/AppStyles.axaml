@@ -434,4 +434,26 @@
     <Setter Property="IsVisible" Value="False" />
   </Style>
 
+  <!-- Status-bar version pill — the only interactive control in the 24px
+       status strip. Deliberately 18px: the 32px monoline rule applies to the
+       app-shell/dialog surfaces, not the status bar (its own surface). Always
+       visibly bordered (no naked buttons). -->
+  <Style Selector="Button.status-pill">
+    <Setter Property="Height" Value="18" />
+    <Setter Property="MinHeight" Value="18" />
+    <Setter Property="Padding" Value="8,0" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="Background" Value="{StaticResource BgRaisedBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Foreground" Value="{StaticResource FgSubtleBrush}" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.status-pill:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource BgRaisedBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
+  </Style>
+
 </Styles>
