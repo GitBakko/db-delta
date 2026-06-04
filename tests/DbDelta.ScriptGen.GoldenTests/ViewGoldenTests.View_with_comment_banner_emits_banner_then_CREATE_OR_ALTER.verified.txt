@@ -1,0 +1,4 @@
+﻿-- =============================================
+-- Author:      Someone
+-- =============================================
+CREATE OR ALTER VIEW dbo.vCustomer AS SELECT Id FROM dbo.Customer;

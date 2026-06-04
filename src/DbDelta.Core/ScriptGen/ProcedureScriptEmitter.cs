@@ -26,28 +26,9 @@ public sealed class ProcedureScriptEmitter
 
     private static string EmitCreateOrAlter(StoredProcedure p)
     {
-        if (p.IsEncrypted || p.Body is null)
-        {
-            return $"-- WARNING: procedure [{p.Schema}].[{p.Name}] is encrypted (WITH ENCRYPTION); body cannot be scripted.";
-        }
-
-        string body = ModuleHeader.AlignNameToCatalog(p.Body.TrimStart(), p.Schema, p.Name);
-        const string createProc = "CREATE PROCEDURE";
-        const string createOrAlterProc = "CREATE OR ALTER PROCEDURE";
-        const string createProcShort = "CREATE PROC";
-        const string createOrAlterProcShort = "CREATE OR ALTER PROC";
-
-        // Try the long form first because "CREATE PROCEDURE" starts with "CREATE PROC".
-        if (body.StartsWith(createProc, StringComparison.OrdinalIgnoreCase))
-        {
-            body = string.Concat(createOrAlterProc, body.AsSpan(createProc.Length));
-        }
-        else if (body.StartsWith(createProcShort, StringComparison.OrdinalIgnoreCase))
-        {
-            body = string.Concat(createOrAlterProcShort, body.AsSpan(createProcShort.Length));
-        }
-
-        return body.EndsWith(';') ? body : body + ";";
+        return p.IsEncrypted || p.Body is null
+            ? $"-- WARNING: procedure [{p.Schema}].[{p.Name}] is encrypted (WITH ENCRYPTION); body cannot be scripted."
+            : ModuleHeader.ToCreateOrAlterScript(p.Body, p.Schema, p.Name);
     }
 
     private static string EmitDrop(StoredProcedure p) =>

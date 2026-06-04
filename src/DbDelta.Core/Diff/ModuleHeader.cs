@@ -15,16 +15,26 @@ namespace DbDelta.Core.Diff;
 /// engine treat them as equal, and lets the script generator emit DDL that targets
 /// the real (catalog) object rather than the stale name.
 /// </para>
+/// <para>
+/// Real-world definitions frequently open with a comment banner (the classic
+/// SSMS "-- ===== Author / Create date =====" template) before the
+/// <c>CREATE</c> token, and may carry arbitrary whitespace between header
+/// keywords. The header regex therefore skips any mix of whitespace, line
+/// comments (<c>--…</c>) and block comments (<c>/* … */</c>) before
+/// <c>CREATE</c>, and tolerates whitespace runs between tokens.
+/// </para>
 /// </summary>
 public static partial class ModuleHeader
 {
-    // Matches the leading  CREATE [OR ALTER] <type> <name>  of a module definition,
-    // tolerating leading whitespace. <name> is captured as an optional
-    // schema-qualifier (group 2) plus the object name (group 4 when qualified,
-    // else group 2). Identifiers may be bracket-quoted or bare.
+    // Matches the leading  CREATE [OR ALTER] <type> <name>  of a module
+    // definition, tolerating any mix of whitespace / -- line comments /
+    // /* block */ comments before the CREATE token (atomic group — no
+    // backtracking into the trivia). <name> is an optional schema qualifier
+    // (id1 + qual/id2) or a bare identifier (id1). Identifiers may be
+    // bracket-quoted or bare. Singleline so block comments span lines.
     [GeneratedRegex(
-        @"^\s*CREATE\s+(?:OR\s+ALTER\s+)?(VIEW|PROCEDURE|PROC|FUNCTION|TRIGGER)\s+(\[[^\]]+\]|[A-Za-z_]\w*)(\s*\.\s*(\[[^\]]+\]|[A-Za-z_]\w*))?",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+        @"^(?>(?:\s+|--[^\r\n]*|/\*.*?\*/)*)(?<create>CREATE)(?<oralter>\s+OR\s+ALTER)?\s+(?<type>VIEW|PROCEDURE|PROC|FUNCTION|TRIGGER)\s+(?<id1>\[[^\]]+\]|[A-Za-z_]\w*)(?<qual>\s*\.\s*(?<id2>\[[^\]]+\]|[A-Za-z_]\w*))?",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Singleline)]
     private static partial Regex HeaderRegex();
 
     /// <summary>
@@ -35,17 +45,21 @@ public static partial class ModuleHeader
     /// keyword upper-cased). Because both sides of a pair share the same catalog
     /// identity, a stale embedded name (or a <c>CREATE</c> vs <c>CREATE OR ALTER</c>
     /// shape difference) collapses to the same header and no longer registers as a
-    /// difference. The body is returned unchanged when it does not open with a
-    /// recognised module header (e.g. body fragments in tests, or definitions that
-    /// open with a comment).
+    /// difference. Any comment banner before the header is preserved verbatim —
+    /// comment-only differences must still surface. The body is returned unchanged
+    /// when no recognised module header is found (e.g. body fragments in tests).
     /// </summary>
     public static string? CanonicalizeObjectName(string? body, string schema, string name)
     {
         if (string.IsNullOrEmpty(body)) { return body; }
         Match m = HeaderRegex().Match(body);
         if (!m.Success) { return body; }
-        string type = m.Groups[1].Value.ToUpperInvariant();
-        return string.Concat($"CREATE {type} [{schema}].[{name}]", body.AsSpan(m.Index + m.Length));
+        string type = m.Groups["type"].Value.ToUpperInvariant();
+        int headerStart = m.Groups["create"].Index;
+        return string.Concat(
+            body.AsSpan(0, headerStart),
+            $"CREATE {type} [{schema}].[{name}]",
+            body.AsSpan(m.Index + m.Length));
     }
 
     /// <summary>
@@ -63,18 +77,53 @@ public static partial class ModuleHeader
         Match m = HeaderRegex().Match(body);
         if (!m.Success) { return body; }
 
-        Group nameGroup = m.Groups[3].Success ? m.Groups[4] : m.Groups[2];
+        Group nameGroup = m.Groups["qual"].Success ? m.Groups["id2"] : m.Groups["id1"];
         string embedded = Unquote(nameGroup.Value);
         if (string.Equals(embedded, name, StringComparison.OrdinalIgnoreCase))
         {
             return body; // not stale — preserve verbatim
         }
 
-        int nameStart = m.Groups[2].Index;
+        int nameStart = m.Groups["id1"].Index;
         return string.Concat(
             body.AsSpan(0, nameStart),
             $"[{schema}].[{name}]",
             body.AsSpan(m.Index + m.Length));
+    }
+
+    /// <summary>
+    /// Rewrites the module header's <c>CREATE</c> verb to <c>CREATE OR ALTER</c>
+    /// while preserving the rest of the definition verbatim — including any
+    /// comment banner before the header and the original spacing between
+    /// tokens. Returns the body unchanged when it already reads
+    /// <c>CREATE OR ALTER</c> or when no recognised module header is found
+    /// (in which case the caller will emit the original text and SQL Server
+    /// will surface the real parse error).
+    /// </summary>
+    public static string EnsureCreateOrAlter(string body)
+    {
+        if (string.IsNullOrEmpty(body)) { return body; }
+        Match m = HeaderRegex().Match(body);
+        if (!m.Success || m.Groups["oralter"].Success) { return body; }
+
+        Group create = m.Groups["create"];
+        int insertAt = create.Index + create.Length;
+        return string.Concat(body.AsSpan(0, insertAt), " OR ALTER", body.AsSpan(insertAt));
+    }
+
+    /// <summary>
+    /// Produces deploy-ready DDL for a module body: trims leading whitespace,
+    /// re-targets a stale embedded name to the catalog identity
+    /// (<see cref="AlignNameToCatalog"/>), upgrades the create verb to
+    /// <c>CREATE OR ALTER</c> (<see cref="EnsureCreateOrAlter"/>) and guarantees a
+    /// trailing <c>;</c>. Shared by the view / procedure / function / trigger
+    /// script emitters so the header-rewrite rules live in exactly one place.
+    /// </summary>
+    public static string ToCreateOrAlterScript(string body, string schema, string name)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        string ddl = EnsureCreateOrAlter(AlignNameToCatalog(body.TrimStart(), schema, name));
+        return ddl.EndsWith(';') ? ddl : ddl + ";";
     }
 
     private static string Unquote(string ident) =>

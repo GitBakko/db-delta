@@ -92,6 +92,41 @@ public class ModuleDiffTests
     }
 
     [Fact]
+    public void View_with_comment_banner_and_stale_embedded_name_is_Identical()
+    {
+        // Real-world SSMS template banner before CREATE. The header regex must
+        // skip the banner so stale-name canonicalization still applies
+        // (regression: banner'd modules diffed as Different on identical bodies).
+        const string banner = "-- ===== Author: X / Create date: 2020 =====\r\n";
+        Database a = Db(new View("dbo", "v", banner + "CREATE VIEW [dbo].[OldName] AS SELECT 1 AS Id", IsEncrypted: false));
+        Database b = Db(new View("dbo", "v", banner + "CREATE VIEW [dbo].[v] AS SELECT 1 AS Id", IsEncrypted: false));
+        new ComparisonEngine().Compare(a, b, ComparisonOptions.None)
+            .Differences.Single(p => p.Identity.Kind == "View")
+            .Status.Should().Be(DifferenceStatus.Identical);
+    }
+
+    [Fact]
+    public void View_with_CREATE_vs_CREATE_OR_ALTER_same_body_is_Identical()
+    {
+        Database a = Db(new View("dbo", "v", "CREATE OR ALTER VIEW [dbo].[v] AS SELECT 1 AS Id", IsEncrypted: false));
+        Database b = Db(new View("dbo", "v", "CREATE VIEW [dbo].[v] AS SELECT 1 AS Id", IsEncrypted: false));
+        new ComparisonEngine().Compare(a, b, ComparisonOptions.None)
+            .Differences.Single(p => p.Identity.Kind == "View")
+            .Status.Should().Be(DifferenceStatus.Identical);
+    }
+
+    [Fact]
+    public void View_bodies_differing_only_in_banner_text_stay_Different()
+    {
+        // Comment-only differences are real content differences and must surface.
+        Database a = Db(new View("dbo", "v", "-- Author: A\r\nCREATE VIEW [dbo].[v] AS SELECT 1 AS Id", IsEncrypted: false));
+        Database b = Db(new View("dbo", "v", "-- Author: B\r\nCREATE VIEW [dbo].[v] AS SELECT 1 AS Id", IsEncrypted: false));
+        new ComparisonEngine().Compare(a, b, ComparisonOptions.None)
+            .Differences.Single(p => p.Identity.Kind == "View")
+            .Status.Should().Be(DifferenceStatus.Different);
+    }
+
+    [Fact]
     public void Procedure_renamed_with_stale_embedded_name_is_Identical()
     {
         Database a = DbWithProcs(new StoredProcedure("dbo", "u", "CREATE PROCEDURE [dbo].[uOld] AS SELECT 1", IsEncrypted: false));

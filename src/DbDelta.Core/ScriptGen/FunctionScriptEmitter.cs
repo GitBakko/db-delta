@@ -25,20 +25,9 @@ public sealed class FunctionScriptEmitter
 
     private static string EmitCreateOrAlter(Function f)
     {
-        if (f.IsEncrypted || f.Body is null)
-        {
-            return $"-- WARNING: function [{f.Schema}].[{f.Name}] is encrypted (WITH ENCRYPTION); body cannot be scripted.";
-        }
-
-        string body = ModuleHeader.AlignNameToCatalog(f.Body.TrimStart(), f.Schema, f.Name);
-        const string createFn = "CREATE FUNCTION";
-        const string createOrAlterFn = "CREATE OR ALTER FUNCTION";
-        if (body.StartsWith(createFn, StringComparison.OrdinalIgnoreCase))
-        {
-            body = string.Concat(createOrAlterFn, body.AsSpan(createFn.Length));
-        }
-
-        return body.EndsWith(';') ? body : body + ";";
+        return f.IsEncrypted || f.Body is null
+            ? $"-- WARNING: function [{f.Schema}].[{f.Name}] is encrypted (WITH ENCRYPTION); body cannot be scripted."
+            : ModuleHeader.ToCreateOrAlterScript(f.Body, f.Schema, f.Name);
     }
 
     private static string EmitDrop(Function f) =>

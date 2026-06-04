@@ -50,6 +50,22 @@ public class ViewGoldenTests
     }
 
     [Fact]
+    public Task View_with_comment_banner_emits_banner_then_CREATE_OR_ALTER()
+    {
+        // SSMS-template banner before CREATE: the emitter must keep the banner
+        // verbatim and still upgrade the verb (regression: banner'd bodies were
+        // emitted as plain CREATE, failing on deploy when the view exists).
+        View v = new(
+            "dbo",
+            "vCustomer",
+            "-- =============================================\r\n-- Author:      Someone\r\n-- =============================================\r\nCREATE VIEW dbo.vCustomer AS SELECT Id FROM dbo.Customer;",
+            IsEncrypted: false);
+        DifferencePair pair = new(v.Identity, DifferenceStatus.OnlyInA, v, null);
+        string ddl = _emitter.Emit(pair);
+        return Verify(ddl);
+    }
+
+    [Fact]
     public Task Encrypted_view_emits_a_comment_warning_and_no_DDL()
     {
         View v = new("dbo", "vSecret", Body: null, IsEncrypted: true);

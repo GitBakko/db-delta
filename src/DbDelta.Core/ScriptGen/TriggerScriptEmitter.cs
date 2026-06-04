@@ -29,20 +29,9 @@ public sealed class TriggerScriptEmitter
 
     private static string EmitCreateOrAlter(Trigger t)
     {
-        if (t.IsEncrypted || t.Body is null)
-        {
-            return $"-- WARNING: trigger [{t.Schema}].[{t.Name}] is encrypted (WITH ENCRYPTION); body cannot be scripted.";
-        }
-
-        string body = ModuleHeader.AlignNameToCatalog(t.Body.TrimStart(), t.Schema, t.Name);
-        const string create = "CREATE TRIGGER";
-        const string createOrAlter = "CREATE OR ALTER TRIGGER";
-        if (body.StartsWith(create, StringComparison.OrdinalIgnoreCase))
-        {
-            body = string.Concat(createOrAlter, body.AsSpan(create.Length));
-        }
-
-        return body.EndsWith(';') ? body : body + ";";
+        return t.IsEncrypted || t.Body is null
+            ? $"-- WARNING: trigger [{t.Schema}].[{t.Name}] is encrypted (WITH ENCRYPTION); body cannot be scripted."
+            : ModuleHeader.ToCreateOrAlterScript(t.Body, t.Schema, t.Name);
     }
 
     private static string EmitDrop(Trigger t) =>

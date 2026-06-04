@@ -30,21 +30,9 @@ public sealed class ViewScriptEmitter
 
     private static string EmitCreateOrAlter(View v)
     {
-        if (v.IsEncrypted || v.Body is null)
-        {
-            return $"-- WARNING: view [{v.Schema}].[{v.Name}] is encrypted (WITH ENCRYPTION); body cannot be scripted.";
-        }
-
-        // Rewrite the leading CREATE VIEW (case-insensitive) to CREATE OR ALTER VIEW.
-        // If the catalog returned a different shape (e.g. already CREATE OR ALTER VIEW), leave it.
-        string body = ModuleHeader.AlignNameToCatalog(v.Body.TrimStart(), v.Schema, v.Name);
-        const string createView = "CREATE VIEW";
-        const string createOrAlterView = "CREATE OR ALTER VIEW";
-        if (body.StartsWith(createView, StringComparison.OrdinalIgnoreCase))
-        {
-            body = string.Concat(createOrAlterView, body.AsSpan(createView.Length));
-        }
-        return body.EndsWith(';') ? body : body + ";";
+        return v.IsEncrypted || v.Body is null
+            ? $"-- WARNING: view [{v.Schema}].[{v.Name}] is encrypted (WITH ENCRYPTION); body cannot be scripted."
+            : ModuleHeader.ToCreateOrAlterScript(v.Body, v.Schema, v.Name);
     }
 
     private static string EmitDrop(View v) =>
