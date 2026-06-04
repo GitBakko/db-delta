@@ -624,31 +624,35 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IReadOnlyList<DifferencePair> selected = SelectedPairs();
         if (selected.Count == 0) { StatusText = "Nessuna differenza selezionata."; return; }
 
-        Views.ConfirmExecuteDialog dlg = new()
-        {
-            DataContext = new ConfirmExecuteViewModel(
-                selected.Count,
-                ConnectionStringRedactor.Redact(AppState.TargetConnectionString)),
-        };
-        bool? ok = await dlg.ShowDialog<bool?>(owner).ConfigureAwait(true);
-        if (ok != true) { return; }
-
+        // Script built up-front; the dialog owns the whole confirm → execute →
+        // outcome flow and runs this delegate in-dialog (busy state + result
+        // panel). Result stays null when the user cancels before executing.
         string script = DeployScriptBuilder.Build(
             selected,
             AppState.SourceConnectionString ?? string.Empty,
             AppState.TargetConnectionString ?? string.Empty,
             DateTime.UtcNow);
 
-        StatusText = "Esecuzione in corso…";
-        SqlBatchResult res = await SqlExecutor.ExecuteAsync(
-            AppState.TargetConnectionString!,
-            script,
-            CancellationToken.None,
-            useOwnTransaction: false).ConfigureAwait(true);
+        ConfirmExecuteViewModel vm = new(
+            objectCount: selected.Count,
+            differentCount: selected.Count(p => p.Status == DifferenceStatus.Different),
+            onlyInTargetCount: selected.Count(p => p.Status == DifferenceStatus.OnlyInB),
+            onlyInSourceCount: selected.Count(p => p.Status == DifferenceStatus.OnlyInA),
+            sourceSummary: ConnectionStringRedactor.Redact(AppState.SourceConnectionString ?? string.Empty),
+            targetSummary: ConnectionStringRedactor.Redact(AppState.TargetConnectionString),
+            executeAsync: () => SqlExecutor.ExecuteAsync(
+                AppState.TargetConnectionString!,
+                script,
+                CancellationToken.None,
+                useOwnTransaction: false));
 
-        StatusText = res.Success
-            ? $"Esecuzione completata — {res.BatchesExecuted} batch in {res.TotalDurationMs} ms."
-            : $"Esecuzione fallita: {res.ErrorMessage}";
+        Views.ConfirmExecuteDialog dlg = new() { DataContext = vm };
+        await dlg.ShowDialog(owner).ConfigureAwait(true);
+
+        if (vm.Result is not null)
+        {
+            StatusText = vm.ResultMessage; // mirror the dialog outcome in the status bar
+        }
     }
 
     private bool CanExecuteOnTarget() =>
