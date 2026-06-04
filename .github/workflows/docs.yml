@@ -40,6 +40,14 @@ jobs:
       - name: Restore tools
         run: dotnet tool restore
 
+      - name: Generate version-history article
+        shell: pwsh
+        run: |
+          ./scripts/docs/build-version-history.ps1
+          $anchors = (Select-String -Path docfx/articles/version-history.md -Pattern '<a id="v').Count
+          if ($anchors -lt 1) { throw "version-history.md has no anchors" }
+          Write-Host "sanity ok: $anchors anchors"
+
       - name: Build documentation
         run: dotnet docfx docfx/docfx.json
 

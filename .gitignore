@@ -75,3 +75,4 @@ agentdb.rvf.lock
 docfx/api/*.yml
 docfx/api/.manifest
 docfx/_site/
+docfx/articles/version-history.md
