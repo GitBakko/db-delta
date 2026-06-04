@@ -8,8 +8,11 @@
 # Run from anywhere BEFORE building the docs:
 #   pwsh scripts/docs/build-version-history.ps1
 #   dotnet docfx docfx/docfx.json
-# The generated article is gitignored; docfx's toc references it, so a docs
-# build without this script fails fast on the missing href (intended).
+# The generated article is gitignored; docfx's toc references it. A docs
+# build without this script only emits a missing-href docfx WARNING (no
+# warnings-as-errors is configured) and publishes without the page — the CI
+# step's anchor assertion in docs.yml is the actual hard gate; for local
+# builds, running this script first is on you.
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -22,7 +25,7 @@ if (-not (Test-Path $changelog)) {
 }
 
 $anchored = 0
-$out = foreach ($line in Get-Content $changelog) {
+$out = foreach ($line in Get-Content $changelog -Encoding utf8) {
     if ($line -match '^##\s+\[(?<ver>[^\]]+)\]' -and $Matches['ver'] -ne 'Unreleased') {
         $anchored++
         "<a id=`"v$($Matches['ver'])`"></a>"
