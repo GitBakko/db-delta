@@ -1,6 +1,13 @@
 using FluentAssertions;
 using Xunit;
 
+// NOTE: no `using DbDelta.App;` — the namespace below already resolves it via
+// parent-namespace traversal, and a redundant using trips IDE0005 in the
+// format gate. `using Xunit;` IS required here: xunit.v3 (3.2.2) does not
+// register `Xunit` as a project-wide implicit using (no `<Using Include="Xunit"/>`
+// in its build props), so `[Fact]` does not resolve without it — every other
+// test file in this repo imports it explicitly for the same reason.
+
 namespace DbDelta.App.HeadlessTests;
 
 public class AppVersionInfoTests
