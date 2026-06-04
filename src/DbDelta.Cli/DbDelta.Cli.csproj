@@ -3,6 +3,9 @@
     <OutputType>Exe</OutputType>
     <AssemblyName>dbdelta</AssemblyName>
     <RootNamespace>DbDelta.Cli</RootNamespace>
+    <!-- Tag-driven versioning: CI passes -p:Version=<tag> at publish; local
+         builds get an honest dev marker so the CLI version output never lies. -->
+    <Version Condition="'$(Version)' == ''">0.0.0-dev</Version>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="System.CommandLine" />
