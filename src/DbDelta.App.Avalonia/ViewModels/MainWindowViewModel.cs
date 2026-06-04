@@ -146,10 +146,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public AppStateViewModel AppState { get; }
 
-    /// <summary>Build banner shown in the topbar.</summary>
-    public string Version => "v0.1 alpha";
-
-    /// <summary>Display version for the status-bar pill (e.g. "v1.0.0-rc1").</summary>
+    /// <summary>
+    /// Display version, bound by both the topbar banner and the status-bar
+    /// pill (e.g. "v1.0.0-rc1"); resolved from the publish-stamped assembly
+    /// version. Replaced the hardcoded "v0.1 alpha" banner string.
+    /// </summary>
     public string AppVersion => AppVersionInfo.Display;
 
     [RelayCommand]

@@ -70,7 +70,7 @@
                      FontWeight="SemiBold"
                      Foreground="{StaticResource FgStrongBrush}"
                      VerticalAlignment="Center" />
-          <TextBlock Text="{Binding Version}"
+          <TextBlock Text="{Binding AppVersion}"
                      FontSize="11"
                      Foreground="{StaticResource FgSubtleBrush}"
                      VerticalAlignment="Center" />
