@@ -8,6 +8,26 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 (Empty — next for v1.0.0 final: code signing, public alpha announcement.)
 
+## [1.0.0-rc3] — 2026-06-04 — third release candidate
+
+### Fixed
+- **False positives on modules with a comment banner before `CREATE`.**
+  Real-world definitions frequently open with an SSMS-style comment banner
+  (`-- ===== Author / Create date =====`) or a block comment before the
+  `CREATE` token. The module-header parser only recognised headers at the
+  very start of the definition, so banner'd views, procedures, functions and
+  triggers never received the stale-name reconciliation shipped in rc2 and
+  compared as Different on semantically identical bodies. The parser now
+  skips any mix of whitespace and `--` / `/* … */` comments before `CREATE`
+  while preserving the banner verbatim, so genuine comment-only differences
+  still surface.
+- **Generated scripts for banner'd modules deployed as plain `CREATE`.** The
+  same parsing limitation meant the script generator failed to upgrade the
+  create verb on banner'd bodies, emitting `CREATE` instead of
+  `CREATE OR ALTER` — which fails on deploy when the object already exists.
+  The verb upgrade now applies regardless of any leading banner, preserving
+  the original formatting and the short `PROC` keyword where used.
+
 ## [1.0.0-rc2] — 2026-06-04 — second release candidate
 
 ### Added
