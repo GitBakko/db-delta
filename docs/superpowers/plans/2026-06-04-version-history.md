@@ -29,10 +29,13 @@ Create `tests/DbDelta.App.HeadlessTests/AppVersionInfoTests.cs`:
 
 ```csharp
 using FluentAssertions;
+using Xunit;
 
 // NOTE: no `using DbDelta.App;` — the namespace below already resolves it via
 // parent-namespace traversal, and a redundant using trips IDE0005 in the
-// format gate. `using Xunit;` is a project-wide implicit using from xunit.v3.
+// format gate. `using Xunit;` IS required — this repo's xunit.v3 setup does
+// not inject implicit usings (amended 2026-06-04: the original plan assumed
+// it did; implementation disproved that empirically).
 
 namespace DbDelta.App.HeadlessTests;
 
