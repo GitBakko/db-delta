@@ -10,13 +10,17 @@ namespace DbDelta.App;
 /// </summary>
 public static class AppVersionInfo
 {
-    private const string HistoryPageUrl =
+    /// <summary>Base URL of the online version-history page (unanchored).</summary>
+    public const string HistoryPageUrl =
         "https://gitbakko.github.io/db-delta/articles/version-history.html";
 
     /// <summary><c>v1.0.0-rc1</c> — or plain <c>dev</c> when no version attribute is present.</summary>
     public static string Display { get; }
 
-    /// <summary>Version-history page URL, anchored at the running version.</summary>
+    /// <summary>
+    /// Version-history page URL, anchored at the running version.
+    /// Unanchored (base page URL) when <see cref="Display"/> is <c>dev</c>.
+    /// </summary>
     public static string HistoryUrl { get; }
 
     static AppVersionInfo()
@@ -41,6 +45,10 @@ public static class AppVersionInfo
             return ("dev", HistoryPageUrl);
         }
         string version = raw.Split('+')[0];
+        if (version.Length == 0)
+        {
+            return ("dev", HistoryPageUrl);
+        }
         return ($"v{version}", $"{HistoryPageUrl}#v{version}");
     }
 }

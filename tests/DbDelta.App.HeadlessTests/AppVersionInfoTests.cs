@@ -53,4 +53,19 @@ public class AppVersionInfoTests
         AppVersionInfo.Display.Should().NotBeNullOrWhiteSpace();
         AppVersionInfo.HistoryUrl.Should().StartWith(PageUrl);
     }
+
+    [Fact]
+    public void Metadata_only_raw_version_falls_back_to_plain_dev()
+    {
+        // "+abc" yields an empty version token after the split — guard kicks in.
+        (string display, string url) = AppVersionInfo.FromRaw("+abc1234");
+        display.Should().Be("dev");
+        url.Should().Be(PageUrl);
+    }
+
+    [Fact]
+    public void Public_page_url_constant_matches_the_pinned_contract() =>
+        // Guards against the production constant drifting away from the URL
+        // the tests pin — a changed URL must fail loudly here.
+        AppVersionInfo.HistoryPageUrl.Should().Be(PageUrl);
 }
