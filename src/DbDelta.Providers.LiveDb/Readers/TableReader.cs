@@ -61,11 +61,11 @@ internal sealed class TableReader
                 string schemaName = tablesReader.GetString(0);
                 string tableName = tablesReader.GetString(1);
                 int objectId = tablesReader.GetInt32(2);
-                // sys.tables.modify_date is server local time; treat as UTC for
-                // display consistency with sys.sql_modules pipeline (same caveat).
+                // sys.tables.modify_date is SERVER-local time — keep it Unspecified
+                // and display it verbatim (the user reasons in the DB server's clock).
                 DateTime? modifyDate = tablesReader.IsDBNull(3)
                     ? null
-                    : DateTime.SpecifyKind(tablesReader.GetDateTime(3), DateTimeKind.Utc);
+                    : tablesReader.GetDateTime(3);
                 tableShells[objectId] = (schemaName, tableName, modifyDate);
             }
         }

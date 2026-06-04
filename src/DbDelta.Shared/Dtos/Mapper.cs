@@ -18,8 +18,8 @@ public static class Mapper
                 SchemaName: d.Identity.SchemaName,
                 ObjectName: d.Identity.ObjectName,
                 Status: d.Status.ToString(),
-                LastModifiedSourceUtc: ExtractModifyDate(d.SideA),
-                LastModifiedTargetUtc: ExtractModifyDate(d.SideB)))
+                LastModifiedSource: ExtractModifyDate(d.SideA),
+                LastModifiedTarget: ExtractModifyDate(d.SideB)))
         ]);
     }
 

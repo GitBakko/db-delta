@@ -62,20 +62,23 @@ public sealed partial class DifferenceRowViewModel(DifferencePair pair, Differen
             ? Dto.ObjectName
             : $"{Dto.SchemaName}.{Dto.ObjectName}";
 
-    public DateTime? LastModifiedSourceUtc => Dto.LastModifiedSourceUtc;
-    public DateTime? LastModifiedTargetUtc => Dto.LastModifiedTargetUtc;
+    public DateTime? LastModifiedSource => Dto.LastModifiedSource;
+    public DateTime? LastModifiedTarget => Dto.LastModifiedTarget;
 
     private static readonly System.Globalization.CultureInfo s_itIt =
         System.Globalization.CultureInfo.GetCultureInfo("it-IT");
 
+    // sys.objects.modify_date is the DB SERVER's local clock — render it
+    // verbatim. A ToLocalTime() here would shift it into the CLIENT timezone
+    // and show a wrong time whenever client and server zones differ.
     public string LastModifiedSourceDisplay =>
-        Dto.LastModifiedSourceUtc.HasValue
-            ? Dto.LastModifiedSourceUtc.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm", s_itIt)
+        Dto.LastModifiedSource.HasValue
+            ? Dto.LastModifiedSource.Value.ToString("dd/MM/yyyy HH:mm", s_itIt)
             : string.Empty;
 
     public string LastModifiedTargetDisplay =>
-        Dto.LastModifiedTargetUtc.HasValue
-            ? Dto.LastModifiedTargetUtc.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm", s_itIt)
+        Dto.LastModifiedTarget.HasValue
+            ? Dto.LastModifiedTarget.Value.ToString("dd/MM/yyyy HH:mm", s_itIt)
             : string.Empty;
 
     /// <summary>Italian display label for <see cref="Kind"/>. Plural forms
@@ -157,6 +160,11 @@ public sealed partial class DifferenceRowViewModel(DifferencePair pair, Differen
         _ => 99,
     };
 
+    /// <summary>Group label of the Identical rows in the "Tipo di differenza"
+    /// grouping. Shared with the results-grid code-behind, which initialises
+    /// that group COLLAPSED (identical rows are noise the user opts into).</summary>
+    public const string IdenticalGroupLabel = "Identici";
+
     /// <summary>Italian display label for the row's status — used as the
     /// grouping key so the headers render localised text directly.</summary>
     public string StatusDisplayItalian => Dto.Status switch
@@ -164,7 +172,7 @@ public sealed partial class DifferenceRowViewModel(DifferencePair pair, Differen
         "Different" => "Diversi",
         "OnlyInB" => "Solo destinazione",
         "OnlyInA" => "Solo provenienza",
-        "Identical" => "Identici",
+        "Identical" => IdenticalGroupLabel,
         _ => Dto.Status,
     };
 }

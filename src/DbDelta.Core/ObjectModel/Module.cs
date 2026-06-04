@@ -15,8 +15,9 @@ namespace DbDelta.Core.ObjectModel;
 /// cannot diff bodies.
 /// </param>
 /// <param name="ModifyDate">
-/// The <c>sys.objects.modify_date</c> for this module, in UTC. <c>null</c> when the value
-/// was not available from the data source (e.g. older provider versions).
+/// The <c>sys.objects.modify_date</c> for this module — the <b>DB server's local
+/// clock</b> (Kind = Unspecified), displayed verbatim, never timezone-converted.
+/// <c>null</c> when the value was not available from the data source.
 /// </param>
 public abstract record Module(string Schema, string Name, string? Body, bool IsEncrypted, DateTime? ModifyDate = null)
 {

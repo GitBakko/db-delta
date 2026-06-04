@@ -61,7 +61,9 @@ internal sealed class ModuleReader
             string name = r.GetString(1);
             string? body = r.IsDBNull(2) ? null : r.GetString(2);
             bool encrypted = body is null;
-            DateTime? modifyDate = r.IsDBNull(3) ? null : DateTime.SpecifyKind(r.GetDateTime(3), DateTimeKind.Utc);
+            // sys.objects.modify_date is SERVER-local time — keep it Unspecified and
+            // display it verbatim (the user reasons in the DB server's clock).
+            DateTime? modifyDate = r.IsDBNull(3) ? null : r.GetDateTime(3);
             views.Add(new View(schema, name, body, encrypted, modifyDate));
         }
         return views;
@@ -83,7 +85,9 @@ internal sealed class ModuleReader
             string name = r.GetString(1);
             string? body = r.IsDBNull(2) ? null : r.GetString(2);
             bool encrypted = body is null;
-            DateTime? modifyDate = r.IsDBNull(3) ? null : DateTime.SpecifyKind(r.GetDateTime(3), DateTimeKind.Utc);
+            // sys.objects.modify_date is SERVER-local time — keep it Unspecified and
+            // display it verbatim (the user reasons in the DB server's clock).
+            DateTime? modifyDate = r.IsDBNull(3) ? null : r.GetDateTime(3);
             procs.Add(new StoredProcedure(schema, name, body, encrypted, modifyDate));
         }
         return procs;
@@ -129,7 +133,8 @@ internal sealed class ModuleReader
                 _ => FunctionKind.Scalar,
             };
             bool encrypted = body is null;
-            DateTime? modifyDate = r.IsDBNull(4) ? null : DateTime.SpecifyKind(r.GetDateTime(4), DateTimeKind.Utc);
+            // Server-local time, displayed verbatim — see ReadViewsAsync.
+            DateTime? modifyDate = r.IsDBNull(4) ? null : r.GetDateTime(4);
             functions.Add(new Function(schema, name, body, encrypted, kind, modifyDate));
         }
         return functions;
@@ -176,7 +181,8 @@ internal sealed class ModuleReader
             bool isDisabled = !r.IsDBNull(5) && r.GetBoolean(5);
             bool isNfr = !r.IsDBNull(6) && r.GetBoolean(6);
             bool encrypted = body is null;
-            DateTime? modifyDate = r.IsDBNull(7) ? null : DateTime.SpecifyKind(r.GetDateTime(7), DateTimeKind.Utc);
+            // Server-local time, displayed verbatim — see ReadViewsAsync.
+            DateTime? modifyDate = r.IsDBNull(7) ? null : r.GetDateTime(7);
             triggers.Add(new Trigger(
                 Schema: triggerSchema,
                 Name: triggerName,
