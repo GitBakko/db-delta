@@ -43,10 +43,14 @@ Make the project's version history consultable in two linked places:
 - **`.gitignore`**: `docfx/articles/version-history.md` (generated artifact).
 - **`.github/workflows/docs.yml`**: run the script, then a sanity assertion
   (anchor count ≥ 1), **before** `docfx build`. A local docfx build needs the
-  same script run first (documented in the script header); without it the
-  docfx build fails fast on the missing toc href (`--warningsAsErrors`),
-  which is the intended behaviour rather than silently publishing without
-  the page.
+  same script run first (documented in the script header). (Amended
+  2026-06-04: the original assumption that the docs build runs with
+  warnings-as-errors was wrong — a missing toc href only emits a docfx
+  warning. CI is covered because docs.yml always generates the article
+  before building; a local build without the script publishes a site with a
+  warning and no version-history page — accepted, the script header is the
+  guard. Rendering the CHANGELOG also surfaces one pre-existing relative
+  link in it as a docfx warning — cosmetic, accepted.)
 
 ### 2. Version stamping (release pipeline)
 
