@@ -411,8 +411,8 @@ public sealed class TableScriptEmitter : IScriptEmitter
             if (a.IdentityIncrement != b.IdentityIncrement) { return false; }
         }
         return string.Equals(a.Collation, b.Collation, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(a.DefaultExpression, b.DefaultExpression, StringComparison.Ordinal)
-            && string.Equals(a.ComputedExpression, b.ComputedExpression, StringComparison.Ordinal);
+            && BodyNormalizer.ExpressionsEqual(a.DefaultExpression, b.DefaultExpression)
+            && BodyNormalizer.ExpressionsEqual(a.ComputedExpression, b.ComputedExpression);
     }
 
     /// <summary>
@@ -428,10 +428,10 @@ public sealed class TableScriptEmitter : IScriptEmitter
         (UniqueConstraint ua, UniqueConstraint ub) =>
             ua.IsClustered == ub.IsClustered && ua.Columns.SequenceEqual(ub.Columns, StringComparer.Ordinal),
         (CheckConstraint ca, CheckConstraint cb) =>
-            string.Equals(ca.Expression, cb.Expression, StringComparison.Ordinal),
+            BodyNormalizer.ExpressionsEqual(ca.Expression, cb.Expression),
         (DefaultConstraint da, DefaultConstraint db) =>
             string.Equals(da.ColumnName, db.ColumnName, StringComparison.Ordinal)
-            && string.Equals(da.Expression, db.Expression, StringComparison.Ordinal),
+            && BodyNormalizer.ExpressionsEqual(da.Expression, db.Expression),
         _ => false,
     };
 

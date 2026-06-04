@@ -633,7 +633,7 @@ public sealed class ScriptGenerator
     private static bool IndexShapeEqual(TableIndex a, TableIndex b) =>
         a.IsUnique == b.IsUnique
         && a.IsClustered == b.IsClustered
-        && string.Equals(a.FilterExpression, b.FilterExpression, StringComparison.Ordinal)
+        && BodyNormalizer.ExpressionsEqual(a.FilterExpression, b.FilterExpression)
         && a.KeyColumns.Select(k => $"{k.Name}|{k.IsDescending}")
             .SequenceEqual(b.KeyColumns.Select(k => $"{k.Name}|{k.IsDescending}"), StringComparer.Ordinal)
         && a.IncludedColumns.SequenceEqual(b.IncludedColumns, StringComparer.Ordinal);

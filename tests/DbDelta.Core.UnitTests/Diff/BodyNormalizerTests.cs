@@ -38,4 +38,23 @@ public class BodyNormalizerTests
         string withSemi = withoutSemi + ";";
         BodyNormalizer.Normalize(withoutSemi).Should().Be(BodyNormalizer.Normalize(withSemi));
     }
+
+    // ----- ExpressionsEqual -------------------------------------------------
+
+    [Theory]
+    [InlineData("([Age]>=0)", "([Age]>=0)\r\n")]
+    [InlineData("([Age]>=0\r\nAND [Age]<=120)", "([Age]>=0 AND [Age]<=120)")]
+    [InlineData("(getdate())", "  (getdate())  ")]
+    [InlineData(null, null)]
+    [InlineData(null, "")]
+    [InlineData("", "   ")]
+    public void ExpressionsEqual_ignores_whitespace_and_null_vs_empty(string? a, string? b) =>
+        BodyNormalizer.ExpressionsEqual(a, b).Should().BeTrue();
+
+    [Theory]
+    [InlineData("([Age]>=0)", "([Age]>=1)")]
+    [InlineData("(getdate())", "(GETDATE())")] // case preserved, like Normalize
+    [InlineData(null, "(0)")]
+    public void ExpressionsEqual_still_detects_real_differences(string? a, string? b) =>
+        BodyNormalizer.ExpressionsEqual(a, b).Should().BeFalse();
 }

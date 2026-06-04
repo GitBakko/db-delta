@@ -401,12 +401,14 @@ public sealed class ComparisonEngine
                 return false;
             }
 
-            if ((col.DefaultExpression ?? string.Empty) != (other.DefaultExpression ?? string.Empty))
+            // Whitespace-normalized: sys.* stores these re-formatted, with
+            // server-dependent whitespace — see BodyNormalizer.ExpressionsEqual.
+            if (!BodyNormalizer.ExpressionsEqual(col.DefaultExpression, other.DefaultExpression))
             {
                 return false;
             }
 
-            if ((col.ComputedExpression ?? string.Empty) != (other.ComputedExpression ?? string.Empty))
+            if (!BodyNormalizer.ExpressionsEqual(col.ComputedExpression, other.ComputedExpression))
             {
                 return false;
             }
@@ -484,11 +486,12 @@ public sealed class ComparisonEngine
             && fk.IsDisabled == other.IsDisabled
             && fk.IsNotForReplication == other.IsNotForReplication,
         CheckConstraint ck when right is CheckConstraint other =>
-            ck.Expression == other.Expression
+            BodyNormalizer.ExpressionsEqual(ck.Expression, other.Expression)
             && ck.IsDisabled == other.IsDisabled
             && ck.IsNotForReplication == other.IsNotForReplication,
         DefaultConstraint df when right is DefaultConstraint other =>
-            df.ColumnName == other.ColumnName && df.Expression == other.Expression,
+            df.ColumnName == other.ColumnName
+            && BodyNormalizer.ExpressionsEqual(df.Expression, other.Expression),
         _ => false,
     };
 
@@ -519,7 +522,7 @@ public sealed class ComparisonEngine
                 return false;
             }
 
-            if ((left.FilterExpression ?? string.Empty) != (right.FilterExpression ?? string.Empty))
+            if (!BodyNormalizer.ExpressionsEqual(left.FilterExpression, right.FilterExpression))
             {
                 return false;
             }

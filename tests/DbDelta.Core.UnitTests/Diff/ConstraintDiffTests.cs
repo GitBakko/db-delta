@@ -78,6 +78,32 @@ public class ConstraintDiffTests
     }
 
     [Fact]
+    public void Check_constraint_expression_differing_only_in_whitespace_is_Identical()
+    {
+        // sys.check_constraints.definition keeps server-dependent whitespace —
+        // cosmetic newline/spacing drift must never classify as Different
+        // (regression: un-flattenable diffs that reappeared right after
+        // applying the generated alignment script).
+        Database a = DbWithTable(TableWith(new CheckConstraint("CK", "([Age]>=0\r\nAND [Age]<=120)", false, false)));
+        Database b = DbWithTable(TableWith(new CheckConstraint("CK", "([Age]>=0 AND [Age]<=120)", false, false)));
+
+        ComparisonResult r = new ComparisonEngine().Compare(a, b, ComparisonOptions.Default);
+
+        r.Differences.Single().Status.Should().Be(DifferenceStatus.Identical);
+    }
+
+    [Fact]
+    public void Default_constraint_expression_differing_only_in_whitespace_is_Identical()
+    {
+        Database a = DbWithTable(TableWith(new DefaultConstraint("DF", "Id", "(getdate())\r\n")));
+        Database b = DbWithTable(TableWith(new DefaultConstraint("DF", "Id", "(getdate())")));
+
+        ComparisonResult r = new ComparisonEngine().Compare(a, b, ComparisonOptions.Default);
+
+        r.Differences.Single().Status.Should().Be(DifferenceStatus.Identical);
+    }
+
+    [Fact]
     public void IgnoreKeys_option_skips_PK_diff()
     {
         Database a = DbWithTable(TableWith(new PrimaryKey("PK", ["Id"], true)));

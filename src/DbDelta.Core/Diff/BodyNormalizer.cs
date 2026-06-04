@@ -36,4 +36,21 @@ public static partial class BodyNormalizer
         string trimmed = collapsed.Trim();
         return trimmed.EndsWith(';') ? trimmed[..^1].TrimEnd() : trimmed;
     }
+
+    /// <summary>
+    /// Whitespace-insensitive equality for definition texts read back from
+    /// <c>sys.*</c> catalog views — DEFAULT / CHECK / computed-column /
+    /// index-filter expressions. SQL Server re-formats these when storing
+    /// them, so the stored whitespace (including line endings) differs across
+    /// servers and across re-creates of the very same script; cosmetic drift
+    /// must never count as a difference, or the diff can never be flattened
+    /// by applying the generated alignment script. <c>null</c> and empty
+    /// compare equal. The same predicate is shared by the comparison engine
+    /// and the script emitters so they always agree on "changed".
+    /// </summary>
+    public static bool ExpressionsEqual(string? a, string? b) =>
+        string.Equals(
+            Normalize(a) ?? string.Empty,
+            Normalize(b) ?? string.Empty,
+            StringComparison.Ordinal);
 }

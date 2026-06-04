@@ -34,6 +34,24 @@ public class IndexDiffTests
     }
 
     [Fact]
+    public void Filter_expression_differing_only_in_whitespace_is_Identical()
+    {
+        // sys.indexes.filter_definition whitespace is server-dependent —
+        // cosmetic drift must not flag the table as Different.
+        TableIndex a1 = new("IX1", false, false, "([Status]=(1))\r\n",
+            [new IndexColumn("Name", false)], []);
+        TableIndex b1 = new("IX1", false, false, "([Status]=(1))",
+            [new IndexColumn("Name", false)], []);
+
+        Database a = DbWithTable(TableWith(a1));
+        Database b = DbWithTable(TableWith(b1));
+
+        ComparisonResult r = new ComparisonEngine().Compare(a, b, ComparisonOptions.Default);
+
+        r.Differences.Single().Status.Should().Be(DifferenceStatus.Identical);
+    }
+
+    [Fact]
     public void Different_key_columns_yield_Different()
     {
         Database a = DbWithTable(TableWith(Ix("IX1", "Name")));
