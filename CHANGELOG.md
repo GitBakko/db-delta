@@ -8,6 +8,30 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 (Empty — next for v1.0.0 final: code signing, public alpha announcement.)
 
+## [1.0.0-rc2] — 2026-06-04 — second release candidate
+
+### Added
+- **Consultable version history.** The docs site gains a
+  [Version history](https://gitbakko.github.io/db-delta/articles/version-history.html)
+  page rendered from this changelog with a stable anchor per version, and the
+  desktop app now shows the running version (status-bar pill and topbar
+  banner) — click the pill to open the page at your version. Published
+  binaries are stamped with the tag-driven semver, so the app and
+  `dbdelta --version` report the real release; local dev builds show
+  `0.0.0-dev`.
+
+### Fixed
+- **False positives on modules renamed with `sp_rename`.** SQL Server keeps
+  the pre-rename name frozen inside `sys.sql_modules.definition`, so two
+  databases whose only divergence was that stale embedded name compared as
+  Different. The comparison now reconciles the embedded `CREATE … <name>`
+  with the catalog identity (views, procedures, functions, triggers), and
+  generated `CREATE OR ALTER` scripts always target the catalog name, never
+  the stale one.
+- **Missing application icon.** The installed `DbDelta.App.exe` showed the
+  generic Windows icon. The exe now embeds a proper multi-size icon, and the
+  MSI wires it to the Start-Menu shortcut and the Apps & Features entry.
+
 ## [1.0.0-rc1] — 2026-05-28 — first release candidate
 
 First release candidate for v1.0.0. The full v1.0 scope is feature-complete —
