@@ -1,17 +1,21 @@
 # DbDelta — Backlog (task list for the next session)
 
-**State at update (2026-05-28):** `main` = `12017f2`, **origin/main SYNCED
-(pushed)**. **`v1.0.0-rc1` is RELEASED** — GitHub Release published as
-prerelease (v0.17.0 stays "Latest") with the unsigned MSI attached, smoke
-install/uninstall green on the runner. CI (`ci.yml`) + docs (`docs.yml`) green
-on the Node-24 action bumps. Next released tag toward GA is `v1.0.0` final,
-gated on code signing + announcement (track A).
+**State at update (2026-06-04):** `main` = `6b076bc`, **origin SYNCED**.
+**`v1.0.0-rc2` is RELEASED** — prerelease (v0.17.0 stays "Latest" by design
+until v1.0.0 final), MSI `DbDelta-1.0.0-rc2-win-x64.msi` (UNSIGNED) attached,
+release+ci+docs all green. rc2 contains: the sp_rename stale-embedded-name
+false-positive fix, the app/MSI icon, and the consultable version-history
+feature (DocFX page live with per-version anchors + clickable status-bar pill +
+tag-driven `-p:Version` stamping). **rc1→rc2: uninstall rc1 first** (same
+numeric ProductVersion 1.0.0 — WiX limit). Next released tag toward GA is
+`v1.0.0` final, gated on code signing + announcement (track A).
 
 Pick an item, then run it through the usual flow: brainstorm → spec →
 writing-plans → subagent-driven execution → finishing. Collaboration rules:
 terse Italian, default to the Recommended option, **one commit per phase EXCEPT
-when phases touch the same files/golden (then bundle)**, **push stays manual**,
-parity > invariants.
+when phases touch the same files/golden (then bundle)**, **push is automatic at
+end of verified work — tags/releases still need the owner's ok** (changed
+2026-06-04), parity > invariants.
 
 ---
 
@@ -22,7 +26,16 @@ parity > invariants.
 - [ ] **Public alpha announcement** — polish `README.md` (download link to the
       latest Release MSI + the DocFX site), draft Release notes, announce.
 
-## B. Release — v1.0.0-rc1 SHIPPED (2026-05-28)
+## B. Release — rc1 (2026-05-28) + rc2 (2026-06-04) SHIPPED
+
+- [x] **Tagged + published `v1.0.0-rc2`** on `6b076bc` — prerelease with
+      `DbDelta-1.0.0-rc2-win-x64.msi`; release/ci/docs green; Version-history
+      page live with the `#v1.0.0-rc2` anchor (curl-verified).
+      https://github.com/GitBakko/db-delta/releases/tag/v1.0.0-rc2
+- [ ] **Owner smoke of rc2 on a real machine** — uninstall rc1 → install rc2 →
+      check: exe/shortcut/ARP icon, no BCEVOLUTION_* false positives on
+      243/PcrmV2Pl_test vs 242/PcrmV2Pl, status-bar pill opens the page at
+      `#v1.0.0-rc2`.
 
 - [x] **Pushed `main`** (now synced) — `ci.yml` (windows build+test, linux
       testcontainers integration) + `docs.yml` (DocFX→Pages) green on the
@@ -78,7 +91,28 @@ The owner wanted to **analyze + brainstorm D** after the parity/cosmetic work
 
 ---
 
-## Done this session (2026-05-28)
+## Done this session (2026-06-03 → 2026-06-04)
+
+- **Fix: sp_rename stale-embedded-name false positive** (`087bc9d`) — new
+  `Diff/ModuleHeader` reconciles the embedded `CREATE … <name>` with the
+  catalog identity in `ClassifyModule` + all 4 module emitters (deploy DDL now
+  always targets the catalog name). Verified live 243→242: both
+  `BCEVOLUTION_Vw*` views now Identical, the 3 remaining Different are genuine.
+- **Fix: missing app icon** (`139ff5e`) — multi-size `app-icon.ico`,
+  `<ApplicationIcon>` in the app csproj, WiX `Icon`/`ARPPRODUCTICON`/shortcut.
+- **Feature: consultable version history** (spec+plan in
+  `docs/superpowers/{specs,plans}/2026-06-04-*`, subagent-driven, 12 commits
+  `c718118..b8d391c`): `scripts/docs/build-version-history.ps1` (stable
+  anchors, generated article gitignored, docs.yml assertion = the hard gate —
+  docfx has NO warnings-as-errors), `-p:Version` stamping into app+CLI
+  publishes + `0.0.0-dev` fallbacks, `AppVersionInfo`, status-bar pill,
+  topbar banner unhardcoded ("v0.1 alpha" removed). 344/344 tests.
+  Gotchas learned: repo's xunit.v3 has NO implicit usings; `--` is illegal
+  inside XML comments; Write-tool output is LF → always `dotnet format`
+  apply+verify before committing `.cs`.
+- **Release v1.0.0-rc2** (`6b076bc` + tag) — see section B.
+
+## Done 2026-05-28
 
 - **C — Node-20 action bump** (`0715a4c`): all workflow actions bumped to
   Node-24 majors ahead of GitHub's 2026-06-02 cutover; versions verified via
