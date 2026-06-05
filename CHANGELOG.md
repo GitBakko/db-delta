@@ -8,6 +8,39 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 (Empty — next for v1.0.0 final: code signing, public alpha announcement.)
 
+## [1.0.0-rc4] — 2026-06-05 — fourth release candidate
+
+### Added
+- **Redesigned direct-execution dialog.** Executing the alignment script
+  against the target is now a full guided flow: a source → target summary
+  card (connection strings redacted), a breakdown of the selected objects by
+  difference type, a transaction/rollback note, in-dialog execution with a
+  busy indicator, and a clear success / failure outcome panel showing the
+  real SQL Server error when something goes wrong. The window cannot be
+  closed while the script is running.
+
+### Changed
+- **The "Identici" group starts collapsed.** When the results grid is
+  grouped by difference type, the Identical group — confirmation noise by
+  definition — now initialises collapsed; expand it on demand. The other
+  groups stay expanded.
+
+### Fixed
+- **Un-flattenable whitespace differences on tables.** Column DEFAULT and
+  computed-column expressions, CHECK / DEFAULT constraint expressions and
+  filtered-index predicates were compared byte-for-byte, while SQL Server
+  re-formats those definition texts when storing them — so newline/spacing
+  drift between servers was reported as Different and reappeared even right
+  after applying the generated alignment script. These texts are now
+  compared whitespace-insensitively, and the script generator uses the same
+  rule, so cosmetic drift no longer triggers findings or spurious
+  constraint/index rebuilds.
+- **Diff-table dates showed the wrong timezone.** `sys.objects.modify_date`
+  is the DB server's local clock, but it was treated as UTC and then
+  converted to the client timezone, showing shifted times whenever client
+  and server zones differed. Dates are now displayed verbatim — exactly what
+  the server reports.
+
 ## [1.0.0-rc3] — 2026-06-04 — third release candidate
 
 ### Fixed
