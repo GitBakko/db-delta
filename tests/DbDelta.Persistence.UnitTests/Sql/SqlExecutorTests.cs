@@ -123,4 +123,46 @@ public class SqlExecutorTests
         // The raw password must NOT appear in the error message.
         result.ErrorMessage.Should().NotContain("SuperSecret123");
     }
+
+    // ── Transaction-mode detection ──────────────────────────────────────────
+    // The two modes are mutually exclusive: a client transaction on top of the
+    // script's own gives @@TRANCOUNT = 2, so the script's COMMIT becomes a bare
+    // decrement and the client then commits work the script's failure gate
+    // believed it had blocked. `apply` has to pick the right side for a script
+    // whose provenance it does not know.
+
+    [Theory]
+    [InlineData("BEGIN TRANSACTION\nSELECT 1;")]
+    [InlineData("BEGIN TRAN\nSELECT 1;")]
+    [InlineData("begin transaction\nSELECT 1;")]
+    [InlineData("SET XACT_ABORT ON;\nGO\nBEGIN TRANSACTION\nSELECT 1;")]
+    [InlineData("SELECT 1;\n  BEGIN TRANSACTION  \nSELECT 2;")]
+    public void ScriptManagesItsOwnTransaction_detects_a_self_contained_script(string script) =>
+        SqlExecutor.ScriptManagesItsOwnTransaction(script).Should().BeTrue();
+
+    [Theory]
+    [InlineData("CREATE TABLE dbo.T (Id int NOT NULL);")]
+    [InlineData("SELECT 1;\nGO\nSELECT 2;")]
+    [InlineData("")]
+    // "BEGIN" opening a block is not "BEGIN TRANSACTION".
+    [InlineData("IF 1 = 1\nBEGIN\n  SELECT 1;\nEND")]
+    // A mention inside a comment or a name must not count as an opener: the
+    // pattern anchors to the start of a line.
+    [InlineData("SELECT 1; -- BEGIN TRANSACTION would go here")]
+    public void ScriptManagesItsOwnTransaction_is_false_for_a_plain_script(string script) =>
+        SqlExecutor.ScriptManagesItsOwnTransaction(script).Should().BeFalse();
+
+    [Fact]
+    public void ExecuteAsync_rejects_a_negative_command_timeout()
+    {
+        // 0 means unlimited; negative is a caller bug, not "very short".
+        Func<Task> act = () => SqlExecutor.ExecuteAsync(
+            "Server=localhost;Database=X;Connect Timeout=1",
+            "SELECT 1",
+            CancellationToken.None,
+            useOwnTransaction: true,
+            commandTimeoutSeconds: -1);
+
+        act.Should().ThrowAsync<ArgumentOutOfRangeException>();
+    }
 }

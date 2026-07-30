@@ -8,11 +8,23 @@ namespace DbDelta.Persistence.Sql;
 /// <summary>
 /// Result returned by <see cref="SqlExecutor.ExecuteAsync"/>.
 /// </summary>
+/// <param name="Success">True when every batch executed without error.</param>
+/// <param name="ErrorMessage">The failure reason, redacted; null on success.</param>
+/// <param name="BatchesExecuted">How many batches ran before the outcome.</param>
+/// <param name="TotalDurationMs">Wall-clock duration of the whole run.</param>
+/// <param name="RolledBack">
+/// True when a rollback was issued and acknowledged, so the target is known to
+/// be unchanged. False on success, and false when the failure left the outcome
+/// indeterminate from the client's point of view — an operator needs to be able
+/// to tell "nothing was applied" from "we do not know", which the previous
+/// result shape could not express.
+/// </param>
 public sealed record SqlBatchResult(
     bool Success,
     string? ErrorMessage,
     int BatchesExecuted,
-    int TotalDurationMs);
+    int TotalDurationMs,
+    bool RolledBack = false);
 
 /// <summary>
 /// Runs a T-SQL script (potentially containing GO batch separators) against a
@@ -20,8 +32,17 @@ public sealed record SqlBatchResult(
 /// </summary>
 public static partial class SqlExecutor
 {
-    private const int CommandTimeoutSeconds = 60;
+    /// <summary>Default per-batch command timeout, in seconds.</summary>
+    public const int CommandTimeoutSeconds = 60;
+
     private const int ConnectTimeoutSeconds = 10;
+
+    /// <summary>
+    /// Short, fixed timeout for the best-effort rollback. Deliberately not the
+    /// caller's timeout: if the batch just timed out, waiting the same amount
+    /// again to give up on the rollback would double an already-bad wait.
+    /// </summary>
+    private const int RollbackTimeoutSeconds = 15;
 
     /// <summary>
     /// Splits <paramref name="script"/> on <c>GO</c> statements (case-insensitive,
@@ -41,12 +62,22 @@ public static partial class SqlExecutor
     /// that case no outer transaction is started so the script's own
     /// <c>XACT_ABORT</c>/<c>ROLLBACK</c> logic takes full effect.
     /// </param>
+    /// <param name="commandTimeoutSeconds">
+    /// Per-batch command timeout. <c>0</c> means unlimited, which is what a DBA
+    /// expects of a deployment script: the default 60 s makes a legitimately long
+    /// batch — an <c>INSERT … SELECT</c> copying a 30M-row table during an
+    /// identity rebuild, a large index build — impossible to deploy at all, since
+    /// the timeout aborts it and the transaction rolls the whole thing back.
+    /// Callers that cannot cancel a running operation should keep it bounded.
+    /// </param>
     public static async Task<SqlBatchResult> ExecuteAsync(
         string connectionString,
         string script,
         CancellationToken ct,
-        bool useOwnTransaction = true)
+        bool useOwnTransaction = true,
+        int commandTimeoutSeconds = CommandTimeoutSeconds)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(commandTimeoutSeconds);
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
         ArgumentNullException.ThrowIfNull(script);
 
@@ -84,8 +115,8 @@ public static partial class SqlExecutor
                 foreach (string batch in batches)
                 {
                     await using SqlCommand cmd = tx is null
-                        ? new(batch, cn) { CommandTimeout = CommandTimeoutSeconds }
-                        : new(batch, cn, tx) { CommandTimeout = CommandTimeoutSeconds };
+                        ? new(batch, cn) { CommandTimeout = commandTimeoutSeconds }
+                        : new(batch, cn, tx) { CommandTimeout = commandTimeoutSeconds };
                     await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
                     executed++;
                 }
@@ -95,12 +126,19 @@ public static partial class SqlExecutor
             }
             catch (Exception ex)
             {
-                if (tx is not null)
-                {
-                    try { await tx.RollbackAsync(ct).ConfigureAwait(false); } catch { /* best-effort */ }
-                }
+                // A rollback must never be cancellable — passing `ct` here meant
+                // that when cancellation WAS the failure the rollback threw
+                // immediately and we fell through to connection dispose, which
+                // does roll back but silently, leaving the caller unable to say
+                // whether the target had been touched.
+                bool rolledBack = await TryRollbackAsync(cn, tx).ConfigureAwait(false);
                 sw.Stop();
-                return new SqlBatchResult(false, ConnectionStringRedactor.Redact(ex.Message), executed, (int)sw.ElapsedMilliseconds);
+                return new SqlBatchResult(
+                    false,
+                    ConnectionStringRedactor.Redact(ex.Message),
+                    executed,
+                    (int)sw.ElapsedMilliseconds,
+                    rolledBack);
             }
             finally
             {
@@ -111,6 +149,55 @@ public static partial class SqlExecutor
         {
             sw.Stop();
             return new SqlBatchResult(false, ConnectionStringRedactor.Redact(ex.Message), 0, (int)sw.ElapsedMilliseconds);
+        }
+    }
+
+    /// <summary>
+    /// Rolls back whatever is still open, without letting cancellation stop it.
+    /// </summary>
+    /// <returns>
+    /// <see langword="true"/> when the rollback was issued and acknowledged, so
+    /// the target is known to be unchanged.
+    /// </returns>
+    /// <remarks>
+    /// Two cases. With a client-owned transaction we roll that back. Without one
+    /// — the self-contained deploy script manages its own — the script's
+    /// <c>XACT_ABORT</c> plus its failure gate normally handle it, and this is a
+    /// no-op on an already-doomed transaction. It earns its keep on TIMEOUT and
+    /// CANCELLATION, where the client gave up mid-batch and the script's own
+    /// footer never ran, so a server-side transaction can still be open. Purely
+    /// best-effort: after a timeout the connection may be unusable, and in that
+    /// case dispose (which returns it to the pool and triggers
+    /// <c>sp_reset_connection</c>) is what actually rolls it back — we just
+    /// cannot confirm it, so we report false rather than claim it.
+    /// </remarks>
+    private static async Task<bool> TryRollbackAsync(SqlConnection cn, SqlTransaction? tx)
+    {
+        if (tx is not null)
+        {
+            try
+            {
+                await tx.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        try
+        {
+            if (cn.State != System.Data.ConnectionState.Open) { return false; }
+            await using SqlCommand rollback = new(
+                "IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;", cn)
+            { CommandTimeout = RollbackTimeoutSeconds };
+            await rollback.ExecuteNonQueryAsync(CancellationToken.None).ConfigureAwait(false);
+            return true;
+        }
+        catch
+        {
+            return false;
         }
     }
 
@@ -155,6 +242,28 @@ public static partial class SqlExecutor
         return [.. batches];
     }
 
+    /// <summary>
+    /// True when <paramref name="script"/> opens its own transaction, i.e. it is
+    /// self-contained and must NOT be wrapped in a client-owned one.
+    /// </summary>
+    /// <remarks>
+    /// The two modes are mutually exclusive: a client transaction plus the
+    /// script's own <c>BEGIN TRANSACTION</c> gives <c>@@TRANCOUNT = 2</c>, so the
+    /// script's <c>COMMIT</c> becomes a bare decrement and the client's commit
+    /// then commits work the script believed its failure gate had blocked. Use
+    /// this to pick a side when the script's provenance is unknown.
+    /// </remarks>
+    public static bool ScriptManagesItsOwnTransaction(string script)
+    {
+        ArgumentNullException.ThrowIfNull(script);
+        return BeginTransactionPattern().IsMatch(script);
+    }
+
     [GeneratedRegex(@"^\s*GO\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex GoLinePattern();
+
+    [GeneratedRegex(
+        @"^\s*BEGIN\s+TRAN(SACTION)?\b",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Multiline)]
+    private static partial Regex BeginTransactionPattern();
 }
