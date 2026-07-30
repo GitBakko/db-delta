@@ -24,11 +24,19 @@ public static class DeployScriptBuilder
     /// </param>
     /// <param name="targetEndpointSummary">Same, for the target endpoint.</param>
     /// <param name="nowUtc">The UTC timestamp to embed in the header.</param>
+    /// <param name="dependencies">
+    /// Source-side dependency edges. Omitting them is not cosmetic: the
+    /// topological sort then degenerates to kind-then-alphabetical order, so a
+    /// new view that selects from a new function emits first and the deploy
+    /// fails with Msg 208. Callers that have a live comparison should always
+    /// pass them.
+    /// </param>
     public static string Build(
         IReadOnlyList<DifferencePair> selectedPairs,
         string sourceEndpointSummary,
         string targetEndpointSummary,
-        DateTime nowUtc)
+        DateTime nowUtc,
+        IReadOnlyList<Dependency.DependencyEdge>? dependencies = null)
     {
         ArgumentNullException.ThrowIfNull(selectedPairs);
 
@@ -56,7 +64,8 @@ public static class DeployScriptBuilder
         string body = _generator.Generate(
             syntheticResult,
             selection: null,
-            options: OptionsFor(selectedPairs));
+            options: OptionsFor(selectedPairs),
+            dependencies: dependencies);
 
         return header.ToString() + body;
     }

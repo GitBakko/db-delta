@@ -1,3 +1,4 @@
+using DbDelta.Core.Dependency;
 using DbDelta.Core.Diff;
 using DbDelta.Core.ObjectModel;
 using DbDelta.Core.ScriptGen;
@@ -177,6 +178,31 @@ public class DeployScriptBuilderTests
             [pair], "src", "tgt", DateTime.UtcNow);
 
         script.Should().Contain("GRANT EXECUTE ON [dbo].[uspChiudiPeriodo] TO [app_writer];");
+    }
+
+    [Fact]
+    public void Build_orders_by_dependency_edges_when_they_are_supplied()
+    {
+        // Without edges the topological sort degenerates to kind-then-alphabetical
+        // order: View(rank 4) before Function(rank 5), so a new view that selects
+        // from a new function emits first and the deploy dies on Msg 208. The app
+        // used to call Build without ever passing the edges it had in hand.
+        View view = new("dbo", "vFattureIva", "CREATE VIEW dbo.vFattureIva AS SELECT dbo.fnIva(1) AS x", false);
+        Function fn = new("dbo", "fnIva", "CREATE FUNCTION dbo.fnIva(@v int) RETURNS int AS BEGIN RETURN @v END",
+            false, FunctionKind.Scalar);
+        DifferencePair viewPair = new(view.Identity, DifferenceStatus.OnlyInA, view, null);
+        DifferencePair fnPair = new(fn.Identity, DifferenceStatus.OnlyInA, fn, null);
+
+        // The view depends on the function, so the function must emit first.
+        DependencyEdge edge = new(view.Identity, fn.Identity, EdgeKind.ModuleReference);
+
+        string withEdges = DeployScriptBuilder.Build(
+            [viewPair, fnPair], "src", "tgt", DateTime.UtcNow, [edge]);
+
+        int fnPos = withEdges.IndexOf("fnIva", StringComparison.Ordinal);
+        int viewPos = withEdges.IndexOf("vFattureIva", StringComparison.Ordinal);
+        fnPos.Should().BeGreaterThan(0);
+        viewPos.Should().BeGreaterThan(fnPos, "the function the view selects from must be created first");
     }
 
     [Fact]
