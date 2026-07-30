@@ -121,4 +121,73 @@ public class DeployScriptBuilderTests
         script.Should().Contain("BEGIN TRANSACTION");
         script.Should().Contain("COMMIT TRANSACTION");
     }
+
+    // ── Header must never carry a secret ───────────────────────────────────
+
+    [Fact]
+    public void Build_header_never_leaks_a_password_from_a_connection_string()
+    {
+        // Both app call sites pass live connection strings, and this header is
+        // written to a .sql file that gets mailed around and committed.
+        string script = DeployScriptBuilder.Build(
+            [MakeTablePair("dbo", "T", DifferenceStatus.OnlyInA)],
+            "Server=DEV01;Database=App;Encrypt=False;TrustServerCertificate=True;User Id=sa;Password=Dev!Secret",
+            "Server=PROD01;Database=App;User ID=sa;PWD=Pr0d!Secret",
+            DateTime.UtcNow);
+
+        script.Should().NotContain("Dev!Secret");
+        script.Should().NotContain("Pr0d!Secret");
+        script.Should().NotContain("Password=");
+        script.Should().NotContain("PWD=");
+        script.Should().NotContain("User Id=");
+        script.Should().NotContain("User ID=");
+        // Server + database survive, because that is what the header is for.
+        script.Should().Contain("Source    : DEV01 / App");
+        script.Should().Contain("Target    : PROD01 / App");
+    }
+
+    [Fact]
+    public void Build_header_passes_through_a_plain_label_unchanged()
+    {
+        string script = DeployScriptBuilder.Build(
+            [MakeTablePair("dbo", "T", DifferenceStatus.OnlyInA)],
+            "MYSERVER/MyDB",
+            "TARGETSERVER/ProdDB",
+            DateTime.UtcNow);
+
+        script.Should().Contain("Source    : MYSERVER/MyDB");
+        script.Should().Contain("Target    : TARGETSERVER/ProdDB");
+    }
+
+    // ── A selected Permission row must actually be deployed ────────────────
+
+    [Fact]
+    public void Build_emits_permission_ddl_when_a_permission_row_is_selected()
+    {
+        // IgnorePermissions ships inside ComparisonOptions.Default, but the
+        // engine still REPORTS Permission differences, so the grid offers them
+        // for selection. Leaving the flag on made the generator drop them
+        // silently: the script ran, said "succeeded", and the difference was
+        // still there on the next compare. The selection IS the intent.
+        Permission p = new("app_writer", "EXECUTE", PermissionState.Grant,
+            "OBJECT_OR_COLUMN", "dbo", "uspChiudiPeriodo", null);
+        DifferencePair pair = new(p.Identity, DifferenceStatus.OnlyInA, p, null);
+
+        string script = DeployScriptBuilder.Build(
+            [pair], "src", "tgt", DateTime.UtcNow);
+
+        script.Should().Contain("GRANT EXECUTE ON [dbo].[uspChiudiPeriodo] TO [app_writer];");
+    }
+
+    [Fact]
+    public void Build_still_ignores_permissions_when_none_is_selected()
+    {
+        string script = DeployScriptBuilder.Build(
+            [MakeTablePair("dbo", "T", DifferenceStatus.OnlyInA)],
+            "src",
+            "tgt",
+            DateTime.UtcNow);
+
+        script.Should().NotContain("GRANT");
+    }
 }

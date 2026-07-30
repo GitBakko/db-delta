@@ -18,8 +18,11 @@ public static class DeployScriptBuilder
     /// Builds the alignment script for <paramref name="selectedPairs"/>.
     /// </summary>
     /// <param name="selectedPairs">The pairs selected by the user in the grid.</param>
-    /// <param name="sourceEndpointSummary">Human-readable label for the source endpoint (server+db).</param>
-    /// <param name="targetEndpointSummary">Human-readable label for the target endpoint (server+db).</param>
+    /// <param name="sourceEndpointSummary">
+    /// Label for the source endpoint. A full connection string is accepted and
+    /// reduced to server + database — see <see cref="DescribeEndpoint"/>.
+    /// </param>
+    /// <param name="targetEndpointSummary">Same, for the target endpoint.</param>
     /// <param name="nowUtc">The UTC timestamp to embed in the header.</param>
     public static string Build(
         IReadOnlyList<DifferencePair> selectedPairs,
@@ -33,8 +36,8 @@ public static class DeployScriptBuilder
         header.AppendLine("-- ============================================================");
         header.AppendLine($"-- DbDelta alignment script");
         header.AppendLine($"-- Generated : {nowUtc:yyyy-MM-dd HH:mm:ss} UTC");
-        header.AppendLine($"-- Source    : {sourceEndpointSummary}");
-        header.AppendLine($"-- Target    : {targetEndpointSummary}");
+        header.AppendLine($"-- Source    : {DescribeEndpoint(sourceEndpointSummary)}");
+        header.AppendLine($"-- Target    : {DescribeEndpoint(targetEndpointSummary)}");
         header.AppendLine($"-- Objects   : {selectedPairs.Count}");
         header.AppendLine("-- ============================================================");
 
@@ -53,8 +56,83 @@ public static class DeployScriptBuilder
         string body = _generator.Generate(
             syntheticResult,
             selection: null,
-            options: Options.ComparisonOptions.Default | Options.ComparisonOptions.DoNotOutputCommentHeader);
+            options: OptionsFor(selectedPairs));
 
         return header.ToString() + body;
     }
+
+    /// <summary>
+    /// Redgate-parity defaults, minus <c>IgnorePermissions</c> when the user
+    /// explicitly selected a Permission row.
+    /// </summary>
+    /// <remarks>
+    /// <c>IgnorePermissions</c> is part of <see cref="Options.ComparisonOptions.Default"/>,
+    /// but the engine still <em>reports</em> Permission differences, so the grid
+    /// offers them for selection. Leaving the flag on made the generator drop
+    /// them silently: the script ran, reported success, and the difference was
+    /// still there on the next compare. The selection IS the user's intent.
+    /// </remarks>
+    private static Options.ComparisonOptions OptionsFor(IReadOnlyList<DifferencePair> selectedPairs)
+    {
+        Options.ComparisonOptions options =
+            Options.ComparisonOptions.Default | Options.ComparisonOptions.DoNotOutputCommentHeader;
+
+        bool permissionSelected = selectedPairs.Any(
+            p => string.Equals(p.Identity.Kind, "Permission", StringComparison.Ordinal));
+
+        return permissionSelected
+            ? options & ~Options.ComparisonOptions.IgnorePermissions
+            : options;
+    }
+
+    /// <summary>
+    /// Reduces an endpoint label to <c>server / database</c>, dropping every
+    /// other token.
+    /// </summary>
+    /// <remarks>
+    /// The two callers pass live connection strings, which carry the plaintext
+    /// password — and this header is written to a <c>.sql</c> file that gets
+    /// mailed around and committed. Deliberately an ALLOW-list of the two keys
+    /// worth showing rather than a deny-list of secret-bearing ones: an
+    /// unrecognised token (a keyword alias we never enumerated, a fragment of a
+    /// value containing <c>;</c>) is dropped instead of leaked. A label with no
+    /// <c>=</c> at all is not a connection string and passes through unchanged.
+    /// </remarks>
+    internal static string DescribeEndpoint(string endpointSummary)
+    {
+        if (string.IsNullOrWhiteSpace(endpointSummary)) { return "(non impostato)"; }
+        if (!endpointSummary.Contains('=', StringComparison.Ordinal)) { return endpointSummary.Trim(); }
+
+        string? server = null;
+        string? database = null;
+        foreach (string token in endpointSummary.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            int eq = token.IndexOf('=', StringComparison.Ordinal);
+            if (eq <= 0) { continue; }
+            string key = token[..eq].Trim().Replace(" ", string.Empty, StringComparison.Ordinal);
+            string value = token[(eq + 1)..].Trim().Trim('"', '\'');
+            if (value.Length == 0) { continue; }
+            if (server is null && IsServerKey(key)) { server = value; }
+            else if (database is null && IsDatabaseKey(key)) { database = value; }
+        }
+
+        return (server, database) switch
+        {
+            (null, null) => "(endpoint non riconosciuto)",
+            (not null, null) => server,
+            (null, not null) => $"? / {database}",
+            _ => $"{server} / {database}",
+        };
+    }
+
+    private static bool IsServerKey(string key) =>
+        key.Equals("server", StringComparison.OrdinalIgnoreCase)
+        || key.Equals("datasource", StringComparison.OrdinalIgnoreCase)
+        || key.Equals("addr", StringComparison.OrdinalIgnoreCase)
+        || key.Equals("address", StringComparison.OrdinalIgnoreCase)
+        || key.Equals("networkaddress", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsDatabaseKey(string key) =>
+        key.Equals("database", StringComparison.OrdinalIgnoreCase)
+        || key.Equals("initialcatalog", StringComparison.OrdinalIgnoreCase);
 }
