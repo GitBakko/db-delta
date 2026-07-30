@@ -10,22 +10,33 @@ namespace DbDelta.Core.ScriptGen;
 /// Orchestrates per-object emitters and wraps the output in a deployment-ready
 /// batch. Order:
 /// <list type="number">
-///   <item>Prologue — Users, Roles (no inter-object dependencies the resolver
-///       tracks, so they emit up front).</item>
+///   <item>Prologue — Schemas (each in its own batch: CREATE SCHEMA must be
+///       first in a batch), then Users and Roles. None of these have
+///       inter-object dependencies the resolver tracks.</item>
+///   <item>Foreign-key DROP pass — EVERY foreign-key drop, before any object is
+///       touched. Dropping an FK has no ordering prerequisite of its own, while
+///       both DROP TABLE and ALTER COLUMN are blocked by one, so doing all of
+///       them first is both safe and necessary. Covers FKs a Different table
+///       lost or reshaped, and FKs held by any table — Identical ones
+///       included — that point at a table about to be dropped or rebuilt.</item>
 ///   <item>DROP pass — removed objects (<see cref="DifferenceStatus.OnlyInB"/>)
 ///       in reverse-topological order (dependent-first) so a referenced object
 ///       is never dropped before its dependents.</item>
-///   <item>Inbound-FK drop for identity-rebuild targets (#33) — FKs pointing at
-///       a table about to be rebuilt are dropped first so the rebuild succeeds.</item>
 ///   <item>CREATE / ALTER pass — a single topological order
 ///       (<see cref="DependencyResolver"/>) over Sequence,
 ///       UserDefinedType, TableType, Table, View, Function, Procedure, Trigger,
 ///       Synonym, so cross-kind dependencies (e.g. a computed column referencing
 ///       a function) emit in dependency order. With no edges the resolver falls
 ///       back to its stable kind-then-alphabetical order.</item>
-///   <item>Indexes (CREATE / DROP / delta), iterated in table topo order.</item>
-///   <item>Foreign keys — emitted last so referenced tables already exist; this
-///       also breaks FK cycles. Includes the #33 inbound-FK re-add.</item>
+///   <item>Indexes — the delta for a normal table; the FULL source-side set for
+///       a rebuilt one, whose indexes went with its DROP TABLE.</item>
+///   <item>Trigger re-create for rebuilt tables — including triggers that are
+///       Identical on both sides, which no other pass would ever emit.</item>
+///   <item>Foreign-key ADD pass — last, so referenced tables already exist; this
+///       also breaks FK cycles. Includes the #33 inbound-FK re-add and the full
+///       outbound set for rebuilt tables.</item>
+///   <item>Schema DROP pass — after every object pass, so a removed schema is
+///       already empty.</item>
 ///   <item>Permissions — GRANT / REVOKE, gated on
 ///       <see cref="ComparisonOptions.IgnorePermissions"/> (default ON).</item>
 /// </list>
@@ -76,25 +87,12 @@ public sealed class ScriptGenerator
                 rebuildTargets.Add((src.Schema, src.Name));
             }
         }
-        List<(string FromSchema, string FromTable, ForeignKey FK)> inboundFkDrops = [];
         List<(string FromSchema, string FromTable, ForeignKey FK)> inboundFkAdds = [];
         HashSet<string> rebuildOrchestratedFkNames = new(StringComparer.Ordinal);
         if (rebuildTargets.Count > 0)
         {
             foreach (DifferencePair p in result.Differences.Where(x => x.Identity.Kind == "Table"))
             {
-                if (p.SideB is Table tgtT)
-                {
-                    foreach (ForeignKey fk in tgtT.Constraints.OfType<ForeignKey>())
-                    {
-                        if (rebuildTargets.Contains((fk.ReferencedSchema, fk.ReferencedTable))
-                            && !rebuildTargets.Contains((tgtT.Schema, tgtT.Name)))
-                        {
-                            inboundFkDrops.Add((tgtT.Schema, tgtT.Name, fk));
-                            rebuildOrchestratedFkNames.Add(fk.Name);
-                        }
-                    }
-                }
                 if (p.SideA is Table srcT)
                 {
                     foreach (ForeignKey fk in srcT.Constraints.OfType<ForeignKey>())
@@ -105,6 +103,73 @@ public sealed class ScriptGenerator
                             inboundFkAdds.Add((srcT.Schema, srcT.Name, fk));
                             rebuildOrchestratedFkNames.Add(fk.Name);
                         }
+                    }
+                }
+            }
+        }
+
+        // ── Every foreign-key DROP, collected up front.
+        //    Dropping a foreign key has no ordering prerequisite of its own, so
+        //    doing all of them before anything else is always safe — and it is
+        //    what makes the later DROP TABLE possible at all. Previously the FK
+        //    drops lived in the FK pass at the very END of the script, so a
+        //    table removed from the source was dropped while another table still
+        //    referenced it: Msg 3726, every time. Three sources feed this:
+        //      (a) target-side FKs that a Different table lost or reshaped;
+        //      (b) FKs held by ANY table — Identical ones included, which never
+        //          appear in `pairs` — pointing at a table about to be DROPped;
+        //      (c) the same, pointing at a table about to be rebuilt (#33).
+        //    (c) used to be a separate pass; folding it in here removes the
+        //    duplication and orders it earlier, which is strictly safer.
+        HashSet<(string Schema, string Name)> droppedTables = [.. pairs
+            .Where(p => p.Identity.Kind == "Table" && p.Status == DifferenceStatus.OnlyInB)
+            .Select(p => p.SideB)
+            .OfType<Table>()
+            .Select(t => (t.Schema, t.Name))];
+
+        List<(string FromSchema, string FromTable, ForeignKey FK)> fkDrops = [];
+        HashSet<string> fkDropNames = new(StringComparer.Ordinal);
+        void AddFkDrop(string schema, string table, ForeignKey fk)
+        {
+            // Constraint names are database-scoped, so the name alone dedupes.
+            if (fkDropNames.Add(fk.Name))
+            {
+                fkDrops.Add((schema, table, fk));
+            }
+        }
+
+        foreach (DifferencePair p in pairs.Where(x =>
+            x.Identity.Kind == "Table" && x.Status == DifferenceStatus.Different))
+        {
+            if (p.SideA is not Table sideA || p.SideB is not Table sideB) { continue; }
+            var srcFks = sideA.Constraints.OfType<ForeignKey>()
+                .ToDictionary(f => f.Name, StringComparer.Ordinal);
+            foreach (ForeignKey t in sideB.Constraints.OfType<ForeignKey>())
+            {
+                bool stillThere = srcFks.TryGetValue(t.Name, out ForeignKey? s);
+                if (!stillThere || !ForeignKeyShapeEqual(t, s!))
+                {
+                    AddFkDrop(sideA.Schema, sideA.Name, t);
+                }
+            }
+        }
+
+        if (droppedTables.Count > 0 || rebuildTargets.Count > 0)
+        {
+            foreach (DifferencePair p in result.Differences.Where(x => x.Identity.Kind == "Table"))
+            {
+                if (p.SideB is not Table holder) { continue; }
+                // A table that is itself being dropped takes its own FKs with it.
+                if (droppedTables.Contains((holder.Schema, holder.Name))) { continue; }
+                foreach (ForeignKey fk in holder.Constraints.OfType<ForeignKey>())
+                {
+                    (string, string) referenced = (fk.ReferencedSchema, fk.ReferencedTable);
+                    bool pointsAtDropped = droppedTables.Contains(referenced);
+                    bool pointsAtRebuilt = rebuildTargets.Contains(referenced)
+                        && !rebuildTargets.Contains((holder.Schema, holder.Name));
+                    if (pointsAtDropped || pointsAtRebuilt)
+                    {
+                        AddFkDrop(holder.Schema, holder.Name, fk);
                     }
                 }
             }
@@ -141,6 +206,20 @@ public sealed class ScriptGenerator
         EmitUsers(writer, pairs);
         EmitRoles(writer, pairs);
 
+        // Foreign-key DROP pass — before every object drop, because a table
+        //     cannot be dropped while any FK still references it, and an
+        //     ALTER COLUMN cannot run while an FK constrains the column.
+        if (fkDrops.Count > 0)
+        {
+            StringBuilder fkDropBody = new();
+            foreach ((string fromSchema, string fromTable, ForeignKey fk) in fkDrops)
+            {
+                fkDropBody.Append("ALTER TABLE [").Append(fromSchema).Append("].[").Append(fromTable)
+                          .Append("] DROP CONSTRAINT [").Append(fk.Name).AppendLine("];");
+            }
+            writer.WriteBatch("Dropping foreign keys", fkDropBody.ToString());
+        }
+
         // DROP pass — objects only in B (removed from source) must be dropped in
         // reverse topological order (dependent-first) so referenced objects are not
         // dropped before their dependents.
@@ -150,21 +229,6 @@ public sealed class ScriptGenerator
             if (pair.Status != DifferenceStatus.OnlyInB) { continue; }
             string? body = DispatchBuild(id.Kind, pair);
             if (!string.IsNullOrWhiteSpace(body)) { writer.WriteBatch(PhaseLabel(pair), body); }
-        }
-
-        // Inbound-FK drop (identity rebuild, #33) — drop inbound FKs to tables
-        //     that are about to be rebuilt (M13-PARITY.6) so DROP TABLE
-        //     succeeds. The foreign-key pass below skips these names so the
-        //     same FK isn't dropped twice.
-        if (inboundFkDrops.Count > 0)
-        {
-            StringBuilder dropBody = new();
-            foreach ((string fromSchema, string fromTable, ForeignKey fk) in inboundFkDrops)
-            {
-                dropBody.Append("ALTER TABLE [").Append(fromSchema).Append("].[").Append(fromTable)
-                        .Append("] DROP CONSTRAINT [").Append(fk.Name).AppendLine("];");
-            }
-            writer.WriteBatch("Dropping inbound foreign keys for rebuilt tables", dropBody.ToString());
         }
 
         // CREATE pass — all non-drop objects in topological (referenced-first) order.
@@ -319,10 +383,10 @@ public sealed class ScriptGenerator
 
                 case DifferenceStatus.Different when pair.SideA is Table tSrc && pair.SideB is Table tTgt:
                     {
-                        string fkDelta = EmitFkDelta(tSrc, tTgt, rebuildOrchestratedFkNames);
-                        if (fkDelta.Length > 0)
+                        string fkAdds = EmitFkAdds(tSrc, tTgt, rebuildOrchestratedFkNames);
+                        if (fkAdds.Length > 0)
                         {
-                            writer.WriteBatch($"Updating foreign keys on [{tSrc.Schema}].[{tSrc.Name}]", fkDelta);
+                            writer.WriteBatch($"Adding foreign keys on [{tSrc.Schema}].[{tSrc.Name}]", fkAdds);
                         }
                         break;
                     }
@@ -762,7 +826,17 @@ public sealed class ScriptGenerator
     /// <see cref="EmitIndexDelta"/>: drops first, then adds; changed FKs are
     /// dropped + re-added.
     /// </summary>
-    private string EmitFkDelta(Table src, Table tgt, HashSet<string>? skipNames = null)
+    /// <summary>
+    /// Emits the ADD half of a table's foreign-key delta: FKs present on the
+    /// source that the target lacks or whose shape changed.
+    /// </summary>
+    /// <remarks>
+    /// The DROP half deliberately lives in the up-front foreign-key drop pass in
+    /// <see cref="Generate"/>, not here. Emitting it at this point — the end of
+    /// the script — meant a table removed from the source was DROPped while
+    /// another table still referenced it (Msg 3726).
+    /// </remarks>
+    private string EmitFkAdds(Table src, Table tgt, HashSet<string>? skipNames = null)
     {
         StringBuilder sb = new();
         var srcFks =
@@ -770,16 +844,6 @@ public sealed class ScriptGenerator
         var tgtFks =
             tgt.Constraints.OfType<ForeignKey>().ToDictionary(fk => fk.Name, StringComparer.Ordinal);
 
-        foreach (ForeignKey t in tgtFks.Values)
-        {
-            if (skipNames is not null && skipNames.Contains(t.Name)) { continue; }
-            bool stillThere = srcFks.TryGetValue(t.Name, out ForeignKey? s);
-            bool shapeChanged = stillThere && !ForeignKeyShapeEqual(t, s!);
-            if (!stillThere || shapeChanged)
-            {
-                sb.AppendLine($"ALTER TABLE [{src.Schema}].[{src.Name}] DROP CONSTRAINT [{t.Name}];");
-            }
-        }
         foreach (ForeignKey s in srcFks.Values)
         {
             if (skipNames is not null && skipNames.Contains(s.Name)) { continue; }
