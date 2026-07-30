@@ -250,12 +250,14 @@ public sealed class ScriptGenerator
         DeploymentScriptWriter writer = new(sb, useTransaction);
         writer.WritePreamble(includeHeader);
 
-        // Prologue: Schemas, then Users + Roles.
+        // Prologue: Schemas, then Users + Roles — CREATE / ALTER only.
+        //    Principal DROPs are in the epilogue: a principal that owns a schema
+        //    or an object cannot be dropped before them (Msg 15138).
         //    Sequences, UDTs, TableTypes, Tables, Views, Functions, Procedures,
         //    Triggers, and Synonyms are emitted by the topo-ordered passes below.
         EmitSchemaCreates(writer, result, pairs);
-        EmitUsers(writer, pairs);
-        EmitRoles(writer, pairs);
+        EmitUsers(writer, pairs, drops: false);
+        EmitRoles(writer, pairs, drops: false);
 
         // Foreign-key DROP pass — before every object drop, because a table
         //     cannot be dropped while any FK still references it, and an
@@ -484,13 +486,23 @@ public sealed class ScriptGenerator
         //    schema held are already gone.
         EmitSchemaDrops(writer, pairs);
 
-        // Permissions — last, gated on options. Default (Redgate-parity)
-        //    skips permissions entirely; consumers can clear the flag to
-        //    include GRANT / REVOKE statements.
+        // Permissions — gated on options. Default (Redgate-parity) skips
+        //    permissions entirely; consumers can clear the flag to include
+        //    GRANT / REVOKE statements. Before the principal drops, so a REVOKE
+        //    still has a principal to name.
         if (!options.HasFlag(ComparisonOptions.IgnorePermissions))
         {
             EmitPermissions(writer, pairs);
         }
+
+        // Principal drops — the very end. `DROP USER` used to sit in the
+        //    prologue while `DROP SCHEMA` sat 200 lines later, so a user owning
+        //    a target-only schema died on Msg 15138 ("The database principal
+        //    owns a schema in the database, and cannot be dropped") — and the
+        //    same for a user owning any object the DROP pass removes. Roles go
+        //    first: a user that owns a role cannot be dropped either.
+        EmitRoles(writer, pairs, drops: true);
+        EmitUsers(writer, pairs, drops: true);
 
         writer.WriteVerdict();
         return sb.ToString();
@@ -760,10 +772,14 @@ public sealed class ScriptGenerator
         }
     }
 
-    private void EmitUsers(DeploymentScriptWriter writer, IReadOnlyList<DifferencePair> pairs)
+    // `drops: true` emits only the DROP USER half, which the epilogue owns;
+    // `false` the CREATE / ALTER half, which the prologue owns. One method
+    // rather than two so the two halves cannot drift apart.
+    private void EmitUsers(DeploymentScriptWriter writer, IReadOnlyList<DifferencePair> pairs, bool drops)
     {
         foreach (DifferencePair pair in pairs
             .Where(p => p.Identity.Kind == "User")
+            .Where(p => IsPrincipalDrop(p) == drops)
             .OrderBy(p => p.Identity.ObjectName, StringComparer.OrdinalIgnoreCase))
         {
             string? body = null;
@@ -792,15 +808,20 @@ public sealed class ScriptGenerator
         }
     }
 
+    private static bool IsPrincipalDrop(DifferencePair pair) =>
+        pair.Status == DifferenceStatus.OnlyInB;
+
     private static bool DefaultSchemaIsOnlyDifference(DatabaseUser a, DatabaseUser b) =>
         string.Equals(a.TypeCode, b.TypeCode, StringComparison.Ordinal)
         && string.Equals(a.LoginName, b.LoginName, StringComparison.OrdinalIgnoreCase)
         && !string.Equals(a.DefaultSchema, b.DefaultSchema, StringComparison.OrdinalIgnoreCase);
 
-    private void EmitRoles(DeploymentScriptWriter writer, IReadOnlyList<DifferencePair> pairs)
+    // Same split as EmitUsers.
+    private void EmitRoles(DeploymentScriptWriter writer, IReadOnlyList<DifferencePair> pairs, bool drops)
     {
         foreach (DifferencePair pair in pairs
             .Where(p => p.Identity.Kind == "Role")
+            .Where(p => IsPrincipalDrop(p) == drops)
             .OrderBy(p => p.Identity.ObjectName, StringComparer.OrdinalIgnoreCase))
         {
             string? body = null;

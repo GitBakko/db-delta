@@ -111,6 +111,45 @@ public class SchemaEmissionTests
     }
 
     [Fact]
+    public void A_principal_is_dropped_after_the_schema_and_the_objects_it_could_own()
+    {
+        // DROP USER used to sit in the prologue while DROP SCHEMA sat at the end
+        // of the script, so a user owning a target-only schema died on Msg 15138
+        // ("The database principal owns a schema in the database, and cannot be
+        // dropped"). Same for a user owning any object the DROP pass removes.
+        // The CREATE half must stay in the prologue — asserted in the same
+        // arrange, since moving both halves would be just as wrong.
+        Table legacyTable = T("legacy", "OldOrder");
+        DatabaseUser goingAway = new("legacy_owner", "S", "legacy_login", "legacy");
+        DatabaseUser arriving = new("app_reader", "S", "app_login", "dbo");
+        Table newTable = T("dbo", "Nuova");
+
+        ComparisonResult r = new(
+        [
+            new DifferencePair(newTable.Identity, DifferenceStatus.OnlyInA, newTable, null),
+            new DifferencePair(legacyTable.Identity, DifferenceStatus.OnlyInB, null, legacyTable),
+            new DifferencePair(new Schema("legacy").Identity, DifferenceStatus.OnlyInB, null, new Schema("legacy")),
+            new DifferencePair(goingAway.Identity, DifferenceStatus.OnlyInB, null, goingAway),
+            new DifferencePair(arriving.Identity, DifferenceStatus.OnlyInA, arriving, null),
+        ]);
+
+        string sql = new ScriptGenerator().Generate(r);
+
+        int dropTable = sql.IndexOf("DROP TABLE [legacy].[OldOrder];", StringComparison.Ordinal);
+        int dropSchema = sql.IndexOf("DROP SCHEMA [legacy];", StringComparison.Ordinal);
+        int dropUser = sql.IndexOf("DROP USER [legacy_owner];", StringComparison.Ordinal);
+        int createUser = sql.IndexOf("CREATE USER [app_reader]", StringComparison.Ordinal);
+        int createTable = sql.IndexOf("CREATE TABLE [dbo].[Nuova]", StringComparison.Ordinal);
+
+        dropTable.Should().BeGreaterThan(0);
+        dropSchema.Should().BeGreaterThan(dropTable);
+        dropUser.Should().BeGreaterThan(dropSchema,
+            "a principal owning the schema cannot be dropped before it");
+        createUser.Should().BeGreaterThan(0).And.BeLessThan(createTable,
+            "the CREATE half stays in the prologue — a new object may reference the new user");
+    }
+
+    [Fact]
     public void A_schema_the_selection_needs_is_created_even_when_its_row_is_not_ticked()
     {
         // The GUI shape. The user ticks the one table row; the Schema row for
