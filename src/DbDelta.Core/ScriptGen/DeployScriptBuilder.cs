@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Text;
 using DbDelta.Core.Diff;
 
@@ -121,26 +122,45 @@ public static class DeployScriptBuilder
     /// password — and this header is written to a <c>.sql</c> file that gets
     /// mailed around and committed. Deliberately an ALLOW-list of the two keys
     /// worth showing rather than a deny-list of secret-bearing ones: an
-    /// unrecognised token (a keyword alias we never enumerated, a fragment of a
-    /// value containing <c>;</c>) is dropped instead of leaked. A label with no
-    /// <c>=</c> at all is not a connection string and passes through unchanged.
+    /// unrecognised key is dropped instead of leaked. A label with no <c>=</c>
+    /// at all is not a connection string and passes through unchanged.
+    /// <para>
+    /// Tokenising is delegated to <see cref="DbConnectionStringBuilder"/>, which
+    /// knows the quoting rules. Splitting on <c>;</c> by hand did not: a value
+    /// may legally contain a semicolon when quoted, so
+    /// <c>Password="a;Server=hunter2"</c> tokenised into a truncated password
+    /// and a <c>Server</c> key whose "value" was half the password — printed
+    /// into the header as the server name. Unreachable from the setup dialog,
+    /// reachable from the raw connection-string box and from the
+    /// <c>{PASSWORD}</c> template substitution in the connection store.
+    /// </para>
     /// </remarks>
     internal static string DescribeEndpoint(string endpointSummary)
     {
         if (string.IsNullOrWhiteSpace(endpointSummary)) { return "(non impostato)"; }
         if (!endpointSummary.Contains('=', StringComparison.Ordinal)) { return endpointSummary.Trim(); }
 
+        DbConnectionStringBuilder parsed;
+        try
+        {
+            parsed = new DbConnectionStringBuilder { ConnectionString = endpointSummary };
+        }
+        catch (ArgumentException)
+        {
+            // Not a parsable connection string. Say nothing rather than guess:
+            // whatever is in there, some of it is probably a secret.
+            return "(endpoint non riconosciuto)";
+        }
+
         string? server = null;
         string? database = null;
-        foreach (string token in endpointSummary.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        foreach (string key in parsed.Keys.OfType<string>())
         {
-            int eq = token.IndexOf('=', StringComparison.Ordinal);
-            if (eq <= 0) { continue; }
-            string key = token[..eq].Trim().Replace(" ", string.Empty, StringComparison.Ordinal);
-            string value = token[(eq + 1)..].Trim().Trim('"', '\'');
+            string normalized = key.Replace(" ", string.Empty, StringComparison.Ordinal);
+            string value = parsed[key]?.ToString()?.Trim() ?? string.Empty;
             if (value.Length == 0) { continue; }
-            if (server is null && IsServerKey(key)) { server = value; }
-            else if (database is null && IsDatabaseKey(key)) { database = value; }
+            if (server is null && IsServerKey(normalized)) { server = value; }
+            else if (database is null && IsDatabaseKey(normalized)) { database = value; }
         }
 
         return (server, database) switch

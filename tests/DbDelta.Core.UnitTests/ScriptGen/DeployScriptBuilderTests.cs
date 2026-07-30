@@ -161,6 +161,26 @@ public class DeployScriptBuilderTests
     }
 
     [Fact]
+    public void Build_header_never_prints_a_quoted_password_as_the_server_name()
+    {
+        // A connection-string value may legally contain a semicolon when
+        // quoted. Splitting on ';' by hand turned this into the tokens
+        // `Password="a` and `Server=hunter2"`, so the allow-list happily
+        // accepted half the password AS the server name and printed it into a
+        // file people mail around. Unreachable from the setup dialog, reachable
+        // from the raw connection-string box.
+        string script = BuildAllSelected(
+            [MakeTablePair("dbo", "T", DifferenceStatus.OnlyInA)],
+            "Password=\"a;Server=hunter2\";Data Source=REAL01;Initial Catalog=App",
+            "tgt",
+            DateTime.UtcNow);
+
+        script.Should().NotContain("hunter2");
+        script.Should().Contain("Source    : REAL01 / App",
+            "the real keys must still be found once the string is parsed properly");
+    }
+
+    [Fact]
     public void Build_header_passes_through_a_plain_label_unchanged()
     {
         string script = BuildAllSelected(
