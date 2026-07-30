@@ -134,9 +134,10 @@ public sealed class ScriptGenerator
         DeploymentScriptWriter writer = new(sb, useTransaction);
         writer.WritePreamble(includeHeader);
 
-        // Prologue: Users + Roles.
+        // Prologue: Schemas, then Users + Roles.
         //    Sequences, UDTs, TableTypes, Tables, Views, Functions, Procedures,
         //    Triggers, and Synonyms are emitted by the topo-ordered passes below.
+        EmitSchemaCreates(writer, pairs);
         EmitUsers(writer, pairs);
         EmitRoles(writer, pairs);
 
@@ -348,6 +349,10 @@ public sealed class ScriptGenerator
             writer.WriteBatch("Re-adding inbound foreign keys to rebuilt tables", addBody.ToString());
         }
 
+        // Schema drops — after every object pass, so the objects a removed
+        //    schema held are already gone.
+        EmitSchemaDrops(writer, pairs);
+
         // Permissions — last, gated on options. Default (Redgate-parity)
         //    skips permissions entirely; consumers can clear the flag to
         //    include GRANT / REVOKE statements.
@@ -365,8 +370,12 @@ public sealed class ScriptGenerator
     private static string PhaseLabel(DifferencePair pair)
     {
         ObjectIdentity id = pair.Identity;
-        bool schemaScoped = id.Kind is not ("User" or "Role" or "Permission");
-        string name = schemaScoped ? $"[{id.SchemaName}].[{id.ObjectName}]" : $"[{id.ObjectName}]";
+        // A Schema carries its name in SchemaName and leaves ObjectName empty,
+        // so neither of the two normal shapes applies.
+        bool schemaScoped = id.Kind is not ("User" or "Role" or "Permission" or "Schema");
+        string name = id.Kind is "Schema"
+            ? $"[{id.SchemaName}]"
+            : schemaScoped ? $"[{id.SchemaName}].[{id.ObjectName}]" : $"[{id.ObjectName}]";
         string verb = pair.Status switch
         {
             DifferenceStatus.OnlyInA => "Creating",
@@ -546,6 +555,39 @@ public sealed class ScriptGenerator
         };
 
     // ── Users / Roles / Permissions emitters ───────────────────────────────
+
+    /// <summary>
+    /// Emits <c>CREATE SCHEMA</c> for source-only schemas, one per batch.
+    /// </summary>
+    /// <remarks>
+    /// One batch each is required, not stylistic: <c>CREATE SCHEMA</c> must be
+    /// the first statement in its batch, so concatenating several into one body
+    /// would make every statement after the first a syntax error.
+    /// </remarks>
+    private static void EmitSchemaCreates(DeploymentScriptWriter writer, IReadOnlyList<DifferencePair> pairs)
+    {
+        foreach (DifferencePair pair in pairs
+            .Where(p => p.Identity.Kind == "Schema" && p.Status == DifferenceStatus.OnlyInA)
+            .OrderBy(p => p.Identity.SchemaName, StringComparer.OrdinalIgnoreCase))
+        {
+            if (pair.SideA is not Schema s) { continue; }
+            writer.WriteBatch(PhaseLabel(pair), SchemaScriptEmitter.EmitCreate(s));
+        }
+    }
+
+    /// <summary>
+    /// Emits <c>DROP SCHEMA</c> for target-only schemas, one per batch.
+    /// </summary>
+    private static void EmitSchemaDrops(DeploymentScriptWriter writer, IReadOnlyList<DifferencePair> pairs)
+    {
+        foreach (DifferencePair pair in pairs
+            .Where(p => p.Identity.Kind == "Schema" && p.Status == DifferenceStatus.OnlyInB)
+            .OrderBy(p => p.Identity.SchemaName, StringComparer.OrdinalIgnoreCase))
+        {
+            if (pair.SideB is not Schema s) { continue; }
+            writer.WriteBatch(PhaseLabel(pair), SchemaScriptEmitter.EmitDrop(s));
+        }
+    }
 
     private void EmitUsers(DeploymentScriptWriter writer, IReadOnlyList<DifferencePair> pairs)
     {

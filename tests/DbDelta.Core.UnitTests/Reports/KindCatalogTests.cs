@@ -8,24 +8,26 @@ namespace DbDelta.Core.UnitTests.Reports;
 public class KindCatalogTests
 {
     [Theory]
-    [InlineData("Table", 0)]
-    [InlineData("View", 1)]
-    [InlineData("Procedure", 2)]
-    [InlineData("Function", 3)]
-    [InlineData("Trigger", 4)]
-    [InlineData("Sequence", 5)]
-    [InlineData("Synonym", 6)]
-    [InlineData("UserDefinedType", 7)]
-    [InlineData("TableType", 8)]
-    [InlineData("User", 9)]
-    [InlineData("Role", 10)]
-    [InlineData("Permission", 11)]
+    [InlineData("Schema", 0)]
+    [InlineData("Table", 1)]
+    [InlineData("View", 2)]
+    [InlineData("Procedure", 3)]
+    [InlineData("Function", 4)]
+    [InlineData("Trigger", 5)]
+    [InlineData("Sequence", 6)]
+    [InlineData("Synonym", 7)]
+    [InlineData("UserDefinedType", 8)]
+    [InlineData("TableType", 9)]
+    [InlineData("User", 10)]
+    [InlineData("Role", 11)]
+    [InlineData("Permission", 12)]
     public void SortOrder_returns_canonical_index_for_known_kind(string kind, int expectedOrder) => KindCatalog.SortOrder(kind).Should().Be(expectedOrder);
 
     [Fact]
     public void SortOrder_returns_max_value_for_unknown_kind_so_it_sorts_last() => KindCatalog.SortOrder("ZZUnknown").Should().Be(int.MaxValue);
 
     [Theory]
+    [InlineData("Schema", "Schemi")]
     [InlineData("Table", "Tabelle")]
     [InlineData("View", "Viste")]
     [InlineData("Procedure", "Procedure")]
@@ -51,10 +53,10 @@ public class KindCatalogTests
     public void StatusOrder_classifies_by_visual_importance(DifferenceStatus status, int expected) => KindCatalog.StatusOrder(status).Should().Be(expected);
 
     [Fact]
-    public void KnownKinds_lists_all_twelve_in_canonical_order()
+    public void KnownKinds_lists_all_thirteen_in_canonical_order()
     {
         KindCatalog.KnownKinds.Should().Equal(
-            "Table", "View", "Procedure", "Function", "Trigger",
+            "Schema", "Table", "View", "Procedure", "Function", "Trigger",
             "Sequence", "Synonym", "UserDefinedType", "TableType",
             "User", "Role", "Permission");
     }

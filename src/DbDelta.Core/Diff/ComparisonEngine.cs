@@ -15,6 +15,7 @@ public sealed class ComparisonEngine
         ArgumentNullException.ThrowIfNull(b);
 
         List<DifferencePair> pairs = [];
+        pairs.AddRange(CompareSchemas(a.Schemas, b.Schemas));
         pairs.AddRange(CompareTables(a, b, options));
         pairs.AddRange(CompareModules(a.Views, b.Views));
         pairs.AddRange(CompareModules(a.Procedures, b.Procedures));
@@ -29,6 +30,55 @@ public sealed class ComparisonEngine
         pairs.AddRange(ComparePermissions(a.Permissions, b.Permissions));
 
         return new ComparisonResult(pairs);
+    }
+
+    // ── Schemas ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Pairs schemas by name, reporting only the ones that exist on a single
+    /// side.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Schemas were read and then thrown away, so a source-only schema was
+    /// never reported and no <c>CREATE SCHEMA</c> was ever emitted — any object
+    /// living in a schema the target lacked made the deploy fail on its first
+    /// statement with Msg 2760.
+    /// </para>
+    /// <para>
+    /// Unlike every other kind, schemas present on BOTH sides are deliberately
+    /// not emitted as Identical pairs. A schema is modelled by its name alone,
+    /// so a pair that matches by identity is equal by construction: the row
+    /// could never carry information, and <c>dbo</c> would appear in every
+    /// comparison anyone ever runs. Revisit this if the model gains an owner
+    /// (<c>sys.schemas.principal_id</c>), which would make Different reachable
+    /// and the pair worth reporting.
+    /// </para>
+    /// <para>
+    /// The reader already filters out the system schemas (sys,
+    /// INFORMATION_SCHEMA, guest, db_*), so nothing here can emit a
+    /// <c>DROP SCHEMA [db_datareader]</c>.
+    /// </para>
+    /// </remarks>
+    private static IEnumerable<DifferencePair> CompareSchemas(
+        IReadOnlyList<Schema> ax, IReadOnlyList<Schema> bx)
+    {
+        var aByIdentity = ax.ToDictionary(s => s.Identity);
+        var bByIdentity = bx.ToDictionary(s => s.Identity);
+        HashSet<ObjectIdentity> all = [.. aByIdentity.Keys];
+        all.UnionWith(bByIdentity.Keys);
+
+        foreach (ObjectIdentity id in all.OrderBy(i => i.SchemaName, StringComparer.OrdinalIgnoreCase))
+        {
+            bool inA = aByIdentity.TryGetValue(id, out Schema? sideA);
+            bool inB = bByIdentity.TryGetValue(id, out Schema? sideB);
+            if (inA && inB) { continue; }
+            yield return new DifferencePair(
+                id,
+                inA ? DifferenceStatus.OnlyInA : DifferenceStatus.OnlyInB,
+                sideA,
+                sideB);
+        }
     }
 
     // ── M6: Users / Roles / Permissions ────────────────────────────────────

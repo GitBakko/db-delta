@@ -3,7 +3,7 @@ using DbDelta.Core.Diff;
 namespace DbDelta.Core.Reports;
 
 /// <summary>
-/// Single source of truth for how the twelve supported object Kinds present
+/// Single source of truth for how the thirteen supported object Kinds present
 /// themselves in user-facing artefacts (HTML report sections, JSON report
 /// ordering). Mirrors the canonical sort order documented in the M0 spec and
 /// the Italian display labels used throughout the Avalonia UI.
@@ -12,6 +12,7 @@ public static class KindCatalog
 {
     public static readonly IReadOnlyList<string> KnownKinds =
     [
+        "Schema",
         "Table",
         "View",
         "Procedure",
@@ -30,6 +31,7 @@ public static class KindCatalog
 
     private static readonly Dictionary<string, string> ItalianLabels = new(StringComparer.Ordinal)
     {
+        ["Schema"] = "Schemi",
         ["Table"] = "Tabelle",
         ["View"] = "Viste",
         ["Procedure"] = "Procedure",
