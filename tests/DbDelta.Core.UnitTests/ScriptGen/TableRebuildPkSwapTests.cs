@@ -262,6 +262,39 @@ public class TableRebuildPkSwapTests
         sql.Should().NotContain("FK_");
     }
 
+    [Fact]
+    public void Rebuild_tmp_table_carries_no_inline_default_for_a_named_default()
+    {
+        // The rebuild re-adds named constraints by name AFTER sp_rename. If the
+        // _tmp table were created with the default inline, SQL Server would
+        // auto-name it there and the later re-add would fail with "Column
+        // already has a DEFAULT bound to it" — so the _tmp create must omit it.
+        DefaultConstraint df = new("DF_Invoice_CreatedAt", "CreatedAt", "(sysutcdatetime())");
+        Table src = new("dbo", "Invoice",
+            [
+                new Column("Id", "int", false, 1, isIdentity: true, identitySeed: 1, identityIncrement: 1),
+                new Column("CreatedAt", "datetime2", false, 2, defaultExpression: "(sysutcdatetime())"),
+            ],
+            [df],
+            []);
+        Table tgt = new("dbo", "Invoice",
+            [
+                new Column("Id", "int", false, 1),
+                new Column("CreatedAt", "datetime2", false, 2, defaultExpression: "(sysutcdatetime())"),
+            ],
+            [df],
+            []);
+
+        string sql = new TableScriptEmitter().Emit(
+            new DifferencePair(src.Identity, DifferenceStatus.Different, src, tgt));
+
+        // Sanity: this really is the rebuild path.
+        sql.Should().Contain("[dbo].[Invoice_tmp]");
+        // The default appears exactly once, as the post-rename named re-add.
+        CountOccurrences(sql, "DEFAULT (sysutcdatetime())").Should().Be(1);
+        sql.Should().Contain("ADD CONSTRAINT [DF_Invoice_CreatedAt] DEFAULT (sysutcdatetime()) FOR [CreatedAt];");
+    }
+
     private static int CountOccurrences(string haystack, string needle)
     {
         int count = 0;

@@ -175,4 +175,50 @@ public class TableAlterDeltaTests
         string sql = new ScriptGenerator().Generate(result);
         sql.Should().Contain("ADD CONSTRAINT [FK_X_Y] FOREIGN KEY ([YId])");
     }
+
+    // ── Named DEFAULT constraints travel inline on the ADD ─────────────────
+
+    [Fact]
+    public void EmitAlter_adds_not_null_column_with_its_default_inline()
+    {
+        // A NOT NULL column added to a populated table WITHOUT a DEFAULT fails
+        // with Msg 4901 ("ALTER TABLE only allows columns to be added that can
+        // contain nulls, or have a DEFAULT definition specified") — and this is
+        // the single most common real migration there is. The default must ride
+        // on the ADD, keeping its constraint name, not arrive as a later
+        // standalone ADD CONSTRAINT.
+        DefaultConstraint df = new("DF_X_Status", "Status", "((0))");
+        Table src = T("X",
+            new Column("Id", "int", false, 1),
+            new Column("Status", "int", false, 2, defaultExpression: "((0))")) with
+        { Constraints = [df] };
+        Table tgt = T("X", new Column("Id", "int", false, 1));
+
+        string sql = new TableScriptEmitter().Emit(Diff(src, tgt));
+
+        sql.Should().Contain("ADD [Status] [int] NOT NULL CONSTRAINT [DF_X_Status] DEFAULT ((0));");
+        // ...and must NOT also be re-added standalone, which would fail with
+        // "Column already has a DEFAULT bound to it".
+        sql.Should().NotContain("ADD CONSTRAINT [DF_X_Status]");
+    }
+
+    [Fact]
+    public void EmitCreate_puts_named_default_on_the_column_not_at_table_level()
+    {
+        // DEFAULT is absent from the T-SQL table_constraint grammar: a
+        // table-level "CONSTRAINT [x] DEFAULT (e) FOR [c]" inside CREATE TABLE
+        // is Msg 102. The column-level form is the only valid one and keeps the
+        // constraint name. (A golden test used to pin the broken form.)
+        DefaultConstraint df = new("DF_X_CreatedAt", "CreatedAt", "(sysutcdatetime())");
+        Table src = T("X",
+            new Column("Id", "int", false, 1),
+            new Column("CreatedAt", "datetime2", false, 2, defaultExpression: "(sysutcdatetime())"))
+            with
+        { Constraints = [df] };
+
+        string sql = TableScriptEmitter.GenerateCreateTable(src);
+
+        sql.Should().Contain("[CreatedAt] [datetime2] NOT NULL CONSTRAINT [DF_X_CreatedAt] DEFAULT (sysutcdatetime())");
+        sql.Should().NotContain("FOR [CreatedAt]");
+    }
 }

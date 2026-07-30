@@ -30,16 +30,27 @@ public sealed class TableScriptEmitter : IScriptEmitter
         StringBuilder sb = new();
         sb.Append("CREATE TABLE [").Append(table.Schema).Append("].[").Append(table.Name).AppendLine("] (");
 
-        HashSet<string> colsWithNamedDefault = includeNamedConstraints
-            ? [.. table.Constraints.OfType<DefaultConstraint>().Select(d => d.ColumnName)]
-            : [];
+        // Named DEFAULT constraints are resolved up-front and always passed to
+        // FormatColumn, because DEFAULT is the one constraint kind that CREATE
+        // TABLE only accepts *inline on the column* — it is absent from the
+        // table_constraint grammar, so a table-level
+        // "CONSTRAINT [x] DEFAULT (e) FOR [c]" is a syntax error (Msg 102).
+        // With includeNamedConstraints the named form is emitted inline;
+        // without it the default is suppressed entirely, because the only
+        // caller in that mode (EmitRebuild) re-adds it by name after
+        // sp_rename and an inline copy would collide ("Column already has a
+        // DEFAULT bound to it").
+        Dictionary<string, DefaultConstraint> namedDefaults = NamedDefaultsByColumn(table);
 
         bool firstLine = true;
         for (int i = 0; i < table.Columns.Count; i++)
         {
             Column col = table.Columns[i];
             AppendLineSeparator(sb, ref firstLine);
-            sb.Append("    ").Append(FormatColumn(col, colsWithNamedDefault.Contains(col.Name)));
+            sb.Append("    ").Append(FormatColumn(
+                col,
+                namedDefaults.GetValueOrDefault(col.Name),
+                inlineNamedDefault: includeNamedConstraints));
         }
 
         if (includeNamedConstraints)
@@ -63,10 +74,11 @@ public sealed class TableScriptEmitter : IScriptEmitter
                         sb.Append("    CONSTRAINT [").Append(ck.Name).Append("] CHECK ")
                           .Append(ck.Expression);
                         break;
-                    case DefaultConstraint df:
-                        AppendLineSeparator(sb, ref firstLine);
-                        sb.Append("    CONSTRAINT [").Append(df.Name).Append("] DEFAULT ")
-                          .Append(df.Expression).Append(" FOR [").Append(df.ColumnName).Append(']');
+                    case DefaultConstraint:
+                        // DEFAULT is not a table_constraint in T-SQL; it was
+                        // already emitted inline on its column above, which is
+                        // the only valid CREATE TABLE form and preserves the
+                        // constraint name.
                         break;
                     case ForeignKey:
                         // FK is emitted standalone by ForeignKeyScriptEmitter.
@@ -188,8 +200,11 @@ public sealed class TableScriptEmitter : IScriptEmitter
             newT.Constraints.ToDictionary(c => c.Name, StringComparer.Ordinal);
         var oldConstraintsByName =
             oldT.Constraints.ToDictionary(c => c.Name, StringComparer.Ordinal);
-        HashSet<string> colsWithNamedDefault =
-            [.. newT.Constraints.OfType<DefaultConstraint>().Select(d => d.ColumnName)];
+        Dictionary<string, DefaultConstraint> namedDefaults = NamedDefaultsByColumn(newT);
+        // Columns whose named DEFAULT we emit inline on an ADD below. Section 5
+        // must then NOT re-add the same constraint standalone, or SQL Server
+        // rejects it with "Column already has a DEFAULT bound to it".
+        HashSet<string> inlinedNamedDefaults = new(StringComparer.Ordinal);
 
         var existingColsByName =
             oldT.Columns.ToDictionary(c => c.Name, StringComparer.Ordinal);
@@ -237,8 +252,12 @@ public sealed class TableScriptEmitter : IScriptEmitter
                 sb.Append("ALTER TABLE ").Append(qualifiedName)
                   .Append(" DROP COLUMN [").Append(newCol.Name).AppendLine("];");
                 sb.Append("ALTER TABLE ").Append(qualifiedName)
-                  .Append(" ADD ").Append(FormatColumn(newCol, colsWithNamedDefault.Contains(newCol.Name)))
+                  .Append(" ADD ").Append(FormatColumn(
+                      newCol,
+                      namedDefaults.GetValueOrDefault(newCol.Name),
+                      inlineNamedDefault: true))
                   .AppendLine(";");
+                if (namedDefaults.ContainsKey(newCol.Name)) { inlinedNamedDefaults.Add(newCol.Name); }
                 continue;
             }
             sb.Append("ALTER TABLE ").Append(qualifiedName)
@@ -249,14 +268,22 @@ public sealed class TableScriptEmitter : IScriptEmitter
               .AppendLine(";");
         }
 
-        // ── 4) ADD new columns (present in source but not target).
+        // ── 4) ADD new columns (present in source but not target). The DEFAULT
+        //       MUST travel inline on the ADD: a NOT NULL column added to a
+        //       populated table without one fails with Msg 4901 ("ALTER TABLE
+        //       only allows columns to be added that can contain nulls, or have
+        //       a DEFAULT definition specified").
         foreach (Column newCol in newT.Columns)
         {
             if (existingColsByName.ContainsKey(newCol.Name)) { continue; }
             sb.Append("ALTER TABLE ").Append(qualifiedName)
               .Append(" ADD ")
-              .Append(FormatColumn(newCol, colsWithNamedDefault.Contains(newCol.Name)))
+              .Append(FormatColumn(
+                  newCol,
+                  namedDefaults.GetValueOrDefault(newCol.Name),
+                  inlineNamedDefault: true))
               .AppendLine(";");
+            if (namedDefaults.ContainsKey(newCol.Name)) { inlinedNamedDefaults.Add(newCol.Name); }
         }
 
         // ── 5) ADD constraints — new ones AND the shape-changed ones we
@@ -265,6 +292,8 @@ public sealed class TableScriptEmitter : IScriptEmitter
         foreach (Constraint c in newT.Constraints)
         {
             if (c is ForeignKey) { continue; }
+            // Already emitted inline on the column's ADD in section 3 / 4.
+            if (c is DefaultConstraint dc && inlinedNamedDefaults.Contains(dc.ColumnName)) { continue; }
             bool existsOnTarget = oldConstraintsByName.TryGetValue(c.Name, out Constraint? oldSame);
             bool shapeChanged = existsOnTarget && !ConstraintShapeEqual(oldSame!, c);
             if (existsOnTarget && !shapeChanged) { continue; }
@@ -445,7 +474,33 @@ public sealed class TableScriptEmitter : IScriptEmitter
         _ => string.Empty,
     };
 
-    private static string FormatColumn(Column c, bool hasNamedDefault)
+    private static Dictionary<string, DefaultConstraint> NamedDefaultsByColumn(Table table)
+    {
+        Dictionary<string, DefaultConstraint> map = new(StringComparer.Ordinal);
+        foreach (DefaultConstraint df in table.Constraints.OfType<DefaultConstraint>())
+        {
+            map[df.ColumnName] = df;
+        }
+        return map;
+    }
+
+    /// <summary>
+    /// Formats one column definition, valid both inside CREATE TABLE and after
+    /// <c>ALTER TABLE … ADD</c>.
+    /// </summary>
+    /// <param name="c">The column to format.</param>
+    /// <param name="namedDefault">
+    /// The named DEFAULT constraint bound to this column, when the table has
+    /// one; <see langword="null"/> when it has none.
+    /// </param>
+    /// <param name="inlineNamedDefault">
+    /// <see langword="true"/> to emit <paramref name="namedDefault"/> inline as
+    /// <c>CONSTRAINT [name] DEFAULT (expr)</c> — the only form CREATE TABLE
+    /// accepts, and the form that keeps ALTER TABLE ADD legal on a populated
+    /// table. <see langword="false"/> to omit it because the caller re-adds it
+    /// standalone afterwards (the rebuild path).
+    /// </param>
+    private static string FormatColumn(Column c, DefaultConstraint? namedDefault, bool inlineNamedDefault)
     {
         StringBuilder sb = new();
         sb.Append('[').Append(c.Name).Append("] ");
@@ -478,7 +533,12 @@ public sealed class TableScriptEmitter : IScriptEmitter
         }
         AppendCollation(sb, c);
         sb.Append(c.IsNullable ? " NULL" : " NOT NULL");
-        if (!hasNamedDefault && !string.IsNullOrEmpty(c.DefaultExpression))
+        if (namedDefault is not null && inlineNamedDefault)
+        {
+            sb.Append(" CONSTRAINT [").Append(namedDefault.Name).Append("] DEFAULT ")
+              .Append(namedDefault.Expression);
+        }
+        else if (namedDefault is null && !string.IsNullOrEmpty(c.DefaultExpression))
         {
             sb.Append(" DEFAULT ").Append(c.DefaultExpression);
         }
