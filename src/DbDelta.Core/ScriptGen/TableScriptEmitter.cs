@@ -331,6 +331,13 @@ public sealed class TableScriptEmitter : IScriptEmitter
     /// once here and consumed twice: by <see cref="EmitAlter"/> for the
     /// constraints it owns, and by <see cref="ScriptGenerator"/> for the indexes
     /// it owns.
+    /// <para>
+    /// Membership is decided by <see cref="ColumnRequiresAlterColumn"/>, NOT by
+    /// <see cref="ColumnShapeEqual"/>: the latter also compares the DEFAULT
+    /// expression, so <c>((0)) → ((1))</c> put the column in here and dropped the
+    /// primary key and every index covering it — for a change that needs nothing
+    /// but a DROP/ADD of the DF_ constraint.
+    /// </para>
     /// </remarks>
     internal static IReadOnlySet<string> ColumnsDroppedOrAltered(Table newT, Table oldT)
     {
@@ -354,11 +361,36 @@ public sealed class TableScriptEmitter : IScriptEmitter
         foreach (Column newCol in newT.Columns)
         {
             if (!oldColsByName.TryGetValue(newCol.Name, out Column? oldCol)) { continue; }
-            if (ColumnShapeEqual(oldCol, newCol)) { continue; }
+            if (!ColumnRequiresAlterColumn(oldCol, newCol)) { continue; }
             touched.Add(newCol.Name);       // section 3 — ALTER COLUMN, or DROP+ADD
         }
         return touched;
     }
+
+    /// <summary>
+    /// True when going from <paramref name="oldCol"/> to <paramref name="newCol"/>
+    /// needs DDL against the COLUMN itself — the thing a dependent index, key or
+    /// CHECK constraint blocks.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately narrower than <see cref="ColumnShapeEqual"/>, which also
+    /// compares the DEFAULT expression. A DEFAULT change is carried entirely by
+    /// dropping and re-adding the DF_ constraint (sections 1 and 5 of
+    /// <see cref="EmitAlter"/>) and touches no index and no key, so feeding it
+    /// into the touched-column set was pure damage: a <c>((0)) → ((1))</c> default
+    /// change dropped the primary key — Msg 3725 when an FK references it —
+    /// and rebuilt the clustered index inside a batch with a 60 s cap, while
+    /// section 3 emitted nothing but a no-op ALTER COLUMN.
+    /// </remarks>
+    private static bool ColumnRequiresAlterColumn(Column oldCol, Column newCol) =>
+        !string.Equals(oldCol.DataType, newCol.DataType, StringComparison.OrdinalIgnoreCase)
+        || oldCol.IsNullable != newCol.IsNullable
+        || !string.Equals(oldCol.Collation, newCol.Collation, StringComparison.OrdinalIgnoreCase)
+        || !BodyNormalizer.ExpressionsEqual(oldCol.ComputedExpression, newCol.ComputedExpression)
+        || oldCol.IsIdentity != newCol.IsIdentity
+        || (oldCol.IsIdentity && newCol.IsIdentity
+            && (oldCol.IdentitySeed != newCol.IdentitySeed
+                || oldCol.IdentityIncrement != newCol.IdentityIncrement));
 
     /// <summary>
     /// True when <paramref name="c"/> depends on one of

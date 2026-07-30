@@ -115,6 +115,37 @@ public class ColumnDependencyOrderingTests
         addCk.Should().BeGreaterThan(alter);
     }
 
+    [Fact]
+    public void A_default_only_change_drops_nothing_but_the_default()
+    {
+        // A DEFAULT change is carried by dropping and re-adding the DF_
+        // constraint; it touches no index and no key. Deciding the touched-column
+        // set with ColumnShapeEqual — which compares DefaultExpression — put the
+        // column in that set anyway, so ((0)) → ((1)) dropped the primary key
+        // (Msg 3725 as soon as an FK references it) and rebuilt the clustered
+        // index inside a batch capped at 60 s, for an ALTER COLUMN that is a
+        // no-op. Verified on SQL Server 2022 that the no-op ALTER COLUMN is
+        // accepted while the PK and the index stay in place.
+        static Table Orders(string defaultExpression)
+        {
+            return new Table("dbo", "Orders",
+                [new Column("Id", "int", false, 1),
+                 new Column("Amount", "decimal(18,2)", false, 2, defaultExpression: defaultExpression)],
+                [new PrimaryKey("PK_Orders", ["Amount"], IsClustered: true),
+                 new DefaultConstraint("DF_Orders_Amount", "Amount", defaultExpression)],
+                [Ix("IX_Orders_Amount", "Amount")]);
+        }
+
+        string sql = Sut.Generate(new ComparisonResult([Diff(Orders("((1))"), Orders("((0))"))]));
+
+        sql.Should().NotContain("DROP CONSTRAINT [PK_Orders]");
+        sql.Should().NotContain("DROP INDEX [IX_Orders_Amount]");
+        sql.Should().NotContain("CREATE NONCLUSTERED INDEX [IX_Orders_Amount]");
+        // What the change actually requires, and all it requires.
+        sql.Should().Contain("DROP CONSTRAINT [DF_Orders_Amount]");
+        sql.Should().Contain("ADD CONSTRAINT [DF_Orders_Amount] DEFAULT ((1)) FOR [Amount];");
+    }
+
     // ── The forced-recreate set is per table, not per index name ────────────
     //    Index names are unique per object_id, not per database, so IX_TenantId
     //    on two tables is routine. The set of "indexes we dropped up front" is
