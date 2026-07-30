@@ -31,6 +31,17 @@ internal static class CliRunner
 
     public static async Task<int> Run(string[] args, CancellationToken ct)
     {
+        (int exitCode, _) = await RunCapturing(args, ct);
+        return exitCode;
+    }
+
+    /// <summary>
+    /// Same spawn, but hands back stdout as well — the CLI reports the outcome
+    /// (success, rolledBack, transaction mode) as JSON on stdout, and an exit
+    /// code alone cannot tell a rolled-back target from a half-migrated one.
+    /// </summary>
+    public static async Task<(int ExitCode, string StdOut)> RunCapturing(string[] args, CancellationToken ct)
+    {
         // AppContext.BaseDirectory => <repo>/tests/DbDelta.Cli.AcceptanceTests/bin/<Config>/net10.0/
         // Walk up to repo root, then locate the CLI DLL under the SAME configuration.
         string testBin = AppContext.BaseDirectory;
@@ -52,7 +63,12 @@ internal static class CliRunner
         }
 
         using Process p = Process.Start(psi)!;
+        // Both pipes have to be drained while the child runs, or a chatty
+        // process blocks on a full buffer and WaitForExitAsync never returns.
+        Task<string> stdout = p.StandardOutput.ReadToEndAsync(ct);
+        Task<string> stderr = p.StandardError.ReadToEndAsync(ct);
         await p.WaitForExitAsync(ct);
-        return p.ExitCode;
+        await stderr;
+        return (p.ExitCode, await stdout);
     }
 }

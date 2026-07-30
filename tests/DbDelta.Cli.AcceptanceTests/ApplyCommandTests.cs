@@ -73,7 +73,7 @@ public class ApplyCommandTests(CliFixture fixture)
             GO
             """, ct);
 
-        int exit = await RunCli(["apply",
+        (int exit, string stdout) = await RunCliCapturing(["apply",
             "--target", ConnectionFor(tgtDb),
             "--script", sqlScript.Path], ct);
 
@@ -81,6 +81,10 @@ public class ApplyCommandTests(CliFixture fixture)
         (await ObjectExistsAsync(tgtDb, "dbo.FirstBatch", ct)).Should()
             .BeFalse("batch 1 must be rolled back when batch 2 fails");
         (await ObjectExistsAsync(tgtDb, "dbo.ThirdBatch", ct)).Should().BeFalse();
+        // The reported outcome has to match the target's actual state: this one
+        // really is rolled back, so the operator is told so.
+        stdout.Should().Contain("\"rolledBack\": true");
+        stdout.Should().Contain("\"transaction\": \"client\"");
     }
 
     [Fact]
@@ -101,7 +105,7 @@ public class ApplyCommandTests(CliFixture fixture)
             GO
             """, ct);
 
-        int exit = await RunCli(["apply",
+        (int exit, string stdout) = await RunCliCapturing(["apply",
             "--target", ConnectionFor(tgtDb),
             "--script", sqlScript.Path,
             "--no-transaction"], ct);
@@ -109,6 +113,12 @@ public class ApplyCommandTests(CliFixture fixture)
         exit.Should().Be(ExpectedExitCodes.DeploymentFailure);
         (await ObjectExistsAsync(tgtDb, "dbo.KeptBatch", ct)).Should()
             .BeTrue("--no-transaction means exactly that");
+        // …and the report must not claim otherwise. dbo.KeptBatch is committed
+        // and there is nothing to undo, so rolledBack:true would have been a
+        // lie about a permanently half-migrated target — which is exactly what
+        // the old `IF @@TRANCOUNT > 0 ROLLBACK` / return-true branch printed.
+        stdout.Should().Contain("\"rolledBack\": false");
+        stdout.Should().Contain("\"transaction\": \"none\"");
     }
 
     [Fact]
@@ -128,6 +138,8 @@ public class ApplyCommandTests(CliFixture fixture)
     private string ConnectionFor(string db) => CliRunner.ConnectionFor(fixture.ConnectionString, db);
     private Task CreateDb(string db, CancellationToken ct) => CliRunner.CreateDb(fixture.ConnectionString, db, ct);
     private static Task<int> RunCli(string[] args, CancellationToken ct) => CliRunner.Run(args, ct);
+    private static Task<(int ExitCode, string StdOut)> RunCliCapturing(string[] args, CancellationToken ct) =>
+        CliRunner.RunCapturing(args, ct);
 
     private async Task<bool> ObjectExistsAsync(string db, string objectName, CancellationToken ct)
     {

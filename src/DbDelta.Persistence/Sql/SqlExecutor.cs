@@ -170,6 +170,18 @@ public static partial class SqlExecutor
     /// case dispose (which returns it to the pool and triggers
     /// <c>sp_reset_connection</c>) is what actually rolls it back — we just
     /// cannot confirm it, so we report false rather than claim it.
+    /// <para>
+    /// In that second case the answer comes from <c>@@TRANCOUNT</c>, not from
+    /// the command succeeding. One branch used to serve two opposite meanings
+    /// with no discriminant: with a script envelope <c>@@TRANCOUNT == 0</c> means
+    /// XACT_ABORT already rolled everything back, but under
+    /// <c>--no-transaction</c> it means there was never a transaction and every
+    /// batch before the failure is permanently committed. Returning true for
+    /// both printed <c>"rolledBack": true</c> over a half-migrated target. We now
+    /// report true only for a rollback this method actually issued; the
+    /// already-rolled-back envelope case under-claims, which is the safe
+    /// direction for a flag documented as "known to be unchanged".
+    /// </para>
     /// </remarks>
     private static async Task<bool> TryRollbackAsync(SqlConnection cn, SqlTransaction? tx)
     {
@@ -190,10 +202,11 @@ public static partial class SqlExecutor
         {
             if (cn.State != System.Data.ConnectionState.Open) { return false; }
             await using SqlCommand rollback = new(
-                "IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;", cn)
+                "IF @@TRANCOUNT > 0 BEGIN ROLLBACK TRANSACTION; SELECT 1 END ELSE SELECT 0;", cn)
             { CommandTimeout = RollbackTimeoutSeconds };
-            await rollback.ExecuteNonQueryAsync(CancellationToken.None).ConfigureAwait(false);
-            return true;
+            object? rolledBack =
+                await rollback.ExecuteScalarAsync(CancellationToken.None).ConfigureAwait(false);
+            return rolledBack is int flag && flag == 1;
         }
         catch
         {
