@@ -11,8 +11,9 @@ namespace DbDelta.Core.UnitTests.ScriptGen;
 /// constraints (PK / UQ / CK / named DEFAULT) BEFORE creating the `_tmp`
 /// table, then re-adds them AFTER <c>sp_rename</c>. Two invariants:
 /// <list type="bullet">
-///   <item>Constraint names are DB-scoped, so `_tmp` cannot carry the
-///         original PK name in parallel with the old table.</item>
+///   <item>Constraint names are unique per SCHEMA, and `_tmp` is created in
+///         the same schema as the original, so it cannot carry the original
+///         PK name in parallel with the old table.</item>
 ///   <item>Inbound FKs from other tables pointing at the rebuilt PK
 ///         must survive the swap — drop them before, re-add after
 ///         (Redgate SQL Compare scenario 03 pattern).</item>
@@ -61,8 +62,8 @@ public class TableRebuildPkSwapTests
         string sql = Sut.Generate(result);
 
         // The `_tmp` CREATE TABLE must NOT carry the PK_Invoice constraint —
-        // SQL Server constraint names are DB-scoped and would collide with
-        // the original table's PK_Invoice.
+        // constraint names are unique per schema and `_tmp` lives in the same
+        // schema, so it would collide with the original table's PK_Invoice.
         int tmpStart = sql.IndexOf("CREATE TABLE [dbo].[Invoice_tmp]", StringComparison.Ordinal);
         int tmpEnd = sql.IndexOf("SET IDENTITY_INSERT [dbo].[Invoice_tmp]", StringComparison.Ordinal);
         tmpStart.Should().BeGreaterThan(0);
@@ -214,11 +215,78 @@ public class TableRebuildPkSwapTests
     }
 
     [Fact]
+    public void An_unrelated_same_named_fk_in_another_schema_is_still_added()
+    {
+        // The set of FKs the rebuild orchestrator owns is consulted to SKIP an
+        // add, and it spans the whole script. Keyed on the bare constraint name
+        // it also swallowed an unrelated namesake: constraint names are unique
+        // per schema, so sales.FK_Fattura_Valuta is a different constraint from
+        // dbo.FK_Fattura_Valuta.
+        //   dbo.Valuta gains IDENTITY => rebuild. dbo.Fattura holds an FK
+        //   pointing at it, so that FK is dropped up front and re-added by the
+        //   inbound pass — its name enters the orchestrated set. sales.Fattura
+        //   is an unrelated Different table that GAINS its own
+        //   FK_Fattura_Valuta pointing at sales.Valuta (untouched, not in the
+        //   comparison). Its ADD was skipped: the deploy reported success and
+        //   sales.Fattura was left with no foreign key, so orphan rows became
+        //   writable.
+        static ForeignKey ValutaFk(string referencedSchema)
+        {
+            return new ForeignKey(
+                Name: "FK_Fattura_Valuta",
+                Columns: ["ValutaId"],
+                ReferencedSchema: referencedSchema,
+                ReferencedTable: "Valuta",
+                ReferencedColumns: ["Id"],
+                OnDelete: ReferentialAction.NoAction,
+                OnUpdate: ReferentialAction.NoAction,
+                IsDisabled: false,
+                IsNotForReplication: false);
+        }
+        static Table Fattura(string schema, params ForeignKey[] fks)
+        {
+            return new Table(schema, "Fattura",
+                [new Column("Id", "int", false, 1), new Column("ValutaId", "int", false, 2)],
+                fks,
+                []);
+        }
+        static Table Valuta(bool identity)
+        {
+            return new Table("dbo", "Valuta",
+                [new Column("Id", "int", isNullable: false, ordinal: 1,
+                    isIdentity: identity, identitySeed: identity ? 1 : null,
+                    identityIncrement: identity ? 1 : null)],
+                [new PrimaryKey("PK_Valuta", ["Id"], IsClustered: true)],
+                []);
+        }
+
+        Table dboFattura = Fattura("dbo", ValutaFk("dbo"));
+        ComparisonResult result = new(
+        [
+            new DifferencePair(Valuta(true).Identity, DifferenceStatus.Different,
+                Valuta(true), Valuta(false)),
+            new DifferencePair(dboFattura.Identity, DifferenceStatus.Identical,
+                dboFattura, dboFattura),
+            new DifferencePair(Fattura("sales").Identity, DifferenceStatus.Different,
+                Fattura("sales", ValutaFk("sales")), Fattura("sales")),
+        ]);
+
+        string sql = Sut.Generate(result);
+
+        CountOccurrences(sql,
+            "ALTER TABLE [sales].[Fattura] ADD CONSTRAINT [FK_Fattura_Valuta] FOREIGN KEY")
+            .Should().Be(1, "nothing about the dbo rebuild concerns the sales constraint");
+        CountOccurrences(sql,
+            "ALTER TABLE [dbo].[Fattura] ADD CONSTRAINT [FK_Fattura_Valuta] FOREIGN KEY")
+            .Should().Be(1, "the inbound pass owns this one, exactly once");
+    }
+
+    [Fact]
     public void Rebuild_drops_named_check_and_unique_constraints_along_with_PK()
     {
         // The old table carries a PK + a named CHECK constraint. The rebuild
         // must drop both up front so the _tmp create doesn't collide with
-        // their DB-scoped names.
+        // their names inside the shared schema.
         Table withCheckOld = new("dbo", "Invoice",
             [new Column("Id", "int", isNullable: false, ordinal: 1),
              new Column("Amount", "decimal(18,2)", isNullable: false, ordinal: 2)],

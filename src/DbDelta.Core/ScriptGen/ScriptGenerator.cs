@@ -88,7 +88,11 @@ public sealed class ScriptGenerator
             }
         }
         List<(string FromSchema, string FromTable, ForeignKey FK)> inboundFkAdds = [];
-        HashSet<string> rebuildOrchestratedFkNames = new(StringComparer.Ordinal);
+        // Keyed on the HOLDER table, same reason as fkDropKeys below: this set
+        // makes the FK pass SKIP a foreign key, so a bare name meant an unrelated
+        // namesake on another table lost its legitimate ADD and the deploy left
+        // that table with no foreign key at all, silently.
+        HashSet<(string Schema, string Table, string Fk)> rebuildOrchestratedFks = [];
         if (rebuildTargets.Count > 0)
         {
             foreach (DifferencePair p in result.Differences.Where(x => x.Identity.Kind == "Table"))
@@ -101,7 +105,7 @@ public sealed class ScriptGenerator
                             && !rebuildTargets.Contains((srcT.Schema, srcT.Name)))
                         {
                             inboundFkAdds.Add((srcT.Schema, srcT.Name, fk));
-                            rebuildOrchestratedFkNames.Add(fk.Name);
+                            rebuildOrchestratedFks.Add((srcT.Schema, srcT.Name, fk.Name));
                         }
                     }
                 }
@@ -128,11 +132,18 @@ public sealed class ScriptGenerator
             .Select(t => (t.Schema, t.Name))];
 
         List<(string FromSchema, string FromTable, ForeignKey FK)> fkDrops = [];
-        HashSet<string> fkDropNames = new(StringComparer.Ordinal);
+        HashSet<(string Schema, string Table, string Fk)> fkDropKeys = [];
         void AddFkDrop(string schema, string table, ForeignKey fk)
         {
-            // Constraint names are database-scoped, so the name alone dedupes.
-            if (fkDropNames.Add(fk.Name))
+            // The holder table is part of the dedupe key. Constraints are
+            // sys.objects rows carrying their parent table's schema_id, so a
+            // constraint name is unique per SCHEMA, not per database:
+            // dbo.FK_Righe_Testa and sales.FK_Righe_Testa coexist legally. With
+            // the name alone, two Different tables in different schemas both
+            // losing an identically-named FK produced ONE DROP CONSTRAINT, and
+            // nothing else re-emits it (EmitFkAdds only adds) — the FK the
+            // source removed survived in production under a success verdict.
+            if (fkDropKeys.Add((schema, table, fk.Name)))
             {
                 fkDrops.Add((schema, table, fk));
             }
@@ -396,7 +407,7 @@ public sealed class ScriptGenerator
                 case DifferenceStatus.OnlyInA when pair.SideA is Table tNew:
                     {
                         List<ForeignKey> fksNew = [.. tNew.Constraints.OfType<ForeignKey>()
-                        .Where(fk => !rebuildOrchestratedFkNames.Contains(fk.Name))];
+                        .Where(fk => !rebuildOrchestratedFks.Contains((tNew.Schema, tNew.Name, fk.Name)))];
                         if (fksNew.Count == 0) { break; }
                         StringBuilder fkBody = new();
                         foreach (ForeignKey fk in fksNew)
@@ -415,7 +426,7 @@ public sealed class ScriptGenerator
                     when pair.SideA is Table tRebFk && rebuildTargets.Contains((tRebFk.Schema, tRebFk.Name)):
                     {
                         List<ForeignKey> outbound = [.. tRebFk.Constraints.OfType<ForeignKey>()
-                            .Where(fk => !rebuildOrchestratedFkNames.Contains(fk.Name))];
+                            .Where(fk => !rebuildOrchestratedFks.Contains((tRebFk.Schema, tRebFk.Name, fk.Name)))];
                         if (outbound.Count == 0) { break; }
                         StringBuilder rebuiltFkBody = new();
                         foreach (ForeignKey fk in outbound)
@@ -430,7 +441,7 @@ public sealed class ScriptGenerator
 
                 case DifferenceStatus.Different when pair.SideA is Table tSrc && pair.SideB is Table tTgt:
                     {
-                        string fkAdds = EmitFkAdds(tSrc, tTgt, rebuildOrchestratedFkNames);
+                        string fkAdds = EmitFkAdds(tSrc, tTgt, rebuildOrchestratedFks);
                         if (fkAdds.Length > 0)
                         {
                             writer.WriteBatch($"Adding foreign keys on [{tSrc.Schema}].[{tSrc.Name}]", fkAdds);
@@ -825,14 +836,10 @@ public sealed class ScriptGenerator
     }
 
     /// <summary>
-    /// Builds DROP INDEX / CREATE INDEX statements for the delta between a
-    /// pair of versions of the same table. Indexes present only on the
-    /// target side are dropped; indexes present only on the source are
-    /// created; indexes whose shape differs (key columns / uniqueness /
-    /// clustering / filter) are dropped + recreated.
-    /// </summary>
-    /// <summary>
-    /// Emits the index delta for a Different table.
+    /// Emits the index delta for a Different table: indexes present only on the
+    /// target side are dropped; indexes present only on the source are created;
+    /// indexes whose shape differs (key columns / uniqueness / clustering /
+    /// filter) are dropped + recreated.
     /// </summary>
     /// <param name="src">Source-side table.</param>
     /// <param name="tgt">Target-side table.</param>
@@ -884,22 +891,20 @@ public sealed class ScriptGenerator
         && a.IncludedColumns.SequenceEqual(b.IncludedColumns, StringComparer.Ordinal);
 
     /// <summary>
-    /// Builds DROP CONSTRAINT / ADD CONSTRAINT FOREIGN KEY statements for the
-    /// FK delta between source and target versions of a table. Mirrors
-    /// <see cref="EmitIndexDelta"/>: drops first, then adds; changed FKs are
-    /// dropped + re-added.
-    /// </summary>
-    /// <summary>
     /// Emits the ADD half of a table's foreign-key delta: FKs present on the
     /// source that the target lacks or whose shape changed.
     /// </summary>
-    /// <remarks>
-    /// The DROP half deliberately lives in the up-front foreign-key drop pass in
-    /// <see cref="Generate"/>, not here. Emitting it at this point — the end of
-    /// the script — meant a table removed from the source was DROPped while
-    /// another table still referenced it (Msg 3726).
-    /// </remarks>
-    private string EmitFkAdds(Table src, Table tgt, HashSet<string>? skipNames = null)
+    /// <param name="src">Source-side table.</param>
+    /// <param name="tgt">Target-side table.</param>
+    /// <param name="skipKeys">
+    /// Foreign keys the rebuild orchestrator already owns (dropped up front,
+    /// re-added by the inbound pass), keyed <c>(schema, table, name)</c> —
+    /// constraint names are unique per schema, and this set spans the whole
+    /// script, so the holder table has to be part of the key or an unrelated
+    /// namesake on another table loses its ADD.
+    /// </param>
+    private string EmitFkAdds(
+        Table src, Table tgt, IReadOnlySet<(string Schema, string Table, string Fk)> skipKeys)
     {
         StringBuilder sb = new();
         var srcFks =
@@ -909,7 +914,7 @@ public sealed class ScriptGenerator
 
         foreach (ForeignKey s in srcFks.Values)
         {
-            if (skipNames is not null && skipNames.Contains(s.Name)) { continue; }
+            if (skipKeys.Contains((src.Schema, src.Name, s.Name))) { continue; }
             bool existsOnTarget = tgtFks.TryGetValue(s.Name, out ForeignKey? t);
             bool shapeChanged = existsOnTarget && !ForeignKeyShapeEqual(s, t!);
             if (existsOnTarget && !shapeChanged) { continue; }

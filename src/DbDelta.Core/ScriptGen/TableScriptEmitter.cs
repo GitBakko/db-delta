@@ -444,11 +444,13 @@ public sealed class TableScriptEmitter : IScriptEmitter
 
         StringBuilder sb = new();
 
-        // M13-PARITY.6 #33 — PK-around-swap pattern. SQL Server constraint
-        // names are DB-scoped, so creating `[X_tmp]` with the same PK name
-        // as `[X]` collides. Drop the existing non-FK named constraints
-        // (PK / UQ / CK / named DEFAULT) before the rebuild and re-create
-        // them after `sp_rename`. This also mirrors Redgate SQL Compare's
+        // M13-PARITY.6 #33 — PK-around-swap pattern. A constraint name is
+        // unique per SCHEMA (constraints are sys.objects rows carrying their
+        // parent table's schema_id) — NOT per database — and `[X_tmp]` is
+        // created in the same schema as `[X]`, so it cannot carry the same PK
+        // name while the original still exists. Drop the existing non-FK named
+        // constraints (PK / UQ / CK / named DEFAULT) before the rebuild and
+        // re-create them after `sp_rename`. This also mirrors Redgate SQL Compare's
         // shape for scenario 03 — the safer pattern when other tables hold
         // FKs pointing AT this PK (inbound-FK lifecycle is orchestrated by
         // <see cref="ScriptGenerator"/>).

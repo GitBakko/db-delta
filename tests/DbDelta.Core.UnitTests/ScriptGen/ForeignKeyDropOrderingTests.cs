@@ -103,6 +103,49 @@ public class ForeignKeyDropOrderingTests
         sql.Should().Contain("DROP TABLE [dbo].[Currency];");
     }
 
+    // ── The drop pass dedupes per (schema, table, name), not per name ───────
+
+    private static ForeignKey TestaFk(string referencedSchema) => new(
+        Name: "FK_Righe_Testa",
+        Columns: ["TestaId"],
+        ReferencedSchema: referencedSchema,
+        ReferencedTable: "Testa",
+        ReferencedColumns: ["Id"],
+        OnDelete: ReferentialAction.NoAction,
+        OnUpdate: ReferentialAction.NoAction,
+        IsDisabled: false,
+        IsNotForReplication: false);
+
+    private static Table Righe(string schema, params ForeignKey[] fks) =>
+        new(schema, "Righe",
+            [new Column("Id", "int", false, 1), new Column("TestaId", "int", false, 2)],
+            fks,
+            []);
+
+    [Fact]
+    public void Same_named_fks_in_two_schemas_are_both_dropped()
+    {
+        // Constraints are sys.objects rows carrying their parent table's
+        // schema_id, so a name is unique per SCHEMA: dbo.FK_Righe_Testa and
+        // sales.FK_Righe_Testa are two different constraints. Deduping the
+        // up-front drop pass on the bare name emitted only ONE
+        // ALTER TABLE … DROP CONSTRAINT, and nothing re-emits the other — the
+        // FK pass only ADDs. The constraint the source removed survived in
+        // production while the tool reported success.
+        ComparisonResult r = new(
+        [
+            new DifferencePair(Righe("dbo").Identity, DifferenceStatus.Different,
+                Righe("dbo"), Righe("dbo", TestaFk("dbo"))),
+            new DifferencePair(Righe("sales").Identity, DifferenceStatus.Different,
+                Righe("sales"), Righe("sales", TestaFk("sales"))),
+        ]);
+
+        string sql = Sut.Generate(r);
+
+        sql.Should().Contain("ALTER TABLE [dbo].[Righe] DROP CONSTRAINT [FK_Righe_Testa];");
+        sql.Should().Contain("ALTER TABLE [sales].[Righe] DROP CONSTRAINT [FK_Righe_Testa];");
+    }
+
     [Fact]
     public void A_reshaped_fk_is_dropped_up_front_and_re_added_at_the_end()
     {
