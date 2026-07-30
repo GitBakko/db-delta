@@ -282,6 +282,64 @@ public class TableRebuildPkSwapTests
     }
 
     [Fact]
+    public void Two_rebuilt_tables_referencing_each_other_still_drop_the_fk_between_them()
+    {
+        // Both tables get IDENTITY, so both are rebuilt, and Fattura points at
+        // Cliente. The holder scan used to skip an FK whose holder was itself a
+        // rebuild target, so nothing dropped it and whichever DROP TABLE ran
+        // first died on Msg 3726 — the outcome depended on the alphabetical
+        // order of the two table names.
+        static Table Cliente(bool identity)
+        {
+            return new Table("dbo", "Cliente",
+                [new Column("Id", "int", isNullable: false, ordinal: 1,
+                    isIdentity: identity, identitySeed: identity ? 1 : null,
+                    identityIncrement: identity ? 1 : null)],
+                [new PrimaryKey("PK_Cliente", ["Id"], IsClustered: true)],
+                []);
+        }
+        static Table Fattura(bool identity)
+        {
+            return new Table("dbo", "Fattura",
+                [new Column("Id", "int", isNullable: false, ordinal: 1,
+                    isIdentity: identity, identitySeed: identity ? 1 : null,
+                    identityIncrement: identity ? 1 : null),
+                 new Column("ClienteId", "int", isNullable: false, ordinal: 2)],
+                [new PrimaryKey("PK_Fattura", ["Id"], IsClustered: true),
+                 new ForeignKey(
+                     Name: "FK_Fattura_Cliente",
+                     Columns: ["ClienteId"],
+                     ReferencedSchema: "dbo",
+                     ReferencedTable: "Cliente",
+                     ReferencedColumns: ["Id"],
+                     OnDelete: ReferentialAction.NoAction,
+                     OnUpdate: ReferentialAction.NoAction,
+                     IsDisabled: false,
+                     IsNotForReplication: false)],
+                []);
+        }
+
+        ComparisonResult result = new(
+        [
+            new DifferencePair(Cliente(true).Identity, DifferenceStatus.Different, Cliente(true), Cliente(false)),
+            new DifferencePair(Fattura(true).Identity, DifferenceStatus.Different, Fattura(true), Fattura(false)),
+        ]);
+
+        string sql = Sut.Generate(result);
+
+        int dropFk = sql.IndexOf(
+            "ALTER TABLE [dbo].[Fattura] DROP CONSTRAINT [FK_Fattura_Cliente];", StringComparison.Ordinal);
+        int dropCliente = sql.IndexOf("DROP TABLE [dbo].[Cliente];", StringComparison.Ordinal);
+        int readdFk = sql.IndexOf(
+            "ALTER TABLE [dbo].[Fattura] ADD CONSTRAINT [FK_Fattura_Cliente] FOREIGN KEY",
+            StringComparison.Ordinal);
+
+        dropFk.Should().BeGreaterThan(0, "DROP TABLE [Cliente] fails with Msg 3726 while the FK stands");
+        dropCliente.Should().BeGreaterThan(dropFk);
+        readdFk.Should().BeGreaterThan(dropCliente, "and the FK must come back once both tables are rebuilt");
+    }
+
+    [Fact]
     public void Rebuild_drops_named_check_and_unique_constraints_along_with_PK()
     {
         // The old table carries a PK + a named CHECK constraint. The rebuild

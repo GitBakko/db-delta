@@ -175,10 +175,15 @@ public sealed class ScriptGenerator
                 foreach (ForeignKey fk in holder.Constraints.OfType<ForeignKey>())
                 {
                     (string, string) referenced = (fk.ReferencedSchema, fk.ReferencedTable);
-                    bool pointsAtDropped = droppedTables.Contains(referenced);
-                    bool pointsAtRebuilt = rebuildTargets.Contains(referenced)
-                        && !rebuildTargets.Contains((holder.Schema, holder.Name));
-                    if (pointsAtDropped || pointsAtRebuilt)
+                    // Deliberately NOT excluding a holder that is itself a rebuild
+                    // target. With two rebuilt tables referencing each other the
+                    // exclusion dropped nothing, and whichever DROP TABLE ran first
+                    // died on Msg 3726 — the failure depended on the alphabetical
+                    // order of the two names. The holder's own DROP TABLE would take
+                    // this FK anyway, so an extra DROP CONSTRAINT is harmless, and
+                    // the rebuilt table's outbound pass re-adds the full source-side
+                    // set afterwards.
+                    if (droppedTables.Contains(referenced) || rebuildTargets.Contains(referenced))
                     {
                         AddFkDrop(holder.Schema, holder.Name, fk);
                     }
