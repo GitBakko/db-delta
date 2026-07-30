@@ -253,7 +253,7 @@ public sealed class ScriptGenerator
         // Prologue: Schemas, then Users + Roles.
         //    Sequences, UDTs, TableTypes, Tables, Views, Functions, Procedures,
         //    Triggers, and Synonyms are emitted by the topo-ordered passes below.
-        EmitSchemaCreates(writer, pairs);
+        EmitSchemaCreates(writer, result, pairs);
         EmitUsers(writer, pairs);
         EmitRoles(writer, pairs);
 
@@ -698,17 +698,39 @@ public sealed class ScriptGenerator
     // ── Users / Roles / Permissions emitters ───────────────────────────────
 
     /// <summary>
-    /// Emits <c>CREATE SCHEMA</c> for source-only schemas, one per batch.
+    /// Emits <c>CREATE SCHEMA</c> for the source-only schemas the selection
+    /// needs, one per batch.
     /// </summary>
     /// <remarks>
+    /// Driven by the FULL result, not by the selection: a partial selection
+    /// almost never contains the Schema row itself. Ticking
+    /// <c>vendite.Ordine</c> alone made the script open with
+    /// <c>CREATE TABLE [vendite].[Ordine]</c> against a target with no
+    /// <c>vendite</c> schema — Msg 2760, exactly the failure the Schema kind
+    /// was added to prevent. Promotion is limited to the schemas the selected
+    /// objects live in, so nothing the user did not ask for is created.
+    /// <para>
     /// One batch each is required, not stylistic: <c>CREATE SCHEMA</c> must be
     /// the first statement in its batch, so concatenating several into one body
     /// would make every statement after the first a syntax error.
+    /// </para>
     /// </remarks>
-    private static void EmitSchemaCreates(DeploymentScriptWriter writer, IReadOnlyList<DifferencePair> pairs)
+    private static void EmitSchemaCreates(
+        DeploymentScriptWriter writer,
+        ComparisonResult result,
+        IReadOnlyList<DifferencePair> pairs)
     {
-        foreach (DifferencePair pair in pairs
+        HashSet<string> needed = new(StringComparer.OrdinalIgnoreCase);
+        foreach (DifferencePair p in pairs)
+        {
+            // An object being dropped needs no schema created for it.
+            if (p.Identity.Kind != "Schema" && p.Status == DifferenceStatus.OnlyInB) { continue; }
+            needed.Add(p.Identity.SchemaName);
+        }
+
+        foreach (DifferencePair pair in result.Differences
             .Where(p => p.Identity.Kind == "Schema" && p.Status == DifferenceStatus.OnlyInA)
+            .Where(p => needed.Contains(p.Identity.SchemaName))
             .OrderBy(p => p.Identity.SchemaName, StringComparer.OrdinalIgnoreCase))
         {
             if (pair.SideA is not Schema s) { continue; }
@@ -719,6 +741,14 @@ public sealed class ScriptGenerator
     /// <summary>
     /// Emits <c>DROP SCHEMA</c> for target-only schemas, one per batch.
     /// </summary>
+    /// <remarks>
+    /// Driven by the SELECTION, unlike <see cref="EmitSchemaCreates"/>, and
+    /// deliberately so: creating a missing schema is a prerequisite of what the
+    /// user asked for, while dropping one destroys something they did not tick.
+    /// Ticking a schema row without its contents still fails loudly on Msg 3729
+    /// (SQL Server refuses to drop a schema that owns objects) — the tool does
+    /// not guess which of the two the user meant.
+    /// </remarks>
     private static void EmitSchemaDrops(DeploymentScriptWriter writer, IReadOnlyList<DifferencePair> pairs)
     {
         foreach (DifferencePair pair in pairs

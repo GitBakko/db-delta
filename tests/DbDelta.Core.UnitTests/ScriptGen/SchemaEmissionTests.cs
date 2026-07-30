@@ -111,6 +111,32 @@ public class SchemaEmissionTests
     }
 
     [Fact]
+    public void A_schema_the_selection_needs_is_created_even_when_its_row_is_not_ticked()
+    {
+        // The GUI shape. The user ticks the one table row; the Schema row for
+        // `vendite` is a separate row they did not tick, so it never reaches the
+        // generator's working set and the script opened with
+        // CREATE TABLE [vendite].[Ordine] against a target with no `vendite`
+        // schema — Msg 2760, the exact failure the Schema kind exists to
+        // prevent. Same arrange asserts the promotion does not overreach: the
+        // unrelated source-only `report` schema stays out.
+        Table order = T("vendite", "Order");
+        Database a = Db([new Schema("dbo"), new Schema("vendite"), new Schema("report")], order);
+        Database b = Db([new Schema("dbo")]);
+        ComparisonResult r = new ComparisonEngine().Compare(a, b, ComparisonOptions.Default);
+
+        DifferencePair tableOnly = r.Differences.Single(p => p.Identity.Kind == "Table");
+        string script = DeployScriptBuilder.Build(
+            r, [tableOnly], "src", "tgt", DateTime.UtcNow, []);
+
+        int createSchema = script.IndexOf("CREATE SCHEMA [vendite];", StringComparison.Ordinal);
+        int createTable = script.IndexOf("CREATE TABLE [vendite].[Order]", StringComparison.Ordinal);
+        createSchema.Should().BeGreaterThan(0, "the selected table lives in it");
+        createTable.Should().BeGreaterThan(createSchema);
+        script.Should().NotContain("CREATE SCHEMA [report];", "nothing selected lives there");
+    }
+
+    [Fact]
     public void Drop_schema_is_emitted_after_the_objects_it_held()
     {
         Table legacyTable = T("legacy", "OldOrder");
