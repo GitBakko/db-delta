@@ -294,6 +294,12 @@ public sealed class ScriptGenerator
         {
             DifferencePair pair = pairById[id];
             if (pair.Status == DifferenceStatus.OnlyInB) { continue; }
+            // A trigger whose parent table is rebuilt is emitted in full by the
+            // rebuild pass below instead. Leaving it here as well would emit it
+            // twice, and for a state-only difference it would emit a bare
+            // ENABLE TRIGGER against an object DROP TABLE has just destroyed
+            // (Msg 4916) — the rebuild re-creates it enabled anyway.
+            if (IsTriggerOnRebuiltTable(pair, rebuildTargets)) { continue; }
             string? body = DispatchBuild(id.Kind, pair);
             if (!string.IsNullOrWhiteSpace(body)) { writer.WriteBatch(PhaseLabel(pair), body); }
         }
@@ -358,18 +364,24 @@ public sealed class ScriptGenerator
         }
 
         // Trigger re-create for rebuilt tables — DROP TABLE inside the rebuild
-        //    block takes the table's triggers with it. Triggers that DIFFER are
-        //    already re-emitted by the CREATE pass above (topo order puts Table
-        //    before Trigger), but an IDENTICAL trigger never enters `pairs` at
-        //    all, so it was silently lost: the deploy reported success, the
-        //    re-compare reported Identical, and in production the trigger was
-        //    gone. Scanning result.Differences unfiltered is the same trick the
-        //    inbound-FK orchestration uses.
+        //    block takes EVERY trigger on the table with it, whatever its
+        //    difference status, so this pass re-emits the FULL source-side set
+        //    exactly like the index and outbound-FK passes above. Filtering on
+        //    Identical covered only the third of the population that no other
+        //    pass reaches, and left two holes: a Different trigger the user did
+        //    not tick never enters `pairs`, so nothing re-created it and the
+        //    deploy reported success with the trigger gone; and a state-only
+        //    Different trigger got a bare ENABLE TRIGGER from the CREATE pass
+        //    against an object that no longer exists. Emitting as OnlyInA
+        //    forces the full CREATE OR ALTER — the source side is authoritative
+        //    here, same rationale as the outbound FK re-add.
+        //    A trigger the source REMOVED has no SideA and is skipped: DROP
+        //    TABLE already took it, and the DROP pass emits its
+        //    DROP TRIGGER IF EXISTS beforehand anyway.
         if (rebuildTargets.Count > 0)
         {
             StringBuilder triggerBody = new();
-            foreach (DifferencePair p in result.Differences
-                .Where(x => x.Identity.Kind == "Trigger" && x.Status == DifferenceStatus.Identical))
+            foreach (DifferencePair p in result.Differences.Where(x => x.Identity.Kind == "Trigger"))
             {
                 if (p.SideA is not Trigger trg) { continue; }
                 if (!rebuildTargets.Contains((trg.ParentSchema, trg.ParentTable))) { continue; }
@@ -377,14 +389,6 @@ public sealed class ScriptGenerator
                     new DifferencePair(trg.Identity, DifferenceStatus.OnlyInA, trg, null));
                 if (string.IsNullOrWhiteSpace(ddl)) { continue; }
                 triggerBody.AppendLine(ddl);
-                // CREATE OR ALTER always yields an ENABLED trigger; a trigger
-                // that was deliberately disabled must not come back enabled.
-                if (trg.IsDisabled)
-                {
-                    triggerBody.Append("DISABLE TRIGGER [").Append(trg.Schema).Append("].[").Append(trg.Name)
-                               .Append("] ON [").Append(trg.ParentSchema).Append("].[").Append(trg.ParentTable)
-                               .AppendLine("];");
-                }
             }
             if (triggerBody.Length > 0)
             {
@@ -486,6 +490,16 @@ public sealed class ScriptGenerator
         writer.WriteVerdict();
         return sb.ToString();
     }
+
+    /// <summary>
+    /// True when <paramref name="pair"/> is a trigger sitting on a table this
+    /// script rebuilds, so the rebuild's own re-create pass owns it.
+    /// </summary>
+    private static bool IsTriggerOnRebuiltTable(
+        DifferencePair pair, IReadOnlySet<(string Schema, string Name)> rebuildTargets) =>
+        pair.Identity.Kind == "Trigger"
+        && pair.SideA is Trigger t
+        && rebuildTargets.Contains((t.ParentSchema, t.ParentTable));
 
     // ── Phase-label helper ──────────────────────────────────────────────────
 

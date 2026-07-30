@@ -27,12 +27,35 @@ public sealed class TriggerScriptEmitter
         };
     }
 
+    /// <summary>
+    /// Emits the trigger body as <c>CREATE OR ALTER</c>, followed by a
+    /// <c>DISABLE TRIGGER</c> when the source side is disabled.
+    /// </summary>
+    /// <remarks>
+    /// The DISABLE belongs here, not at the call sites. <c>CREATE OR ALTER</c>
+    /// always yields an ENABLED trigger, so every path through this method
+    /// re-enables a trigger somebody deliberately disabled — a body change on a
+    /// disabled audit trigger silently turned it back on. The guard used to
+    /// exist at exactly one call site (the rebuild rescue in
+    /// <see cref="ScriptGenerator"/>), which is the shape that leaves every
+    /// sibling caller broken.
+    /// </remarks>
     private static string EmitCreateOrAlter(Trigger t)
     {
-        return t.IsEncrypted || t.Body is null
-            ? $"-- WARNING: trigger [{t.Schema}].[{t.Name}] is encrypted (WITH ENCRYPTION); body cannot be scripted."
-            : ModuleHeader.ToCreateOrAlterScript(t.Body, t.Schema, t.Name);
+        if (t.IsEncrypted || t.Body is null)
+        {
+            return $"-- WARNING: trigger [{t.Schema}].[{t.Name}] is encrypted (WITH ENCRYPTION); body cannot be scripted.";
+        }
+
+        string ddl = ModuleHeader.ToCreateOrAlterScript(t.Body, t.Schema, t.Name);
+        return t.IsDisabled
+            ? ddl + Environment.NewLine + EmitStateChange(t, disable: true)
+            : ddl;
     }
+
+    private static string EmitStateChange(Trigger t, bool disable) =>
+        $"{(disable ? "DISABLE" : "ENABLE")} TRIGGER [{t.Schema}].[{t.Name}] "
+        + $"ON [{t.ParentSchema}].[{t.ParentTable}];";
 
     private static string EmitDrop(Trigger t) =>
         $"DROP TRIGGER IF EXISTS [{t.Schema}].[{t.Name}];";
@@ -45,12 +68,8 @@ public sealed class TriggerScriptEmitter
                 BodyNormalizer.Normalize(ModuleHeader.CanonicalizeObjectName(sideB.Body, sideB.Schema, sideB.Name)),
                 StringComparison.Ordinal);
 
-        if (bodiesMatch && sideA.IsDisabled != sideB.IsDisabled)
-        {
-            string verb = sideA.IsDisabled ? "DISABLE" : "ENABLE";
-            return $"{verb} TRIGGER [{sideA.Schema}].[{sideA.Name}] ON [{sideA.ParentSchema}].[{sideA.ParentTable}];";
-        }
-
-        return EmitCreateOrAlter(sideA);
+        return bodiesMatch && sideA.IsDisabled != sideB.IsDisabled
+            ? EmitStateChange(sideA, disable: sideA.IsDisabled)
+            : EmitCreateOrAlter(sideA);
     }
 }
