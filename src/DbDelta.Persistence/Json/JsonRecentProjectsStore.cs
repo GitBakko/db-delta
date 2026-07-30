@@ -52,7 +52,7 @@ public sealed class JsonRecentProjectsStore
     /// entries whose backing files no longer exist on disk.</summary>
     public async Task<IReadOnlyList<RecentProject>> LoadAsync(CancellationToken ct)
     {
-        Document doc = await ReadDocumentAsync(ct).ConfigureAwait(false);
+        Document doc = await ReadDocumentAsync(ct, forWrite: false).ConfigureAwait(false);
         return [.. doc.Entries
             .Where(e => File.Exists(e.Path))
             .OrderByDescending(e => e.LastUsedUtc)
@@ -68,7 +68,7 @@ public sealed class JsonRecentProjectsStore
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
-        Document doc = await ReadDocumentAsync(ct).ConfigureAwait(false);
+        Document doc = await ReadDocumentAsync(ct, forWrite: true).ConfigureAwait(false);
         List<RecentProject> next =
         [
             new RecentProject(path, DateTime.UtcNow),
@@ -85,7 +85,18 @@ public sealed class JsonRecentProjectsStore
         return next;
     }
 
-    private async Task<Document> ReadDocumentAsync(CancellationToken ct)
+    /// <summary>
+    /// Reads the backing document. See
+    /// <see cref="JsonConnectionStore"/> for why an unreadable file degrades on
+    /// the load path but rethrows on the read-modify-write path.
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <param name="forWrite">
+    /// <see langword="false"/> degrades an unreadable file to an empty list;
+    /// <see langword="true"/> rethrows so a write never clobbers entries it
+    /// merely failed to read.
+    /// </param>
+    private async Task<Document> ReadDocumentAsync(CancellationToken ct, bool forWrite)
     {
         if (!File.Exists(_filePath))
         {
@@ -95,9 +106,15 @@ public sealed class JsonRecentProjectsStore
         {
             byte[] bytes = await File.ReadAllBytesAsync(_filePath, ct).ConfigureAwait(false);
             Document? doc = JsonSerializer.Deserialize<Document>(bytes, s_json);
-            return doc ?? new Document(CurrentSchemaVersion, []);
+            return doc is null || doc.SchemaVersion > CurrentSchemaVersion
+                ? new Document(CurrentSchemaVersion, [])
+                : doc;
         }
         catch (JsonException)
+        {
+            return new Document(CurrentSchemaVersion, []);
+        }
+        catch (Exception ex) when (!forWrite && ex is IOException or UnauthorizedAccessException)
         {
             return new Document(CurrentSchemaVersion, []);
         }
@@ -112,6 +129,12 @@ public sealed class JsonRecentProjectsStore
             Access = FileAccess.Write,
             Share = FileShare.None,
         };
+        if (!OperatingSystem.IsWindows())
+        {
+            // 0600 — owner read/write only. Matches JsonConnectionStore; the
+            // MRU file carries the user's project paths.
+            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        }
         await using (FileStream fs = new(tmp, options))
         {
             await JsonSerializer.SerializeAsync(fs, doc, s_json, ct).ConfigureAwait(false);

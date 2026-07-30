@@ -46,7 +46,7 @@ public sealed class JsonConnectionStore : IConnectionStore
 
     public async Task<IReadOnlyList<ConnectionEntry>> LoadAsync(CancellationToken ct)
     {
-        Document doc = await ReadDocumentAsync(ct).ConfigureAwait(false);
+        Document doc = await ReadDocumentAsync(ct, forWrite: false).ConfigureAwait(false);
         return [.. doc.Entries
             .OrderByDescending(e => e.IsPinned)
             .ThenByDescending(e => e.LastUsedUtc)
@@ -56,7 +56,7 @@ public sealed class JsonConnectionStore : IConnectionStore
     public async Task<ConnectionEntry> UpsertAsync(ConnectionEntry entry, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        Document doc = await ReadDocumentAsync(ct).ConfigureAwait(false);
+        Document doc = await ReadDocumentAsync(ct, forWrite: true).ConfigureAwait(false);
         List<ConnectionEntry> next = [.. doc.Entries.Where(e => e.Id != entry.Id), entry];
         await WriteAtomicAsync(new Document(CurrentSchemaVersion, next), ct).ConfigureAwait(false);
         return entry;
@@ -64,20 +64,35 @@ public sealed class JsonConnectionStore : IConnectionStore
 
     public async Task DeleteAsync(Guid id, CancellationToken ct)
     {
-        Document doc = await ReadDocumentAsync(ct).ConfigureAwait(false);
+        Document doc = await ReadDocumentAsync(ct, forWrite: true).ConfigureAwait(false);
         List<ConnectionEntry> next = [.. doc.Entries.Where(e => e.Id != id)];
         await WriteAtomicAsync(new Document(CurrentSchemaVersion, next), ct).ConfigureAwait(false);
     }
 
     public async Task TouchUsageAsync(Guid id, CancellationToken ct)
     {
-        Document doc = await ReadDocumentAsync(ct).ConfigureAwait(false);
+        Document doc = await ReadDocumentAsync(ct, forWrite: true).ConfigureAwait(false);
         List<ConnectionEntry> next = [.. doc.Entries.Select(e =>
             e.Id == id ? e with { LastUsedUtc = DateTime.UtcNow } : e)];
         await WriteAtomicAsync(new Document(CurrentSchemaVersion, next), ct).ConfigureAwait(false);
     }
 
-    private async Task<Document> ReadDocumentAsync(CancellationToken ct)
+    /// <summary>
+    /// Reads the backing document.
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <param name="forWrite">
+    /// Distinguishes the two failure policies for an <em>unreadable</em> file
+    /// (locked by a sync client, or a read-only / redirected profile — as
+    /// opposed to corrupt content, which is always moved aside).
+    /// <see langword="false"/> degrades to an empty list, because
+    /// <see cref="LoadAsync"/> runs from app startup and an escaping exception
+    /// there kills the process before any window is usable.
+    /// <see langword="true"/> rethrows, because a read-modify-write that
+    /// silently treated an unreadable file as empty would overwrite every
+    /// saved connection with the single entry being upserted.
+    /// </param>
+    private async Task<Document> ReadDocumentAsync(CancellationToken ct, bool forWrite)
     {
         if (!File.Exists(_filePath))
         {
@@ -103,6 +118,10 @@ public sealed class JsonConnectionStore : IConnectionStore
             MoveAside("invalid-json");
             return new Document(CurrentSchemaVersion, []);
         }
+        catch (Exception ex) when (!forWrite && ex is IOException or UnauthorizedAccessException)
+        {
+            return new Document(CurrentSchemaVersion, []);
+        }
     }
 
     private void MoveAside(string reason)
@@ -112,9 +131,10 @@ public sealed class JsonConnectionStore : IConnectionStore
         {
             File.Move(_filePath, aside, overwrite: false);
         }
-        catch (IOException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // Another instance may have moved it already. Best-effort.
+            // Another instance may have moved it already, or the profile is
+            // read-only. Best-effort: never let this sink the caller.
         }
     }
 
