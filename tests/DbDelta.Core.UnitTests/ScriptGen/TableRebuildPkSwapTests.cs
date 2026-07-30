@@ -262,6 +262,101 @@ public class TableRebuildPkSwapTests
         sql.Should().NotContain("FK_");
     }
 
+    // ── DROP TABLE inside the rebuild takes the table's indexes, triggers and
+    //    outbound FKs with it. Anything IDENTICAL on both sides is absent from
+    //    the delta, so it used to be silently lost: deploy reported success and
+    //    the re-compare reported Identical while production had lost the object.
+
+    [Fact]
+    public void Rebuild_recreates_every_index_including_the_identical_ones()
+    {
+        TableIndex ix = new("IX_Invoice_Amount", false, false, null,
+            [new IndexColumn("Amount", false)], []);
+        Table oldT = InvoiceWithPk(identityFlipped: false) with { Indexes = [ix] };
+        Table newT = InvoiceWithPk(identityFlipped: true) with { Indexes = [ix] };
+        ComparisonResult result = new(
+        [
+            new DifferencePair(newT.Identity, DifferenceStatus.Different, newT, oldT),
+        ]);
+
+        string sql = Sut.Generate(result);
+
+        int renameIdx = sql.IndexOf("sp_rename", StringComparison.Ordinal);
+        int createIxIdx = sql.IndexOf("CREATE NONCLUSTERED INDEX [IX_Invoice_Amount]", StringComparison.Ordinal);
+        renameIdx.Should().BeGreaterThan(0);
+        createIxIdx.Should().BeGreaterThan(renameIdx, "the index must be re-created after the table is back");
+        // The index is identical on both sides, so the delta path would have
+        // emitted a DROP for it — the rebuild already destroyed it.
+        sql.Should().NotContain("DROP INDEX [IX_Invoice_Amount]");
+    }
+
+    [Fact]
+    public void Rebuild_recreates_an_identical_trigger_and_keeps_it_disabled()
+    {
+        Table oldT = InvoiceWithPk(identityFlipped: false);
+        Table newT = InvoiceWithPk(identityFlipped: true);
+        Trigger trg = new(
+            Schema: "dbo",
+            Name: "trg_Invoice_Audit",
+            Body: "CREATE TRIGGER dbo.trg_Invoice_Audit ON dbo.Invoice AFTER INSERT AS BEGIN SET NOCOUNT ON; END",
+            IsEncrypted: false,
+            ParentSchema: "dbo",
+            ParentTable: "Invoice",
+            IsDisabled: true,
+            IsNotForReplication: false);
+        ComparisonResult result = new(
+        [
+            new DifferencePair(newT.Identity, DifferenceStatus.Different, newT, oldT),
+            new DifferencePair(trg.Identity, DifferenceStatus.Identical, trg, trg),
+        ]);
+
+        string sql = Sut.Generate(result);
+
+        int renameIdx = sql.IndexOf("sp_rename", StringComparison.Ordinal);
+        int trgIdx = sql.IndexOf("TRIGGER dbo.trg_Invoice_Audit", StringComparison.Ordinal);
+        trgIdx.Should().BeGreaterThan(renameIdx);
+        // It was disabled before the rebuild; CREATE OR ALTER yields an enabled
+        // trigger, so the disabled state has to be re-applied.
+        sql.Should().Contain("DISABLE TRIGGER [dbo].[trg_Invoice_Audit] ON [dbo].[Invoice];");
+    }
+
+    [Fact]
+    public void Rebuild_readds_its_own_outbound_fk_when_identical_on_both_sides()
+    {
+        ForeignKey outbound = new(
+            Name: "FK_Invoice_Customer",
+            Columns: ["CustomerId"],
+            ReferencedSchema: "dbo",
+            ReferencedTable: "Customer",
+            ReferencedColumns: ["Id"],
+            OnDelete: ReferentialAction.NoAction,
+            OnUpdate: ReferentialAction.NoAction,
+            IsDisabled: false,
+            IsNotForReplication: false);
+        Table Build(bool flipped)
+        {
+            return new Table("dbo", "Invoice",
+                [new Column("Id", "int", isNullable: false, ordinal: 1,
+                    isIdentity: flipped, identitySeed: flipped ? 1 : null, identityIncrement: flipped ? 1 : null),
+                 new Column("CustomerId", "int", isNullable: false, ordinal: 2)],
+                [new PrimaryKey("PK_Invoice", ["Id"], IsClustered: true), outbound],
+                []);
+        }
+        ComparisonResult result = new(
+        [
+            new DifferencePair(Build(true).Identity, DifferenceStatus.Different, Build(true), Build(false)),
+        ]);
+
+        string sql = Sut.Generate(result);
+
+        int renameIdx = sql.IndexOf("sp_rename", StringComparison.Ordinal);
+        int fkIdx = sql.IndexOf(
+            "ALTER TABLE [dbo].[Invoice] ADD CONSTRAINT [FK_Invoice_Customer] FOREIGN KEY",
+            StringComparison.Ordinal);
+        fkIdx.Should().BeGreaterThan(renameIdx,
+            "DROP TABLE took the outbound FK with it, so it must be re-added after the rename");
+    }
+
     [Fact]
     public void Rebuild_tmp_table_carries_no_inline_default_for_a_named_default()
     {

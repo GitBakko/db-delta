@@ -196,6 +196,26 @@ public sealed class ScriptGenerator
                         break;
                     }
 
+                // A rebuilt table was DROPped and re-created under a new name, so
+                // every one of its indexes went with it — including the ones that
+                // are identical on both sides and therefore absent from the delta.
+                // Re-create the full source-side set instead of diffing against a
+                // target that no longer exists.
+                case DifferenceStatus.Different
+                    when pair.SideA is Table tReb && rebuildTargets.Contains((tReb.Schema, tReb.Name)):
+                    {
+                        if (tReb.Indexes.Count == 0) { break; }
+                        StringBuilder rebuiltIndexBody = new();
+                        foreach (TableIndex ix in tReb.Indexes)
+                        {
+                            rebuiltIndexBody.AppendLine(_indexEmitter.EmitCreate(tReb.Schema, tReb.Name, ix));
+                        }
+                        writer.WriteBatch(
+                            $"Re-creating indexes on rebuilt [{tReb.Schema}].[{tReb.Name}]",
+                            rebuiltIndexBody.ToString());
+                        break;
+                    }
+
                 case DifferenceStatus.Different when pair.SideA is Table tSrc && pair.SideB is Table tTgt:
                     {
                         string indexDelta = EmitIndexDelta(tSrc, tTgt);
@@ -211,6 +231,41 @@ public sealed class ScriptGenerator
                 case DifferenceStatus.Identical:
                 default:
                     break;
+            }
+        }
+
+        // Trigger re-create for rebuilt tables — DROP TABLE inside the rebuild
+        //    block takes the table's triggers with it. Triggers that DIFFER are
+        //    already re-emitted by the CREATE pass above (topo order puts Table
+        //    before Trigger), but an IDENTICAL trigger never enters `pairs` at
+        //    all, so it was silently lost: the deploy reported success, the
+        //    re-compare reported Identical, and in production the trigger was
+        //    gone. Scanning result.Differences unfiltered is the same trick the
+        //    inbound-FK orchestration uses.
+        if (rebuildTargets.Count > 0)
+        {
+            StringBuilder triggerBody = new();
+            foreach (DifferencePair p in result.Differences
+                .Where(x => x.Identity.Kind == "Trigger" && x.Status == DifferenceStatus.Identical))
+            {
+                if (p.SideA is not Trigger trg) { continue; }
+                if (!rebuildTargets.Contains((trg.ParentSchema, trg.ParentTable))) { continue; }
+                string ddl = _triggerEmitter.Emit(
+                    new DifferencePair(trg.Identity, DifferenceStatus.OnlyInA, trg, null));
+                if (string.IsNullOrWhiteSpace(ddl)) { continue; }
+                triggerBody.AppendLine(ddl);
+                // CREATE OR ALTER always yields an ENABLED trigger; a trigger
+                // that was deliberately disabled must not come back enabled.
+                if (trg.IsDisabled)
+                {
+                    triggerBody.Append("DISABLE TRIGGER [").Append(trg.Schema).Append("].[").Append(trg.Name)
+                               .Append("] ON [").Append(trg.ParentSchema).Append("].[").Append(trg.ParentTable)
+                               .AppendLine("];");
+                }
+            }
+            if (triggerBody.Length > 0)
+            {
+                writer.WriteBatch("Re-creating triggers on rebuilt tables", triggerBody.ToString());
             }
         }
 
@@ -237,6 +292,27 @@ public sealed class ScriptGenerator
                             fkBody.AppendLine(_fkEmitter.EmitAdd(tNew.Schema, tNew.Name, fk));
                         }
                         writer.WriteBatch($"Adding foreign keys on [{tNew.Schema}].[{tNew.Name}]", fkBody.ToString());
+                        break;
+                    }
+
+                // Same as the index pass: DROP TABLE took the rebuilt table's own
+                // (outbound) foreign keys with it, so the delta against the
+                // vanished target would skip every FK that was identical on both
+                // sides. Re-add the full source-side set.
+                case DifferenceStatus.Different
+                    when pair.SideA is Table tRebFk && rebuildTargets.Contains((tRebFk.Schema, tRebFk.Name)):
+                    {
+                        List<ForeignKey> outbound = [.. tRebFk.Constraints.OfType<ForeignKey>()
+                            .Where(fk => !rebuildOrchestratedFkNames.Contains(fk.Name))];
+                        if (outbound.Count == 0) { break; }
+                        StringBuilder rebuiltFkBody = new();
+                        foreach (ForeignKey fk in outbound)
+                        {
+                            rebuiltFkBody.AppendLine(_fkEmitter.EmitAdd(tRebFk.Schema, tRebFk.Name, fk));
+                        }
+                        writer.WriteBatch(
+                            $"Re-adding foreign keys on rebuilt [{tRebFk.Schema}].[{tRebFk.Name}]",
+                            rebuiltFkBody.ToString());
                         break;
                     }
 
