@@ -193,6 +193,31 @@ public sealed class ScriptGenerator
             .Order([.. topoPairs.Select(p => p.Identity)], dependencies);
         var pairById = topoPairs.ToDictionary(p => p.Identity);
 
+        // ── Indexes that block an ALTER / DROP COLUMN.
+        //    SQL Server refuses to retype or drop a column while an index covers
+        //    it (Msg 5074), so widening an indexed int to bigint — a routine
+        //    migration — failed outright. Those indexes are dropped in the same
+        //    up-front pass as the foreign keys and force-recreated afterwards:
+        //    the normal index delta would emit nothing for an index that is
+        //    identical on both sides, leaving production without it.
+        List<(string Schema, string Table, TableIndex Index)> blockingIndexDrops = [];
+        HashSet<string> forcedIndexRecreates = new(StringComparer.Ordinal);
+        foreach (DifferencePair p in pairs.Where(x =>
+            x.Identity.Kind == "Table" && x.Status == DifferenceStatus.Different))
+        {
+            if (p.SideA is not Table sideA || p.SideB is not Table sideB) { continue; }
+            // A rebuilt table drops and re-creates everything anyway.
+            if (rebuildTargets.Contains((sideA.Schema, sideA.Name))) { continue; }
+            IReadOnlySet<string> touched = TableScriptEmitter.ColumnsDroppedOrAltered(sideA, sideB);
+            if (touched.Count == 0) { continue; }
+            foreach (TableIndex ix in sideB.Indexes)
+            {
+                if (!TableScriptEmitter.IndexDependsOnColumn(ix, touched)) { continue; }
+                blockingIndexDrops.Add((sideB.Schema, sideB.Name, ix));
+                forcedIndexRecreates.Add(ix.Name);
+            }
+        }
+
         bool useTransaction = !options.HasFlag(ComparisonOptions.NoTransactions);
         bool includeHeader = !options.HasFlag(ComparisonOptions.DoNotOutputCommentHeader);
         StringBuilder sb = new();
@@ -218,6 +243,18 @@ public sealed class ScriptGenerator
                           .Append("] DROP CONSTRAINT [").Append(fk.Name).AppendLine("];");
             }
             writer.WriteBatch("Dropping foreign keys", fkDropBody.ToString());
+        }
+
+        // Index DROP pass for columns about to be dropped or retyped — same
+        //     reasoning as the foreign keys above, same position.
+        if (blockingIndexDrops.Count > 0)
+        {
+            StringBuilder ixDropBody = new();
+            foreach ((string schema, string table, TableIndex ix) in blockingIndexDrops)
+            {
+                ixDropBody.AppendLine(_indexEmitter.EmitDrop(schema, table, ix));
+            }
+            writer.WriteBatch("Dropping indexes on columns being altered", ixDropBody.ToString());
         }
 
         // DROP pass — objects only in B (removed from source) must be dropped in
@@ -283,7 +320,7 @@ public sealed class ScriptGenerator
 
                 case DifferenceStatus.Different when pair.SideA is Table tSrc && pair.SideB is Table tTgt:
                     {
-                        string indexDelta = EmitIndexDelta(tSrc, tTgt);
+                        string indexDelta = EmitIndexDelta(tSrc, tTgt, forcedIndexRecreates);
                         if (indexDelta.Length > 0)
                         {
                             writer.WriteBatch($"Updating indexes on [{tSrc.Schema}].[{tSrc.Name}]", indexDelta);
@@ -784,7 +821,18 @@ public sealed class ScriptGenerator
     /// created; indexes whose shape differs (key columns / uniqueness /
     /// clustering / filter) are dropped + recreated.
     /// </summary>
-    private string EmitIndexDelta(Table src, Table tgt)
+    /// <summary>
+    /// Emits the index delta for a Different table.
+    /// </summary>
+    /// <param name="src">Source-side table.</param>
+    /// <param name="tgt">Target-side table.</param>
+    /// <param name="alreadyDropped">
+    /// Names of indexes the up-front pass already dropped to free a column being
+    /// retyped or removed. Their DROP is skipped here (it has happened) and
+    /// their CREATE is FORCED even when the two sides match, because otherwise
+    /// the delta emits nothing and the deploy silently ends without the index.
+    /// </param>
+    private string EmitIndexDelta(Table src, Table tgt, IReadOnlySet<string>? alreadyDropped = null)
     {
         StringBuilder sb = new();
         var srcByName =
@@ -795,6 +843,7 @@ public sealed class ScriptGenerator
         // DROPs first so a rename-shaped change frees the slot before CREATE.
         foreach (TableIndex t in tgt.Indexes)
         {
+            if (alreadyDropped is not null && alreadyDropped.Contains(t.Name)) { continue; }
             bool stillThere = srcByName.TryGetValue(t.Name, out TableIndex? s);
             bool shapeChanged = stillThere && !IndexShapeEqual(t, s!);
             if (!stillThere || shapeChanged)
@@ -804,9 +853,10 @@ public sealed class ScriptGenerator
         }
         foreach (TableIndex s in src.Indexes)
         {
+            bool mustRestore = alreadyDropped is not null && alreadyDropped.Contains(s.Name);
             bool existsOnTarget = tgtByName.TryGetValue(s.Name, out TableIndex? t);
             bool shapeChanged = existsOnTarget && !IndexShapeEqual(s, t!);
-            if (existsOnTarget && !shapeChanged) { continue; }
+            if (existsOnTarget && !shapeChanged && !mustRestore) { continue; }
             sb.AppendLine(_indexEmitter.EmitCreate(src.Schema, src.Name, s));
         }
         return sb.ToString();

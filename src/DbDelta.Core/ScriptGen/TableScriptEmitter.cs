@@ -211,6 +211,13 @@ public sealed class TableScriptEmitter : IScriptEmitter
         var newColsByName =
             newT.Columns.ToDictionary(c => c.Name, StringComparer.Ordinal);
 
+        // Columns this ALTER will drop or retype. A key or CHECK constraint that
+        // depends on one of them blocks the column DDL with Msg 5074, so it has
+        // to be dropped in section 1 and put back in section 5 — even when the
+        // constraint itself is completely unchanged.
+        IReadOnlySet<string> touchedColumns = ColumnsDroppedOrAltered(newT, oldT);
+        HashSet<string> droppedForColumnDependency = new(StringComparer.Ordinal);
+
         // ── 1) DROP non-FK constraints first (FKs handled by ForeignKeyScriptEmitter).
         //       Dropping a constraint may also be a prerequisite for the column /
         //       constraint shape changes below.
@@ -221,7 +228,10 @@ public sealed class TableScriptEmitter : IScriptEmitter
             // Constraint shape changed → drop now and re-create below.
             bool stillPresent = newConstraintsByName.TryGetValue(oldC.Name, out Constraint? newSame);
             bool shapeChanged = stillPresent && !ConstraintShapeEqual(oldC, newSame!);
-            if (!stillPresent || shapeChanged)
+            bool blocksColumnDdl = stillPresent && !shapeChanged
+                && DependsOnColumn(oldC, touchedColumns);
+            if (blocksColumnDdl) { droppedForColumnDependency.Add(oldC.Name); }
+            if (!stillPresent || shapeChanged || blocksColumnDdl)
             {
                 sb.Append("ALTER TABLE ").Append(qualifiedName)
                   .Append(" DROP CONSTRAINT [").Append(oldC.Name).AppendLine("];");
@@ -296,7 +306,9 @@ public sealed class TableScriptEmitter : IScriptEmitter
             if (c is DefaultConstraint dc && inlinedNamedDefaults.Contains(dc.ColumnName)) { continue; }
             bool existsOnTarget = oldConstraintsByName.TryGetValue(c.Name, out Constraint? oldSame);
             bool shapeChanged = existsOnTarget && !ConstraintShapeEqual(oldSame!, c);
-            if (existsOnTarget && !shapeChanged) { continue; }
+            // Unchanged, but section 1 had to drop it to free an altered column.
+            bool mustRestore = droppedForColumnDependency.Contains(c.Name);
+            if (existsOnTarget && !shapeChanged && !mustRestore) { continue; }
             string body = FormatStandaloneConstraintBody(c);
             if (body.Length == 0) { continue; }
             sb.Append("ALTER TABLE ").Append(qualifiedName)
@@ -305,6 +317,82 @@ public sealed class TableScriptEmitter : IScriptEmitter
         }
 
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// The target-side column names that an ALTER of <paramref name="oldT"/>
+    /// into <paramref name="newT"/> will DROP or ALTER.
+    /// </summary>
+    /// <remarks>
+    /// SQL Server refuses to drop or retype a column while an index, key or
+    /// CHECK constraint depends on it (Msg 5074, "The object '…' is dependent on
+    /// column '…'"). Everything that depends on one of these columns therefore
+    /// has to be dropped first and re-created afterwards. The set is computed
+    /// once here and consumed twice: by <see cref="EmitAlter"/> for the
+    /// constraints it owns, and by <see cref="ScriptGenerator"/> for the indexes
+    /// it owns.
+    /// </remarks>
+    internal static IReadOnlySet<string> ColumnsDroppedOrAltered(Table newT, Table oldT)
+    {
+        ArgumentNullException.ThrowIfNull(newT);
+        ArgumentNullException.ThrowIfNull(oldT);
+
+        HashSet<string> touched = new(StringComparer.Ordinal);
+        // A rebuild re-creates the whole table, so nothing is "altered in place".
+        if (RequiresFullRebuild(newT, oldT)) { return touched; }
+
+        var newColsByName = newT.Columns.ToDictionary(c => c.Name, StringComparer.Ordinal);
+        var oldColsByName = oldT.Columns.ToDictionary(c => c.Name, StringComparer.Ordinal);
+
+        foreach (Column oldCol in oldT.Columns)
+        {
+            if (!newColsByName.ContainsKey(oldCol.Name))
+            {
+                touched.Add(oldCol.Name);   // section 2 — DROP COLUMN
+            }
+        }
+        foreach (Column newCol in newT.Columns)
+        {
+            if (!oldColsByName.TryGetValue(newCol.Name, out Column? oldCol)) { continue; }
+            if (ColumnShapeEqual(oldCol, newCol)) { continue; }
+            touched.Add(newCol.Name);       // section 3 — ALTER COLUMN, or DROP+ADD
+        }
+        return touched;
+    }
+
+    /// <summary>
+    /// True when <paramref name="c"/> depends on one of
+    /// <paramref name="touchedColumns"/> and therefore blocks the column DDL.
+    /// </summary>
+    /// <remarks>
+    /// DEFAULT constraints are deliberately excluded: ALTER COLUMN tolerates a
+    /// bound default, and a column being DROPped takes its default with it (the
+    /// default disappears from the source side too, so the normal
+    /// disappeared-constraint rule already drops it). Dropping and re-adding
+    /// defaults here would be churn plus a chance of colliding with the inline
+    /// default emitted on an ADD.
+    /// </remarks>
+    private static bool DependsOnColumn(Constraint c, IReadOnlySet<string> touchedColumns) => c switch
+    {
+        PrimaryKey pk => pk.Columns.Any(touchedColumns.Contains),
+        UniqueConstraint uq => uq.Columns.Any(touchedColumns.Contains),
+        // Catalog CHECK definitions bracket their column references, so a
+        // substring match on "[name]" is reliable here.
+        CheckConstraint ck => ck.Expression is { } expr
+            && touchedColumns.Any(col => expr.Contains($"[{col}]", StringComparison.Ordinal)),
+        _ => false,
+    };
+
+    /// <summary>
+    /// True when <paramref name="index"/> covers one of
+    /// <paramref name="touchedColumns"/>, as a key or an included column.
+    /// </summary>
+    internal static bool IndexDependsOnColumn(TableIndex index, IReadOnlySet<string> touchedColumns)
+    {
+        ArgumentNullException.ThrowIfNull(index);
+        ArgumentNullException.ThrowIfNull(touchedColumns);
+        return index.KeyColumns.Any(k => touchedColumns.Contains(k.Name))
+            || index.IncludedColumns.Any(touchedColumns.Contains);
     }
 
     /// <summary>
