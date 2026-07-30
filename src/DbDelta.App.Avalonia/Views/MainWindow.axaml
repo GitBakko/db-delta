@@ -17,7 +17,7 @@
   <Panel ClipToBounds="True">
 
   <!-- App shell: 44px topbar / 56px header strip / flex middle / 24px statusbar -->
-  <Grid RowDefinitions="44,56,*,24">
+  <Grid RowDefinitions="44,56,Auto,*,24">
 
     <!-- ── Band 1: App topbar ─────────────────────────────────────────────── -->
     <Border Grid.Row="0"
@@ -300,8 +300,51 @@
       <v:ProjectHeaderStrip DataContext="{Binding}" />
     </Border>
 
-    <!-- ── Band 3: Middle ─ welcome overlay OR populated body ──────────────── -->
-    <Panel Grid.Row="2">
+    <!-- ── Band 3: Error banner ─────────────────────────────────────────────
+         AppState.LastError was previously bound ONLY in ConnectionPickerView,
+         which is never instantiated — so every failed compare / project load
+         set the message and nobody ever saw it. The grid kept showing the
+         PREVIOUS run's counts, which the user then read as current. Auto row:
+         collapses to zero height while there is no error. -->
+    <Border Grid.Row="2"
+            Background="{StaticResource DangerSoftBrush}"
+            BorderBrush="{StaticResource DangerBrush}"
+            BorderThickness="0,0,0,1"
+            Padding="12,8"
+            IsVisible="{Binding AppState.LastError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <Path Grid.Column="0"
+              Stroke="{StaticResource DangerBrush}"
+              StrokeThickness="1.8"
+              StrokeLineCap="Round"
+              StrokeJoin="Round"
+              Data="M 8,1 L 15,14 L 1,14 Z M 8,6 L 8,10 M 8,11.6 L 8,12.4"
+              Width="16" Height="16"
+              Margin="0,0,10,0"
+              VerticalAlignment="Center" />
+        <TextBlock Grid.Column="1"
+                   Text="{Binding AppState.LastError}"
+                   FontSize="12"
+                   Foreground="{StaticResource DangerFgBrush}"
+                   TextWrapping="Wrap"
+                   VerticalAlignment="Center" />
+        <Button Grid.Column="2"
+                Content="Chiudi"
+                Command="{Binding DismissErrorCommand}"
+                Height="32"
+                Padding="12,0"
+                Margin="12,0,0,0"
+                Background="{StaticResource BgRaisedBrush}"
+                BorderBrush="{StaticResource BorderStrongBrush}"
+                BorderThickness="1"
+                Foreground="{StaticResource FgStrongBrush}"
+                FontSize="12"
+                VerticalAlignment="Center" />
+      </Grid>
+    </Border>
+
+    <!-- ── Band 4: Middle ─ welcome overlay OR populated body ──────────────── -->
+    <Panel Grid.Row="3">
 
       <!-- Welcome state: no project loaded yet -->
       <StackPanel HorizontalAlignment="Center"
@@ -441,7 +484,7 @@
     <!-- Status bar. ClipToBounds suppresses any minor pixel overflow from
          the redacted connection strings that previously bubbled up into a
          stray window-level horizontal scrollbar. -->
-    <Border Grid.Row="3"
+    <Border Grid.Row="4"
             Background="{StaticResource BgMutedBrush}"
             BorderBrush="{StaticResource BorderBrush}"
             BorderThickness="0,1,0,0"
@@ -449,9 +492,16 @@
       <Grid ColumnDefinitions="*,Auto" Margin="12,0">
         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"
                     HorizontalAlignment="Left">
-          <TextBlock Text="{Binding AppState.StatusText}"
+          <!-- MainWindowViewModel.StatusText, NOT AppState.StatusText: the
+               latter is computed ("Ready" / "Working…") and the busy overlay
+               already shows it, while the writable one carries the outcome of
+               save / deploy / execute — which was bound nowhere, so those
+               messages were written and never displayed. -->
+          <TextBlock Text="{Binding StatusText}"
                      FontSize="11"
-                     Foreground="{StaticResource FgSubtleBrush}" />
+                     Foreground="{StaticResource FgSubtleBrush}"
+                     TextTrimming="CharacterEllipsis"
+                     MaxWidth="560" />
           <TextBlock Text="·" Foreground="{StaticResource BorderStrongBrush}" FontSize="11" />
           <TextBlock Text="{Binding AppState.SourceConnectionString, Converter={x:Static v:Converters.RedactConnectionString}}"
                      FontSize="11"

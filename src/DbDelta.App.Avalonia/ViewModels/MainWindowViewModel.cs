@@ -162,9 +162,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            // Browser launch failure is rare and non-actionable in-app; the
-            // status bar has no writable message channel (StatusText is
-            // computed from IsBusy), so log and move on.
+            StatusText = $"Impossibile aprire la version history: {ex.Message}";
             Debug.WriteLine($"Failed to open version history: {ex.Message}");
         }
     }
@@ -572,6 +570,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// </summary>
     [ObservableProperty]
     private string _statusText = "Ready";
+
+    /// <summary>
+    /// Clears <see cref="AppStateViewModel.LastError"/>, collapsing the error
+    /// banner in the shell.
+    /// </summary>
+    [RelayCommand]
+    private void DismissError() => AppState.LastError = null;
 
     /// <summary>
     /// Produces an alignment SQL script for the selected rows and lets the
