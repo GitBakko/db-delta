@@ -115,6 +115,69 @@ public class ColumnDependencyOrderingTests
         addCk.Should().BeGreaterThan(alter);
     }
 
+    // ── The forced-recreate set is per table, not per index name ────────────
+    //    Index names are unique per object_id, not per database, so IX_TenantId
+    //    on two tables is routine. The set of "indexes we dropped up front" is
+    //    global to the script and was keyed on the bare name, then handed to
+    //    every Different table's index delta — so an unrelated namesake on
+    //    another table inherited the flag. Both fixtures below need TWO tables;
+    //    every other fixture in the suite is single-table, which is why this
+    //    was invisible.
+
+    private static Table Tenanted(string name, string tenantIdType, params TableIndex[] indexes) =>
+        new("dbo", name,
+            [new Column("Id", "int", false, 1), new Column("TenantId", tenantIdType, false, 2)],
+            [],
+            indexes);
+
+    [Fact]
+    public void A_namesake_index_on_another_table_is_not_force_recreated()
+    {
+        // Orders.TenantId is retyped, so dbo.Orders' IX_TenantId is dropped up
+        // front and must be re-created. Invoices' IX_TenantId is identical on
+        // both sides and was never dropped: a CREATE for it fails with Msg 1913
+        // ("operation failed, an index with name IX_TenantId already exists"),
+        // and XACT_ABORT rolls the whole deploy back.
+        TableIndex ix = Ix("IX_TenantId", "TenantId");
+        Table invoiceTgt = Tenanted("Invoices", "int", ix);
+        Table invoiceSrc = new("dbo", "Invoices",
+            [new Column("Id", "int", false, 1), new Column("TenantId", "int", false, 2),
+             new Column("Note", "nvarchar(50)", true, 3)],
+            [],
+            [ix]);
+
+        string sql = Sut.Generate(new ComparisonResult(
+        [
+            Diff(Tenanted("Orders", "bigint", ix), Tenanted("Orders", "int", ix)),
+            Diff(invoiceSrc, invoiceTgt),
+        ]));
+
+        sql.Should().Contain("CREATE NONCLUSTERED INDEX [IX_TenantId] ON [dbo].[Orders]",
+            "Orders' index really was dropped up front");
+        sql.Should().NotContain("CREATE NONCLUSTERED INDEX [IX_TenantId] ON [dbo].[Invoices]");
+    }
+
+    [Fact]
+    public void A_namesake_index_removed_from_the_source_is_still_dropped_on_another_table()
+    {
+        // Mirror of the above and the silent half: the source deleted Invoices'
+        // IX_TenantId, so the delta owes a DROP. Skipping it as "already
+        // dropped" left the index in production while the tool reported success
+        // and the next compare still showed the table as Different.
+        TableIndex ix = Ix("IX_TenantId", "TenantId");
+
+        string sql = Sut.Generate(new ComparisonResult(
+        [
+            Diff(Tenanted("Orders", "bigint", ix), Tenanted("Orders", "int", ix)),
+            Diff(Tenanted("Invoices", "int"), Tenanted("Invoices", "int", ix)),
+        ]));
+
+        sql.Should().Contain("DROP INDEX [IX_TenantId] ON [dbo].[Orders];",
+            "Orders' index blocks the ALTER COLUMN");
+        sql.Should().Contain("DROP INDEX [IX_TenantId] ON [dbo].[Invoices];",
+            "the source removed this one — nothing else emits it");
+    }
+
     [Fact]
     public void Index_on_a_dropped_column_is_dropped_first()
     {

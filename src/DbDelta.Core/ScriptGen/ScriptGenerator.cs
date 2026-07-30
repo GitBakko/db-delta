@@ -200,8 +200,16 @@ public sealed class ScriptGenerator
         //    up-front pass as the foreign keys and force-recreated afterwards:
         //    the normal index delta would emit nothing for an index that is
         //    identical on both sides, leaving production without it.
+        //    The recreate set is keyed on (schema, table, index name), NOT on the
+        //    index name alone: index names are unique per object_id, not per
+        //    database, so IX_TenantId on two different tables is routine. With a
+        //    name-only key the SAME global set was handed to every Different
+        //    table's EmitIndexDelta, and the unrelated namesake either got a
+        //    CREATE for an index that still exists (Msg 1913, whole deploy rolls
+        //    back) or had its legitimate DROP skipped (index survives in
+        //    production, tool reports success).
         List<(string Schema, string Table, TableIndex Index)> blockingIndexDrops = [];
-        HashSet<string> forcedIndexRecreates = new(StringComparer.Ordinal);
+        HashSet<(string Schema, string Table, string Index)> forcedIndexRecreates = [];
         foreach (DifferencePair p in pairs.Where(x =>
             x.Identity.Kind == "Table" && x.Status == DifferenceStatus.Different))
         {
@@ -214,7 +222,9 @@ public sealed class ScriptGenerator
             {
                 if (!TableScriptEmitter.IndexDependsOnColumn(ix, touched)) { continue; }
                 blockingIndexDrops.Add((sideB.Schema, sideB.Name, ix));
-                forcedIndexRecreates.Add(ix.Name);
+                // Keyed on the SOURCE side, which is what EmitIndexDelta looks
+                // up with — the same strings, not merely an equal identity.
+                forcedIndexRecreates.Add((sideA.Schema, sideA.Name, ix.Name));
             }
         }
 
@@ -827,12 +837,15 @@ public sealed class ScriptGenerator
     /// <param name="src">Source-side table.</param>
     /// <param name="tgt">Target-side table.</param>
     /// <param name="alreadyDropped">
-    /// Names of indexes the up-front pass already dropped to free a column being
-    /// retyped or removed. Their DROP is skipped here (it has happened) and
-    /// their CREATE is FORCED even when the two sides match, because otherwise
-    /// the delta emits nothing and the deploy silently ends without the index.
+    /// The indexes the up-front pass already dropped to free a column being
+    /// retyped or removed, keyed <c>(schema, table, index name)</c>. Their DROP
+    /// is skipped here (it has happened) and their CREATE is FORCED even when the
+    /// two sides match, because otherwise the delta emits nothing and the deploy
+    /// silently ends without the index. The table has to be part of the key: the
+    /// set is global to the script and index names are only unique per table.
     /// </param>
-    private string EmitIndexDelta(Table src, Table tgt, IReadOnlySet<string>? alreadyDropped = null)
+    private string EmitIndexDelta(
+        Table src, Table tgt, IReadOnlySet<(string Schema, string Table, string Index)> alreadyDropped)
     {
         StringBuilder sb = new();
         var srcByName =
@@ -843,7 +856,7 @@ public sealed class ScriptGenerator
         // DROPs first so a rename-shaped change frees the slot before CREATE.
         foreach (TableIndex t in tgt.Indexes)
         {
-            if (alreadyDropped is not null && alreadyDropped.Contains(t.Name)) { continue; }
+            if (alreadyDropped.Contains((src.Schema, src.Name, t.Name))) { continue; }
             bool stillThere = srcByName.TryGetValue(t.Name, out TableIndex? s);
             bool shapeChanged = stillThere && !IndexShapeEqual(t, s!);
             if (!stillThere || shapeChanged)
@@ -853,7 +866,7 @@ public sealed class ScriptGenerator
         }
         foreach (TableIndex s in src.Indexes)
         {
-            bool mustRestore = alreadyDropped is not null && alreadyDropped.Contains(s.Name);
+            bool mustRestore = alreadyDropped.Contains((src.Schema, src.Name, s.Name));
             bool existsOnTarget = tgtByName.TryGetValue(s.Name, out TableIndex? t);
             bool shapeChanged = existsOnTarget && !IndexShapeEqual(s, t!);
             if (existsOnTarget && !shapeChanged && !mustRestore) { continue; }
