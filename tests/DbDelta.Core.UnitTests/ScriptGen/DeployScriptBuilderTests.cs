@@ -19,10 +19,23 @@ public class DeployScriptBuilderTests
             SideB: status == DifferenceStatus.OnlyInA ? null : table);
     }
 
+    /// <summary>
+    /// The degenerate case where the user selected everything the comparison
+    /// found, i.e. full result == selection. Tests that care about the gap
+    /// between the two call <see cref="DeployScriptBuilder.Build"/> directly.
+    /// </summary>
+    private static string BuildAllSelected(
+        IReadOnlyList<DifferencePair> selected,
+        string sourceSummary,
+        string targetSummary,
+        DateTime nowUtc) =>
+        DeployScriptBuilder.Build(
+            new ComparisonResult(selected), selected, sourceSummary, targetSummary, nowUtc, []);
+
     [Fact]
     public void Build_empty_selection_returns_header_only_script()
     {
-        string script = DeployScriptBuilder.Build(
+        string script = BuildAllSelected(
             [],
             "SrcServer/SrcDb",
             "TgtServer/TgtDb",
@@ -37,7 +50,7 @@ public class DeployScriptBuilderTests
     [Fact]
     public void Build_includes_source_and_target_summary_lines()
     {
-        string script = DeployScriptBuilder.Build(
+        string script = BuildAllSelected(
             [MakeTablePair("dbo", "T1", DifferenceStatus.OnlyInA)],
             "MYSERVER/MyDB",
             "TARGETSERVER/ProdDB",
@@ -52,7 +65,7 @@ public class DeployScriptBuilderTests
     {
         DateTime ts = new(2025, 6, 15, 9, 30, 0, DateTimeKind.Utc);
 
-        string script = DeployScriptBuilder.Build(
+        string script = BuildAllSelected(
             [MakeTablePair("dbo", "T", DifferenceStatus.OnlyInA)],
             "src",
             "tgt",
@@ -64,7 +77,7 @@ public class DeployScriptBuilderTests
     [Fact]
     public void Build_emits_full_verbose_envelope_without_orphan_GO()
     {
-        string script = DeployScriptBuilder.Build(
+        string script = BuildAllSelected(
             [MakeTablePair("dbo", "T", DifferenceStatus.OnlyInA)],
             "src",
             "tgt",
@@ -108,7 +121,7 @@ public class DeployScriptBuilderTests
             tableWithIndex,
             null);
 
-        string script = DeployScriptBuilder.Build(
+        string script = BuildAllSelected(
             [tablePair],
             "src",
             "tgt",
@@ -130,7 +143,7 @@ public class DeployScriptBuilderTests
     {
         // Both app call sites pass live connection strings, and this header is
         // written to a .sql file that gets mailed around and committed.
-        string script = DeployScriptBuilder.Build(
+        string script = BuildAllSelected(
             [MakeTablePair("dbo", "T", DifferenceStatus.OnlyInA)],
             "Server=DEV01;Database=App;Encrypt=False;TrustServerCertificate=True;User Id=sa;Password=Dev!Secret",
             "Server=PROD01;Database=App;User ID=sa;PWD=Pr0d!Secret",
@@ -150,7 +163,7 @@ public class DeployScriptBuilderTests
     [Fact]
     public void Build_header_passes_through_a_plain_label_unchanged()
     {
-        string script = DeployScriptBuilder.Build(
+        string script = BuildAllSelected(
             [MakeTablePair("dbo", "T", DifferenceStatus.OnlyInA)],
             "MYSERVER/MyDB",
             "TARGETSERVER/ProdDB",
@@ -174,7 +187,7 @@ public class DeployScriptBuilderTests
             "OBJECT_OR_COLUMN", "dbo", "uspChiudiPeriodo", null);
         DifferencePair pair = new(p.Identity, DifferenceStatus.OnlyInA, p, null);
 
-        string script = DeployScriptBuilder.Build(
+        string script = BuildAllSelected(
             [pair], "src", "tgt", DateTime.UtcNow);
 
         script.Should().Contain("GRANT EXECUTE ON [dbo].[uspChiudiPeriodo] TO [app_writer];");
@@ -196,8 +209,9 @@ public class DeployScriptBuilderTests
         // The view depends on the function, so the function must emit first.
         DependencyEdge edge = new(view.Identity, fn.Identity, EdgeKind.ModuleReference);
 
+        DifferencePair[] selected = [viewPair, fnPair];
         string withEdges = DeployScriptBuilder.Build(
-            [viewPair, fnPair], "src", "tgt", DateTime.UtcNow, [edge]);
+            new ComparisonResult(selected), selected, "src", "tgt", DateTime.UtcNow, [edge]);
 
         int fnPos = withEdges.IndexOf("fnIva", StringComparison.Ordinal);
         int viewPos = withEdges.IndexOf("vFattureIva", StringComparison.Ordinal);
@@ -205,10 +219,108 @@ public class DeployScriptBuilderTests
         viewPos.Should().BeGreaterThan(fnPos, "the function the view selects from must be created first");
     }
 
+    // ── The selection is not the comparison ────────────────────────────────
+    //    Build used to wrap the selection in `new ComparisonResult(selectedPairs)`
+    //    and pass `selection: null`, so inside Generate the full result WAS the
+    //    selection. Every rescue pass that scans the unfiltered result for
+    //    objects the user cannot tick — Identical rows have no checkbox
+    //    (DifferenceRowViewModel.IsSelectable => !IsIdentical) — was therefore a
+    //    no-op on the app path, the only path that runs against a live database.
+    //    Both tests below pass an Identical pair in the full result and NOT in
+    //    the selection: the shape the GUI actually produces.
+
+    [Fact]
+    public void Build_recreates_an_identical_trigger_when_only_its_rebuilt_table_is_selected()
+    {
+        // Target: dbo.Fatture + a byte-identical audit trigger. Source adds
+        // IDENTITY to Id => full rebuild => DROP TABLE takes the trigger with
+        // it. The user can only tick the Fatture row.
+        static Table Fatture(bool identity)
+        {
+            return new Table("dbo", "Fatture",
+                [new Column("Id", "int", isNullable: false, ordinal: 1,
+                    isIdentity: identity, identitySeed: identity ? 1 : null,
+                    identityIncrement: identity ? 1 : null)],
+                [new PrimaryKey("PK_Fatture", ["Id"], IsClustered: true)],
+                []);
+        }
+        Trigger audit = new(
+            Schema: "dbo",
+            Name: "trg_Fatture_Audit",
+            Body: "CREATE TRIGGER dbo.trg_Fatture_Audit ON dbo.Fatture AFTER INSERT AS BEGIN SET NOCOUNT ON; END",
+            IsEncrypted: false,
+            ParentSchema: "dbo",
+            ParentTable: "Fatture",
+            IsDisabled: false,
+            IsNotForReplication: false);
+
+        DifferencePair tablePair = new(
+            Fatture(true).Identity, DifferenceStatus.Different, Fatture(true), Fatture(false));
+        DifferencePair triggerPair = new(
+            audit.Identity, DifferenceStatus.Identical, audit, audit);
+
+        string script = DeployScriptBuilder.Build(
+            new ComparisonResult([tablePair, triggerPair]),
+            [tablePair],
+            "src",
+            "tgt",
+            DateTime.UtcNow,
+            []);
+
+        int renameIdx = script.IndexOf("sp_rename", StringComparison.Ordinal);
+        int triggerIdx = script.IndexOf("TRIGGER dbo.trg_Fatture_Audit", StringComparison.Ordinal);
+        renameIdx.Should().BeGreaterThan(0, "this is the rebuild path");
+        triggerIdx.Should().BeGreaterThan(renameIdx,
+            "DROP TABLE destroyed the trigger, so it must be re-created after the rename");
+    }
+
+    [Fact]
+    public void Build_drops_an_fk_held_by_an_identical_table_when_only_the_referenced_table_is_selected()
+    {
+        // dbo.Currency was removed from the source; dbo.Invoice is Identical on
+        // both sides and holds an FK pointing at it. Only Currency is tickable.
+        ForeignKey fk = new(
+            Name: "FK_Invoice_Currency",
+            Columns: ["CurrencyId"],
+            ReferencedSchema: "dbo",
+            ReferencedTable: "Currency",
+            ReferencedColumns: ["Id"],
+            OnDelete: ReferentialAction.NoAction,
+            OnUpdate: ReferentialAction.NoAction,
+            IsDisabled: false,
+            IsNotForReplication: false);
+        Table currency = new("dbo", "Currency", [new Column("Id", "int", false, 1)]);
+        Table invoice = new("dbo", "Invoice",
+            [new Column("Id", "int", false, 1), new Column("CurrencyId", "int", false, 2)],
+            [fk],
+            []);
+
+        DifferencePair currencyPair = new(
+            currency.Identity, DifferenceStatus.OnlyInB, null, currency);
+        DifferencePair invoicePair = new(
+            invoice.Identity, DifferenceStatus.Identical, invoice, invoice);
+
+        string script = DeployScriptBuilder.Build(
+            new ComparisonResult([currencyPair, invoicePair]),
+            [currencyPair],
+            "src",
+            "tgt",
+            DateTime.UtcNow,
+            []);
+
+        int dropFk = script.IndexOf(
+            "ALTER TABLE [dbo].[Invoice] DROP CONSTRAINT [FK_Invoice_Currency];",
+            StringComparison.Ordinal);
+        int dropTable = script.IndexOf("DROP TABLE [dbo].[Currency];", StringComparison.Ordinal);
+        dropFk.Should().BeGreaterThan(0,
+            "DROP TABLE fails with Msg 3726 while the FK on the Identical table still references it");
+        dropTable.Should().BeGreaterThan(dropFk);
+    }
+
     [Fact]
     public void Build_still_ignores_permissions_when_none_is_selected()
     {
-        string script = DeployScriptBuilder.Build(
+        string script = BuildAllSelected(
             [MakeTablePair("dbo", "T", DifferenceStatus.OnlyInA)],
             "src",
             "tgt",

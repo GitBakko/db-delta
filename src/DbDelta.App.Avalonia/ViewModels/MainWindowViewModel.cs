@@ -601,6 +601,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (file is null) { return; }
 
         string script = DeployScriptBuilder.Build(
+            AppState.LastComparisonRaw,
             selected,
             AppState.SourceConnectionString ?? string.Empty,
             AppState.TargetConnectionString ?? string.Empty,
@@ -634,6 +635,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         // outcome flow and runs this delegate in-dialog (busy state + result
         // panel). Result stays null when the user cancels before executing.
         string script = DeployScriptBuilder.Build(
+            AppState.LastComparisonRaw,
             selected,
             AppState.SourceConnectionString ?? string.Empty,
             AppState.TargetConnectionString ?? string.Empty,
