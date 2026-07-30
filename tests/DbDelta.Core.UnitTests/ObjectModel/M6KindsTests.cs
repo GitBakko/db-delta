@@ -160,12 +160,26 @@ public class M6KindsTests
             .Should().Be("GRANT EXECUTE ON SCHEMA::[app] TO [app];");
     }
 
+    // A database-scoped grant takes NO ON clause: it applies to the database
+    // the batch runs in. "ON DATABASE" is not valid T-SQL (the only ON form is
+    // "ON DATABASE::[name]", which would hard-code a database name into a
+    // portable script), and this test used to assert exactly that broken form —
+    // contradicting its own name.
     [Fact]
     public void Permission_database_level_grant_omits_target_object()
     {
         Permission p = new("app", "CONNECT", PermissionState.Grant,
             "DATABASE", null, null, null);
         new PermissionScriptEmitter().EmitGrantOrDeny(p)
-            .Should().Be("GRANT CONNECT ON DATABASE TO [app];");
+            .Should().Be("GRANT CONNECT TO [app];");
+    }
+
+    [Fact]
+    public void Permission_database_level_revoke_omits_target_object()
+    {
+        Permission p = new("app", "CONNECT", PermissionState.Grant,
+            "DATABASE", null, null, null);
+        new PermissionScriptEmitter().EmitRevoke(p)
+            .Should().Be("REVOKE CONNECT FROM [app];");
     }
 }
