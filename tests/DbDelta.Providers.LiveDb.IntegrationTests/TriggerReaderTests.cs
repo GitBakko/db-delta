@@ -52,6 +52,36 @@ public class TriggerReaderTests(LiveDbFixture fixture)
         trg.IsDisabled.Should().BeTrue();
     }
 
+    [Fact]
+    public async Task LiveDbSource_loads_INSTEAD_OF_trigger_on_a_view()
+    {
+        // TriggerQuery used to INNER JOIN sys.tables on tr.parent_id, which
+        // silently discarded every trigger whose parent is a VIEW — i.e. every
+        // INSTEAD OF trigger, the standard way to make a multi-table view
+        // updatable. Both sides read zero triggers for it, so the pair compared
+        // Identical and no DDL was ever generated: after a "successful" deploy
+        // every INSERT against the target view failed.
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        const string dbName = "DbDeltaTriggerInsteadOfView";
+        string conn = await CreateAndSeedAsync(dbName, """
+            IF OBJECT_ID('dbo.Customer') IS NULL
+                CREATE TABLE dbo.Customer(Id int NOT NULL, Name nvarchar(50) NULL);
+            IF OBJECT_ID('dbo.vCustomer') IS NULL
+                EXEC('CREATE VIEW dbo.vCustomer AS SELECT Id, Name FROM dbo.Customer');
+            IF OBJECT_ID('dbo.trgVCustomerInsert') IS NULL
+                EXEC('CREATE TRIGGER dbo.trgVCustomerInsert ON dbo.vCustomer INSTEAD OF INSERT AS BEGIN SET NOCOUNT ON; END');
+            """, ct);
+
+        Result<Database> result = await new LiveDbSource(conn).LoadAsync(ct);
+        result.IsSuccess.Should().BeTrue(result.Error?.Message);
+
+        Trigger trg = result.Value!.Triggers
+            .Should().ContainSingle(t => t.Name == "trgVCustomerInsert").Subject;
+        trg.ParentSchema.Should().Be("dbo");
+        trg.ParentTable.Should().Be("vCustomer");
+        trg.Body.Should().Contain("INSTEAD OF INSERT");
+    }
+
     private async Task<string> CreateAndSeedAsync(string dbName, string seedSql, CancellationToken ct)
     {
         await using (SqlConnection master = new(fixture.ConnectionString))

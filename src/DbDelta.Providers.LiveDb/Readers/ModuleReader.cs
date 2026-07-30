@@ -145,15 +145,19 @@ internal sealed class ModuleReader
                tr.name AS TriggerName,
                sm.definition AS Body,
                ts.name AS ParentSchema,
-               t.name  AS ParentTable,
+               po.name AS ParentTable,
                CAST(tr.is_disabled AS BIT)             AS IsDisabled,
                CAST(tr.is_not_for_replication AS BIT)  AS IsNotForReplication,
                o.modify_date AS ModifyDate
         FROM sys.triggers AS tr
         INNER JOIN sys.objects AS o ON o.object_id = tr.object_id
         INNER JOIN sys.schemas AS ps ON ps.schema_id = o.schema_id
-        INNER JOIN sys.tables  AS t  ON t.object_id  = tr.parent_id
-        INNER JOIN sys.schemas AS ts ON ts.schema_id = t.schema_id
+        -- Parent is resolved through sys.objects, not sys.tables: a view is a
+        -- legal trigger parent (INSTEAD OF triggers, the standard way to make a
+        -- multi-table view updatable) and joining sys.tables discarded every
+        -- one of them, so they were never compared nor deployed.
+        INNER JOIN sys.objects AS po ON po.object_id = tr.parent_id AND po.type IN ('U', 'V')
+        INNER JOIN sys.schemas AS ts ON ts.schema_id = po.schema_id
         LEFT  JOIN sys.sql_modules AS sm ON sm.object_id = tr.object_id
         WHERE tr.parent_class = 1
           AND tr.is_ms_shipped = 0
