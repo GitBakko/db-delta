@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DbDelta.Core.Abstractions;
+using DbDelta.Core.Dependency;
 using DbDelta.Core.Diff;
 using DbDelta.Core.ObjectModel;
 using DbDelta.Core.Options;
@@ -71,6 +72,21 @@ public sealed partial class AppStateViewModel : ObservableObject
     private ComparisonResult? _lastComparisonRaw;
 
     /// <summary>
+    /// Source-side dependency edges from the most recent comparison. Required by
+    /// the deploy-script generator: with an empty edge list the topological sort
+    /// degenerates to kind-then-alphabetical order, which emits a new view
+    /// before the new function it selects from (Msg 208).
+    /// </summary>
+    public IReadOnlyList<DependencyEdge> SourceDependencies { get; private set; } = [];
+
+    /// <summary>
+    /// Target-side dependency edges from the most recent comparison. Not used by
+    /// the forward script; retained because an inverse (rollback) script has to
+    /// be ordered by the dependencies of the side it restores.
+    /// </summary>
+    public IReadOnlyList<DependencyEdge> TargetDependencies { get; private set; } = [];
+
+    /// <summary>
     /// Active status filter for the result grid. <c>null</c> = no filter.
     /// Bound options match the raw <see cref="DifferenceDto.Status"/> string
     /// values ("Different" / "OnlyInA" / "OnlyInB" / "Identical").
@@ -138,6 +154,41 @@ public sealed partial class AppStateViewModel : ObservableObject
 
     partial void OnIsBusyChanged(bool value) => OnPropertyChanged(nameof(StatusText));
 
+    /// <summary>
+    /// Describes a connection-string parse failure without echoing the string.
+    /// </summary>
+    /// <remarks>
+    /// This message is shown in the shell's error banner, so it must never
+    /// carry a value. It previously embedded the whole string with passwords
+    /// masked by a <c>(password|pwd)\s*=\s*[^;]+</c> regex — which stops at the
+    /// first <c>;</c>, so a quoted password containing one (legal, and common in
+    /// generated passwords) left its tail in plain sight, and any other
+    /// secret-bearing keyword was not covered at all. Key NAMES are safe and
+    /// keep the diagnostic value; values are never included.
+    /// </remarks>
+    private static string DescribeParseFailure(string side, string connectionString, Exception parseEx)
+    {
+        IEnumerable<string> keys = connectionString
+            .Split(';', StringSplitOptions.RemoveEmptyEntries)
+            .Select(t => t.IndexOf('=', StringComparison.Ordinal) is int eq && eq > 0
+                ? t[..eq].Trim()
+                : "(senza '=')")
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+
+        int ctrlIdx = connectionString
+            .Select((ch, i) => (ch, i))
+            .FirstOrDefault(x => char.IsControl(x.ch)).i;
+        bool hasCtrl = connectionString.Any(char.IsControl);
+
+        string ctrl = hasCtrl
+            ? $"\nCarattere di controllo alla posizione {ctrlIdx} — probabile newline incollata."
+            : string.Empty;
+
+        return $"Stringa di connessione di {side} non valida: {parseEx.Message}"
+             + $"\nLunghezza {connectionString.Length}, chiavi lette: {string.Join(", ", keys)}."
+             + ctrl;
+    }
+
     [RelayCommand(CanExecute = nameof(CanCompare))]
     public async Task CompareAsync(CancellationToken ct)
     {
@@ -152,18 +203,15 @@ public sealed partial class AppStateViewModel : ObservableObject
             string srcCs = (SourceConnectionString ?? string.Empty).Trim();
             string tgtCs = (TargetConnectionString ?? string.Empty).Trim();
 
-            // Surface a sanitised echo of the parsed string when SqlClient throws
-            // so we know exactly what the parser saw (e.g. a stray newline at
-            // index N, or markdown ** that survived the paste).
+            // Report enough to diagnose a bad paste (a stray newline, markdown
+            // ** that survived the clipboard) WITHOUT echoing the string.
             try
             {
                 _ = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(srcCs);
             }
             catch (Exception parseEx)
             {
-                LastError = $"Source connection string parse failed: {parseEx.Message}\n"
-                    + $"len={srcCs.Length}\n"
-                    + $"sanitised='{System.Text.RegularExpressions.Regex.Replace(srcCs, @"(?i)(password|pwd)\s*=\s*[^;]+", "$1=***")}'";
+                LastError = DescribeParseFailure("provenienza", srcCs, parseEx);
                 return;
             }
             try
@@ -172,9 +220,7 @@ public sealed partial class AppStateViewModel : ObservableObject
             }
             catch (Exception parseEx)
             {
-                LastError = $"Target connection string parse failed: {parseEx.Message}\n"
-                    + $"len={tgtCs.Length}\n"
-                    + $"sanitised='{System.Text.RegularExpressions.Regex.Replace(tgtCs, @"(?i)(password|pwd)\s*=\s*[^;]+", "$1=***")}'";
+                LastError = DescribeParseFailure("destinazione", tgtCs, parseEx);
                 return;
             }
 
@@ -199,6 +245,14 @@ public sealed partial class AppStateViewModel : ObservableObject
             ComparisonResult result = engine.Compare(srcRes.Value!, tgtRes.Value!, ComparisonOptions.Default);
             LastComparisonRaw = result;
             LastComparison = Mapper.ToDto(result);
+
+            // Keep the dependency edges: without them the deploy script the app
+            // builds has NO topological ordering and degenerates to KindRank, so
+            // a new view over a new function emits in the wrong order and fails.
+            // Both sides are retained — the target's are what an inverse
+            // (rollback) script would need.
+            SourceDependencies = srcRes.Value!.Dependencies;
+            TargetDependencies = tgtRes.Value!.Dependencies;
 
             // Wire the diff viewer with a live resolver bound to the same
             // source/target connection strings so the bottom pane can fetch
