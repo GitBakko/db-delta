@@ -163,6 +163,24 @@ public class MainWindowViewModelTests
     }
 
     [AvaloniaFact]
+    public void Kind_label_and_sort_order_come_from_the_shared_catalog()
+    {
+        // The row view-model used to carry its own copy of the kind table, and
+        // it had fallen behind twice: Schema and TableType were added to
+        // KindCatalog and never here, so those rows rendered the raw English
+        // kind and sorted to the bottom while the reports showed "Schemi" /
+        // "Tipi tabella" in their proper place.
+        DifferenceRowViewModel schema = MakeRowVm(MakeDto("vendite", "Different", "Schema"));
+        DifferenceRowViewModel tableType = MakeRowVm(MakeDto("TipoRiga", "Different", "TableType"));
+        DifferenceRowViewModel table = MakeRowVm(MakeDto("Orders", "Different", "Table"));
+
+        schema.KindDisplayName.Should().Be("Schemi");
+        tableType.KindDisplayName.Should().Be("Tipi tabella");
+        schema.KindOrder.Should().BeLessThan(table.KindOrder, "schemas come first, as in every report");
+        tableType.KindOrder.Should().BeLessThan(int.MaxValue, "it is a known kind, not an 'everything else'");
+    }
+
+    [AvaloniaFact]
     public void QualifiedName_includes_schema_prefix()
     {
         DifferenceRowViewModel row = MakeRowVm(new DifferenceDto("Table", "dbo", "Orders", "Different"));

@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using DbDelta.Core.Diff;
+using DbDelta.Core.Reports;
 using DbDelta.Shared.Dtos;
 
 namespace DbDelta.App.ViewModels;
@@ -81,48 +82,29 @@ public sealed partial class DifferenceRowViewModel(DifferencePair pair, Differen
             ? Dto.LastModifiedTarget.Value.ToString("dd/MM/yyyy HH:mm", s_itIt)
             : string.Empty;
 
-    /// <summary>Italian display label for <see cref="Kind"/>. Plural forms
-    /// chosen so the same label reads correctly in the "Tipo di oggetto"
-    /// group header (e.g. "Tabelle (5)") and stays consistent across the
-    /// per-row "Tipo entità" column.</summary>
-    public string KindDisplayName => Kind switch
-    {
-        "Table" => "Tabelle",
-        "View" => "Viste",
-        "Procedure" => "Procedure",
-        "Function" => "Funzioni",
-        "Trigger" => "Trigger",
-        "Sequence" => "Sequenze",
-        "Synonym" => "Sinonimi",
-        "UserDefinedType" => "Tipi utente",
-        "User" => "Utenti",
-        "Role" => "Ruoli",
-        "Permission" => "Permessi",
-        _ => Kind,
-    };
+    /// <summary>
+    /// Italian display label for <see cref="Kind"/>. Plural forms chosen so the
+    /// same label reads correctly in the "Tipo di oggetto" group header (e.g.
+    /// "Tabelle (5)") and in the per-row "Tipo entità" column.
+    /// </summary>
+    /// <remarks>
+    /// Delegates to <see cref="KindCatalog"/> instead of carrying its own copy
+    /// of the table. The copy had already fallen behind twice — TableType and
+    /// then Schema were added to the catalog and never here, so those rows
+    /// rendered the raw English kind and sorted last while every other
+    /// user-facing artefact showed "Tipi tabella" / "Schemi" in their proper
+    /// place.
+    /// </remarks>
+    public string KindDisplayName => KindCatalog.DisplayLabel(Kind);
 
     /// <summary>
     /// Deterministic sort key for the "Tipo di oggetto" column / group
-    /// ordering. User-requested fixed order:
-    ///   0 Tabelle → 1 Viste → 2 Procedure → 3 Funzioni → 4 Trigger → 99 rest.
-    /// Used by the grid's SortDescriptions so alphabetical sorting cannot
-    /// re-order these categories.
+    /// ordering, used by the grid's SortDescriptions so alphabetical sorting
+    /// cannot re-order the categories. Same single source of truth as
+    /// <see cref="KindDisplayName"/>; the requested relative order (Tabelle →
+    /// Viste → Procedure → Funzioni → Trigger → rest) is the catalog's order.
     /// </summary>
-    public int KindOrder => Kind switch
-    {
-        "Table" => 0,
-        "View" => 1,
-        "Procedure" => 2,
-        "Function" => 3,
-        "Trigger" => 4,
-        "Sequence" => 5,
-        "Synonym" => 6,
-        "UserDefinedType" => 7,
-        "User" => 8,
-        "Role" => 9,
-        "Permission" => 10,
-        _ => 99,
-    };
+    public int KindOrder => KindCatalog.SortOrder(Kind);
 
     /// <summary>True when the object exists only in the source database.</summary>
     public bool IsSourceOnly => Dto.Status == "OnlyInA";
