@@ -89,6 +89,10 @@ public class ForeignKeyDropOrderingTests
     {
         // Invoice itself is being dropped, so its FK goes with it — emitting an
         // explicit DROP CONSTRAINT first would be noise.
+        // NOT a regression test for the up-front drop pass: it passes on the
+        // pre-ec6eb83 behaviour too. What it guards is the
+        // `droppedTables.Contains(holder)` skip inside the holder scan; delete
+        // that line and this test goes red.
         Table invoice = Invoice(Fk("FK_Invoice_Currency", "Currency"));
         ComparisonResult r = new(
         [
@@ -147,10 +151,14 @@ public class ForeignKeyDropOrderingTests
     }
 
     [Fact]
-    public void A_reshaped_fk_is_dropped_up_front_and_re_added_at_the_end()
+    public void A_reshaped_fk_is_dropped_in_the_up_front_pass_and_re_added_in_the_late_one()
     {
-        // The drop and the add are now in different passes; both must still fire,
-        // in that order.
+        // The drop and the add are in different passes; both must still fire, in
+        // that order. Anchored to the two PASS LABELS, not merely to
+        // `addFk > dropFk`: the old EmitFkDelta emitted DROP then ADD inside the
+        // same late batch, so relative statement order was already satisfied and
+        // the earlier version of this test passed with the whole restructuring
+        // reverted. Asserting the up-front pass EXISTS is what makes it bite.
         Table src = Invoice(Fk("FK_Invoice_Currency", "Currency"));
         Table tgt = Invoice(Fk("FK_Invoice_Currency", "OldCurrency"));
         ComparisonResult r = new(
@@ -160,13 +168,19 @@ public class ForeignKeyDropOrderingTests
 
         string sql = Sut.Generate(r);
 
+        int dropPass = sql.IndexOf("PRINT N'Dropping foreign keys';", StringComparison.Ordinal);
         int dropFk = sql.IndexOf(
             "ALTER TABLE [dbo].[Invoice] DROP CONSTRAINT [FK_Invoice_Currency];",
             StringComparison.Ordinal);
+        int addPass = sql.IndexOf(
+            "PRINT N'Adding foreign keys on [dbo].[Invoice]';", StringComparison.Ordinal);
         int addFk = sql.IndexOf(
             "ADD CONSTRAINT [FK_Invoice_Currency] FOREIGN KEY",
             StringComparison.Ordinal);
-        dropFk.Should().BeGreaterThan(0);
-        addFk.Should().BeGreaterThan(dropFk);
+
+        dropPass.Should().BeGreaterThan(0, "the up-front foreign-key drop pass must exist");
+        dropFk.Should().BeGreaterThan(dropPass, "the drop belongs to that pass, not to the late one");
+        addPass.Should().BeGreaterThan(dropFk);
+        addFk.Should().BeGreaterThan(addPass);
     }
 }

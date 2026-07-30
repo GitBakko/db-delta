@@ -353,9 +353,11 @@ public class TableRebuildPkSwapTests
         int createIxIdx = sql.IndexOf("CREATE NONCLUSTERED INDEX [IX_Invoice_Amount]", StringComparison.Ordinal);
         renameIdx.Should().BeGreaterThan(0);
         createIxIdx.Should().BeGreaterThan(renameIdx, "the index must be re-created after the table is back");
-        // The index is identical on both sides, so the delta path would have
-        // emitted a DROP for it — the rebuild already destroyed it.
-        sql.Should().NotContain("DROP INDEX [IX_Invoice_Amount]");
+        // Deleted here: a `NotContain("DROP INDEX [IX_Invoice_Amount]")` assert
+        // that could not fail. The delta path never emits a DROP for an index
+        // that is identical on both sides, so it held before the fix and after
+        // it — and the comment justifying it claimed the opposite of what the
+        // code does.
     }
 
     [Fact]

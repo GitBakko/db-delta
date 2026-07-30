@@ -146,14 +146,30 @@ public class SqlExecutorTests
     [InlineData("")]
     // "BEGIN" opening a block is not "BEGIN TRANSACTION".
     [InlineData("IF 1 = 1\nBEGIN\n  SELECT 1;\nEND")]
-    // A mention inside a comment or a name must not count as an opener: the
-    // pattern anchors to the start of a line.
+    // A trailing `-- BEGIN TRANSACTION` does not match because `--` is not
+    // whitespace, so the keyword is not at the start of the line. That is ALL
+    // this row proves — see the over-detection test below for what the pattern
+    // does with a mention that IS at the start of a line.
     [InlineData("SELECT 1; -- BEGIN TRANSACTION would go here")]
     public void ScriptManagesItsOwnTransaction_is_false_for_a_plain_script(string script) =>
         SqlExecutor.ScriptManagesItsOwnTransaction(script).Should().BeFalse();
 
+    // Known limitation, asserted so it is a fact instead of a belief. The
+    // pattern is purely line-anchored, so BEGIN TRANSACTION at the start of a
+    // line inside a block comment — or inside a procedure body, where it opens a
+    // transaction at CALL time and not at deploy time — reads as a
+    // self-contained script. `apply` then skips the client transaction and a
+    // failure at batch 3 of 5 leaves the target half-migrated. Distinguishing
+    // those needs a parser, not a regex; recording it here beats a comment
+    // claiming comments are handled.
+    [Theory]
+    [InlineData("/*\nBEGIN TRANSACTION\n*/\nSELECT 1;")]
+    [InlineData("CREATE PROCEDURE dbo.p AS\nBEGIN TRANSACTION\n  UPDATE dbo.T SET x = 1;\n  COMMIT")]
+    public void ScriptManagesItsOwnTransaction_over_detects_a_mention_at_the_start_of_a_line(string script) =>
+        SqlExecutor.ScriptManagesItsOwnTransaction(script).Should().BeTrue();
+
     [Fact]
-    public void ExecuteAsync_rejects_a_negative_command_timeout()
+    public async Task ExecuteAsync_rejects_a_negative_command_timeout()
     {
         // 0 means unlimited; negative is a caller bug, not "very short".
         Func<Task> act = () => SqlExecutor.ExecuteAsync(
@@ -163,6 +179,9 @@ public class SqlExecutorTests
             useOwnTransaction: true,
             commandTimeoutSeconds: -1);
 
-        act.Should().ThrowAsync<ArgumentOutOfRangeException>();
+        // `await` is load-bearing: without it ThrowAsync returns a Task that is
+        // dropped on the floor, and because the test method was not async there
+        // was no CS4014 to warn about it. The assertion never ran.
+        await act.Should().ThrowAsync<ArgumentOutOfRangeException>();
     }
 }

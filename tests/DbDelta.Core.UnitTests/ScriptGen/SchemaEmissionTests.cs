@@ -49,17 +49,28 @@ public class SchemaEmissionTests
     }
 
     [Fact]
-    public void Schemas_present_on_both_sides_produce_no_row()
+    public void Only_the_schemas_that_differ_produce_a_row()
     {
         // A schema is modelled by its name alone, so a pair that matches by
         // identity can never be anything but equal — the row would carry no
         // information and dbo would show up in every comparison ever run.
+        // The suppression is asserted in the SAME arrange as the two schemas
+        // that DO differ: on its own, the negative half stayed green with
+        // CompareSchemas deleted from the engine, so it could not catch a
+        // refactor that removed the feature.
         Database a = Db([new Schema("dbo"), new Schema("sales")]);
-        Database b = Db([new Schema("dbo"), new Schema("sales")]);
+        Database b = Db([new Schema("dbo"), new Schema("legacy")]);
 
         ComparisonResult r = new ComparisonEngine().Compare(a, b, ComparisonOptions.Default);
 
-        r.Differences.Should().NotContain(p => p.Identity.Kind == "Schema");
+        IReadOnlyList<DifferencePair> schemaRows =
+            [.. r.Differences.Where(p => p.Identity.Kind == "Schema")];
+        schemaRows.Should().HaveCount(2, "sales and legacy differ, dbo matches");
+        schemaRows.Should().ContainSingle(p =>
+            p.Identity.SchemaName == "sales" && p.Status == DifferenceStatus.OnlyInA);
+        schemaRows.Should().ContainSingle(p =>
+            p.Identity.SchemaName == "legacy" && p.Status == DifferenceStatus.OnlyInB);
+        schemaRows.Should().NotContain(p => p.Identity.SchemaName == "dbo");
     }
 
     [Fact]
