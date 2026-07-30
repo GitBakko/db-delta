@@ -169,6 +169,22 @@ public class SqlExecutorTests
         SqlExecutor.ScriptManagesItsOwnTransaction(script).Should().BeTrue();
 
     [Fact]
+    public void ScriptManagesItsOwnTransaction_trusts_the_dbdelta_provenance_marker()
+    {
+        // No line-anchored BEGIN TRANSACTION anywhere, so the syntactic
+        // fallback cannot fire: only the marker can answer this. Spelled out as
+        // a literal rather than through the constant — it is a wire format that
+        // has to keep matching scripts written by other versions.
+        const string script = """
+            -- dbdelta:transaction=script
+            EXEC('BEGIN TRANSACTION');
+            SELECT 1;
+            """;
+
+        SqlExecutor.ScriptManagesItsOwnTransaction(script).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task ExecuteAsync_rejects_a_negative_command_timeout()
     {
         // 0 means unlimited; negative is a caller bug, not "very short".

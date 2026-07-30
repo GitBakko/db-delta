@@ -51,9 +51,10 @@ internal static class ApplyCommand
         Option<bool> noTransaction = new("--no-transaction")
         {
             Description =
-                "Do not wrap the script in a transaction. Only needed for a script that "
-                + "cannot run inside one (e.g. it contains CREATE DATABASE or a backup). "
-                + "A script that opens its own transaction is detected automatically."
+                "Do not wrap the script in a transaction. Needed for a script that cannot "
+                + "run inside one (e.g. it contains CREATE DATABASE or a backup), and for a "
+                + "script written elsewhere that opens its own transaction without saying so "
+                + "in a way we can detect. A DbDelta-generated script declares it."
         };
 
         Command command = new("apply", "Execute a generated T-SQL deployment script against the target")
@@ -95,9 +96,9 @@ internal static class ApplyCommand
                 return ExitCodes.SuccessNoDifferences;
             }
 
-            // A self-contained DbDelta script manages its own transaction; anything
-            // else needs one from us, or a mid-script failure leaves the database
-            // half-migrated.
+            // A self-contained DbDelta script manages its own transaction and says
+            // so with its provenance marker; anything else needs one from us, or a
+            // mid-script failure leaves the database half-migrated.
             bool selfManaged = SqlExecutor.ScriptManagesItsOwnTransaction(script);
             bool useOwnTransaction = !selfManaged && !noTx;
 

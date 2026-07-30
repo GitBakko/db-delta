@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using Microsoft.Data.SqlClient;
+using DbDelta.Core.ScriptGen;
 using DbDelta.Persistence.Util;
 
 namespace DbDelta.Persistence.Sql;
@@ -263,13 +264,25 @@ public static partial class SqlExecutor
     /// The two modes are mutually exclusive: a client transaction plus the
     /// script's own <c>BEGIN TRANSACTION</c> gives <c>@@TRANCOUNT = 2</c>, so the
     /// script's <c>COMMIT</c> becomes a bare decrement and the client's commit
-    /// then commits work the script believed its failure gate had blocked. Use
-    /// this to pick a side when the script's provenance is unknown.
+    /// then commits work the script believed its failure gate had blocked.
+    /// <para>
+    /// Answered by PROVENANCE first: a script DbDelta generated says so with
+    /// <c>-- dbdelta:transaction=script</c> (<c>DeploymentScriptWriter</c>
+    /// writes it next to the <c>BEGIN TRANSACTION</c> it emits), and that is not
+    /// a guess. The syntactic fallback stays for scripts written elsewhere and
+    /// for scripts generated before the marker existed — it is a heuristic and
+    /// it over-detects: the pattern is line-anchored, so a
+    /// <c>BEGIN TRANSACTION</c> at the start of a line inside a block comment or
+    /// a procedure body reads as self-contained, and that script then runs with
+    /// no transaction at all. Ruling that out needs a parser rather than a
+    /// regex; <c>--no-transaction</c> is the documented escape hatch meanwhile.
+    /// </para>
     /// </remarks>
     public static bool ScriptManagesItsOwnTransaction(string script)
     {
         ArgumentNullException.ThrowIfNull(script);
-        return BeginTransactionPattern().IsMatch(script);
+        return script.Contains(DeploymentScriptWriter.SelfManagedTransactionMarker, StringComparison.Ordinal)
+            || BeginTransactionPattern().IsMatch(script);
     }
 
     [GeneratedRegex(@"^\s*GO\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]

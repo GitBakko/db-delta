@@ -139,6 +139,24 @@ public class DeployScriptBuilderTests
     // ── Header must never carry a secret ───────────────────────────────────
 
     [Fact]
+    public void Build_marks_the_script_as_managing_its_own_transaction()
+    {
+        // `dbdelta apply` decides whether to add a client transaction of its own,
+        // and getting it wrong either half-migrates the target or gives
+        // @@TRANCOUNT = 2. The app suppresses the generator's comment header, so
+        // the marker has to survive DoNotOutputCommentHeader — this is the path
+        // that writes the .sql file a user later feeds to `apply`.
+        string script = BuildAllSelected(
+            [MakeTablePair("dbo", "T", DifferenceStatus.OnlyInA)],
+            "src",
+            "tgt",
+            DateTime.UtcNow);
+
+        script.Should().Contain("-- dbdelta:transaction=script");
+        script.Should().Contain("BEGIN TRANSACTION", "the marker must describe what the script does");
+    }
+
+    [Fact]
     public void Build_header_never_leaks_a_password_from_a_connection_string()
     {
         // Both app call sites pass live connection strings, and this header is
