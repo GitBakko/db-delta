@@ -91,6 +91,14 @@ public sealed class ScriptGenerator
     {
         ArgumentNullException.ThrowIfNull(result);
         dependencies ??= [];
+        // Every (schema, table[, name]) key below is compared the way the
+        // target resolves names. Value-tuple equality is ordinal, so once the
+        // engine began pairing dbo.Clienti with dbo.CLIENTI, a set filled from
+        // one side and probed from the other silently missed. See NameKey.
+        IEqualityComparer<(string Schema, string Name)> pairKey =
+            NameKey.Pair(result.NameComparer);
+        IEqualityComparer<(string Schema, string Table, string Name)> tripleKey =
+            NameKey.Triple(result.NameComparer);
         List<DifferencePair> pairs = [.. (selection ?? result.Differences)
             .Where(p => p.Status != DifferenceStatus.Identical)];
 
@@ -99,7 +107,7 @@ public sealed class ScriptGenerator
         // rebuild block (so DROP TABLE succeeds) and re-added *after*.
         // Looking up via `result.Differences` (unfiltered) covers FKs held
         // by Identical tables, which never appear in <c>pairs</c>.
-        HashSet<(string Schema, string Name)> rebuildTargets = [];
+        HashSet<(string Schema, string Name)> rebuildTargets = new(pairKey);
         foreach (DifferencePair pair in pairs.Where(p => p.Identity.Kind == "Table"))
         {
             if (pair.Status == DifferenceStatus.Different
@@ -118,7 +126,7 @@ public sealed class ScriptGenerator
         // makes the FK pass SKIP a foreign key, so a bare name meant an unrelated
         // namesake on another table lost its legitimate ADD and the deploy left
         // that table with no foreign key at all, silently.
-        HashSet<(string Schema, string Table, string Fk)> orchestratedFks = [];
+        HashSet<(string Schema, string Table, string Fk)> orchestratedFks = new(tripleKey);
 
         // Hands one foreign key to that pair. The source side is authoritative:
         // it carries the shape the final schema wants. An FK the source no
@@ -128,10 +136,22 @@ public sealed class ScriptGenerator
         {
             if (!orchestratedFks.Add((sourceHolder.Schema, sourceHolder.Name, fkName))) { return; }
             ForeignKey? sourceFk = sourceHolder.Constraints.OfType<ForeignKey>()
-                .FirstOrDefault(f => string.Equals(f.Name, fkName, StringComparison.Ordinal));
+                .FirstOrDefault(f => result.NameComparer.Equals(f.Name, fkName));
             if (sourceFk is not null)
             {
                 orchestratedFkAdds.Add((sourceHolder.Schema, sourceHolder.Name, sourceFk));
+            }
+        }
+
+        // Same pair, but restoring the TARGET's own foreign key verbatim. Used
+        // when the holder has no source side at all, where "the source is
+        // authoritative" has nothing to say and dropping without restoring
+        // would leave a surviving table without its constraint.
+        void ClaimTargetSideFkReAdd(Table targetHolder, ForeignKey fk)
+        {
+            if (orchestratedFks.Add((targetHolder.Schema, targetHolder.Name, fk.Name)))
+            {
+                orchestratedFkAdds.Add((targetHolder.Schema, targetHolder.Name, fk));
             }
         }
 
@@ -166,14 +186,16 @@ public sealed class ScriptGenerator
         //      (c) the same, pointing at a table about to be rebuilt (#33).
         //    (c) used to be a separate pass; folding it in here removes the
         //    duplication and orders it earlier, which is strictly safer.
-        HashSet<(string Schema, string Name)> droppedTables = [.. pairs
-            .Where(p => p.Identity.Kind == "Table" && p.Status == DifferenceStatus.OnlyInB)
-            .Select(p => p.SideB)
-            .OfType<Table>()
-            .Select(t => (t.Schema, t.Name))];
+        HashSet<(string Schema, string Name)> droppedTables = new(
+            pairs
+                .Where(p => p.Identity.Kind == "Table" && p.Status == DifferenceStatus.OnlyInB)
+                .Select(p => p.SideB)
+                .OfType<Table>()
+                .Select(t => (t.Schema, t.Name)),
+            pairKey);
 
         List<(string FromSchema, string FromTable, ForeignKey FK)> fkDrops = [];
-        HashSet<(string Schema, string Table, string Fk)> fkDropKeys = [];
+        HashSet<(string Schema, string Table, string Fk)> fkDropKeys = new(tripleKey);
         void AddFkDrop(string schema, string table, ForeignKey fk)
         {
             // The holder table is part of the dedupe key. Constraints are
@@ -279,10 +301,10 @@ public sealed class ScriptGenerator
         //    back) or had its legitimate DROP skipped (index survives in
         //    production, tool reports success).
         List<(string Schema, string Table, TableIndex Index)> blockingIndexDrops = [];
-        HashSet<(string Schema, string Table, string Index)> forcedIndexRecreates = [];
+        HashSet<(string Schema, string Table, string Index)> forcedIndexRecreates = new(tripleKey);
         // The target-side columns each Different table is about to drop or
         // retype, kept so the foreign keys over them can be found below.
-        Dictionary<(string Schema, string Table), IReadOnlySet<string>> touchedByTable = [];
+        Dictionary<(string Schema, string Table), IReadOnlySet<string>> touchedByTable = new(pairKey);
         foreach (DifferencePair p in pairs.Where(x =>
             x.Identity.Kind == "Table" && x.Status == DifferenceStatus.Different))
         {
@@ -324,7 +346,13 @@ public sealed class ScriptGenerator
             foreach (DifferencePair p in result.Differences.Where(x => x.Identity.Kind == "Table"))
             {
                 if (p.SideB is not Table holder) { continue; }
-                // A table being dropped takes its own foreign keys with it.
+                // A table the SCRIPT drops takes its own foreign keys with it —
+                // and the DROP pass runs before every ALTER COLUMN this feeder
+                // protects, so unlike the sibling feeder above no ordering
+                // assumption is involved. `droppedTables` is built from the
+                // selection, so a target-only table the user did not tick is
+                // deliberately not in it: that table survives the deploy and its
+                // key has to come back.
                 if (droppedTables.Contains((holder.Schema, holder.Name))) { continue; }
                 foreach (ForeignKey fk in holder.Constraints.OfType<ForeignKey>())
                 {
@@ -336,7 +364,20 @@ public sealed class ScriptGenerator
                     }
                     if (!fk.ReferencedColumns.Any(referencedTouched.Contains)) { continue; }
                     AddFkDrop(holder.Schema, holder.Name, fk);
-                    if (p.SideA is Table sourceHolder) { OrchestrateFkReAdd(sourceHolder, fk.Name); }
+                    if (p.SideA is Table sourceHolder)
+                    {
+                        OrchestrateFkReAdd(sourceHolder, fk.Name);
+                    }
+                    else
+                    {
+                        // The holder exists only on the target — either removed
+                        // from the source and left unticked, or never there. The
+                        // source has no shape to restore, so put back exactly
+                        // what we found. Without this the constraint is dropped,
+                        // never re-added, and the script reports success on a
+                        // table that has quietly lost its referential integrity.
+                        ClaimTargetSideFkReAdd(holder, fk);
+                    }
                 }
             }
         }

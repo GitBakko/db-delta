@@ -29,4 +29,19 @@ public static class Sql
 
     /// <summary>Quotes a schema-qualified name — the shape almost every call site wants.</summary>
     public static string Q(string schema, string name) => $"{Q(schema)}.{Q(name)}";
+
+    /// <summary>
+    /// Quotes a value as a T-SQL string LITERAL, doubling any apostrophe.
+    /// </summary>
+    /// <remarks>
+    /// Not interchangeable with <see cref="Q(string)"/>. sp_rename takes its
+    /// arguments as literals, not as identifiers, so bracket-doubling does
+    /// nothing there while an apostrophe in the name closes the literal early —
+    /// <c>EXEC sp_rename '[dbo].[O'Brien_tmp]', 'O'Brien';</c> does not parse.
+    /// </remarks>
+    public static string L(string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return $"'{value.Replace("'", "''", StringComparison.Ordinal)}'";
+    }
 }

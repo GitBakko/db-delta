@@ -72,18 +72,34 @@ public class DropOrderingTests
             "documents the fallback: with no target edges the pass falls through to reverse-alphabetical");
     }
 
+    /// <summary>
+    /// The drop edges must not leak into the CREATE order. The edge below would
+    /// invert the two views' alphabetical order if it did, so a self-edge — which
+    /// the resolver discards anyway — would not have proved anything.
+    /// </summary>
     [Fact]
     public void Target_edges_do_not_disturb_the_create_order()
     {
-        View created = V("vNew", "CREATE VIEW dbo.vNew AS SELECT 1 AS X;");
-        DifferencePair added = new(created.Identity, DifferenceStatus.OnlyInA, created, null);
+        View vATop = V("vATop", "CREATE VIEW dbo.vATop AS SELECT 1 AS X;");
+        View vZBase = V("vZBase", "CREATE VIEW dbo.vZBase AS SELECT 2 AS X;");
+        DifferencePair[] added =
+        [
+            new(vATop.Identity, DifferenceStatus.OnlyInA, vATop, null),
+            new(vZBase.Identity, DifferenceStatus.OnlyInA, vZBase, null),
+        ];
 
         string withEdges = Sut.Generate(
-            new ComparisonResult([added]),
+            new ComparisonResult(added),
             selection: null,
-            dropDependencies: [new DependencyEdge(created.Identity, created.Identity, EdgeKind.ModuleReference)]);
-        string withoutEdges = Sut.Generate(new ComparisonResult([added]));
+            // "vZBase depends on vATop" — if this reached the create resolver it
+            // would force vATop first... which is also the alphabetical order, so
+            // state the edge the other way round to make the difference visible.
+            dropDependencies: [new DependencyEdge(vATop.Identity, vZBase.Identity, EdgeKind.ModuleReference)]);
+        string withoutEdges = Sut.Generate(new ComparisonResult(added));
 
+        int top = withEdges.IndexOf("dbo.vATop", StringComparison.Ordinal);
+        int bas = withEdges.IndexOf("dbo.vZBase", StringComparison.Ordinal);
+        top.Should().BeLessThan(bas, "the create order stays kind-then-alphabetical");
         withEdges.Should().Be(withoutEdges);
     }
 }

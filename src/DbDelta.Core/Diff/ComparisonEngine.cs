@@ -33,7 +33,7 @@ public sealed class ComparisonEngine
         pairs.AddRange(CompareTableTypeUdts(a.TableTypeUdts, b.TableTypeUdts, ids));
         pairs.AddRange(CompareUsers(a.Users, b.Users, ids));
         pairs.AddRange(CompareRoles(a.Roles, b.Roles, ids));
-        pairs.AddRange(ComparePermissions(a.Permissions, b.Permissions));
+        pairs.AddRange(ComparePermissions(a.Permissions, b.Permissions, ids.Names));
 
         return new ComparisonResult(pairs) { NameComparer = ids.Names };
     }
@@ -193,17 +193,21 @@ public sealed class ComparisonEngine
     }
 
     private static IEnumerable<DifferencePair> ComparePermissions(
-        IReadOnlyList<Permission> ax, IReadOnlyList<Permission> bx)
+        IReadOnlyList<Permission> ax, IReadOnlyList<Permission> bx, StringComparer names)
     {
         // Permissions are pure presence/absence — there's nothing to "modify"
         // about a single row beyond the row existing on one side or both. Use
         // the DiffKey string as the pairing identity so identical
         // (Grantee+Action+Target) rows on both sides classify as Identical.
-        var aByKey =
-            ax.GroupBy(p => p.DiffKey).ToDictionary(g => g.Key, g => g.First());
-        var bByKey =
-            bx.GroupBy(p => p.DiffKey).ToDictionary(g => g.Key, g => g.First());
-        HashSet<string> allKeys = [.. aByKey.Keys];
+        //
+        // The key embeds the securable's name, so it follows the target's
+        // collation like every other pairing: matching it ordinally made
+        // GRANT SELECT ON [dbo].[CLIENTI] and GRANT SELECT ON [dbo].[Clienti]
+        // two rows, and deploying them emitted the GRANT followed by a REVOKE
+        // of the same permission — the target ends up without it.
+        var aByKey = ax.GroupBy(p => p.DiffKey, names).ToDictionary(g => g.Key, g => g.First(), names);
+        var bByKey = bx.GroupBy(p => p.DiffKey, names).ToDictionary(g => g.Key, g => g.First(), names);
+        HashSet<string> allKeys = new(aByKey.Keys, names);
         allKeys.UnionWith(bByKey.Keys);
 
         foreach (string key in allKeys.OrderBy(k => k, StringComparer.Ordinal))

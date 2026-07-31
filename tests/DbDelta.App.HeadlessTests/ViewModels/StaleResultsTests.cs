@@ -22,11 +22,11 @@ public class StaleResultsTests
     /// Puts the view-model in the state a completed comparison leaves behind:
     /// endpoints set, rows built, one row ticked.
     /// </summary>
-    private static (AppStateViewModel State, MainWindowViewModel Vm) AfterAComparison()
+    private static (AppStateViewModel State, MainWindowViewModel Vm) AfterAComparison(string source = Dev)
     {
         AppStateViewModel appState = new()
         {
-            SourceConnectionString = Dev,
+            SourceConnectionString = source,
             TargetConnectionString = Staging,
         };
         MainWindowViewModel vm = new(appState);
@@ -39,7 +39,7 @@ public class StaleResultsTests
                 SideA: null,
                 SideB: null),
         ];
-        appState.PublishComparison(new ComparisonResult(pairs), Dev, Staging);
+        appState.PublishComparison(new ComparisonResult(pairs), source, Staging);
 
         vm.Rows.Single().IsSelected = true;
         return (appState, vm);
@@ -89,11 +89,15 @@ public class StaleResultsTests
     [AvaloniaFact]
     public async Task A_failed_comparison_disables_both_commands()
     {
-        (AppStateViewModel state, MainWindowViewModel vm) = AfterAComparison();
+        // The endpoints must already equal the published pair, or changing them
+        // is what makes the results stale and the clear-on-start this test
+        // exists for goes unexercised — which is exactly what the first version
+        // of this test did.
+        const string unparseable = "not==a==connection==string";
+        (AppStateViewModel state, MainWindowViewModel vm) = AfterAComparison(source: unparseable);
+        state.ResultsAreStale.Should().BeFalse("precondition: the pair on screen matches the endpoints");
 
-        // Unparseable: CompareAsync bails on the source before any I/O.
-        state.SourceConnectionString = "not==a==connection==string";
-        state.TargetConnectionString = Staging;
+        // CompareAsync bails on the unparseable source before any I/O.
         await state.CompareAsync(CancellationToken.None);
 
         state.LastError.Should().NotBeNullOrEmpty();

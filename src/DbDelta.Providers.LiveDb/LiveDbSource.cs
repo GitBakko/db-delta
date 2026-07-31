@@ -159,7 +159,7 @@ public sealed class LiveDbSource : ISchemaSource
                 missing.Add((
                     "it lacks VIEW DEFINITION, so sys.tables and its siblings hide every object it holds "
                     + "no permission on",
-                    $"GRANT VIEW DEFINITION TO [{PrincipalName}];"));
+                    $"GRANT VIEW DEFINITION TO {Core.ScriptGen.Sql.Q(PrincipalName)};"));
             }
             if (!ReadsDependencies)
             {
@@ -167,7 +167,7 @@ public sealed class LiveDbSource : ISchemaSource
                     "it lacks SELECT on sys.sql_expression_dependencies, which by default is granted to "
                     + "db_owner only, so the dependency edges that order the generated script would be "
                     + "missing",
-                    $"GRANT SELECT ON sys.sql_expression_dependencies TO [{PrincipalName}];"));
+                    $"GRANT SELECT ON sys.sql_expression_dependencies TO {Core.ScriptGen.Sql.Q(PrincipalName)};"));
             }
             return missing;
         }
@@ -205,7 +205,7 @@ public sealed class LiveDbSource : ISchemaSource
         CancellationToken ct)
     {
         const string sql = """
-            SELECT CASE WHEN HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'VIEW DEFINITION') = 1
+            SELECT CASE WHEN HAS_PERMS_BY_NAME(QUOTENAME(DB_NAME()), 'DATABASE', 'VIEW DEFINITION') = 1
                           OR HAS_PERMS_BY_NAME(NULL, NULL, 'VIEW ANY DEFINITION') = 1
                         THEN 1 ELSE 0 END AS SeesEveryObject,
                    CASE WHEN HAS_PERMS_BY_NAME('sys.sql_expression_dependencies', 'OBJECT', 'SELECT') = 1

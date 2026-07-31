@@ -234,7 +234,7 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
             // Constraint disappeared from source → drop on target.
             // Constraint shape changed → drop now and re-create below.
             bool stillPresent = newConstraintsByName.TryGetValue(oldC.Name, out Constraint? newSame);
-            bool shapeChanged = stillPresent && !ConstraintShapeEqual(oldC, newSame!);
+            bool shapeChanged = stillPresent && !ConstraintShapeEqual(oldC, newSame!, names);
             bool blocksColumnDdl = stillPresent && !shapeChanged
                 && DependsOnColumn(oldC, touchedColumns);
             if (blocksColumnDdl) { droppedForColumnDependency.Add(oldC.Name); }
@@ -312,7 +312,7 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
             // Already emitted inline on the column's ADD in section 3 / 4.
             if (c is DefaultConstraint dc && inlinedNamedDefaults.Contains(dc.ColumnName)) { continue; }
             bool existsOnTarget = oldConstraintsByName.TryGetValue(c.Name, out Constraint? oldSame);
-            bool shapeChanged = existsOnTarget && !ConstraintShapeEqual(oldSame!, c);
+            bool shapeChanged = existsOnTarget && !ConstraintShapeEqual(oldSame!, c, names);
             // Unchanged, but section 1 had to drop it to free an altered column.
             bool mustRestore = droppedForColumnDependency.Contains(c.Name);
             if (existsOnTarget && !shapeChanged && !mustRestore) { continue; }
@@ -546,8 +546,8 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
         }
 
         sb.Append("DROP TABLE ").Append(qualifiedOld).AppendLine(";");
-        sb.Append("EXEC sp_rename '").Append(qualifiedTmp).Append("', '")
-          .Append(newT.Name).AppendLine("';");
+        sb.Append("EXEC sp_rename ").Append(Sql.L(qualifiedTmp)).Append(", ")
+          .Append(Sql.L(newT.Name)).AppendLine(";");
 
         // Re-add the named non-FK constraints from the source-side table
         // (newT) — these are the constraints the final shape requires.
@@ -598,16 +598,16 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
     /// only emits DROP+ADD when ComparisonEngine would consider the constraint
     /// to have changed.
     /// </summary>
-    private static bool ConstraintShapeEqual(Constraint a, Constraint b) => (a, b) switch
+    private static bool ConstraintShapeEqual(Constraint a, Constraint b, StringComparer names) => (a, b) switch
     {
         (PrimaryKey pa, PrimaryKey pb) =>
-            pa.IsClustered == pb.IsClustered && pa.Columns.SequenceEqual(pb.Columns, StringComparer.Ordinal),
+            pa.IsClustered == pb.IsClustered && pa.Columns.SequenceEqual(pb.Columns, names),
         (UniqueConstraint ua, UniqueConstraint ub) =>
-            ua.IsClustered == ub.IsClustered && ua.Columns.SequenceEqual(ub.Columns, StringComparer.Ordinal),
+            ua.IsClustered == ub.IsClustered && ua.Columns.SequenceEqual(ub.Columns, names),
         (CheckConstraint ca, CheckConstraint cb) =>
             BodyNormalizer.ExpressionsEqual(ca.Expression, cb.Expression),
         (DefaultConstraint da, DefaultConstraint db) =>
-            string.Equals(da.ColumnName, db.ColumnName, StringComparison.Ordinal)
+            names.Equals(da.ColumnName, db.ColumnName)
             && BodyNormalizer.ExpressionsEqual(da.Expression, db.Expression),
         _ => false,
     };

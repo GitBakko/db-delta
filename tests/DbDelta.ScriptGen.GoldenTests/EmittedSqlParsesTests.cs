@@ -111,6 +111,34 @@ public class EmittedSqlParsesTests
     }
 
     /// <summary>
+    /// The rebuild passes the table name to sp_rename as a string LITERAL, where
+    /// bracket-doubling does nothing and an apostrophe closes the literal early.
+    /// Quoting identifiers was not enough on its own.
+    /// </summary>
+    [Fact]
+    public void Generated_rebuild_is_parseable_when_the_table_name_contains_an_apostrophe()
+    {
+        const string nasty = "O'Brien";
+        static Table Build(bool identity)
+        {
+            return new Table(
+                Schema: "dbo",
+                Name: nasty,
+                Columns: [new Column("Id", "int", false, 1, isIdentity: identity)],
+                Constraints: [],
+                Indexes: []);
+        }
+
+        string sql = new ScriptGenerator().Generate(new ComparisonResult(
+        [
+            new DifferencePair(
+                Build(true).Identity, DifferenceStatus.Different, Build(true), Build(false)),
+        ]));
+
+        AssertParses(sql, "ScriptGenerator.Generate(apostrophe in a rebuilt table name)");
+    }
+
+    /// <summary>
     /// Negative control: the gate must REJECT the two forms this repo actually
     /// shipped and pinned as correct.
     /// </summary>
