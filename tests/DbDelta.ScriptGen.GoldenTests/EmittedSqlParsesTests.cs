@@ -80,6 +80,37 @@ public class EmittedSqlParsesTests
     }
 
     /// <summary>
+    /// S11 — the whole point of quoting identifiers is that the emitted script
+    /// still parses when a catalog name contains a closing bracket. Before it,
+    /// the name terminated its own identifier and the remainder became script
+    /// text, which is the difference between a broken deploy and an arbitrary
+    /// statement running with the deploy's privileges.
+    /// </summary>
+    [Fact]
+    public void Generated_deploy_script_is_parseable_when_names_contain_a_closing_bracket()
+    {
+        const string nasty = "Ev]il";
+        Table hostile = new(
+            Schema: nasty,
+            Name: nasty,
+            Columns: [new Column(nasty, "nvarchar(50)", false, 1)],
+            Constraints: [new PrimaryKey(nasty, [nasty], IsClustered: true)],
+            Indexes:
+            [
+                new TableIndex(nasty, false, false, null, [new IndexColumn(nasty, false)], [])
+            ]);
+
+        string sql = new ScriptGenerator().Generate(new ComparisonResult(
+        [
+            new DifferencePair(new ObjectIdentity(nasty, nasty, "Schema"),
+                DifferenceStatus.OnlyInA, new Schema(nasty), null),
+            new DifferencePair(hostile.Identity, DifferenceStatus.OnlyInA, hostile, null),
+        ]));
+
+        AssertParses(sql, "ScriptGenerator.Generate(hostile identifiers)");
+    }
+
+    /// <summary>
     /// Negative control: the gate must REJECT the two forms this repo actually
     /// shipped and pinned as correct.
     /// </summary>

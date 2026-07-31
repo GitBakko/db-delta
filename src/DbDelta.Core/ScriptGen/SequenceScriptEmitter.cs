@@ -16,7 +16,7 @@ public sealed class SequenceScriptEmitter
     {
         ArgumentNullException.ThrowIfNull(seq);
         StringBuilder sb = new();
-        sb.Append("CREATE SEQUENCE [").Append(seq.Schema).Append("].[").Append(seq.Name).Append("] AS ").Append(seq.DataType);
+        sb.Append("CREATE SEQUENCE ").Append(Sql.Q(seq.Schema, seq.Name)).Append(" AS ").Append(seq.DataType);
         sb.Append(" START WITH ").Append(seq.StartValue.ToString(CultureInfo.InvariantCulture));
         sb.Append(" INCREMENT BY ").Append(seq.Increment.ToString(CultureInfo.InvariantCulture));
         if (seq.MinValue.HasValue)
@@ -55,7 +55,7 @@ public sealed class SequenceScriptEmitter
     public string EmitDrop(Sequence seq)
     {
         ArgumentNullException.ThrowIfNull(seq);
-        return $"DROP SEQUENCE [{seq.Schema}].[{seq.Name}];";
+        return $"DROP SEQUENCE {Sql.Q(seq.Schema, seq.Name)};";
     }
 
     /// <summary>
@@ -77,7 +77,7 @@ public sealed class SequenceScriptEmitter
         }
 
         StringBuilder sb = new();
-        sb.Append("ALTER SEQUENCE [").Append(source.Schema).Append("].[").Append(source.Name).Append(']');
+        sb.Append("ALTER SEQUENCE ").Append(Sql.Q(source.Schema, source.Name));
         int prefixLength = sb.Length;
 
         if (source.StartValue != target.StartValue)

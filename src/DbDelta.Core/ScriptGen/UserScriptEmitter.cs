@@ -19,18 +19,18 @@ public sealed class UserScriptEmitter
     {
         ArgumentNullException.ThrowIfNull(user);
         StringBuilder sb = new();
-        sb.Append("CREATE USER [").Append(user.Name).Append(']');
+        sb.Append("CREATE USER ").Append(Sql.Q(user.Name));
         switch (user.TypeCode)
         {
             case "S":
                 sb.Append(string.IsNullOrEmpty(user.LoginName)
                     ? " WITHOUT LOGIN"
-                    : $" FOR LOGIN [{user.LoginName}]");
+                    : $" FOR LOGIN {Sql.Q(user.LoginName)}");
                 break;
             case "U" or "G":
                 if (!string.IsNullOrEmpty(user.LoginName))
                 {
-                    sb.Append(" FOR LOGIN [").Append(user.LoginName).Append(']');
+                    sb.Append(" FOR LOGIN ").Append(Sql.Q(user.LoginName));
                 }
                 break;
             case "E" or "X":
@@ -42,7 +42,7 @@ public sealed class UserScriptEmitter
         if (!string.IsNullOrEmpty(user.DefaultSchema)
             && !string.Equals(user.DefaultSchema, "dbo", StringComparison.OrdinalIgnoreCase))
         {
-            sb.Append(" WITH DEFAULT_SCHEMA = [").Append(user.DefaultSchema).Append(']');
+            sb.Append(" WITH DEFAULT_SCHEMA = ").Append(Sql.Q(user.DefaultSchema));
         }
         sb.Append(';');
         return sb.ToString();
@@ -51,12 +51,12 @@ public sealed class UserScriptEmitter
     public string EmitAlterDefaultSchema(DatabaseUser user)
     {
         ArgumentNullException.ThrowIfNull(user);
-        return $"ALTER USER [{user.Name}] WITH DEFAULT_SCHEMA = [{user.DefaultSchema}];";
+        return $"ALTER USER {Sql.Q(user.Name)} WITH DEFAULT_SCHEMA = {Sql.Q(user.DefaultSchema)};";
     }
 
     public string EmitDrop(DatabaseUser user)
     {
         ArgumentNullException.ThrowIfNull(user);
-        return $"DROP USER [{user.Name}];";
+        return $"DROP USER {Sql.Q(user.Name)};";
     }
 }

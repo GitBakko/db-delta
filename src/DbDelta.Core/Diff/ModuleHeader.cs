@@ -31,9 +31,12 @@ public static partial class ModuleHeader
     // /* block */ comments before the CREATE token (atomic group — no
     // backtracking into the trivia). <name> is an optional schema qualifier
     // (id1 + qual/id2) or a bare identifier (id1). Identifiers may be
-    // bracket-quoted or bare. Singleline so block comments span lines.
+    // bracket-quoted or bare; a quoted one may contain doubled brackets, and
+    // must, or the match stops halfway through a name like [Ev]]il] and the
+    // rewrite splices from the wrong offset. Singleline so block comments span
+    // lines.
     [GeneratedRegex(
-        @"^(?>(?:\s+|--[^\r\n]*|/\*.*?\*/)*)(?<create>CREATE)(?<oralter>\s+OR\s+ALTER)?\s+(?<type>VIEW|PROCEDURE|PROC|FUNCTION|TRIGGER)\s+(?<id1>\[[^\]]+\]|[A-Za-z_]\w*)(?<qual>\s*\.\s*(?<id2>\[[^\]]+\]|[A-Za-z_]\w*))?",
+        @"^(?>(?:\s+|--[^\r\n]*|/\*.*?\*/)*)(?<create>CREATE)(?<oralter>\s+OR\s+ALTER)?\s+(?<type>VIEW|PROCEDURE|PROC|FUNCTION|TRIGGER)\s+(?<id1>\[(?:[^\]]|\]\])+\]|[A-Za-z_]\w*)(?<qual>\s*\.\s*(?<id2>\[(?:[^\]]|\]\])+\]|[A-Za-z_]\w*))?",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Singleline)]
     private static partial Regex HeaderRegex();
 
@@ -58,7 +61,7 @@ public static partial class ModuleHeader
         int headerStart = m.Groups["create"].Index;
         return string.Concat(
             body.AsSpan(0, headerStart),
-            $"CREATE {type} [{schema}].[{name}]",
+            $"CREATE {type} {ScriptGen.Sql.Q(schema, name)}",
             body.AsSpan(m.Index + m.Length));
     }
 
@@ -87,7 +90,7 @@ public static partial class ModuleHeader
         int nameStart = m.Groups["id1"].Index;
         return string.Concat(
             body.AsSpan(0, nameStart),
-            $"[{schema}].[{name}]",
+            ScriptGen.Sql.Q(schema, name),
             body.AsSpan(m.Index + m.Length));
     }
 
@@ -126,6 +129,14 @@ public static partial class ModuleHeader
         return ddl.EndsWith(';') ? ddl : ddl + ";";
     }
 
+    /// <summary>
+    /// Reverses <see cref="ScriptGen.Sql.Q(string)"/>: strips the outer brackets
+    /// and collapses the doubled ones inside. Without the collapse a correctly
+    /// quoted <c>[Ev]]il]</c> read back as <c>Ev]]il</c>, so the staleness
+    /// comparison below mis-fired and the rewrite spliced a name nobody had.
+    /// </summary>
     private static string Unquote(string ident) =>
-        ident.Length >= 2 && ident[0] == '[' && ident[^1] == ']' ? ident[1..^1] : ident;
+        ident.Length >= 2 && ident[0] == '[' && ident[^1] == ']'
+            ? ident[1..^1].Replace("]]", "]", StringComparison.Ordinal)
+            : ident;
 }

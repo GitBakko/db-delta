@@ -13,16 +13,15 @@ public sealed class ForeignKeyScriptEmitter
     {
         ArgumentNullException.ThrowIfNull(fk);
         StringBuilder sb = new();
-        sb.Append("ALTER TABLE [").Append(schema).Append("].[").Append(table).Append("] ");
+        sb.Append("ALTER TABLE ").Append(Sql.Q(schema, table)).Append(' ');
         if (fk.IsDisabled)
         {
             sb.Append("WITH NOCHECK ");
         }
-        sb.Append("ADD CONSTRAINT [").Append(fk.Name).Append("] FOREIGN KEY (")
-          .Append(string.Join(", ", fk.Columns.Select(c => $"[{c}]")))
-          .Append(") REFERENCES [").Append(fk.ReferencedSchema).Append("].[")
-          .Append(fk.ReferencedTable).Append("] (")
-          .Append(string.Join(", ", fk.ReferencedColumns.Select(c => $"[{c}]")))
+        sb.Append("ADD CONSTRAINT ").Append(Sql.Q(fk.Name)).Append(" FOREIGN KEY (")
+          .Append(string.Join(", ", fk.Columns.Select(c => $"{Sql.Q(c)}")))
+          .Append(") REFERENCES ").Append(Sql.Q(fk.ReferencedSchema, fk.ReferencedTable)).Append(" (")
+          .Append(string.Join(", ", fk.ReferencedColumns.Select(c => $"{Sql.Q(c)}")))
           .Append(')');
 
         if (fk.OnDelete != ReferentialAction.NoAction)
@@ -42,8 +41,8 @@ public sealed class ForeignKeyScriptEmitter
         if (fk.IsDisabled)
         {
             sb.Append('\n')
-              .Append("ALTER TABLE [").Append(schema).Append("].[").Append(table).Append("] ")
-              .Append("NOCHECK CONSTRAINT [").Append(fk.Name).Append("];");
+              .Append("ALTER TABLE ").Append(Sql.Q(schema, table))
+              .Append(" NOCHECK CONSTRAINT ").Append(Sql.Q(fk.Name)).Append(';');
         }
 
         return sb.ToString();

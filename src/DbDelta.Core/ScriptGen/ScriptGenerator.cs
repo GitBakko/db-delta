@@ -364,8 +364,8 @@ public sealed class ScriptGenerator
             StringBuilder fkDropBody = new();
             foreach ((string fromSchema, string fromTable, ForeignKey fk) in fkDrops)
             {
-                fkDropBody.Append("ALTER TABLE [").Append(fromSchema).Append("].[").Append(fromTable)
-                          .Append("] DROP CONSTRAINT [").Append(fk.Name).AppendLine("];");
+                fkDropBody.Append("ALTER TABLE ").Append(Sql.Q(fromSchema, fromTable))
+                          .Append(" DROP CONSTRAINT ").Append(Sql.Q(fk.Name)).AppendLine(";");
             }
             writer.WriteBatch("Dropping foreign keys", fkDropBody.ToString());
         }
@@ -425,7 +425,7 @@ public sealed class ScriptGenerator
                         {
                             indexBody.AppendLine(_indexEmitter.EmitCreate(tNew.Schema, tNew.Name, ix));
                         }
-                        writer.WriteBatch($"Creating indexes on [{tNew.Schema}].[{tNew.Name}]", indexBody.ToString());
+                        writer.WriteBatch($"Creating indexes on {Sql.Q(tNew.Schema, tNew.Name)}", indexBody.ToString());
                         break;
                     }
 
@@ -444,7 +444,7 @@ public sealed class ScriptGenerator
                             rebuiltIndexBody.AppendLine(_indexEmitter.EmitCreate(tReb.Schema, tReb.Name, ix));
                         }
                         writer.WriteBatch(
-                            $"Re-creating indexes on rebuilt [{tReb.Schema}].[{tReb.Name}]",
+                            $"Re-creating indexes on rebuilt {Sql.Q(tReb.Schema, tReb.Name)}",
                             rebuiltIndexBody.ToString());
                         break;
                     }
@@ -454,7 +454,7 @@ public sealed class ScriptGenerator
                         string indexDelta = EmitIndexDelta(tSrc, tTgt, forcedIndexRecreates);
                         if (indexDelta.Length > 0)
                         {
-                            writer.WriteBatch($"Updating indexes on [{tSrc.Schema}].[{tSrc.Name}]", indexDelta);
+                            writer.WriteBatch($"Updating indexes on {Sql.Q(tSrc.Schema, tSrc.Name)}", indexDelta);
                         }
                         break;
                     }
@@ -522,7 +522,7 @@ public sealed class ScriptGenerator
                         {
                             fkBody.AppendLine(_fkEmitter.EmitAdd(tNew.Schema, tNew.Name, fk));
                         }
-                        writer.WriteBatch($"Adding foreign keys on [{tNew.Schema}].[{tNew.Name}]", fkBody.ToString());
+                        writer.WriteBatch($"Adding foreign keys on {Sql.Q(tNew.Schema, tNew.Name)}", fkBody.ToString());
                         break;
                     }
 
@@ -542,7 +542,7 @@ public sealed class ScriptGenerator
                             rebuiltFkBody.AppendLine(_fkEmitter.EmitAdd(tRebFk.Schema, tRebFk.Name, fk));
                         }
                         writer.WriteBatch(
-                            $"Re-adding foreign keys on rebuilt [{tRebFk.Schema}].[{tRebFk.Name}]",
+                            $"Re-adding foreign keys on rebuilt {Sql.Q(tRebFk.Schema, tRebFk.Name)}",
                             rebuiltFkBody.ToString());
                         break;
                     }
@@ -552,7 +552,7 @@ public sealed class ScriptGenerator
                         string fkAdds = EmitFkAdds(tSrc, tTgt, orchestratedFks);
                         if (fkAdds.Length > 0)
                         {
-                            writer.WriteBatch($"Adding foreign keys on [{tSrc.Schema}].[{tSrc.Name}]", fkAdds);
+                            writer.WriteBatch($"Adding foreign keys on {Sql.Q(tSrc.Schema, tSrc.Name)}", fkAdds);
                         }
                         break;
                     }
@@ -625,8 +625,8 @@ public sealed class ScriptGenerator
         // so neither of the two normal shapes applies.
         bool schemaScoped = id.Kind is not ("User" or "Role" or "Permission" or "Schema");
         string name = id.Kind is "Schema"
-            ? $"[{id.SchemaName}]"
-            : schemaScoped ? $"[{id.SchemaName}].[{id.ObjectName}]" : $"[{id.ObjectName}]";
+            ? $"{Sql.Q(id.SchemaName)}"
+            : schemaScoped ? $"{Sql.Q(id.SchemaName, id.ObjectName)}" : $"{Sql.Q(id.ObjectName)}";
         string verb = pair.Status switch
         {
             DifferenceStatus.OnlyInA => "Creating",
@@ -998,7 +998,7 @@ public sealed class ScriptGenerator
             }
             if (!string.IsNullOrWhiteSpace(body))
             {
-                writer.WriteBatch($"Setting permission [{pair.Identity.ObjectName}]", body);
+                writer.WriteBatch($"Setting permission {Sql.Q(pair.Identity.ObjectName)}", body);
             }
         }
     }

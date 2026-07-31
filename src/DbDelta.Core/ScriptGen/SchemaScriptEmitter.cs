@@ -47,13 +47,13 @@ public sealed class SchemaScriptEmitter : IScriptEmitter
     public static string EmitCreate(Schema schema)
     {
         ArgumentNullException.ThrowIfNull(schema);
-        return $"CREATE SCHEMA [{schema.Name}];";
+        return $"CREATE SCHEMA {Sql.Q(schema.Name)};";
     }
 
     /// <summary>Emits <c>DROP SCHEMA</c>.</summary>
     public static string EmitDrop(Schema schema)
     {
         ArgumentNullException.ThrowIfNull(schema);
-        return $"DROP SCHEMA [{schema.Name}];";
+        return $"DROP SCHEMA {Sql.Q(schema.Name)};";
     }
 }

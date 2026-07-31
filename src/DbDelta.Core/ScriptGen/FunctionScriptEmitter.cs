@@ -26,10 +26,10 @@ public sealed class FunctionScriptEmitter
     private static string EmitCreateOrAlter(Function f)
     {
         return f.IsEncrypted || f.Body is null
-            ? $"-- WARNING: function [{f.Schema}].[{f.Name}] is encrypted (WITH ENCRYPTION); body cannot be scripted."
+            ? $"-- WARNING: function {Sql.Q(f.Schema, f.Name)} is encrypted (WITH ENCRYPTION); body cannot be scripted."
             : ModuleHeader.ToCreateOrAlterScript(f.Body, f.Schema, f.Name);
     }
 
     private static string EmitDrop(Function f) =>
-        $"DROP FUNCTION IF EXISTS [{f.Schema}].[{f.Name}];";
+        $"DROP FUNCTION IF EXISTS {Sql.Q(f.Schema, f.Name)};";
 }

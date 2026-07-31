@@ -13,17 +13,18 @@ public sealed class RoleScriptEmitter
     {
         ArgumentNullException.ThrowIfNull(role);
         StringBuilder sb = new();
-        sb.Append("CREATE ROLE [").Append(role.Name).Append(']');
+        sb.Append("CREATE ROLE ").Append(Sql.Q(role.Name));
         if (!string.IsNullOrEmpty(role.OwnerName)
             && !string.Equals(role.OwnerName, "dbo", StringComparison.OrdinalIgnoreCase))
         {
-            sb.Append(" AUTHORIZATION [").Append(role.OwnerName).Append(']');
+            sb.Append(" AUTHORIZATION ").Append(Sql.Q(role.OwnerName));
         }
         sb.AppendLine(";");
 
         foreach (string member in role.Members.OrderBy(m => m, StringComparer.OrdinalIgnoreCase))
         {
-            sb.Append("ALTER ROLE [").Append(role.Name).Append("] ADD MEMBER [").Append(member).AppendLine("];");
+            sb.Append("ALTER ROLE ").Append(Sql.Q(role.Name)).Append(" ADD MEMBER ")
+              .Append(Sql.Q(member)).AppendLine(";");
         }
 
         return sb.ToString().TrimEnd();
@@ -32,12 +33,12 @@ public sealed class RoleScriptEmitter
     public string EmitDrop(DatabaseRole role)
     {
         ArgumentNullException.ThrowIfNull(role);
-        return $"DROP ROLE [{role.Name}];";
+        return $"DROP ROLE {Sql.Q(role.Name)};";
     }
 
     public string EmitAddMember(string roleName, string memberName) =>
-        $"ALTER ROLE [{roleName}] ADD MEMBER [{memberName}];";
+        $"ALTER ROLE {Sql.Q(roleName)} ADD MEMBER {Sql.Q(memberName)};";
 
     public string EmitDropMember(string roleName, string memberName) =>
-        $"ALTER ROLE [{roleName}] DROP MEMBER [{memberName}];";
+        $"ALTER ROLE {Sql.Q(roleName)} DROP MEMBER {Sql.Q(memberName)};";
 }

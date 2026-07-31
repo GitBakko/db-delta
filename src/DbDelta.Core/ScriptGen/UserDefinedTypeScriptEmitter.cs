@@ -15,8 +15,8 @@ public sealed class UserDefinedTypeScriptEmitter
     {
         ArgumentNullException.ThrowIfNull(udt);
         StringBuilder sb = new();
-        sb.Append("CREATE TYPE [").Append(udt.Schema).Append("].[").Append(udt.Name)
-          .Append("] FROM ").Append(FormatBaseType(udt));
+        sb.Append("CREATE TYPE ").Append(Sql.Q(udt.Schema, udt.Name))
+          .Append(" FROM ").Append(FormatBaseType(udt));
         if (!udt.IsNullable)
         {
             sb.Append(" NOT NULL");
@@ -28,7 +28,7 @@ public sealed class UserDefinedTypeScriptEmitter
     public string EmitDrop(UserDefinedType udt)
     {
         ArgumentNullException.ThrowIfNull(udt);
-        return $"DROP TYPE [{udt.Schema}].[{udt.Name}];";
+        return $"DROP TYPE {Sql.Q(udt.Schema, udt.Name)};";
     }
 
     /// <summary>

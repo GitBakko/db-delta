@@ -31,10 +31,10 @@ public sealed class ViewScriptEmitter
     private static string EmitCreateOrAlter(View v)
     {
         return v.IsEncrypted || v.Body is null
-            ? $"-- WARNING: view [{v.Schema}].[{v.Name}] is encrypted (WITH ENCRYPTION); body cannot be scripted."
+            ? $"-- WARNING: view {Sql.Q(v.Schema, v.Name)} is encrypted (WITH ENCRYPTION); body cannot be scripted."
             : ModuleHeader.ToCreateOrAlterScript(v.Body, v.Schema, v.Name);
     }
 
     private static string EmitDrop(View v) =>
-        $"DROP VIEW IF EXISTS [{v.Schema}].[{v.Name}];";
+        $"DROP VIEW IF EXISTS {Sql.Q(v.Schema, v.Name)};";
 }

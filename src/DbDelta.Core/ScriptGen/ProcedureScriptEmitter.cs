@@ -27,10 +27,10 @@ public sealed class ProcedureScriptEmitter
     private static string EmitCreateOrAlter(StoredProcedure p)
     {
         return p.IsEncrypted || p.Body is null
-            ? $"-- WARNING: procedure [{p.Schema}].[{p.Name}] is encrypted (WITH ENCRYPTION); body cannot be scripted."
+            ? $"-- WARNING: procedure {Sql.Q(p.Schema, p.Name)} is encrypted (WITH ENCRYPTION); body cannot be scripted."
             : ModuleHeader.ToCreateOrAlterScript(p.Body, p.Schema, p.Name);
     }
 
     private static string EmitDrop(StoredProcedure p) =>
-        $"DROP PROCEDURE IF EXISTS [{p.Schema}].[{p.Name}];";
+        $"DROP PROCEDURE IF EXISTS {Sql.Q(p.Schema, p.Name)};";
 }

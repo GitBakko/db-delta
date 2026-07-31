@@ -28,10 +28,10 @@ public sealed class PermissionScriptEmitter
         sb.Append(p.Action);
         if (!string.IsNullOrEmpty(p.ColumnName))
         {
-            sb.Append(" ([").Append(p.ColumnName).Append("])");
+            sb.Append(" (").Append(Sql.Q(p.ColumnName)).Append(')');
         }
         AppendOnTarget(sb, p);
-        sb.Append(" TO [").Append(p.GranteeName).Append(']');
+        sb.Append(" TO ").Append(Sql.Q(p.GranteeName));
         if (p.State == PermissionState.GrantWithGrantOption)
         {
             sb.Append(" WITH GRANT OPTION");
@@ -47,10 +47,10 @@ public sealed class PermissionScriptEmitter
         sb.Append("REVOKE ").Append(p.Action);
         if (!string.IsNullOrEmpty(p.ColumnName))
         {
-            sb.Append(" ([").Append(p.ColumnName).Append("])");
+            sb.Append(" (").Append(Sql.Q(p.ColumnName)).Append(')');
         }
         AppendOnTarget(sb, p);
-        sb.Append(" FROM [").Append(p.GranteeName).Append("];");
+        sb.Append(" FROM ").Append(Sql.Q(p.GranteeName)).Append(';');
         return sb.ToString();
     }
 
@@ -77,10 +77,11 @@ public sealed class PermissionScriptEmitter
     private static string? FormatTarget(Permission p) => p.ClassDesc switch
     {
         "DATABASE" => null,
-        "SCHEMA" => $"SCHEMA::[{p.ObjectSchema ?? p.ObjectName}]",
+        // Neither name present would previously have emitted "SCHEMA::[]".
+        "SCHEMA" => (p.ObjectSchema ?? p.ObjectName) is { } schema ? $"SCHEMA::{Sql.Q(schema)}" : null,
         _ when !string.IsNullOrEmpty(p.ObjectSchema) && !string.IsNullOrEmpty(p.ObjectName) =>
-            $"[{p.ObjectSchema}].[{p.ObjectName}]",
-        _ when !string.IsNullOrEmpty(p.ObjectName) => $"[{p.ObjectName}]",
+            $"{Sql.Q(p.ObjectSchema, p.ObjectName)}",
+        _ when !string.IsNullOrEmpty(p.ObjectName) => $"{Sql.Q(p.ObjectName)}",
         _ => null,
     };
 }

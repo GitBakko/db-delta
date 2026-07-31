@@ -15,7 +15,7 @@ internal static class SqlTypeFormatter
         string t = dataType.Trim();
         int paren = t.IndexOf('(');
         string name = (paren < 0 ? t : t[..paren]).TrimEnd();
-        string bracketedName = name.StartsWith('[') || name.Contains('.') ? name : $"[{name}]";
+        string bracketedName = name.StartsWith('[') || name.Contains('.') ? name : $"{Sql.Q(name)}";
         if (paren < 0)
         {
             return bracketedName;

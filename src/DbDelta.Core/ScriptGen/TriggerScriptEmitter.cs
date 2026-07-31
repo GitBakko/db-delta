@@ -44,7 +44,7 @@ public sealed class TriggerScriptEmitter
     {
         if (t.IsEncrypted || t.Body is null)
         {
-            return $"-- WARNING: trigger [{t.Schema}].[{t.Name}] is encrypted (WITH ENCRYPTION); body cannot be scripted.";
+            return $"-- WARNING: trigger {Sql.Q(t.Schema, t.Name)} is encrypted (WITH ENCRYPTION); body cannot be scripted.";
         }
 
         string ddl = ModuleHeader.ToCreateOrAlterScript(t.Body, t.Schema, t.Name);
@@ -54,11 +54,11 @@ public sealed class TriggerScriptEmitter
     }
 
     private static string EmitStateChange(Trigger t, bool disable) =>
-        $"{(disable ? "DISABLE" : "ENABLE")} TRIGGER [{t.Schema}].[{t.Name}] "
-        + $"ON [{t.ParentSchema}].[{t.ParentTable}];";
+        $"{(disable ? "DISABLE" : "ENABLE")} TRIGGER {Sql.Q(t.Schema, t.Name)} "
+        + $"ON {Sql.Q(t.ParentSchema, t.ParentTable)};";
 
     private static string EmitDrop(Trigger t) =>
-        $"DROP TRIGGER IF EXISTS [{t.Schema}].[{t.Name}];";
+        $"DROP TRIGGER IF EXISTS {Sql.Q(t.Schema, t.Name)};";
 
     private static string EmitDifferent(Trigger sideA, Trigger sideB)
     {

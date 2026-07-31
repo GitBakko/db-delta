@@ -14,11 +14,11 @@ public sealed class TableTypeUdtScriptEmitter
     {
         ArgumentNullException.ThrowIfNull(udt);
         StringBuilder sb = new();
-        sb.Append("CREATE TYPE [").Append(udt.Schema).Append("].[").Append(udt.Name).AppendLine("] AS TABLE (");
+        sb.Append("CREATE TYPE ").Append(Sql.Q(udt.Schema, udt.Name)).AppendLine(" AS TABLE (");
         for (int i = 0; i < udt.Columns.Count; i++)
         {
             Column col = udt.Columns[i];
-            sb.Append("    [").Append(col.Name).Append("] ").Append(SqlTypeFormatter.FormatColumnType(col.DataType));
+            sb.Append("    ").Append(Sql.Q(col.Name)).Append(' ').Append(SqlTypeFormatter.FormatColumnType(col.DataType));
             AppendCollation(sb, col);
             sb.Append(col.IsNullable ? " NULL" : " NOT NULL");
             if (i < udt.Columns.Count - 1)
@@ -34,7 +34,7 @@ public sealed class TableTypeUdtScriptEmitter
     public string EmitDrop(TableTypeUdt udt)
     {
         ArgumentNullException.ThrowIfNull(udt);
-        return $"DROP TYPE [{udt.Schema}].[{udt.Name}];";
+        return $"DROP TYPE {Sql.Q(udt.Schema, udt.Name)};";
     }
 
     /// <summary>

@@ -11,12 +11,12 @@ public sealed class SynonymScriptEmitter
     public string EmitCreate(Synonym syn)
     {
         ArgumentNullException.ThrowIfNull(syn);
-        return $"CREATE SYNONYM [{syn.Schema}].[{syn.Name}] FOR {syn.BaseObjectName};";
+        return $"CREATE SYNONYM {Sql.Q(syn.Schema, syn.Name)} FOR {syn.BaseObjectName};";
     }
 
     public string EmitDrop(Synonym syn)
     {
         ArgumentNullException.ThrowIfNull(syn);
-        return $"DROP SYNONYM [{syn.Schema}].[{syn.Name}];";
+        return $"DROP SYNONYM {Sql.Q(syn.Schema, syn.Name)};";
     }
 }

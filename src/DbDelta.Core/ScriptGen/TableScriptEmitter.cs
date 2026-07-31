@@ -38,7 +38,7 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
         bool includeNamedConstraints = true)
     {
         StringBuilder sb = new();
-        sb.Append("CREATE TABLE [").Append(table.Schema).Append("].[").Append(table.Name).AppendLine("] (");
+        sb.Append("CREATE TABLE ").Append(Sql.Q(table.Schema, table.Name)).AppendLine(" (");
 
         // Named DEFAULT constraints are resolved up-front and always passed to
         // FormatColumn, because DEFAULT is the one constraint kind that CREATE
@@ -78,13 +78,13 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
                         break;
                     case UniqueConstraint uq:
                         AppendLineSeparator(sb, ref firstLine);
-                        sb.Append("    CONSTRAINT [").Append(uq.Name).Append("] UNIQUE ")
+                        sb.Append("    CONSTRAINT ").Append(Sql.Q(uq.Name)).Append(" UNIQUE ")
                           .Append(uq.IsClustered ? "CLUSTERED " : "NONCLUSTERED ")
-                          .Append('(').Append(string.Join(", ", uq.Columns.Select(Bracket))).Append(')');
+                          .Append('(').Append(string.Join(", ", uq.Columns.Select(Sql.Q))).Append(')');
                         break;
                     case CheckConstraint ck:
                         AppendLineSeparator(sb, ref firstLine);
-                        sb.Append("    CONSTRAINT [").Append(ck.Name).Append("] CHECK ")
+                        sb.Append("    CONSTRAINT ").Append(Sql.Q(ck.Name)).Append(" CHECK ")
                           .Append(ck.Expression);
                         break;
                     case DefaultConstraint:
@@ -110,8 +110,8 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
         {
             foreach (PrimaryKey pk in table.Constraints.OfType<PrimaryKey>())
             {
-                sb.Append("ALTER TABLE [").Append(table.Schema).Append("].[").Append(table.Name)
-                  .Append("] ADD CONSTRAINT [").Append(pk.Name).Append("] ")
+                sb.Append("ALTER TABLE ").Append(Sql.Q(table.Schema, table.Name))
+                  .Append(" ADD CONSTRAINT ").Append(Sql.Q(pk.Name)).Append(' ')
                   .Append(FormatStandaloneConstraintBody(pk)).AppendLine(";");
             }
         }
@@ -128,8 +128,6 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
         }
         sb.AppendLine(",");
     }
-
-    private static string Bracket(string identifier) => $"[{identifier}]";
 
     /// <summary>
     /// Generates a standalone CREATE TABLE script for a single table, suitable for
@@ -193,7 +191,7 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
     }
 
     private static string EmitDrop(Table table) =>
-        $"DROP TABLE [{table.Schema}].[{table.Name}];";
+        $"DROP TABLE {Sql.Q(table.Schema, table.Name)};";
 
     private static string EmitAlter(Table newT, Table oldT, StringComparer names)
     {
@@ -207,7 +205,7 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
         }
 
         StringBuilder sb = new();
-        string qualifiedName = $"[{newT.Schema}].[{newT.Name}]";
+        string qualifiedName = $"{Sql.Q(newT.Schema, newT.Name)}";
 
         var newConstraintsByName = newT.Constraints.ToDictionary(c => c.Name, names);
         var oldConstraintsByName = oldT.Constraints.ToDictionary(c => c.Name, names);
@@ -243,7 +241,7 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
             if (!stillPresent || shapeChanged || blocksColumnDdl)
             {
                 sb.Append("ALTER TABLE ").Append(qualifiedName)
-                  .Append(" DROP CONSTRAINT [").Append(oldC.Name).AppendLine("];");
+                  .Append(" DROP CONSTRAINT ").Append(Sql.Q(oldC.Name)).AppendLine(";");
             }
         }
 
@@ -255,7 +253,7 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
             if (!newColsByName.ContainsKey(oldCol.Name))
             {
                 sb.Append("ALTER TABLE ").Append(qualifiedName)
-                  .Append(" DROP COLUMN [").Append(oldCol.Name).AppendLine("];");
+                  .Append(" DROP COLUMN ").Append(Sql.Q(oldCol.Name)).AppendLine(";");
             }
         }
 
@@ -269,7 +267,7 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
                 || newCol.IsIdentity != oldCol.IsIdentity)
             {
                 sb.Append("ALTER TABLE ").Append(qualifiedName)
-                  .Append(" DROP COLUMN [").Append(newCol.Name).AppendLine("];");
+                  .Append(" DROP COLUMN ").Append(Sql.Q(newCol.Name)).AppendLine(";");
                 sb.Append("ALTER TABLE ").Append(qualifiedName)
                   .Append(" ADD ").Append(FormatColumn(
                       newCol,
@@ -280,7 +278,7 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
                 continue;
             }
             sb.Append("ALTER TABLE ").Append(qualifiedName)
-              .Append(" ALTER COLUMN [").Append(newCol.Name).Append("] ")
+              .Append(" ALTER COLUMN ").Append(Sql.Q(newCol.Name)).Append(' ')
               .Append(SqlTypeFormatter.FormatColumnType(newCol.DataType));
             AppendCollation(sb, newCol);
             sb.Append(newCol.IsNullable ? " NULL" : " NOT NULL")
@@ -321,7 +319,7 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
             string body = FormatStandaloneConstraintBody(c);
             if (body.Length == 0) { continue; }
             sb.Append("ALTER TABLE ").Append(qualifiedName)
-              .Append(" ADD CONSTRAINT [").Append(c.Name).Append("] ")
+              .Append(" ADD CONSTRAINT ").Append(Sql.Q(c.Name)).Append(' ')
               .Append(body).AppendLine(";");
         }
 
@@ -489,9 +487,9 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
     /// </summary>
     private static string EmitRebuild(Table newT, Table oldT, StringComparer names)
     {
-        string qualifiedOld = $"[{newT.Schema}].[{newT.Name}]";
+        string qualifiedOld = $"{Sql.Q(newT.Schema, newT.Name)}";
         string tmpName = $"{newT.Name}_tmp";
-        string qualifiedTmp = $"[{newT.Schema}].[{tmpName}]";
+        string qualifiedTmp = $"{Sql.Q(newT.Schema, tmpName)}";
 
         HashSet<string> oldColNames = new(oldT.Columns.Select(c => c.Name), names);
         List<string> commonInsertable =
@@ -499,7 +497,7 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
             .. newT.Columns
                 .Where(c => oldColNames.Contains(c.Name) && c.ComputedExpression is null)
                 .OrderBy(c => c.Ordinal)
-                .Select(c => $"[{c.Name}]")
+                .Select(c => $"{Sql.Q(c.Name)}")
         ];
 
         StringBuilder sb = new();
@@ -519,7 +517,7 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
         foreach (Constraint oldC in namedNonFkConstraintsOnOld)
         {
             sb.Append("ALTER TABLE ").Append(qualifiedOld)
-              .Append(" DROP CONSTRAINT [").Append(oldC.Name).AppendLine("];");
+              .Append(" DROP CONSTRAINT ").Append(Sql.Q(oldC.Name)).AppendLine(";");
         }
 
         // _tmp is created *without* named constraints; we add them back
@@ -558,7 +556,7 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
             string body = FormatStandaloneConstraintBody(c);
             if (body.Length == 0) { continue; }
             sb.Append("ALTER TABLE ").Append(qualifiedOld)
-              .Append(" ADD CONSTRAINT [").Append(c.Name).Append("] ")
+              .Append(" ADD CONSTRAINT ").Append(Sql.Q(c.Name)).Append(' ')
               .Append(body).AppendLine(";");
         }
         return sb.ToString();
@@ -616,10 +614,10 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
 
     private static string FormatStandaloneConstraintBody(Constraint c) => c switch
     {
-        PrimaryKey pk => $"PRIMARY KEY {(pk.IsClustered ? "CLUSTERED" : "NONCLUSTERED")} ({string.Join(", ", pk.Columns.Select(Bracket))})",
-        UniqueConstraint uq => $"UNIQUE {(uq.IsClustered ? "CLUSTERED" : "NONCLUSTERED")} ({string.Join(", ", uq.Columns.Select(Bracket))})",
+        PrimaryKey pk => $"PRIMARY KEY {(pk.IsClustered ? "CLUSTERED" : "NONCLUSTERED")} ({string.Join(", ", pk.Columns.Select(Sql.Q))})",
+        UniqueConstraint uq => $"UNIQUE {(uq.IsClustered ? "CLUSTERED" : "NONCLUSTERED")} ({string.Join(", ", uq.Columns.Select(Sql.Q))})",
         CheckConstraint ck => $"CHECK {ck.Expression}",
-        DefaultConstraint df => $"DEFAULT {df.Expression} FOR [{df.ColumnName}]",
+        DefaultConstraint df => $"DEFAULT {df.Expression} FOR {Sql.Q(df.ColumnName)}",
         ForeignKey => string.Empty,
         _ => string.Empty,
     };
@@ -653,7 +651,7 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
     private static string FormatColumn(Column c, DefaultConstraint? namedDefault, bool inlineNamedDefault)
     {
         StringBuilder sb = new();
-        sb.Append('[').Append(c.Name).Append("] ");
+        sb.Append(Sql.Q(c.Name)).Append(' ');
 
         if (c.ComputedExpression is not null)
         {
@@ -685,7 +683,7 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
         sb.Append(c.IsNullable ? " NULL" : " NOT NULL");
         if (namedDefault is not null && inlineNamedDefault)
         {
-            sb.Append(" CONSTRAINT [").Append(namedDefault.Name).Append("] DEFAULT ")
+            sb.Append(" CONSTRAINT ").Append(Sql.Q(namedDefault.Name)).Append(" DEFAULT ")
               .Append(namedDefault.Expression);
         }
         else if (namedDefault is null && !string.IsNullOrEmpty(c.DefaultExpression))
