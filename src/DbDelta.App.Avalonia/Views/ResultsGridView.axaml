@@ -27,6 +27,10 @@
             IsVisible="{Binding AppState.LastComparison,
                                 Converter={x:Static ObjectConverters.IsNotNull}}">
 
+      <!-- ColumnHeaderHeight is pinned rather than auto-sized: left to the text
+           it comes out under 20 px and vertically clips the select-all box in
+           the checkbox column. 32 is the app's monoline height and what the
+           group headers already use. -->
       <DataGrid x:Name="ResultsGrid"
                 ItemsSource="{Binding RowsView}"
                 SelectedItem="{Binding AppState.SelectedRow, Mode=TwoWay}"
@@ -36,6 +40,7 @@
                 CanUserSortColumns="True"
                 GridLinesVisibility="Horizontal"
                 HeadersVisibility="Column"
+                ColumnHeaderHeight="32"
                 LoadingRowGroup="OnLoadingRowGroup">
 
         <DataGrid.Styles>

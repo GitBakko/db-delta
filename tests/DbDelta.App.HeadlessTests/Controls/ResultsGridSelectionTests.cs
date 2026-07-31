@@ -69,6 +69,21 @@ public class ResultsGridSelectionTests
         box.IsThreeState.Should().BeTrue("a partial selection has to be distinguishable from none");
         box.IsVisible.Should().BeTrue();
         box.Bounds.Width.Should().BeGreaterThan(0, "a zero-width box is one nobody can click");
+        // Both dimensions, and against the header that contains it: the box was
+        // first invisible for want of width, then clipped because the header row
+        // auto-sized from its text to under 20 px. Either one alone passes while
+        // the user sees half a checkbox.
+        box.Bounds.Height.Should().BeGreaterThan(0);
+
+        // The header row is pinned rather than auto-sized, because auto-sizing
+        // it from the header TEXT gives under 20 px on a real window and clips
+        // the box. Asserted as a value, not as a measurement: the headless
+        // renderer sizes the header to fit its content, so it does NOT reproduce
+        // the clip — removing ColumnHeaderHeight leaves every layout assertion
+        // here green while the shipped app shows half a checkbox. This line is
+        // the only thing standing between that and the user.
+        Grid(view).ColumnHeaderHeight.Should().BeGreaterThanOrEqualTo(
+            32, "the app's monoline height, and enough for the select-all box");
     }
 
     /// <summary>
