@@ -56,12 +56,20 @@ public sealed record Database(
     public IReadOnlyList<DependencyEdge> Dependencies { get; init; } = [];
 
     /// <summary>
-    /// Database default collation (sys.databases.collation_name). Null when
-    /// unknown (e.g. headless / unit-test fixtures). Used by the script
-    /// generator to decide when to emit an explicit COLLATE clause on
-    /// columns whose collation diverges from the database default
-    /// (M13-PARITY.5 #32).
+    /// Database default collation (<c>sys.databases.collation_name</c>). Null
+    /// when unknown (headless / unit-test fixtures).
     /// </summary>
+    /// <remarks>
+    /// This is not a cosmetic hint about <c>COLLATE</c> clauses. Read from the
+    /// TARGET, it is the single input deciding how the whole comparison pairs
+    /// names: <see cref="Diff.NameComparison.ForCollation"/> turns it into the
+    /// comparer that matches objects, columns, constraints and indexes, and
+    /// every keyed set in the generator inherits it. Null means
+    /// case-INSENSITIVE, deliberately — assuming case-sensitivity on a
+    /// case-insensitive server generates a DROP of live data, while the
+    /// converse at worst pairs two objects that should have stayed apart.
+    /// Changing this value changes what the deploy does, not how it reads.
+    /// </remarks>
     public string? DefaultCollation { get; init; }
 
     /// <summary>

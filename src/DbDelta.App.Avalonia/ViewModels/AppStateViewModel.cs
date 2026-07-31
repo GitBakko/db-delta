@@ -80,9 +80,12 @@ public sealed partial class AppStateViewModel : ObservableObject
     public IReadOnlyList<DependencyEdge> SourceDependencies { get; private set; } = [];
 
     /// <summary>
-    /// Target-side dependency edges from the most recent comparison. Not used by
-    /// the forward script; retained because an inverse (rollback) script has to
-    /// be ordered by the dependencies of the side it restores.
+    /// Target-side dependency edges from the most recent comparison. Since S3
+    /// these order the FORWARD script's DROP pass: an object being dropped was
+    /// removed from the source, so it appears in no source-side edge and
+    /// reversing the create order sorts nothing — which is Msg 3729 on a
+    /// schemabound view over a schemabound view. An inverse (rollback) script
+    /// would need them too, for the same reason.
     /// </summary>
     public IReadOnlyList<DependencyEdge> TargetDependencies { get; private set; } = [];
 
@@ -94,10 +97,17 @@ public sealed partial class AppStateViewModel : ObservableObject
     private (string Source, string Target)? _comparedEndpoints;
 
     /// <summary>
-    /// True when the grid is showing rows that no longer describe the endpoints
-    /// currently configured.
+    /// True when the grid is showing rows that no COMPLETED comparison against
+    /// the endpoints currently configured produced.
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// Not the same as "the endpoints changed", and the difference is what the
+    /// banner has to say: because <see cref="CompareAsync"/> clears the stored
+    /// pair before it runs, a refresh that fails against the SAME endpoints
+    /// lands here too — and that is the commoner route. Both cases mean the
+    /// rows are unverified; only one of them means the connections differ.
+    /// </para>
     /// <para>
     /// This is derived, not raised as a flag on each way out of
     /// <see cref="CompareAsync"/>. A flag has to be set on all five error exits
@@ -292,8 +302,8 @@ public sealed partial class AppStateViewModel : ObservableObject
             // Keep the dependency edges: without them the deploy script the app
             // builds has NO topological ordering and degenerates to KindRank, so
             // a new view over a new function emits in the wrong order and fails.
-            // Both sides are retained — the target's are what an inverse
-            // (rollback) script would need.
+            // Both sides are used by the forward script — the source's order the
+            // CREATE pass, the target's the DROP pass.
             SourceDependencies = srcRes.Value!.Dependencies;
             TargetDependencies = tgtRes.Value!.Dependencies;
 
@@ -332,11 +342,15 @@ public sealed partial class AppStateViewModel : ObservableObject
     /// computed from.
     /// </summary>
     /// <remarks>
-    /// The two are set here and nowhere else so they cannot drift apart. The
-    /// whole point of <see cref="ResultsAreStale"/> is that rows carry their
-    /// provenance; a code path that could assign
-    /// <see cref="LastComparisonRaw"/> on its own would hand the grid rows with
-    /// no provenance and re-open the hole.
+    /// The whole point of <see cref="ResultsAreStale"/> is that rows carry their
+    /// provenance, so the result and the endpoints have to be set together. This
+    /// is the only place that does — but nothing in the type enforces it:
+    /// <see cref="LastComparisonRaw"/> is an <c>[ObservableProperty]</c> and its
+    /// generated setter is public, so any caller can still hand the grid rows
+    /// with no provenance. Every route in and out of a comparison must come
+    /// through here. Sealing the setter would need the property written by hand
+    /// instead of generated; until then this is a convention with one call site,
+    /// not a guarantee.
     /// </remarks>
     public void PublishComparison(ComparisonResult result, string source, string target)
     {

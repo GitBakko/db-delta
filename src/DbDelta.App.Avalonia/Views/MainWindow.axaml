@@ -332,17 +332,19 @@
     </c:NoticeBand>
 
     <!-- ── Band 3b: Stale results ───────────────────────────────────────────
-         The rows below were computed against a different pair of endpoints
-         than the ones now configured, so they must not read as current. Both
-         Salva and Esegui are disabled while this shows — see
-         AppStateViewModel.ResultsAreStale. No dismiss button: the only way out
-         is to compare again. -->
+         The rows below are not backed by a comparison that completed against
+         the endpoints now configured, so they must not read as current. That
+         covers a repointed endpoint AND a refresh that failed against the very
+         same one, which is the commoner case — so the wording claims nothing
+         about the connections themselves. Both Salva and Esegui are disabled
+         while this shows — see AppStateViewModel.ResultsAreStale. No dismiss
+         button: the only way out is to compare again. -->
     <c:NoticeBand Grid.Row="3"
                   Accent="{StaticResource WarningBrush}"
                   AccentSoft="{StaticResource WarningSoftBrush}"
                   AccentForeground="{StaticResource WarningFgBrush}"
                   IconPath="M 8,1 A 7,7 0 1 1 7.99,1 M 8,4.4 L 8,8.6 M 8,10.6 L 8,11.4"
-                  Message="Questi risultati provengono da un confronto precedente, calcolato su connessioni diverse da quelle configurate ora. Esegui di nuovo il confronto prima di generare o applicare uno script."
+                  Message="Questi risultati provengono da un confronto precedente e non sono stati verificati sulle connessioni configurate ora. Esegui di nuovo il confronto prima di generare o applicare uno script."
                   IsVisible="{Binding ResultsAreStale}" />
 
     <!-- ── Band 4: Middle ─ welcome overlay OR populated body ──────────────── -->

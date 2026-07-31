@@ -21,7 +21,12 @@ public class MainWindowViewModelTests
                 Status: DifferenceStatus.Different,
                 SideA: null,
                 SideB: null))];
-            appState.LastComparisonRaw = new ComparisonResult(pairs);
+            // Through the public entry point, not by assigning the raw result:
+            // that is the one path that stamps the rows with the endpoints they
+            // were computed from, and a test that skips it is a test proving the
+            // invariant can be skipped. The DTO is then swapped for the one
+            // these tests describe, which carries no provenance either way.
+            appState.PublishComparison(new ComparisonResult(pairs), "src", "tgt");
             appState.LastComparison = new ComparisonResultDto([.. diffs]);
         }
 

@@ -327,10 +327,19 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
     }
 
     /// <summary>
-    /// The target-side column names that an ALTER of <paramref name="oldT"/>
-    /// into <paramref name="newT"/> will DROP or ALTER.
+    /// The column names that an ALTER of <paramref name="oldT"/> into
+    /// <paramref name="newT"/> will DROP or ALTER.
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// The set mixes spellings on purpose, and callers must not assume one side:
+    /// a column the source removed can only be named by the TARGET, while a
+    /// retyped one is added under the SOURCE's spelling, so on a
+    /// case-insensitive server half the set carries each. That is safe only
+    /// because the set is built with <paramref name="names"/> and every consumer
+    /// probes it with <c>Contains</c>, letting its own comparer decide — never
+    /// by comparing the strings it yields against something else.
+    /// </para>
     /// SQL Server refuses to drop or retype a column while an index, key or
     /// CHECK constraint depends on it (Msg 5074, "The object '…' is dependent on
     /// column '…'"). Everything that depends on one of these columns therefore
