@@ -115,6 +115,161 @@ public class ColumnDependencyOrderingTests
         addCk.Should().BeGreaterThan(alter);
     }
 
+    // ── Foreign keys over a retyped column (S2) ────────────────────────────
+
+    /// <summary>
+    /// Builds the canonical widening: parent Testa.Id and child Righe.TestaId
+    /// both go int → bigint, joined by an FK that is byte-identical on the two
+    /// sides. The FK's shape never changes and neither table is dropped or
+    /// rebuilt, so none of the original three drop feeders saw it.
+    /// </summary>
+    private static (Table SrcParent, Table TgtParent, Table SrcChild, Table TgtChild) WideningPair()
+    {
+        static Table Parent(string idType)
+        {
+            return new Table(
+                "dbo", "Testa",
+                [new Column("Id", idType, false, 1)],
+                [new PrimaryKey("PK_Testa", ["Id"], IsClustered: true)],
+                []);
+        }
+
+        static Table Child(string fkColumnType)
+        {
+            return new Table(
+                "dbo", "Righe",
+                [new Column("Id", "int", false, 1), new Column("TestaId", fkColumnType, false, 2)],
+                [
+                    new ForeignKey(
+                        "FK_Righe_Testa",
+                        ["TestaId"],
+                        "dbo",
+                        "Testa",
+                        ["Id"],
+                        ReferentialAction.NoAction,
+                        ReferentialAction.NoAction,
+                        IsDisabled: false,
+                        IsNotForReplication: false)
+                ],
+                []);
+        }
+
+        return (Parent("bigint"), Parent("int"), Child("bigint"), Child("int"));
+    }
+
+    [Fact]
+    public void Foreign_key_over_a_retyped_column_is_dropped_first_and_re_added_after()
+    {
+        (Table srcParent, Table tgtParent, Table srcChild, Table tgtChild) = WideningPair();
+
+        string sql = Sut.Generate(new ComparisonResult(
+            [Diff(srcParent, tgtParent), Diff(srcChild, tgtChild)]));
+
+        int dropFk = sql.IndexOf("DROP CONSTRAINT [FK_Righe_Testa]", StringComparison.Ordinal);
+        int alterChild = sql.IndexOf("ALTER COLUMN [TestaId] [bigint]", StringComparison.Ordinal);
+        int dropPk = sql.IndexOf("DROP CONSTRAINT [PK_Testa]", StringComparison.Ordinal);
+        int addFk = sql.IndexOf("ADD CONSTRAINT [FK_Righe_Testa]", StringComparison.Ordinal);
+
+        dropFk.Should().BeGreaterThan(0, "Msg 5074 blocks the child's ALTER COLUMN while the FK constrains it");
+        alterChild.Should().BeGreaterThan(dropFk);
+        dropPk.Should().BeGreaterThan(dropFk, "Msg 3725 blocks the PK drop while the FK references it");
+        addFk.Should().BeGreaterThan(alterChild, "the FK must come back — silently losing it is worse than failing");
+    }
+
+    /// <summary>
+    /// The holder of the blocking FK is a table with no differences of its own,
+    /// so it appears in no pass. Only a walk of the full result can find it.
+    /// </summary>
+    [Fact]
+    public void An_identical_table_holding_the_blocking_foreign_key_still_gets_it_dropped_and_re_added()
+    {
+        (Table srcParent, Table tgtParent, Table srcChild, _) = WideningPair();
+
+        string sql = Sut.Generate(new ComparisonResult(
+        [
+            Diff(srcParent, tgtParent),
+            new DifferencePair(srcChild.Identity, DifferenceStatus.Identical, srcChild, srcChild),
+        ]));
+
+        sql.Should().Contain("DROP CONSTRAINT [FK_Righe_Testa]");
+        sql.Should().Contain("ADD CONSTRAINT [FK_Righe_Testa]");
+    }
+
+    /// <summary>
+    /// The half the referenced-column feeder cannot see. Re-collating the
+    /// CHILD's key column is a legitimate migration that leaves the parent
+    /// untouched, so nothing points at a retyped column — but SQL Server still
+    /// refuses the ALTER COLUMN while the FK constrains it (Msg 5074).
+    /// </summary>
+    [Fact]
+    public void Foreign_key_over_a_re_collated_child_column_is_dropped_even_though_the_parent_is_untouched()
+    {
+        static Table Parent()
+        {
+            return new Table(
+                "dbo", "Testa",
+                [new Column("Codice", "nvarchar(20)", false, 1, collation: "Latin1_General_CI_AS")],
+                [new PrimaryKey("PK_Testa", ["Codice"], IsClustered: true)],
+                []);
+        }
+
+        static Table Child(string collation)
+        {
+            return new Table(
+                "dbo", "Righe",
+                [new Column("TestaCodice", "nvarchar(20)", false, 1, collation: collation)],
+                [
+                    new ForeignKey(
+                        "FK_Righe_Testa",
+                        ["TestaCodice"],
+                        "dbo",
+                        "Testa",
+                        ["Codice"],
+                        ReferentialAction.NoAction,
+                        ReferentialAction.NoAction,
+                        IsDisabled: false,
+                        IsNotForReplication: false)
+                ],
+                []);
+        }
+
+        string sql = Sut.Generate(new ComparisonResult(
+        [
+            new DifferencePair(Parent().Identity, DifferenceStatus.Identical, Parent(), Parent()),
+            Diff(Child("Latin1_General_BIN2"), Child("Latin1_General_CI_AS")),
+        ]));
+
+        int dropFk = sql.IndexOf("DROP CONSTRAINT [FK_Righe_Testa]", StringComparison.Ordinal);
+        int alter = sql.IndexOf("ALTER COLUMN [TestaCodice]", StringComparison.Ordinal);
+        int addFk = sql.IndexOf("ADD CONSTRAINT [FK_Righe_Testa]", StringComparison.Ordinal);
+
+        dropFk.Should().BeGreaterThan(0);
+        alter.Should().BeGreaterThan(dropFk);
+        addFk.Should().BeGreaterThan(alter);
+    }
+
+    [Fact]
+    public void A_foreign_key_over_untouched_columns_is_left_alone()
+    {
+        (Table srcParent, _, Table srcChild, _) = WideningPair();
+
+        // Both sides keep TestaId as it is; the child only gains a column the FK
+        // does not cover, so nothing the FK constrains is being retyped.
+        Table childWithNote = srcChild with
+        {
+            Columns = [.. srcChild.Columns, new Column("Note", "nvarchar(50)", true, 3)],
+        };
+
+        string sql = Sut.Generate(new ComparisonResult(
+        [
+            new DifferencePair(srcParent.Identity, DifferenceStatus.Identical, srcParent, srcParent),
+            Diff(childWithNote, srcChild),
+        ]));
+
+        sql.Should().Contain("ADD [Note]");
+        sql.Should().NotContain("FK_Righe_Testa", "nothing the FK covers was retyped");
+    }
+
     [Fact]
     public void A_default_only_change_drops_nothing_but_the_default()
     {
