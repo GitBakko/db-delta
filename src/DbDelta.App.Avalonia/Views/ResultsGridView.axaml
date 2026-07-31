@@ -65,43 +65,27 @@
                 <Border BorderBrush="{StaticResource BorderBrush}"
                         BorderThickness="0,0,0,1"
                         Background="{TemplateBinding Background}">
-                  <Grid ColumnDefinitions="6,Auto,Auto,Auto,*">
-                    <!-- 6-px status colour stripe -->
-                    <Border Grid.Column="0"
-                            Background="{Binding Key, Converter={x:Static v:Converters.StatusKeyToBrush}}" />
+                  <!-- Column widths MIRROR the DataGrid's own so the group's
+                       select-all box lands in the same column as the per-row
+                       boxes it drives. Keep the two lists in step: the header
+                       is a template, not a real row, so nothing enforces it.
+                       Known limit — CanUserResizeColumns is on, and a resized
+                       column shifts the cells without shifting this template,
+                       so the box drifts until the grid is rebuilt. -->
+                  <Grid ColumnDefinitions="100,140,*,40,*,140">
 
-                    <!-- Select / deselect every row of this group. IsChecked is
-                         OneWay: the click is carried by the Command, and the
-                         binding re-asserts the real state straight after, so
-                         the box can never disagree with the rows underneath.
-                         The SelectedCount leg is what makes it re-evaluate at
-                         all — see GroupSelectionStateConverter. -->
-                    <CheckBox Grid.Column="1"
-                              x:Name="GroupSelectAll"
-                              Margin="8,0,0,0"
-                              MinWidth="0"
-                              Padding="0"
-                              IsThreeState="True"
-                              VerticalAlignment="Center"
-                              ToolTip.Tip="Seleziona o deseleziona tutte le righe di questo gruppo"
-                              Command="{Binding ((vm:MainWindowViewModel)DataContext).ToggleGroupCommand,
-                                                RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                              CommandParameter="{Binding}">
-                      <CheckBox.IsChecked>
-                        <MultiBinding Converter="{x:Static v:Converters.GroupSelectionState}"
-                                      Mode="OneWay">
-                          <Binding />
-                          <Binding Path="((vm:MainWindowViewModel)DataContext).SelectedCount"
-                                   RelativeSource="{RelativeSource AncestorType=DataGrid}" />
-                        </MultiBinding>
-                      </CheckBox.IsChecked>
-                    </CheckBox>
+                    <!-- Stripe + expander + label + count share the three
+                         columns to the left of the checkbox column. -->
+                    <Grid Grid.Column="0" Grid.ColumnSpan="3" ColumnDefinitions="6,Auto,Auto,*">
+                      <!-- 6-px status colour stripe -->
+                      <Border Grid.Column="0"
+                              Background="{Binding Key, Converter={x:Static v:Converters.StatusKeyToBrush}}" />
                     <!-- PART_ExpanderButton — DataGrid wires this ToggleButton's
                          IsChecked to the group's expansion state. Single click
                          toggles. The chevron Path rotates -90° when checked
                          (i.e. expanded) so it visually maps to ▶ collapsed /
                          ▼ expanded. -->
-                    <ToggleButton Grid.Column="2"
+                    <ToggleButton Grid.Column="1"
                                   x:Name="PART_ExpanderButton"
                                   Background="Transparent"
                                   BorderThickness="0"
@@ -143,19 +127,47 @@
                         </Path.Styles>
                       </Path>
                     </ToggleButton>
-                    <TextBlock Grid.Column="3"
-                               Text="{Binding Key}"
-                               Margin="8,0,0,0"
-                               FontSize="12"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource FgStrongBrush}"
-                               VerticalAlignment="Center" />
-                    <TextBlock Grid.Column="4"
-                               Text="{Binding ItemCount, StringFormat='({0})'}"
-                               Margin="6,0,0,0"
-                               FontSize="11"
-                               Foreground="{StaticResource FgSubtleBrush}"
-                               VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="2"
+                                 Text="{Binding Key}"
+                                 Margin="8,0,0,0"
+                                 FontSize="12"
+                                 FontWeight="SemiBold"
+                                 Foreground="{StaticResource FgStrongBrush}"
+                                 VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="3"
+                                 Text="{Binding ItemCount, StringFormat='({0})'}"
+                                 Margin="6,0,0,0"
+                                 FontSize="11"
+                                 Foreground="{StaticResource FgSubtleBrush}"
+                                 VerticalAlignment="Center" />
+                    </Grid>
+
+                    <!-- Select / deselect every row of this group, in the same
+                         column as the row boxes. IsChecked is OneWay: the click
+                         is carried by the Command and the binding re-asserts the
+                         real state straight after, so the box can never disagree
+                         with the rows underneath. The SelectedCount leg is what
+                         makes it re-evaluate at all — see
+                         GroupSelectionStateConverter. -->
+                    <CheckBox Grid.Column="3"
+                              MinWidth="0"
+                              Padding="0"
+                              IsThreeState="True"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center"
+                              ToolTip.Tip="Seleziona o deseleziona tutte le righe di questo gruppo"
+                              Command="{Binding ((vm:MainWindowViewModel)DataContext).ToggleGroupCommand,
+                                                RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                              CommandParameter="{Binding}">
+                      <CheckBox.IsChecked>
+                        <MultiBinding Converter="{x:Static v:Converters.GroupSelectionState}"
+                                      Mode="OneWay">
+                          <Binding />
+                          <Binding Path="((vm:MainWindowViewModel)DataContext).SelectedCount"
+                                   RelativeSource="{RelativeSource AncestorType=DataGrid}" />
+                        </MultiBinding>
+                      </CheckBox.IsChecked>
+                    </CheckBox>
                   </Grid>
                 </Border>
               </ControlTemplate>
@@ -218,7 +230,25 @@
           <!-- Col 4: Deploy selection checkbox — the ONLY column with vertical
                borders so it visually demarcates the boundary between source
                and target name columns. -->
-          <DataGridTemplateColumn Header="" Width="40" CanUserSort="False" CanUserResize="False">
+          <DataGridTemplateColumn Width="40" CanUserSort="False" CanUserResize="False">
+            <!-- Select / deselect every VISIBLE difference, sitting directly
+                 above the per-row boxes it drives. Acts on what the search box
+                 leaves on screen and never on hidden rows: a row silently added
+                 to the selection becomes a statement in the deploy script that
+                 nobody reviewed. -->
+            <DataGridTemplateColumn.Header>
+              <CheckBox IsThreeState="True"
+                        MinWidth="0"
+                        Padding="0"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        ToolTip.Tip="Seleziona o deseleziona tutte le differenze visibili"
+                        IsChecked="{Binding ((vm:MainWindowViewModel)DataContext).AllVisibleSelected,
+                                            RelativeSource={RelativeSource AncestorType=DataGrid},
+                                            Mode=OneWay}"
+                        Command="{Binding ((vm:MainWindowViewModel)DataContext).ToggleAllVisibleCommand,
+                                          RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+            </DataGridTemplateColumn.Header>
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:DifferenceRowViewModel">
                 <Border BorderBrush="{StaticResource BorderBrush}"

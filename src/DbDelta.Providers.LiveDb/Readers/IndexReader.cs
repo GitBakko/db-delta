@@ -34,7 +34,13 @@ internal sealed class IndexReader
           AND i.is_unique_constraint = 0
           AND i.type IN (1, 2)
           AND i.name IS NOT NULL
-        ORDER BY i.object_id, i.index_id, ic.is_included_column, ic.key_ordinal;
+        -- index_column_id is the tiebreak that makes INCLUDE order deterministic:
+        -- key_ordinal is 1..n for key columns but ZERO for every included one, so
+        -- ordering by it alone left the INCLUDE list in whatever order the engine
+        -- felt like returning. IndexesEqual compares that list as a SEQUENCE, so
+        -- two reads of one unchanged index could disagree and report a rebuild of
+        -- an index nobody touched.
+        ORDER BY i.object_id, i.index_id, ic.is_included_column, ic.key_ordinal, ic.index_column_id;
         """;
 
     public async Task<IReadOnlyDictionary<int, List<TableIndex>>> ReadAsync(
