@@ -1,5 +1,23 @@
 # HANDOFF — i 3 critical che droppano la produzione, poi S2 / S3 / S11
 
+> **CHIUSO IL 2026-07-31.** Tutti e sei i finding di questo documento sono stati
+> corretti in sette commit `2c7776d..e249d24`, ognuno con il suo probe di
+> mutazione eseguito. Suite: **594 verdi** su 10 progetti (Compat esclusa, gira
+> solo di notte), `dotnet format --verify-no-changes` esce 0, build senza avvisi.
+> Il documento resta come **specifica di ciò che è stato corretto e perché** —
+> la sezione «Cosa NON fare», le trappole di processo e l'appendice del
+> 2026-07-31 valgono ancora. **Resta da fare prima di rc5: lo smoke live
+> 243 → 242.**
+>
+> | # | Commit | Come è stato chiuso |
+> |---|--------|---------------------|
+> | C3 | `2c7776d` | Preflight in `LoadAsync`. Scoperto scrivendo il test: serve **anche** `SELECT` su `sys.sql_expression_dependencies`, concesso di default al solo `db_owner` — la remediation come l'avevo scritta all'inizio non produceva una connessione funzionante. Nota onesta: senza preflight un login cieco riceveva già `CatalogQueryFailed` dal `DependencyReader`, quindi la finestra davvero aperta era più stretta di quanto scritto sotto. |
+> | C2 | `41bc5dd` + `112f516` | Comparer derivato dalla collation del target, nel motore **e** nell'emitter (la metà colonne è perdita di dati quanto quella tabelle). Trappola confermata: il comparer CI fa lanciare i `ToDictionary` su un database davvero CS che contiene entrambe le grafie → il motore rifiuta invece di scartarne una. |
+> | C1 | `06343fa` | Staleness **derivata** dalla coppia di endpoint memorizzata, non un flag da ricordare su cinque uscite. Copre anche `ConnectionPickerSlot` e il caricamento progetto senza codice dedicato. Gate su **entrambi** i comandi. |
+> | S2 | `8167187` | Due feeder (uscente + entrante) sul set di colonne toccate, ognuno con un test che lo isola. Il re-add ha riusato il meccanismo del rebuild invece di aggiungere `forcedFkRecreates`. |
+> | S3 | `4a9ea0c` | **Una riga**: tolto lo skip dell'holder che viene droppato lui stesso. Msg 3726 non dipende più dall'ordine, quindi nemmeno da un ordinamento topologico. Gli archi target-side servono ora solo per la catena schemabound (Msg 3729), e sono passati. |
+> | S11 | `e249d24` | `Sql.Q` ovunque, in entrambe le sintassi. La architecture test ha trovato un sito che il grep d'inventario aveva mancato; la regex di `ModuleHeader` e `Unquote` avevano il bug speculare in lettura. |
+
 **Da leggere per primo in una sessione nuova.** Tutto quello che serve è qui o
 nei due documenti citati; non serve ricostruire nulla.
 
