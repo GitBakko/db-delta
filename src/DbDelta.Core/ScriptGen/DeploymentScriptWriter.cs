@@ -38,6 +38,19 @@ public sealed class DeploymentScriptWriter(StringBuilder sb, bool useTransaction
         }
     }
 
+    /// <summary>
+    /// Writes one phase: the label, then the body, then the failure gate.
+    /// </summary>
+    /// <remarks>
+    /// A body may contain its own <c>GO</c> lines, and each part then becomes a
+    /// separately gated batch under the one label. Emitters need that because
+    /// SQL Server compiles a whole batch before running any of it: an
+    /// <c>ALTER TABLE … ADD [C]</c> followed in the SAME batch by a CHECK over
+    /// <c>[C]</c> fails to compile with Msg 207, since the column does not exist
+    /// yet at compile time. Splitting here rather than at the call site keeps
+    /// every part gated — a body spliced in raw would leave all but the last
+    /// batch unguarded, so a failure in the middle would not stop the rest.
+    /// </remarks>
     public void WriteBatch(string label, string body)
     {
         ArgumentNullException.ThrowIfNull(label);
@@ -45,10 +58,42 @@ public sealed class DeploymentScriptWriter(StringBuilder sb, bool useTransaction
         if (string.IsNullOrWhiteSpace(body)) { return; }
         sb.Append("PRINT N'").Append(label.Replace("'", "''", StringComparison.Ordinal)).AppendLine("';");
         sb.AppendLine("GO");
-        sb.AppendLine(body.TrimEnd());
-        sb.AppendLine("GO");
-        sb.AppendLine("IF @@ERROR <> 0 SET NOEXEC ON;");
-        sb.AppendLine("GO");
+        foreach (string part in SplitOnGo(body))
+        {
+            sb.AppendLine(part);
+            sb.AppendLine("GO");
+            sb.AppendLine("IF @@ERROR <> 0 SET NOEXEC ON;");
+            sb.AppendLine("GO");
+        }
+    }
+
+    /// <summary>
+    /// Splits a body on lines consisting solely of <c>GO</c>, dropping empty
+    /// parts. A body with no separator comes back as a single part, so the
+    /// common case is unchanged byte-for-byte.
+    /// </summary>
+    private static List<string> SplitOnGo(string body)
+    {
+        List<string> parts = [];
+        List<string> current = [];
+        foreach (string line in body.Split(["\r\n", "\n", "\r"], StringSplitOptions.None))
+        {
+            if (line.Trim().Equals("GO", StringComparison.OrdinalIgnoreCase))
+            {
+                Flush(parts, current);
+                continue;
+            }
+            current.Add(line);
+        }
+        Flush(parts, current);
+        return parts;
+
+        static void Flush(List<string> parts, List<string> current)
+        {
+            string part = string.Join(Environment.NewLine, current).TrimEnd();
+            if (!string.IsNullOrWhiteSpace(part)) { parts.Add(part); }
+            current.Clear();
+        }
     }
 
     public void WriteVerdict()

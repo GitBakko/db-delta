@@ -55,6 +55,17 @@ public static class Converters
     public static readonly IMultiValueConverter GroupSelectionState = new GroupSelectionStateConverter();
 
     /// <summary>
+    /// True when a grid group holds at least one row that can be ticked. Drives
+    /// the group's select-all box away from the "Identici" group, whose rows
+    /// carry no DDL and are not selectable — a box that can never do anything
+    /// is worse than no box, because it invites a click that does nothing.
+    /// </summary>
+    public static readonly IValueConverter GroupHasSelectableRows =
+        new FuncValueConverter<object?, bool>(static group =>
+            group is DataGridCollectionViewGroup g
+            && g.Items.OfType<DifferenceRowViewModel>().Any(r => r.IsSelectable));
+
+    /// <summary>
     /// Maps a <c>DifferenceDto.Status</c> string ("OnlyInA" / "OnlyInB" /
     /// "Different" / "Identical") to the matching diff-strip brush from
     /// <c>Styles/Tokens.axaml</c>.

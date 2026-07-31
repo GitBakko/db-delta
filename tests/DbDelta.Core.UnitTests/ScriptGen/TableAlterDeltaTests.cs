@@ -273,4 +273,72 @@ public class TableAlterDeltaTests
         sql.Should().Contain("[CreatedAt] [datetime2] NOT NULL CONSTRAINT [DF_X_CreatedAt] DEFAULT (sysutcdatetime())");
         sql.Should().NotContain("FOR [CreatedAt]");
     }
+
+    /// <summary>
+    /// A CHECK over a column the same run adds must not share the column's
+    /// batch.
+    /// </summary>
+    /// <remarks>
+    /// SQL Server compiles a batch IN FULL before running any of it, so the
+    /// constraint cannot resolve a column that only exists once an earlier
+    /// statement in that same batch has run: Msg 207, "invalid column name",
+    /// at compile time. Every deploy adding a column plus a CHECK over it died
+    /// on it — and under XACT_ABORT that takes the whole transaction with it.
+    /// Found by the first live smoke against a real database.
+    /// </remarks>
+    [Fact]
+    public void A_constraint_over_a_newly_added_column_lands_in_a_later_batch()
+    {
+        Table tgt = T("Regole", new Column("Id", "int", false, 1));
+        Table src = new(
+            "dbo",
+            "Regole",
+            [new Column("Id", "int", false, 1), new Column("Cond", "nvarchar(8)", true, 2)],
+            [new CheckConstraint("CK_Regole_Cond", "([Cond] IS NULL OR [Cond]='HAS')", false, false)],
+            []);
+
+        string sql = new ScriptGenerator().Generate(new ComparisonResult([Diff(src, tgt)]));
+
+        int addColumn = sql.IndexOf("ADD [Cond]", StringComparison.Ordinal);
+        int addCheck = sql.IndexOf("ADD CONSTRAINT [CK_Regole_Cond]", StringComparison.Ordinal);
+        addColumn.Should().BeGreaterThan(0);
+        addCheck.Should().BeGreaterThan(addColumn);
+
+        string between = sql[addColumn..addCheck];
+        between.Split('\n').Select(l => l.Trim())
+            .Should().Contain("GO", "the column has to be committed to the table before the CHECK compiles");
+    }
+
+    /// <summary>
+    /// The separator is emitted only when a column was actually added: a table
+    /// whose constraints alone changed keeps its single-batch shape, so the
+    /// script does not grow a batch per table for no reason.
+    /// </summary>
+    [Fact]
+    public void A_constraint_change_with_no_new_column_stays_in_one_batch()
+    {
+        Table tgt = new(
+            "dbo",
+            "Regole",
+            [new Column("Id", "int", false, 1)],
+            [new CheckConstraint("CK_Regole_Id", "([Id]>(0))", false, false)],
+            []);
+        Table src = new(
+            "dbo",
+            "Regole",
+            [new Column("Id", "int", false, 1)],
+            [new CheckConstraint("CK_Regole_Id", "([Id]>(1))", false, false)],
+            []);
+
+        string sql = new ScriptGenerator().Generate(new ComparisonResult([Diff(src, tgt)]));
+
+        int drop = sql.IndexOf("DROP CONSTRAINT [CK_Regole_Id]", StringComparison.Ordinal);
+        int add = sql.IndexOf("ADD CONSTRAINT [CK_Regole_Id]", StringComparison.Ordinal);
+        drop.Should().BeGreaterThan(0);
+        add.Should().BeGreaterThan(drop);
+
+        string between = sql[drop..add];
+        between.Split('\n').Select(l => l.Trim())
+            .Should().NotContain("GO", "nothing here needs a new batch");
+    }
 }

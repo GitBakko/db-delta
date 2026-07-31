@@ -224,6 +224,9 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
         // constraint itself is completely unchanged.
         IReadOnlySet<string> touchedColumns = ColumnsDroppedOrAltered(newT, oldT, names);
         HashSet<string> droppedForColumnDependency = new(names);
+        // Set by sections 3 and 4. A constraint added in the same batch as the
+        // column it covers cannot compile — see the separator before section 5.
+        bool addedColumns = false;
 
         // ── 1) DROP non-FK constraints first (FKs handled by ForeignKeyScriptEmitter).
         //       Dropping a constraint may also be a prerequisite for the column /
@@ -275,6 +278,7 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
                       inlineNamedDefault: true))
                   .AppendLine(";");
                 if (namedDefaults.ContainsKey(newCol.Name)) { inlinedNamedDefaults.Add(newCol.Name); }
+                addedColumns = true;
                 continue;
             }
             sb.Append("ALTER TABLE ").Append(qualifiedName)
@@ -301,11 +305,13 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
                   inlineNamedDefault: true))
               .AppendLine(";");
             if (namedDefaults.ContainsKey(newCol.Name)) { inlinedNamedDefaults.Add(newCol.Name); }
+            addedColumns = true;
         }
 
         // ── 5) ADD constraints — new ones AND the shape-changed ones we
         //       dropped above. FKs are emitted standalone by
         //       ForeignKeyScriptEmitter (see ScriptGenerator section 7).
+        StringBuilder constraints = new();
         foreach (Constraint c in newT.Constraints)
         {
             if (c is ForeignKey) { continue; }
@@ -318,9 +324,21 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
             if (existsOnTarget && !shapeChanged && !mustRestore) { continue; }
             string body = FormatStandaloneConstraintBody(c);
             if (body.Length == 0) { continue; }
-            sb.Append("ALTER TABLE ").Append(qualifiedName)
+            constraints.Append("ALTER TABLE ").Append(qualifiedName)
               .Append(" ADD CONSTRAINT ").Append(Sql.Q(c.Name)).Append(' ')
               .Append(body).AppendLine(";");
+        }
+
+        if (constraints.Length > 0)
+        {
+            // A batch is COMPILED IN FULL before any of it runs, so a constraint
+            // over a column the same batch adds cannot resolve that column and
+            // dies at compile time with Msg 207 — which is every deploy that
+            // adds a column and a CHECK over it in one go. The separator is
+            // emitted only when a column was actually added, so a table whose
+            // constraints alone changed keeps its single-batch shape.
+            if (addedColumns) { sb.AppendLine("GO"); }
+            sb.Append(constraints);
         }
 
         return sb.ToString();

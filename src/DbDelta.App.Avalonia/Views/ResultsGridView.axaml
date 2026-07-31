@@ -65,18 +65,20 @@
                 <Border BorderBrush="{StaticResource BorderBrush}"
                         BorderThickness="0,0,0,1"
                         Background="{TemplateBinding Background}">
-                  <!-- Column widths MIRROR the DataGrid's own so the group's
+                  <!-- Columns 2..7 MIRROR the DataGrid's own so the group's
                        select-all box lands in the same column as the per-row
-                       boxes it drives. Keep the two lists in step: the header
-                       is a template, not a real row, so nothing enforces it.
-                       Known limit — CanUserResizeColumns is on, and a resized
-                       column shifts the cells without shifting this template,
-                       so the box drifts until the grid is rebuilt. -->
-                  <Grid ColumnDefinitions="100,140,*,40,*,140">
+                       boxes it drives. Column 0 replaces the indent the grid
+                       gives a grouped DATA row (DataGridRowGroupHeader's
+                       SublevelIndent, 10 px per level) — this template draws the
+                       whole header, so without it every cell above sits 10 px
+                       left of the cells below. Keep the widths in step with
+                       DataGrid.Columns: nothing enforces it, and a user-resized
+                       column drifts them apart until the grid is rebuilt. -->
+                  <Grid ColumnDefinitions="10,100,140,*,40,*,140">
 
                     <!-- Stripe + expander + label + count share the three
                          columns to the left of the checkbox column. -->
-                    <Grid Grid.Column="0" Grid.ColumnSpan="3" ColumnDefinitions="6,Auto,Auto,*">
+                    <Grid Grid.Column="1" Grid.ColumnSpan="3" ColumnDefinitions="6,Auto,Auto,*">
                       <!-- 6-px status colour stripe -->
                       <Border Grid.Column="0"
                               Background="{Binding Key, Converter={x:Static v:Converters.StatusKeyToBrush}}" />
@@ -149,12 +151,13 @@
                          with the rows underneath. The SelectedCount leg is what
                          makes it re-evaluate at all — see
                          GroupSelectionStateConverter. -->
-                    <CheckBox Grid.Column="3"
+                    <CheckBox Grid.Column="4"
                               MinWidth="0"
                               Padding="0"
                               IsThreeState="True"
                               HorizontalAlignment="Center"
                               VerticalAlignment="Center"
+                              IsVisible="{Binding Converter={x:Static v:Converters.GroupHasSelectableRows}}"
                               ToolTip.Tip="Seleziona o deseleziona tutte le righe di questo gruppo"
                               Command="{Binding ((vm:MainWindowViewModel)DataContext).ToggleGroupCommand,
                                                 RelativeSource={RelativeSource AncestorType=DataGrid}}"
