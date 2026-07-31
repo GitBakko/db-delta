@@ -157,8 +157,6 @@
                          makes it re-evaluate at all — see
                          GroupSelectionStateConverter. -->
                     <CheckBox Grid.Column="4"
-                              MinWidth="0"
-                              Padding="0"
                               IsThreeState="True"
                               HorizontalAlignment="Center"
                               VerticalAlignment="Center"
@@ -253,17 +251,15 @@
             </DataGridTemplateColumn.Header>
             <DataGridTemplateColumn.HeaderTemplate>
               <DataTemplate>
-                <!-- Explicit size, not MinWidth=0: the Fluent CheckBox draws its
-                     box from the template's own measure, so zeroing the minimum
-                     let it collapse to nothing inside a column header — present
-                     in the tree, zero pixels wide, invisible on screen. -->
+                <!-- Width pinned, height left alone. A column header gives its
+                     content no width to measure against, so without an explicit
+                     Width the box collapses to zero and vanishes; but forcing
+                     the height too squeezed the Fluent template and clipped the
+                     glyph's bottom edge. The per-row boxes need neither, because
+                     a DataGridCell stretches and a header does not. -->
                 <CheckBox IsThreeState="True"
-                          Width="20"
-                          Height="20"
-                          MinWidth="20"
-                          MinHeight="20"
+                          Width="24"
                           Padding="0"
-                          Margin="0"
                           HorizontalAlignment="Center"
                           VerticalAlignment="Center"
                           ToolTip.Tip="Seleziona o deseleziona tutte le differenze visibili"
