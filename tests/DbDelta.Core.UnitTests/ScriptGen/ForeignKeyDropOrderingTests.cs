@@ -28,8 +28,7 @@ public class ForeignKeyDropOrderingTests
         IsDisabled: false,
         IsNotForReplication: false);
 
-    private static Table Currency() =>
-        new("dbo", "Currency", [new Column("Id", "int", false, 1)]);
+    private static Table Currency() => new("dbo", "Currency", [new Column("Id", "int", false, 1)]);
 
     private static Table Invoice(params ForeignKey[] fks) =>
         new("dbo", "Invoice",
@@ -84,27 +83,47 @@ public class ForeignKeyDropOrderingTests
         dropTable.Should().BeGreaterThan(dropFk);
     }
 
-    [Fact]
-    public void A_dropped_table_does_not_get_a_pointless_drop_for_its_own_fk()
+    /// <summary>
+    /// Two target-only tables joined by a foreign key. Whether the deploy
+    /// survives must not depend on which name sorts first.
+    /// </summary>
+    /// <remarks>
+    /// The holder scan used to skip a holder that was itself being dropped, on
+    /// the grounds that its DROP TABLE takes the FK with it. That is true only
+    /// if the holder is dropped FIRST, and the drop pass orders target-only
+    /// objects by reversed kind rank and then reverse-alphabetically — so it
+    /// held for Currency/Invoice and failed for Zone/Alpha. The predecessor of
+    /// this test used the lucky pair and asserted only that both DROP TABLEs
+    /// were present, never their order, so it pinned the broken behaviour
+    /// instead of catching it.
+    /// </remarks>
+    [Theory]
+    [InlineData("Currency", "Invoice")]
+    [InlineData("Zone", "Alpha")]
+    public void Two_target_only_tables_joined_by_an_fk_drop_in_a_survivable_order(string parent, string child)
     {
-        // Invoice itself is being dropped, so its FK goes with it — emitting an
-        // explicit DROP CONSTRAINT first would be noise.
-        // NOT a regression test for the up-front drop pass: it passes on the
-        // pre-ec6eb83 behaviour too. What it guards is the
-        // `droppedTables.Contains(holder)` skip inside the holder scan; delete
-        // that line and this test goes red.
-        Table invoice = Invoice(Fk("FK_Invoice_Currency", "Currency"));
+        Table parentTable = new("dbo", parent, [new Column("Id", "int", false, 1)]);
+        Table childTable = new(
+            "dbo",
+            child,
+            [new Column("Id", "int", false, 1), new Column("CurrencyId", "int", false, 2)],
+            [Fk($"FK_{child}_{parent}", parent)],
+            []);
+
         ComparisonResult r = new(
         [
-            new DifferencePair(Currency().Identity, DifferenceStatus.OnlyInB, null, Currency()),
-            new DifferencePair(invoice.Identity, DifferenceStatus.OnlyInB, null, invoice),
+            new DifferencePair(parentTable.Identity, DifferenceStatus.OnlyInB, null, parentTable),
+            new DifferencePair(childTable.Identity, DifferenceStatus.OnlyInB, null, childTable),
         ]);
 
         string sql = Sut.Generate(r);
 
-        sql.Should().NotContain("DROP CONSTRAINT [FK_Invoice_Currency]");
-        sql.Should().Contain("DROP TABLE [dbo].[Invoice];");
-        sql.Should().Contain("DROP TABLE [dbo].[Currency];");
+        int dropFk = sql.IndexOf($"DROP CONSTRAINT [FK_{child}_{parent}]", StringComparison.Ordinal);
+        int dropParent = sql.IndexOf($"DROP TABLE [dbo].[{parent}];", StringComparison.Ordinal);
+
+        dropFk.Should().BeGreaterThan(0, "Msg 3726 fires the moment the parent is dropped while the FK stands");
+        dropParent.Should().BeGreaterThan(dropFk);
+        sql.Should().Contain($"DROP TABLE [dbo].[{child}];");
     }
 
     // ── The drop pass dedupes per (schema, table, name), not per name ───────

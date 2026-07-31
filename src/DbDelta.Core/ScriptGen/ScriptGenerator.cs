@@ -63,11 +63,31 @@ public sealed class ScriptGenerator
     /// <summary>
     /// Generates a complete T-SQL migration script for the given comparison result.
     /// </summary>
+    /// <param name="result">The comparison to emit.</param>
+    /// <param name="selection">
+    /// The subset to emit DDL for. Null means every difference. The unfiltered
+    /// <paramref name="result"/> is still scanned by the passes that have to see
+    /// Identical objects.
+    /// </param>
+    /// <param name="options">Emission options.</param>
+    /// <param name="dependencies">
+    /// SOURCE-side dependency edges, which order the CREATE pass.
+    /// </param>
+    /// <param name="dropDependencies">
+    /// TARGET-side dependency edges, which order the DROP pass. Null or empty
+    /// falls back to reversing the create order — which orders nothing at all
+    /// for removed objects, since an object that exists only on the target
+    /// appears in no source-side edge, and leaves the pass on the inverted kind
+    /// rank. That is enough for the common case and not enough for a
+    /// schemabound view over a schemabound view, where the wrong order is
+    /// Msg 3729.
+    /// </param>
     public string Generate(
         ComparisonResult result,
         IEnumerable<DifferencePair>? selection = null,
         ComparisonOptions options = ComparisonOptions.Default,
-        IReadOnlyList<DependencyEdge>? dependencies = null)
+        IReadOnlyList<DependencyEdge>? dependencies = null,
+        IReadOnlyList<DependencyEdge>? dropDependencies = null)
     {
         ArgumentNullException.ThrowIfNull(result);
         dependencies ??= [];
@@ -191,19 +211,21 @@ public sealed class ScriptGenerator
             foreach (DifferencePair p in result.Differences.Where(x => x.Identity.Kind == "Table"))
             {
                 if (p.SideB is not Table holder) { continue; }
-                // A table that is itself being dropped takes its own FKs with it.
-                if (droppedTables.Contains((holder.Schema, holder.Name))) { continue; }
                 foreach (ForeignKey fk in holder.Constraints.OfType<ForeignKey>())
                 {
                     (string, string) referenced = (fk.ReferencedSchema, fk.ReferencedTable);
-                    // Deliberately NOT excluding a holder that is itself a rebuild
-                    // target. With two rebuilt tables referencing each other the
-                    // exclusion dropped nothing, and whichever DROP TABLE ran first
-                    // died on Msg 3726 — the failure depended on the alphabetical
-                    // order of the two names. The holder's own DROP TABLE would take
-                    // this FK anyway, so an extra DROP CONSTRAINT is harmless, and
-                    // the rebuilt table's outbound pass re-adds the full source-side
-                    // set afterwards.
+                    // Deliberately NOT excluding a holder that is itself being
+                    // dropped or rebuilt. "Its own DROP TABLE takes the FK with
+                    // it" is true only when the holder is dropped FIRST, and the
+                    // drop pass orders target-only objects by reversed kind rank
+                    // then reverse-alphabetically — so it held for
+                    // Currency/Invoice and failed on Msg 3726 for Zone/Alpha,
+                    // making survival a function of the two names. Two rebuilt
+                    // tables referencing each other failed the same way. An
+                    // extra DROP CONSTRAINT for a table that is about to
+                    // disappear costs one statement; getting it wrong costs the
+                    // deploy. The rebuilt table's outbound pass re-adds the full
+                    // source-side set afterwards.
                     if (droppedTables.Contains(referenced) || rebuildTargets.Contains(referenced))
                     {
                         AddFkDrop(holder.Schema, holder.Name, fk);
@@ -226,8 +248,19 @@ public sealed class ScriptGenerator
             "View", "Function", "Procedure", "Trigger", "Synonym",
         };
         List<DifferencePair> topoPairs = [.. pairs.Where(p => topoKinds.Contains(p.Identity.Kind))];
+        ObjectIdentity[] topoIdentities = [.. topoPairs.Select(p => p.Identity)];
         IReadOnlyList<ObjectIdentity> createOrder = new DependencyResolver()
-            .Order([.. topoPairs.Select(p => p.Identity)], dependencies);
+            .Order(topoIdentities, dependencies);
+
+        // The DROP pass needs its OWN order, resolved from the target's edges.
+        // Reversing createOrder cannot work: every object being dropped was
+        // removed from the source, so it appears in no source-side edge, gets
+        // in-degree zero, and lands wherever the inverted kind rank puts it.
+        // With no target edges the fallback is that same reversal — no worse
+        // than before, and correct for everything except a schemabound chain.
+        IReadOnlyList<ObjectIdentity> dropOrder = dropDependencies is { Count: > 0 }
+            ? [.. new DependencyResolver().Order(topoIdentities, dropDependencies).Reverse()]
+            : [.. createOrder.Reverse()];
         var pairById = topoPairs.ToDictionary(p => p.Identity);
 
         // ── Indexes that block an ALTER / DROP COLUMN.
@@ -352,7 +385,7 @@ public sealed class ScriptGenerator
         // DROP pass — objects only in B (removed from source) must be dropped in
         // reverse topological order (dependent-first) so referenced objects are not
         // dropped before their dependents.
-        foreach (ObjectIdentity id in createOrder.Reverse())
+        foreach (ObjectIdentity id in dropOrder)
         {
             DifferencePair pair = pairById[id];
             if (pair.Status != DifferenceStatus.OnlyInB) { continue; }

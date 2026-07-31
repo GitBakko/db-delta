@@ -30,7 +30,7 @@ public class DeployScriptBuilderTests
         string targetSummary,
         DateTime nowUtc) =>
         DeployScriptBuilder.Build(
-            new ComparisonResult(selected), selected, sourceSummary, targetSummary, nowUtc, []);
+            new ComparisonResult(selected), selected, sourceSummary, targetSummary, nowUtc, [], []);
 
     [Fact]
     public void Build_empty_selection_returns_header_only_script()
@@ -249,7 +249,7 @@ public class DeployScriptBuilderTests
 
         DifferencePair[] selected = [viewPair, fnPair];
         string withEdges = DeployScriptBuilder.Build(
-            new ComparisonResult(selected), selected, "src", "tgt", DateTime.UtcNow, [edge]);
+            new ComparisonResult(selected), selected, "src", "tgt", DateTime.UtcNow, [edge], []);
 
         int fnPos = withEdges.IndexOf("fnIva", StringComparison.Ordinal);
         int viewPos = withEdges.IndexOf("vFattureIva", StringComparison.Ordinal);
@@ -303,6 +303,7 @@ public class DeployScriptBuilderTests
             "src",
             "tgt",
             DateTime.UtcNow,
+            [],
             []);
 
         int renameIdx = script.IndexOf("sp_rename", StringComparison.Ordinal);
@@ -344,6 +345,7 @@ public class DeployScriptBuilderTests
             "src",
             "tgt",
             DateTime.UtcNow,
+            [],
             []);
 
         int dropFk = script.IndexOf(

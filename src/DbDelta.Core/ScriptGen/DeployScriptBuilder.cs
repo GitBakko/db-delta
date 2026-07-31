@@ -47,17 +47,25 @@ public static class DeployScriptBuilder
     /// function emits first and the deploy fails with Msg 208. A caller with
     /// nothing to pass has to say so with an empty list.
     /// </param>
+    /// <param name="targetDependencies">
+    /// Target-side dependency edges, for the DROP order. Also without a
+    /// default, for the mirror-image reason: an object removed from the source
+    /// exists only on the target, so it appears in none of the source edges and
+    /// the source list cannot order its drop at all.
+    /// </param>
     public static string Build(
         ComparisonResult fullResult,
         IReadOnlyList<DifferencePair> selectedPairs,
         string sourceEndpointSummary,
         string targetEndpointSummary,
         DateTime nowUtc,
-        IReadOnlyList<Dependency.DependencyEdge> dependencies)
+        IReadOnlyList<Dependency.DependencyEdge> dependencies,
+        IReadOnlyList<Dependency.DependencyEdge> targetDependencies)
     {
         ArgumentNullException.ThrowIfNull(fullResult);
         ArgumentNullException.ThrowIfNull(selectedPairs);
         ArgumentNullException.ThrowIfNull(dependencies);
+        ArgumentNullException.ThrowIfNull(targetDependencies);
 
         StringBuilder header = new();
         header.AppendLine("-- ============================================================");
@@ -84,7 +92,8 @@ public static class DeployScriptBuilder
             fullResult,
             selection: selectedPairs,
             options: OptionsFor(selectedPairs),
-            dependencies: dependencies);
+            dependencies: dependencies,
+            dropDependencies: targetDependencies);
 
         return header.ToString() + body;
     }

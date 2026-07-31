@@ -613,7 +613,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             AppState.SourceConnectionString ?? string.Empty,
             AppState.TargetConnectionString ?? string.Empty,
             DateTime.UtcNow,
-            AppState.SourceDependencies);
+            AppState.SourceDependencies,
+            AppState.TargetDependencies);
 
         await using Stream s = await file.OpenWriteAsync().ConfigureAwait(true);
         await using StreamWriter w = new(s, Encoding.UTF8);
@@ -653,7 +654,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             AppState.SourceConnectionString ?? string.Empty,
             AppState.TargetConnectionString ?? string.Empty,
             DateTime.UtcNow,
-            AppState.SourceDependencies);
+            AppState.SourceDependencies,
+            AppState.TargetDependencies);
 
         ConfirmExecuteViewModel vm = new(
             objectCount: selected.Count,

@@ -79,6 +79,7 @@ public class TriggerLifecycleTests
             "src",
             "tgt",
             DateTime.UtcNow,
+            [],
             []);
 
         int rename = script.IndexOf("sp_rename", StringComparison.Ordinal);

@@ -82,7 +82,8 @@ internal static class ScriptCommand
                 comparison,
                 selection: null,
                 options: opts,
-                dependencies: srcResult.Value!.Dependencies);
+                dependencies: srcResult.Value!.Dependencies,
+                dropDependencies: tgtResult.Value!.Dependencies);
 
             if (string.Equals(output, "-", StringComparison.Ordinal))
             {

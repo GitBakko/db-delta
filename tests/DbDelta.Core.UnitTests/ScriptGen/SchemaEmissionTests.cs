@@ -166,7 +166,7 @@ public class SchemaEmissionTests
 
         DifferencePair tableOnly = r.Differences.Single(p => p.Identity.Kind == "Table");
         string script = DeployScriptBuilder.Build(
-            r, [tableOnly], "src", "tgt", DateTime.UtcNow, []);
+            r, [tableOnly], "src", "tgt", DateTime.UtcNow, [], []);
 
         int createSchema = script.IndexOf("CREATE SCHEMA [vendite];", StringComparison.Ordinal);
         int createTable = script.IndexOf("CREATE TABLE [vendite].[Order]", StringComparison.Ordinal);

@@ -57,6 +57,13 @@ public class DependencyResolverTests
         order.IndexOf(zBase).Should().BeLessThan(order.IndexOf(aOnZ));
     }
 
+    /// <summary>
+    /// Both passes emit around foreign keys rather than ordering by them: the
+    /// CREATE pass adds every FK last, and the DROP pass runs after a batch that
+    /// has already dropped every FK in play. Honouring FK edges here would buy
+    /// nothing and would make two tables referencing each other — legal SQL
+    /// Server, and unorderable — throw DependencyCycleException.
+    /// </summary>
     [Fact]
     public void Foreign_key_edges_are_ignored()
     {
