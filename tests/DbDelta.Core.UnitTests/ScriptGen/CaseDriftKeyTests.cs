@@ -160,6 +160,43 @@ public class CaseDriftKeyTests
     }
 
     /// <summary>
+    /// The last two ordinal pairings in the generator: the index delta and the
+    /// foreign-key ADD half. On a case-insensitive target <c>IX_Data</c> and
+    /// <c>IX_DATA</c> are one index, but pairing them ordinally made one look
+    /// removed and the other added — so a byte-identical index was dropped and
+    /// rebuilt, minutes of table lock inside a batch with a 60 s cap.
+    /// </summary>
+    [Fact]
+    public void An_unchanged_index_and_foreign_key_survive_a_name_case_difference()
+    {
+        Table parent = new("dbo", "Parent", [new Column("Id", "int", false, 1)]);
+        TableIndex ixSrc = new("IX_Data", false, false, null, [new IndexColumn("ParentId", false)], []);
+        TableIndex ixTgt = new("IX_DATA", false, false, null, [new IndexColumn("PARENTID", false)], []);
+
+        Database source = Db(
+            parent,
+            new Table("dbo", "Child",
+                [new Column("ParentId", "int", false, 1), new Column("Nota", "nvarchar(10)", true, 2)],
+                [Fk("FK_Child_Parent", "ParentId", "Parent", "Id")],
+                [ixSrc]));
+
+        Database target = Db(
+            parent,
+            new Table("dbo", "Child",
+                [new Column("PARENTID", "int", false, 1)],
+                [Fk("FK_CHILD_PARENT", "PARENTID", "PARENT", "ID")],
+                [ixTgt]));
+
+        string sql = Generate(source, target);
+
+        sql.Should().Contain("ADD [Nota]", "the run has a real change to make");
+        sql.Should().NotContain("DROP INDEX", "the two spellings are one index on this server");
+        sql.Should().NotContain(
+            "ADD CONSTRAINT [FK_Child_Parent]",
+            "the two spellings are one foreign key on this server");
+    }
+
+    /// <summary>
     /// The permission comparer was the one left keyed ordinally. A securable
     /// spelled differently on the two sides produced two rows, and deploying
     /// them emitted the GRANT and then a REVOKE of the same permission.

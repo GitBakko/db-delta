@@ -429,6 +429,13 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
     /// The identifiers a catalog expression brackets, e.g. <c>([Qty]&gt;(0))</c>
     /// yields <c>Qty</c>.
     /// </summary>
+    /// <remarks>
+    /// A <c>]</c> inside a name is written doubled, by the catalog and by
+    /// <see cref="Sql.Q(string)"/> alike. Stopping at the first <c>]</c> cut a
+    /// column named <c>a]b</c> down to <c>a</c>, which matched nothing in the
+    /// touched-column set, so the CHECK constraint over it was never dropped and
+    /// the ALTER COLUMN it blocks died on Msg 5074.
+    /// </remarks>
     private static IEnumerable<string> BracketedNames(string expression)
     {
         int i = 0;
@@ -436,9 +443,20 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
         {
             int open = expression.IndexOf('[', i);
             if (open < 0) { yield break; }
-            int close = expression.IndexOf(']', open + 1);
-            if (close < 0) { yield break; }
-            yield return expression[(open + 1)..close];
+            int close = open + 1;
+            while (true)
+            {
+                close = expression.IndexOf(']', close);
+                if (close < 0) { yield break; }
+                // A doubled ']' is content, not the end of the identifier.
+                if (close + 1 < expression.Length && expression[close + 1] == ']')
+                {
+                    close += 2;
+                    continue;
+                }
+                break;
+            }
+            yield return expression[(open + 1)..close].Replace("]]", "]", StringComparison.Ordinal);
             i = close + 1;
         }
     }

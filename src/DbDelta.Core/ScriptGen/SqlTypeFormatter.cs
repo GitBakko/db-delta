@@ -5,9 +5,19 @@ namespace DbDelta.Core.ScriptGen;
 /// type name is bracket-quoted and a single space precedes the size/precision
 /// arguments, whose internal commas are spaced. For example
 /// <c>nvarchar(200)</c> becomes <c>[nvarchar] (200)</c> and
-/// <c>decimal(18,2)</c> becomes <c>[decimal] (18, 2)</c>. Already-bracketed or
-/// schema-qualified type names (e.g. a user-defined type) are left untouched.
+/// <c>decimal(18,2)</c> becomes <c>[decimal] (18, 2)</c>.
 /// </summary>
+/// <remarks>
+/// The name used to be passed through unquoted when it already started with
+/// <c>[</c> or held a <c>.</c>, on the theory that it was an alias or a
+/// schema-qualified user-defined type someone had already quoted. No producer
+/// in this repo ever emits either shape: every <c>DataType</c> reaching here is
+/// a bare <c>sys.types.name</c> with an optional length, from
+/// <c>TableReader</c>, <c>TableTypeUdtReader</c>, or the body resolver. So the
+/// branch fired for exactly one input — a catalog type name holding a bracket
+/// or a dot — and handed it to the script raw, which is the one sink S11 set
+/// out to close.
+/// </remarks>
 internal static class SqlTypeFormatter
 {
     public static string FormatColumnType(string dataType)
@@ -15,7 +25,7 @@ internal static class SqlTypeFormatter
         string t = dataType.Trim();
         int paren = t.IndexOf('(');
         string name = (paren < 0 ? t : t[..paren]).TrimEnd();
-        string bracketedName = name.StartsWith('[') || name.Contains('.') ? name : $"{Sql.Q(name)}";
+        string bracketedName = Sql.Q(name);
         if (paren < 0)
         {
             return bracketedName;

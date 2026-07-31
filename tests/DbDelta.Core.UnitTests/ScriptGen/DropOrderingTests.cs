@@ -51,25 +51,32 @@ public class DropOrderingTests
     }
 
     /// <summary>
-    /// The same objects with the SOURCE-side edges the generator used to be
-    /// handed. A removed object is in none of them, so they cannot order it —
-    /// which is why the drop pass needed its own list rather than a reversal of
-    /// the create order.
+    /// The target's edges can hold a cycle the source's cannot: a live server
+    /// happily holds a function reading a table whose computed column calls that
+    /// function, because they were created in an order the catalog no longer
+    /// shows. Both being removed, the CREATE resolver never sees the cycle — so
+    /// letting the drop resolver throw would fail a script that used to be
+    /// emitted, in exchange for an ordering improvement.
     /// </summary>
     [Fact]
-    public void Source_side_edges_cannot_order_the_drop_and_the_fallback_gets_it_wrong()
+    public void A_cycle_among_the_target_edges_falls_back_instead_of_throwing()
     {
-        View vBase = V("vZBase", "CREATE VIEW dbo.vZBase WITH SCHEMABINDING AS SELECT Id FROM dbo.T;");
-        View vTop = V("vATop", "CREATE VIEW dbo.vATop WITH SCHEMABINDING AS SELECT Id FROM dbo.vZBase;");
+        View vBase = V("vZBase", "CREATE VIEW dbo.vZBase AS SELECT 1 AS X;");
+        View vTop = V("vATop", "CREATE VIEW dbo.vATop AS SELECT 2 AS X;");
 
-        string sql = Sut.Generate(new ComparisonResult([Removed(vBase), Removed(vTop)]));
+        DependencyEdge[] cyclicTargetEdges =
+        [
+            new DependencyEdge(vTop.Identity, vBase.Identity, EdgeKind.ModuleReference),
+            new DependencyEdge(vBase.Identity, vTop.Identity, EdgeKind.ModuleReference),
+        ];
 
-        int dropTop = sql.IndexOf("DROP VIEW IF EXISTS [dbo].[vATop]", StringComparison.Ordinal);
-        int dropBase = sql.IndexOf("DROP VIEW IF EXISTS [dbo].[vZBase]", StringComparison.Ordinal);
+        string sql = Sut.Generate(
+            new ComparisonResult([Removed(vBase), Removed(vTop)]),
+            selection: null,
+            dropDependencies: cyclicTargetEdges);
 
-        dropBase.Should().BeLessThan(
-            dropTop,
-            "documents the fallback: with no target edges the pass falls through to reverse-alphabetical");
+        sql.Should().Contain("DROP VIEW IF EXISTS [dbo].[vATop]");
+        sql.Should().Contain("DROP VIEW IF EXISTS [dbo].[vZBase]");
     }
 
     /// <summary>

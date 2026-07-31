@@ -63,6 +63,48 @@ public class IdentifierEscapingTests
         index.Should().Contain($"({Quoted} ASC)");
     }
 
+    /// <summary>
+    /// The type token was the one identifier left with an escape hatch: a name
+    /// starting with <c>[</c> or holding a <c>.</c> was passed through unquoted,
+    /// on the theory it was already qualified. Every producer in the repo hands
+    /// over a bare <c>sys.types.name</c>, so the branch only ever fired for the
+    /// input it must not: a type name carrying the punctuation.
+    /// </summary>
+    [Theory]
+    [InlineData("Ev]il", "[Ev]]il]")]
+    [InlineData("dbo.Money", "[dbo.Money]")]
+    [InlineData("[preformatted]", "[[preformatted]]]")]
+    public void A_column_type_name_is_quoted_whatever_punctuation_it_holds(string dataType, string expected)
+    {
+        Table t = new("dbo", "T", [new Column("C", dataType, true, 1)]);
+
+        string create = new TableScriptEmitter().Emit(
+            new DifferencePair(t.Identity, DifferenceStatus.OnlyInA, t, null));
+
+        create.Should().Contain($"[C] {expected}");
+    }
+
+    /// <summary>
+    /// A CHECK constraint over a column whose name holds a <c>]</c>: the catalog
+    /// writes it doubled, so a reader that stops at the first <c>]</c> saw a
+    /// different column and left the constraint in place — Msg 5074 on the
+    /// ALTER COLUMN it was supposed to unblock.
+    /// </summary>
+    [Fact]
+    public void A_check_over_a_bracketed_column_is_dropped_before_that_column_is_retyped()
+    {
+        CheckConstraint ck = new("CK_T", $"({Quoted}>(0))", false, false);
+        Table src = new("dbo", "T", [new Column(Nasty, "bigint", false, 1)], [ck], []);
+        Table tgt = new("dbo", "T", [new Column(Nasty, "int", false, 1)], [ck], []);
+
+        string sql = new TableScriptEmitter().Emit(
+            new DifferencePair(src.Identity, DifferenceStatus.Different, src, tgt));
+
+        sql.Should().Contain($"DROP CONSTRAINT [CK_T]");
+        sql.Should().Contain($"ALTER COLUMN {Quoted} [bigint]");
+        sql.Should().Contain($"ADD CONSTRAINT [CK_T] CHECK");
+    }
+
     [Fact]
     public void The_module_header_round_trips_a_bracketed_name()
     {

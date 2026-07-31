@@ -117,6 +117,15 @@ public sealed class ScriptGenerator
                 rebuildTargets.Add((src.Schema, src.Name));
             }
         }
+
+        // The tables this run actually reshapes. A table outside the selection
+        // keeps whatever the target already holds, which is what decides whose
+        // foreign-key shape the re-add pass may restore — see ClaimFkReAdd.
+        HashSet<(string Schema, string Name)> selectedTables = new(
+            pairs.Where(p => p.Identity.Kind == "Table")
+                 .Select(p => (p.Identity.SchemaName, p.Identity.ObjectName)),
+            pairKey);
+
         // Foreign keys the up-front DROP pass takes ownership of: dropped before
         // anything else and re-added by a single late pass. Two collections that
         // always move together — the list says what to re-add, the key set makes
@@ -155,22 +164,22 @@ public sealed class ScriptGenerator
             }
         }
 
-        if (rebuildTargets.Count > 0)
+        // Picks between the two for one holder. The source side is authoritative
+        // only for a table the run actually reshapes — that is the table whose
+        // final shape the user asked for. For a holder OUTSIDE the selection the
+        // script changes nothing else about it, so restoring the source's column
+        // list or ON DELETE would apply a change nobody ticked, under a success
+        // verdict; that constraint has to come back exactly as it was found. A
+        // holder with no source side has no other shape to restore anyway.
+        void ClaimFkReAdd(DifferencePair holderPair, Table targetHolder, ForeignKey targetFk)
         {
-            foreach (DifferencePair p in result.Differences.Where(x => x.Identity.Kind == "Table"))
+            if (holderPair.SideA is Table sourceHolder
+                && selectedTables.Contains((targetHolder.Schema, targetHolder.Name)))
             {
-                if (p.SideA is Table srcT)
-                {
-                    foreach (ForeignKey fk in srcT.Constraints.OfType<ForeignKey>())
-                    {
-                        if (rebuildTargets.Contains((fk.ReferencedSchema, fk.ReferencedTable))
-                            && !rebuildTargets.Contains((srcT.Schema, srcT.Name)))
-                        {
-                            OrchestrateFkReAdd(srcT, fk.Name);
-                        }
-                    }
-                }
+                OrchestrateFkReAdd(sourceHolder, targetFk.Name);
+                return;
             }
+            ClaimTargetSideFkReAdd(targetHolder, targetFk);
         }
 
         // ── Every foreign-key DROP, collected up front.
@@ -179,13 +188,16 @@ public sealed class ScriptGenerator
         //    what makes the later DROP TABLE possible at all. Previously the FK
         //    drops lived in the FK pass at the very END of the script, so a
         //    table removed from the source was dropped while another table still
-        //    referenced it: Msg 3726, every time. Three sources feed this:
+        //    referenced it: Msg 3726, every time. Four feeders, matching the
+        //    class doc:
         //      (a) target-side FKs that a Different table lost or reshaped;
         //      (b) FKs held by ANY table — Identical ones included, which never
-        //          appear in `pairs` — pointing at a table about to be DROPped;
-        //      (c) the same, pointing at a table about to be rebuilt (#33).
-        //    (c) used to be a separate pass; folding it in here removes the
-        //    duplication and orders it earlier, which is strictly safer.
+        //          appear in `pairs` — pointing at a table about to be DROPped
+        //          or rebuilt (#33); (b) used to be two passes, and folding them
+        //          together orders the rebuild half earlier, which is safer;
+        //      (c) a Different table's own FKs over a column it is about to drop
+        //          or retype;
+        //      (d) FKs pointing AT such a column, again from anywhere.
         HashSet<(string Schema, string Name)> droppedTables = new(
             pairs
                 .Where(p => p.Identity.Kind == "Table" && p.Status == DifferenceStatus.OnlyInB)
@@ -193,6 +205,33 @@ public sealed class ScriptGenerator
                 .OfType<Table>()
                 .Select(t => (t.Schema, t.Name)),
             pairKey);
+
+        // Inbound foreign keys to a rebuilt table are claimed for the late
+        // re-add pass here, before the drop feeders below take them. Walks the
+        // FULL result because the holder may be an Identical table that appears
+        // in no other pass, but only ever over the TARGET side: a source-only
+        // table left unticked is never created, and an ALTER TABLE … ADD
+        // CONSTRAINT against it is Msg 4902 halfway through the deploy. A holder
+        // the script DROPs is skipped for the same reason — there is no table
+        // left to carry the key.
+        if (rebuildTargets.Count > 0)
+        {
+            foreach (DifferencePair p in result.Differences.Where(x => x.Identity.Kind == "Table"))
+            {
+                if (p.SideB is not Table holder) { continue; }
+                if (droppedTables.Contains((holder.Schema, holder.Name))) { continue; }
+                // A rebuilt table's own outbound FKs are re-added in full by the
+                // rebuild branch of the FK pass, not from here.
+                if (rebuildTargets.Contains((holder.Schema, holder.Name))) { continue; }
+                foreach (ForeignKey fk in holder.Constraints.OfType<ForeignKey>())
+                {
+                    if (rebuildTargets.Contains((fk.ReferencedSchema, fk.ReferencedTable)))
+                    {
+                        OrchestrateFkReAdd(holder, fk.Name);
+                    }
+                }
+            }
+        }
 
         List<(string FromSchema, string FromTable, ForeignKey FK)> fkDrops = [];
         HashSet<(string Schema, string Table, string Fk)> fkDropKeys = new(tripleKey);
@@ -217,11 +256,11 @@ public sealed class ScriptGenerator
         {
             if (p.SideA is not Table sideA || p.SideB is not Table sideB) { continue; }
             var srcFks = sideA.Constraints.OfType<ForeignKey>()
-                .ToDictionary(f => f.Name, StringComparer.Ordinal);
+                .ToDictionary(f => f.Name, result.NameComparer);
             foreach (ForeignKey t in sideB.Constraints.OfType<ForeignKey>())
             {
                 bool stillThere = srcFks.TryGetValue(t.Name, out ForeignKey? s);
-                if (!stillThere || !ForeignKeyShapeEqual(t, s!))
+                if (!stillThere || !ForeignKeyShapeEqual(t, s!, result.NameComparer))
                 {
                     AddFkDrop(sideA.Schema, sideA.Name, t);
                 }
@@ -238,16 +277,18 @@ public sealed class ScriptGenerator
                     (string, string) referenced = (fk.ReferencedSchema, fk.ReferencedTable);
                     // Deliberately NOT excluding a holder that is itself being
                     // dropped or rebuilt. "Its own DROP TABLE takes the FK with
-                    // it" is true only when the holder is dropped FIRST, and the
-                    // drop pass orders target-only objects by reversed kind rank
-                    // then reverse-alphabetically — so it held for
-                    // Currency/Invoice and failed on Msg 3726 for Zone/Alpha,
-                    // making survival a function of the two names. Two rebuilt
-                    // tables referencing each other failed the same way. An
-                    // extra DROP CONSTRAINT for a table that is about to
-                    // disappear costs one statement; getting it wrong costs the
-                    // deploy. The rebuilt table's outbound pass re-adds the full
-                    // source-side set afterwards.
+                    // it" is true only when the holder is dropped FIRST, which
+                    // is not something this feeder can assume: S3 gave the drop
+                    // pass a real order, but only when the caller hands over
+                    // target-side edges — without them it still falls back to
+                    // reversed kind rank then reverse-alphabetically, which held
+                    // for Currency/Invoice and failed on Msg 3726 for
+                    // Zone/Alpha, making survival a function of the two names.
+                    // Two rebuilt tables referencing each other are worse still:
+                    // no edge list orders a cycle. An extra DROP CONSTRAINT for
+                    // a table that is about to disappear costs one statement;
+                    // getting it wrong costs the deploy. The rebuilt table's
+                    // outbound pass re-adds the full source-side set afterwards.
                     if (droppedTables.Contains(referenced) || rebuildTargets.Contains(referenced))
                     {
                         AddFkDrop(holder.Schema, holder.Name, fk);
@@ -280,9 +321,8 @@ public sealed class ScriptGenerator
         // in-degree zero, and lands wherever the inverted kind rank puts it.
         // With no target edges the fallback is that same reversal — no worse
         // than before, and correct for everything except a schemabound chain.
-        IReadOnlyList<ObjectIdentity> dropOrder = dropDependencies is { Count: > 0 }
-            ? [.. new DependencyResolver().Order(topoIdentities, dropDependencies).Reverse()]
-            : [.. createOrder.Reverse()];
+        IReadOnlyList<ObjectIdentity> dropOrder = ResolveDropOrder(
+            topoIdentities, dropDependencies, createOrder);
         var pairById = topoPairs.ToDictionary(p => p.Identity);
 
         // ── Indexes that block an ALTER / DROP COLUMN.
@@ -332,7 +372,7 @@ public sealed class ScriptGenerator
             {
                 if (!fk.Columns.Any(touched.Contains)) { continue; }
                 AddFkDrop(sideA.Schema, sideA.Name, fk);
-                OrchestrateFkReAdd(sideA, fk.Name);
+                ClaimFkReAdd(p, sideB, fk);
             }
         }
 
@@ -364,20 +404,10 @@ public sealed class ScriptGenerator
                     }
                     if (!fk.ReferencedColumns.Any(referencedTouched.Contains)) { continue; }
                     AddFkDrop(holder.Schema, holder.Name, fk);
-                    if (p.SideA is Table sourceHolder)
-                    {
-                        OrchestrateFkReAdd(sourceHolder, fk.Name);
-                    }
-                    else
-                    {
-                        // The holder exists only on the target — either removed
-                        // from the source and left unticked, or never there. The
-                        // source has no shape to restore, so put back exactly
-                        // what we found. Without this the constraint is dropped,
-                        // never re-added, and the script reports success on a
-                        // table that has quietly lost its referential integrity.
-                        ClaimTargetSideFkReAdd(holder, fk);
-                    }
+                    // Without a re-add the constraint is dropped, never put
+                    // back, and the script reports success on a table that has
+                    // quietly lost its referential integrity.
+                    ClaimFkReAdd(p, holder, fk);
                 }
             }
         }
@@ -492,7 +522,8 @@ public sealed class ScriptGenerator
 
                 case DifferenceStatus.Different when pair.SideA is Table tSrc && pair.SideB is Table tTgt:
                     {
-                        string indexDelta = EmitIndexDelta(tSrc, tTgt, forcedIndexRecreates);
+                        string indexDelta = EmitIndexDelta(
+                            tSrc, tTgt, forcedIndexRecreates, result.NameComparer);
                         if (indexDelta.Length > 0)
                         {
                             writer.WriteBatch($"Updating indexes on {Sql.Q(tSrc.Schema, tSrc.Name)}", indexDelta);
@@ -544,9 +575,12 @@ public sealed class ScriptGenerator
         // Foreign keys — emitted last so referenced tables already exist; this
         //    also breaks FK cycles. OnlyInA: add every FK. Different: diff
         //    against target — drop removed/changed FKs, add new/changed FKs
-        //    (M8 polish). FKs whose names are already covered by the rebuild
-        //    orchestrator (inbound-FK drop above + inbound-FK re-add below) are
-        //    skipped here to avoid double drops / adds (M13-PARITY.6 #33).
+        //    (M8 polish). Foreign keys already claimed by the up-front drop pass
+        //    are skipped here so the late re-add pass stays their single owner
+        //    and nothing is dropped or added twice. That claim started as the
+        //    rebuild orchestrator's inbound set (M13-PARITY.6 #33) and S2 widened
+        //    it to every FK dropped to free a column being retyped, so it is no
+        //    longer about rebuilds at all.
         //    Iteration follows createOrder so FK order tracks table order.
         foreach (ObjectIdentity id in createOrder.Where(i => i.Kind == "Table"))
         {
@@ -590,7 +624,8 @@ public sealed class ScriptGenerator
 
                 case DifferenceStatus.Different when pair.SideA is Table tSrc && pair.SideB is Table tTgt:
                     {
-                        string fkAdds = EmitFkAdds(tSrc, tTgt, orchestratedFks);
+                        string fkAdds = EmitFkAdds(
+                            tSrc, tTgt, orchestratedFks, result.NameComparer);
                         if (fkAdds.Length > 0)
                         {
                             writer.WriteBatch($"Adding foreign keys on {Sql.Q(tSrc.Schema, tSrc.Name)}", fkAdds);
@@ -645,6 +680,39 @@ public sealed class ScriptGenerator
 
         writer.WriteVerdict();
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// The order the DROP pass walks: the target's own topological order,
+    /// reversed, falling back to the reversed CREATE order.
+    /// </summary>
+    /// <remarks>
+    /// The target's edges can hold a cycle the source's cannot: a function F
+    /// reads table T while T has a computed column calling F — legal on a live
+    /// server, since the two were created in an order that no longer shows in
+    /// the catalog. Both being removed, they appear in no source-side edge, so
+    /// the CREATE resolver never sees the cycle and the script used to be
+    /// emitted fine. Letting the throw escape would turn ordering the drop pass
+    /// (a strict improvement) into a hard failure on input that worked before.
+    /// The fallback is exactly what a caller passing no target edges gets.
+    /// </remarks>
+    private static IReadOnlyList<ObjectIdentity> ResolveDropOrder(
+        ObjectIdentity[] topoIdentities,
+        IReadOnlyList<DependencyEdge>? dropDependencies,
+        IReadOnlyList<ObjectIdentity> createOrder)
+    {
+        if (dropDependencies is { Count: > 0 })
+        {
+            try
+            {
+                return [.. new DependencyResolver().Order(topoIdentities, dropDependencies).Reverse()];
+            }
+            catch (DependencyCycleException)
+            {
+                // Fall through to the reversal below.
+            }
+        }
+        return [.. createOrder.Reverse()];
     }
 
     /// <summary>
@@ -1060,21 +1128,29 @@ public sealed class ScriptGenerator
     /// silently ends without the index. The table has to be part of the key: the
     /// set is global to the script and index names are only unique per table.
     /// </param>
+    /// <param name="names">
+    /// How the target resolves identifier case. Pairing the two sides ordinally
+    /// on a case-insensitive target made <c>IX_Data</c> and <c>IX_DATA</c> look
+    /// like one index removed and another added, so a byte-identical index was
+    /// dropped and rebuilt — minutes of table lock inside a batch with a 60 s
+    /// cap, for no change at all.
+    /// </param>
     private string EmitIndexDelta(
-        Table src, Table tgt, IReadOnlySet<(string Schema, string Table, string Index)> alreadyDropped)
+        Table src,
+        Table tgt,
+        IReadOnlySet<(string Schema, string Table, string Index)> alreadyDropped,
+        StringComparer names)
     {
         StringBuilder sb = new();
-        var srcByName =
-            src.Indexes.ToDictionary(i => i.Name, StringComparer.Ordinal);
-        var tgtByName =
-            tgt.Indexes.ToDictionary(i => i.Name, StringComparer.Ordinal);
+        var srcByName = src.Indexes.ToDictionary(i => i.Name, names);
+        var tgtByName = tgt.Indexes.ToDictionary(i => i.Name, names);
 
         // DROPs first so a rename-shaped change frees the slot before CREATE.
         foreach (TableIndex t in tgt.Indexes)
         {
             if (alreadyDropped.Contains((src.Schema, src.Name, t.Name))) { continue; }
             bool stillThere = srcByName.TryGetValue(t.Name, out TableIndex? s);
-            bool shapeChanged = stillThere && !IndexShapeEqual(t, s!);
+            bool shapeChanged = stillThere && !IndexShapeEqual(t, s!, names);
             if (!stillThere || shapeChanged)
             {
                 sb.AppendLine(_indexEmitter.EmitDrop(src.Schema, src.Name, t));
@@ -1084,20 +1160,25 @@ public sealed class ScriptGenerator
         {
             bool mustRestore = alreadyDropped.Contains((src.Schema, src.Name, s.Name));
             bool existsOnTarget = tgtByName.TryGetValue(s.Name, out TableIndex? t);
-            bool shapeChanged = existsOnTarget && !IndexShapeEqual(s, t!);
+            bool shapeChanged = existsOnTarget && !IndexShapeEqual(s, t!, names);
             if (existsOnTarget && !shapeChanged && !mustRestore) { continue; }
             sb.AppendLine(_indexEmitter.EmitCreate(src.Schema, src.Name, s));
         }
         return sb.ToString();
     }
 
-    private static bool IndexShapeEqual(TableIndex a, TableIndex b) =>
+    // Column names are compared pairwise rather than through one "name|desc"
+    // string: a composite key would push the direction flag through the name's
+    // comparer, and a case-insensitive one would then equate nothing useful.
+    private static bool IndexShapeEqual(TableIndex a, TableIndex b, StringComparer names) =>
         a.IsUnique == b.IsUnique
         && a.IsClustered == b.IsClustered
         && BodyNormalizer.ExpressionsEqual(a.FilterExpression, b.FilterExpression)
-        && a.KeyColumns.Select(k => $"{k.Name}|{k.IsDescending}")
-            .SequenceEqual(b.KeyColumns.Select(k => $"{k.Name}|{k.IsDescending}"), StringComparer.Ordinal)
-        && a.IncludedColumns.SequenceEqual(b.IncludedColumns, StringComparer.Ordinal);
+        && a.KeyColumns.Count == b.KeyColumns.Count
+        && a.KeyColumns.Zip(b.KeyColumns).All(p =>
+            names.Equals(p.First.Name, p.Second.Name)
+            && p.First.IsDescending == p.Second.IsDescending)
+        && a.IncludedColumns.SequenceEqual(b.IncludedColumns, names);
 
     /// <summary>
     /// Emits the ADD half of a table's foreign-key delta: FKs present on the
@@ -1106,37 +1187,48 @@ public sealed class ScriptGenerator
     /// <param name="src">Source-side table.</param>
     /// <param name="tgt">Target-side table.</param>
     /// <param name="skipKeys">
-    /// Foreign keys the rebuild orchestrator already owns (dropped up front,
-    /// re-added by the inbound pass), keyed <c>(schema, table, name)</c> —
+    /// Foreign keys the up-front drop pass already claimed — inbound keys to a
+    /// rebuilt table, and (since S2) any key dropped to free a column being
+    /// retyped — re-added by the late orchestrated pass and therefore not this
+    /// one's to emit. Keyed <c>(schema, table, name)</c> —
     /// constraint names are unique per schema, and this set spans the whole
     /// script, so the holder table has to be part of the key or an unrelated
     /// namesake on another table loses its ADD.
     /// </param>
+    /// <param name="names">
+    /// How the target resolves identifier case, for the same reason as
+    /// <see cref="EmitIndexDelta"/>: pairing ordinally on a case-insensitive
+    /// target makes one spelling of a constraint look removed and the other
+    /// added, and the up-front DROP pass has already taken the only copy.
+    /// </param>
     private string EmitFkAdds(
-        Table src, Table tgt, IReadOnlySet<(string Schema, string Table, string Fk)> skipKeys)
+        Table src,
+        Table tgt,
+        IReadOnlySet<(string Schema, string Table, string Fk)> skipKeys,
+        StringComparer names)
     {
         StringBuilder sb = new();
         var srcFks =
-            src.Constraints.OfType<ForeignKey>().ToDictionary(fk => fk.Name, StringComparer.Ordinal);
+            src.Constraints.OfType<ForeignKey>().ToDictionary(fk => fk.Name, names);
         var tgtFks =
-            tgt.Constraints.OfType<ForeignKey>().ToDictionary(fk => fk.Name, StringComparer.Ordinal);
+            tgt.Constraints.OfType<ForeignKey>().ToDictionary(fk => fk.Name, names);
 
         foreach (ForeignKey s in srcFks.Values)
         {
             if (skipKeys.Contains((src.Schema, src.Name, s.Name))) { continue; }
             bool existsOnTarget = tgtFks.TryGetValue(s.Name, out ForeignKey? t);
-            bool shapeChanged = existsOnTarget && !ForeignKeyShapeEqual(s, t!);
+            bool shapeChanged = existsOnTarget && !ForeignKeyShapeEqual(s, t!, names);
             if (existsOnTarget && !shapeChanged) { continue; }
             sb.AppendLine(_fkEmitter.EmitAdd(src.Schema, src.Name, s));
         }
         return sb.ToString();
     }
 
-    private static bool ForeignKeyShapeEqual(ForeignKey a, ForeignKey b) =>
-        a.Columns.SequenceEqual(b.Columns, StringComparer.Ordinal)
-        && string.Equals(a.ReferencedSchema, b.ReferencedSchema, StringComparison.Ordinal)
-        && string.Equals(a.ReferencedTable, b.ReferencedTable, StringComparison.Ordinal)
-        && a.ReferencedColumns.SequenceEqual(b.ReferencedColumns, StringComparer.Ordinal)
+    private static bool ForeignKeyShapeEqual(ForeignKey a, ForeignKey b, StringComparer names) =>
+        a.Columns.SequenceEqual(b.Columns, names)
+        && names.Equals(a.ReferencedSchema, b.ReferencedSchema)
+        && names.Equals(a.ReferencedTable, b.ReferencedTable)
+        && a.ReferencedColumns.SequenceEqual(b.ReferencedColumns, names)
         && a.OnDelete == b.OnDelete
         && a.OnUpdate == b.OnUpdate
         && a.IsDisabled == b.IsDisabled
