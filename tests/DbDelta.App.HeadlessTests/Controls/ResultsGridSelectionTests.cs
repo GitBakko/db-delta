@@ -50,17 +50,25 @@ public class ResultsGridSelectionTests
     /// unrelated to the column it controls.
     /// </summary>
     [AvaloniaFact]
-    public void The_checkbox_column_header_is_a_wired_select_all_box()
+    public void The_checkbox_column_header_shows_a_wired_select_all_box()
     {
         (ResultsGridView view, MainWindowViewModel vm) = Build();
 
-        DataGridColumn checkboxColumn = Grid(view).Columns
-            .Single(c => c.Header is CheckBox);
+        // Found in the REALISED visual tree, not on the column object: a live
+        // CheckBox assigned to Header passed that weaker check while never
+        // appearing on screen, because a control has one visual parent and the
+        // header row is rebuilt.
+        CheckBox box = Grid(view).GetVisualDescendants()
+            .OfType<DataGridColumnHeader>()
+            .SelectMany(h => h.GetVisualDescendants().OfType<CheckBox>())
+            .Should().ContainSingle("the checkbox column's header carries the select-all box")
+            .Subject;
 
-        var box = (CheckBox)checkboxColumn.Header;
         box.Command.Should().BeSameAs(vm.ToggleAllVisibleCommand,
             "the header box must drive the bulk command, not just look like a checkbox");
         box.IsThreeState.Should().BeTrue("a partial selection has to be distinguishable from none");
+        box.IsVisible.Should().BeTrue();
+        box.Bounds.Width.Should().BeGreaterThan(0, "a zero-width box is one nobody can click");
     }
 
     /// <summary>

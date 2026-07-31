@@ -239,19 +239,36 @@
                  leaves on screen and never on hidden rows: a row silently added
                  to the selection becomes a statement in the deploy script that
                  nobody reviewed. -->
+            <!-- Through a TEMPLATE, not a live CheckBox in Header: a control
+                 instance has one visual parent, so the moment the grid rebuilds
+                 its header row the box detaches and is simply never seen again.
+                 A template mints a fresh one for every realisation. -->
             <DataGridTemplateColumn.Header>
-              <CheckBox IsThreeState="True"
-                        MinWidth="0"
-                        Padding="0"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        ToolTip.Tip="Seleziona o deseleziona tutte le differenze visibili"
-                        IsChecked="{Binding ((vm:MainWindowViewModel)DataContext).AllVisibleSelected,
-                                            RelativeSource={RelativeSource AncestorType=DataGrid},
-                                            Mode=OneWay}"
-                        Command="{Binding ((vm:MainWindowViewModel)DataContext).ToggleAllVisibleCommand,
-                                          RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+              <x:String>selectAll</x:String>
             </DataGridTemplateColumn.Header>
+            <DataGridTemplateColumn.HeaderTemplate>
+              <DataTemplate>
+                <!-- Explicit size, not MinWidth=0: the Fluent CheckBox draws its
+                     box from the template's own measure, so zeroing the minimum
+                     let it collapse to nothing inside a column header — present
+                     in the tree, zero pixels wide, invisible on screen. -->
+                <CheckBox IsThreeState="True"
+                          Width="20"
+                          Height="20"
+                          MinWidth="20"
+                          MinHeight="20"
+                          Padding="0"
+                          Margin="0"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          ToolTip.Tip="Seleziona o deseleziona tutte le differenze visibili"
+                          IsChecked="{Binding ((vm:MainWindowViewModel)DataContext).AllVisibleSelected,
+                                              RelativeSource={RelativeSource AncestorType=DataGrid},
+                                              Mode=OneWay}"
+                          Command="{Binding ((vm:MainWindowViewModel)DataContext).ToggleAllVisibleCommand,
+                                            RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+              </DataTemplate>
+            </DataGridTemplateColumn.HeaderTemplate>
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:DifferenceRowViewModel">
                 <Border BorderBrush="{StaticResource BorderBrush}"
