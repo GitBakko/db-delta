@@ -9,6 +9,10 @@ nei due documenti citati; non serve ricostruire nulla.
 - **Chiuso finora:** i 4 blocker + S1 del handoff precedente
   (`docs/review/2026-07-30-handoff-blockers.md`, tutti verificati), i 6 test
   morti, e il batch a effort S: S4, S5, S6, S8, S9, S10, S13, S16.
+- **Ri-verificato il 2026-07-31** su `d5e8c63`: tutti e sei i finding di questo
+  documento sono ancora **aperti**, nessuno ha copertura di test, e i file:line
+  citati sono ancora esatti. La verifica ha però aggiunto materiale — vedi
+  l'**appendice** in fondo prima di iniziare un finding.
 
 ## Regola d'ingaggio
 
@@ -290,3 +294,228 @@ I 6 commit dei blocker e gli 8 del batch S **cambiano cosa emette la GUI**
 (FK di tabelle non selezionate, trigger ricreati, schemi promossi, marker di
 transazione). Nessun golden copre la forma del path GUI — il pass di revert
 della review lo ha dimostrato. **Smoke live 243 → 242 prima del tag.**
+
+---
+
+# APPENDICE — ri-verifica del 2026-07-31 su `d5e8c63`
+
+Sei scanner indipendenti + sei contestatori adversariali, uno per finding, con
+il mandato opposto (allo scanner: «trova il fix»; al contestatore: «trova il
+buco»). **Verdetto unanime: sei finding su sei ancora aperti, zero test.** Sotto
+solo ciò che il corpo del documento non dice già.
+
+## C1 — cosa si è aggiunto
+
+- **Un secondo punto d'ingresso, oggi latente.** Il setter di
+  `ConnectionPickerSlot.ConnectionString`
+  (`src/DbDelta.App.Avalonia/ViewModels/ConnectionPickerSlot.cs:17-23`, guidato
+  da `OnSelectedEntryChanged` `:35-47`) ripunta `AppState.TargetConnectionString`
+  **senza tentare alcun confronto**: righe e spunte stantie sopravvivono senza
+  nemmeno bisogno di un compare fallito. Non è raggiungibile oggi
+  (`ConnectionPickerView.axaml` non è istanziata da nessuna finestra) ma il fix
+  deve coprirlo, non solo i tre writer vivi (`App.axaml.cs:88-108`,
+  `MainWindowViewModel.cs:296-306` apertura progetto, `:539-547` modifica).
+- **Il notify è già asimmetrico.** Su cambio del target
+  (`MainWindowViewModel.cs:51-54`) viene notificato **solo**
+  `ExecuteOnTargetCommand`; `DeployCommand` no. Gatendo un comando solo si lascia
+  vivo l'altro.
+- **Il dialog di conferma non è una mitigazione.** `MainWindowViewModel.cs:650-651`
+  passa a `ConfirmExecuteViewModel` la redazione delle connessioni **correnti** —
+  cioè PROD, esattamente ciò su cui l'utente ha appena ripuntato — mai gli
+  endpoint da cui il diff è stato calcolato. Strutturalmente non può accorgersene.
+  E `DeployAsync` (salvataggio script, gatato dal solo `CanDeploy`) non mostra
+  alcun dialog.
+- **Nessuna difesa a valle.** Grep su tutto `src/DbDelta.Core/` per
+  `DB_NAME|@@SERVERNAME|SERVERPROPERTY|RAISERROR`: zero. Lo script emesso non
+  porta nessuna asserzione d'identità del target, e
+  `SqlExecutor.ExecuteAsync` (`src/DbDelta.Persistence/Sql/SqlExecutor.cs:74`)
+  non prende un parametro "database atteso".
+
+## C2 — una trappola che il fix ingenuo fa esplodere
+
+**L'uguaglianza ordinale di oggi è ciò che impedisce a `ToDictionary(x => x.Identity)`
+di lanciare.** Nel momento in cui il comparer diventa case-insensitive, un
+database con collation **davvero CS** che contiene sia `dbo.Clienti` sia
+`dbo.CLIENTI` fa lanciare `ArgumentException` (chiave duplicata) a **tutti** i
+~12 `ToDictionary` del motore, invece di confrontare. Quindi: derivare il
+comparer **strettamente** dalla collation (rilassare solo su `_CI_`) e/o passare a
+una forma `TryAdd`/raggruppamento. Non basta scambiare il comparer.
+
+Altri fatti verificati:
+
+- `IEqualityComparer` **non compare da nessuna parte** nel repo (né `src/` né
+  `tests/`). `ObjectIdentity` non è `partial`: un override di `Equals`/`GetHashCode`
+  in un altro file non è solo assente, è impossibile senza toccare
+  `Table.cs:28`.
+- `Database.DefaultCollation` è **letta e buttata**: 5 occorrenze in `src/`, la
+  dichiarazione (`Database.cs:65`) e tre in `LiveDbSource.cs` (`:32`, `:99`,
+  `:132`). Zero letture in `Diff/` o `ScriptGen/`. Il commento di documentazione
+  a `Database.cs:59-64`, che dice che il generatore la usa per emettere le
+  clausole `COLLATE`, **è falso**, e
+  `tests/DbDelta.Core.UnitTests/ScriptGen/ColumnCollationTests.cs:40-41` imposta
+  la property senza che l'emitter la legga — passerebbe anche cancellandola.
+- **Un test verde fissa il difetto:**
+  `tests/DbDelta.Core.UnitTests/ObjectModel/TableTests.cs:10-18`
+  `Identity_combines_schema_and_name_case_sensitively_by_default` asserisce
+  `t1.Identity.Should().NotBe(t3.Identity)` per `dbo.Customer` vs `dbo.customer`.
+  Va riscritto **insieme** al fix, non dopo.
+- Siti di accoppiamento da toccare, ai numeri di riga correnti: `ComparisonEngine.cs`
+  `:66` (schemi), `:89` (utenti), `:117` (ruoli), `:192`, `:226`, `:252`, `:283`,
+  `:322` (tabelle), `:341` (moduli, serve viste/proc/funzioni), `:612` (trigger),
+  più i permessi su chiavi stringa ordinali a `:164-170`. Colonne/vincoli/indici
+  sono ordinali a `:306`, `:425`, `:501`, `:557` e in
+  `TableScriptEmitter.cs:209-212`.
+- Nessun path parzialmente sistemato: i quattro costruttori del confronto
+  (`AppStateViewModel.cs:245`, `CompareCommand.cs:66`, `ReportCommand.cs:79`,
+  `ScriptCommand.cs:80`) sono identici.
+
+## C3 — il cablaggio esiste già, manca solo la chiamata
+
+- `ErrorCode.InsufficientPermissions` (`src/DbDelta.Core/Abstractions/Result.cs:11`)
+  è già mappato a **exit code 11** (`src/DbDelta.Cli/CliErrorMapper.cs:23-24`,
+  `src/DbDelta.Cli/ExitCodes.cs:11`) e **non è costruito da nessuna parte** in
+  `src/`. Membro morto in attesa del preflight.
+- `LiveDbSource` ha già `DisplayName` (`:20`/`:23`) e i chiamanti passano già
+  `"source"`/`"target"`: il messaggio d'errore può nominare l'endpoint senza
+  lavoro extra.
+- **Perché nessun catch può salvare:** i tre catch (`LiveDbSource.cs:103-122`)
+  intercettano `SqlException`. Il filtro di metadata visibility **non è un
+  errore** — `SELECT ... FROM sys.tables` riesce e restituisce meno righe. Il
+  difetto è strutturalmente invisibile alla gestione errori esistente.
+- Una `PreflightAsync` privata attesa fra `LiveDbSource.cs:29` e `:32` gatea
+  tutti e 13 i reader e tutti e 4 i chiamanti con un unico guard.
+- Attenzione: `docs/03_core_modules.md:175` e `:301` **descrivono il preflight
+  come se esistesse** (`fn_my_permissions`/`HAS_PERMS_BY_NAME`), e
+  `docs/01_architecture.md:270`/`:1438` enunciano il requisito di permessi.
+  Documentazione di un'intenzione mai implementata — vanno allineati col fix.
+- Nessuna rete a valle: `ComparisonEngine` classifica `(null, _) => OnlyInB`
+  meccanicamente (`:101`, `:129`, `:178`, `:204`, `:238`, `:264`, `:295`, `:391`),
+  senza euristica di volume. `ConfirmExecuteViewModel.OnlyInTargetCount`
+  **mostra** il conteggio gonfiato come legittimo, e la CLI `script` non ha
+  nemmeno quello.
+
+## S2 — riprodotto empiricamente
+
+Probe eseguito contro il `ScriptGenerator` reale: padre `dbo.Testa` con `Id`
+`int → bigint` e `PK_Testa` clustered, figlio `dbo.Righe` con `TestaId`
+`int → bigint` e `FK_Righe_Testa` **byte-identica sui due lati**, entrambe le
+coppie `Different`, nessuna tabella droppata né ricostruita. Lo script emesso
+**non contiene alcun batch «Dropping foreign keys»**: va dal preambolo diritto a
+`ALTER TABLE [dbo].[Righe] ALTER COLUMN [TestaId] [bigint] NOT NULL;` (Msg 5074)
+e poi `ALTER TABLE [dbo].[Testa] DROP CONSTRAINT [PK_Testa];` (Msg 3725).
+
+Il perché, ai numeri correnti:
+
+- `AddFkDrop` (`ScriptGenerator.cs:136-150`) ha **esattamente due** call site,
+  `:163` e `:188`.
+- Feeder (a) `:152-166` raccoglie solo se `!stillThere || !ForeignKeyShapeEqual`
+  (`:161`) → una FK di forma invariata non entra mai.
+- Feeder (b)+(c) `:168-192` sono dentro
+  `if (droppedTables.Count > 0 || rebuildTargets.Count > 0)` → con nessuna
+  tabella droppata né ricostruita **il blocco non gira affatto**, perché
+  `RequiresFullRebuild` (`TableScriptEmitter.cs:438-453`) scatta **solo** sui
+  cambi di identity: un `int → bigint` semplice non produce mai un rebuild.
+- Il pass sulle colonne toccate è `:227-245` (`touched` a `:235`) e itera solo
+  `sideB.Indexes` (`:237`). `sideB.Constraints.OfType<ForeignKey>()` mai.
+- `forcedFkRecreates` non esiste: grep di `forcedFk|blockingFk|FkRecreate` su
+  tutto il repo colpisce solo i `docs/review/*.md`.
+- **Il gemello serve davvero:** `EmitFkAdds` (`:976-994`) ha
+  `if (existsOnTarget && !shapeChanged) { continue; }` a `:990` senza override —
+  confronta con `:357`, che invece infila `forcedIndexRecreates` in
+  `EmitIndexDelta`. Senza il forzamento il fix è **peggio** del bug: la FK viene
+  droppata e mai ri-aggiunta.
+- Nessun altro path può droppare quella FK: i tre soli `DROP CONSTRAINT` in
+  `src/` sono `ScriptGenerator.cs:271`, `TableScriptEmitter.cs:237` (sezione 1,
+  che però esclude le FK a `:226`) e `TableScriptEmitter.cs:494` (dentro
+  `EmitRebuild`, che richiede `RequiresFullRebuild`).
+- Nessun test è in grado di diventare rosso: `ColumnDependencyOrderingTests.cs`
+  ha 8 fact e l'unica occorrenza di `ForeignKey|FK` è un commento a `:125`;
+  `ForeignKeyDropOrderingTests.cs` ha 5 fact, tutti su tabella referenziata o
+  forma della FK.
+- **Da correggere col codice:** il commento XML di classe a
+  `ScriptGenerator.cs:17-21` dichiara «EVERY foreign-key drop» ed elenca proprio
+  i tre feeder esistenti. La clausola d'apertura è falsa.
+
+## S3 — la stima ottimista è confutata, non ridimensionata
+
+Il corpo del documento e un primo passaggio di analisi ipotizzavano che il pass
+di drop FK anticipato (`ScriptGenerator.cs:265-274`, da `ec6eb83`) **mascherasse
+già** il caso Msg 3726 delle due tabelle target-only. **Falso, provato eseguendo
+il generatore**: padre `dbo.Zone`, figlio `dbo.Alpha`, `FK_Alpha_Zone`, entrambe
+`OnlyInB`. Lo script mette `DROP TABLE [dbo].[Zone];` **prima** di
+`DROP TABLE [dbo].[Alpha];` e **non emette alcun** `DROP CONSTRAINT
+[FK_Alpha_Zone]`, perché `ScriptGenerator.cs:174` salta deliberatamente un
+holder che sta a sua volta per essere droppato. Msg 3726 al deploy. La
+sopravvivenza dipende interamente dall'ordine alfabetico inverso.
+
+- Il test esistente **fissa il comportamento vulnerabile**:
+  `ForeignKeyDropOrderingTests.cs:88`
+  `A_dropped_table_does_not_get_a_pointless_drop_for_its_own_fk` usa
+  Currency/Invoice, che ordinano in modo fortunato (figlio `Invoice` > padre
+  `Currency`, quindi il reverse droppa prima il figlio) e asserisce solo la
+  **presenza** dei due `DROP TABLE`, mai il loro ordine relativo.
+- **Sfilare il filtro nel resolver non basta:** nessun arco `ForeignKey` viene
+  mai **costruito**. `new DependencyEdge` compare una volta sola in tutto `src/`,
+  `DependencyReader.cs:60-63`, cablato su `EdgeKind.ModuleReference`;
+  `sys.foreign_keys` è letta solo da `ConstraintReader.cs:47` e
+  `LiveDbObjectBodyResolver.cs:428`, che popolano `Table.Constraints`. Serve
+  anche il lavoro sul reader.
+- `DependencyResolverTests.cs:60-70` `Foreign_key_edges_are_ignored` fissa il
+  comportamento vecchio: va riscritto col fix.
+- **Avvertenza sul resolver:** rimuovere il filtro FK in blocco fa lanciare
+  `DependencyCycleException` sulle tabelle auto-referenziate — il pass di CREATE
+  si affida al fatto che le FK siano differite. Lo sfilamento va limitato alla
+  chiamata d'ordinamento del DROP.
+- `TargetDependencies` è ancora write-only: dichiarata a
+  `AppStateViewModel.cs:87`, assegnata a `:255`, letta da nessuno.
+
+## S11 — conteggio reale e un sito in più
+
+- **52** occorrenze di `[{` su **19** file in `src/`, di cui ~**42** finiscono in
+  DDL emesso (le altre sono etichette: `PhaseLabel` `:530-531`, le label di
+  `WriteBatch` `:331/:350/:360/:428/:448/:458/:903`, `Permission.cs:28`).
+- **In più**, una decina di righe di emissione a `StringBuilder`
+  (`Append("[")`, `Append("].[")`), concentrate in `TableScriptEmitter` e
+  `ForeignKeyScriptEmitter` (p.es. `TableScriptEmitter.cs:31`, `:68`): stesso
+  difetto in sintassi diversa, che **un grep di `[{` non vede**. Il fix va
+  cercato con entrambi i pattern.
+- L'unico helper è `TableScriptEmitter.Bracket` (`:119`,
+  `$"[{identifier}]"`): avvolge senza raddoppiare, è `private` e ha 3 chiamanti
+  (`:70`, `:591`, `:592`). Non è un fix nemmeno lì.
+- Zero escaping in `src/`: i soli `]]` sono una classe di caratteri regex
+  (`ModuleHeader.cs:36`) e un indice di array (`KindCatalog.cs:76`).
+- Nessuna validazione al confine: grep di
+  `IsValidIdentifier|ValidateName|Sanitiz|Contains(']')|QUOTENAME` su `src/` non
+  restituisce nulla. I nomi arrivano grezzi dal catalogo.
+- **Sito nuovo, lato lettura:** `ModuleHeader.cs:129-130`
+  `Unquote` toglie le parentesi esterne **senza** ricomprimere `]]`, quindi un
+  `[Ev]]il]` correttamente quotato diventa `Ev]]il`: il confronto di staleness a
+  `:82` sbaglia e `AlignNameToCatalog:90` innesta poi `$"[{schema}].[{name}]"`
+  non escapato dentro un corpo di modulo vivo.
+- **I property test non possono catturarlo:**
+  `tests/DbDelta.Property.Tests/Arbitraries/SchemaArbitraries.cs` genera nomi solo
+  da `_schemas = ["dbo","stage","audit"]` (`:17`) e dai template `T_{suffix}`
+  (`:53`), `C_{i:D3}` (`:62`), `v_`/`usp_`/`fn_`/`seq_`. Nessun generatore può
+  emettere un `]`.
+- La casa del test di guardia esiste già: `tests/DbDelta.Architecture.Tests/`,
+  che oggi contiene il solo `LayeringTests.cs` con 3 test NetArchTest.
+- Precedente utile: `HtmlReportGeneratorTests.cs:107`
+  `Schema_and_object_names_are_html_encoded_to_avoid_injection` dimostra che il
+  progetto ha già capito che i valori di catalogo sono non fidati — e lo ha
+  applicato al sink HTML lasciando grezzo quello SQL.
+
+## Riepilogo degli artefatti falsi o morti trovati strada facendo
+
+Da correggere insieme al finding che li tocca, non separatamente:
+
+| Artefatto | Problema |
+|---|---|
+| `Database.cs:59-64` (commento) | Dice che il generatore usa `DefaultCollation` per le clausole `COLLATE`. Non la legge nessuno. (C2) |
+| `ColumnCollationTests.cs:40-41` | Imposta `DefaultCollation`, l'emitter non la legge: passerebbe anche cancellando la property. (C2) |
+| `TableTests.cs:10-18` | Test verde che **fissa** l'accoppiamento case-sensitive. (C2) |
+| `ErrorCode.InsufficientPermissions` | Mappato a exit 11, costruito da nessuna parte. (C3) |
+| `docs/03_core_modules.md:175,:301` | Descrivono il preflight permessi come implementato. (C3) |
+| `ScriptGenerator.cs:17-21` (commento) | «EVERY foreign-key drop»: falso, i feeder sono tre e nessuno guarda le colonne. (S2) |
+| `ForeignKeyDropOrderingTests.cs:88` | Nomi che ordinano in modo fortunato + asserisce solo la presenza: fissa il comportamento vulnerabile. (S3) |
+| `DependencyResolverTests.cs:60-70` | `Foreign_key_edges_are_ignored` fissa il comportamento vecchio. (S3) |
+| `AppStateViewModel.cs:87`/`:255` | `TargetDependencies` write-only. (S3) |
