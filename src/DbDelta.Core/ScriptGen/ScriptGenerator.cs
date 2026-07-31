@@ -43,7 +43,6 @@ namespace DbDelta.Core.ScriptGen;
 /// </summary>
 public sealed class ScriptGenerator
 {
-    private readonly TableScriptEmitter _tableEmitter = new();
     private readonly IndexScriptEmitter _indexEmitter = new();
     private readonly ForeignKeyScriptEmitter _fkEmitter = new();
     private readonly ViewScriptEmitter _viewEmitter = new();
@@ -82,7 +81,7 @@ public sealed class ScriptGenerator
         {
             if (pair.Status == DifferenceStatus.Different
                 && pair.SideA is Table src && pair.SideB is Table tgt
-                && TableScriptEmitter.RequiresFullRebuild(src, tgt))
+                && TableScriptEmitter.RequiresFullRebuild(src, tgt, result.NameComparer))
             {
                 rebuildTargets.Add((src.Schema, src.Name));
             }
@@ -232,7 +231,8 @@ public sealed class ScriptGenerator
             if (p.SideA is not Table sideA || p.SideB is not Table sideB) { continue; }
             // A rebuilt table drops and re-creates everything anyway.
             if (rebuildTargets.Contains((sideA.Schema, sideA.Name))) { continue; }
-            IReadOnlySet<string> touched = TableScriptEmitter.ColumnsDroppedOrAltered(sideA, sideB);
+            IReadOnlySet<string> touched =
+                TableScriptEmitter.ColumnsDroppedOrAltered(sideA, sideB, result.NameComparer);
             if (touched.Count == 0) { continue; }
             foreach (TableIndex ix in sideB.Indexes)
             {
@@ -292,7 +292,7 @@ public sealed class ScriptGenerator
         {
             DifferencePair pair = pairById[id];
             if (pair.Status != DifferenceStatus.OnlyInB) { continue; }
-            string? body = DispatchBuild(id.Kind, pair);
+            string? body = DispatchBuild(id.Kind, pair, result.NameComparer);
             if (!string.IsNullOrWhiteSpace(body)) { writer.WriteBatch(PhaseLabel(pair), body); }
         }
 
@@ -307,7 +307,7 @@ public sealed class ScriptGenerator
             // ENABLE TRIGGER against an object DROP TABLE has just destroyed
             // (Msg 4916) — the rebuild re-creates it enabled anyway.
             if (IsTriggerOnRebuiltTable(pair, rebuildTargets)) { continue; }
-            string? body = DispatchBuild(id.Kind, pair);
+            string? body = DispatchBuild(id.Kind, pair, result.NameComparer);
             if (!string.IsNullOrWhiteSpace(body)) { writer.WriteBatch(PhaseLabel(pair), body); }
         }
 
@@ -634,9 +634,9 @@ public sealed class ScriptGenerator
         return null;
     }
 
-    private string? BuildOneTable(DifferencePair pair)
+    private static string? BuildOneTable(DifferencePair pair, StringComparer names)
     {
-        string ddl = _tableEmitter.Emit(pair);
+        string ddl = new TableScriptEmitter(names).Emit(pair);
         return string.IsNullOrWhiteSpace(ddl) ? null : ddl;
     }
 
@@ -692,13 +692,13 @@ public sealed class ScriptGenerator
 
     // ── Dispatch helper ─────────────────────────────────────────────────────
 
-    private string? DispatchBuild(string kind, DifferencePair pair) =>
+    private string? DispatchBuild(string kind, DifferencePair pair, StringComparer names) =>
         kind switch
         {
             "Sequence" => BuildOneSequence(pair),
             "UserDefinedType" => BuildOneUserDefinedType(pair),
             "TableType" => BuildOneTableTypeUdt(pair),
-            "Table" => BuildOneTable(pair),
+            "Table" => BuildOneTable(pair, names),
             "View" => BuildOneView(pair),
             "Function" => BuildOneFunction(pair),
             "Procedure" => BuildOneProcedure(pair),

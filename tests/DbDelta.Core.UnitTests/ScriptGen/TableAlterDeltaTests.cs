@@ -18,6 +18,58 @@ public class TableAlterDeltaTests
     private static DifferencePair Diff(Table src, Table tgt) =>
         new(src.Identity, DifferenceStatus.Different, src, tgt);
 
+    // ── EmitAlter — case sensitivity of the column pairing (C2) ────────────
+
+    /// <summary>
+    /// The engine pairs the TABLE case-insensitively on a CI target, so a
+    /// genuinely changed column reaches the emitter as a Different pair. If the
+    /// emitter then pairs its columns ordinally it sees one column removed and
+    /// another added, and emits DROP COLUMN — which takes the data with it —
+    /// instead of the ALTER COLUMN the change actually needs.
+    /// </summary>
+    [Fact]
+    public void EmitAlter_pairs_columns_by_the_supplied_comparer_instead_of_dropping_and_re_adding()
+    {
+        Table src = T("Clienti", new Column("Nome", "nvarchar(50)", false, 1));
+        Table tgt = T("Clienti", new Column("NOME", "nvarchar(40)", false, 1));
+
+        string sql = new TableScriptEmitter(StringComparer.OrdinalIgnoreCase).Emit(Diff(src, tgt));
+
+        sql.Should().Contain("ALTER COLUMN [Nome] [nvarchar] (50)");
+        sql.Should().NotContain("DROP COLUMN");
+    }
+
+    [Fact]
+    public void EmitAlter_still_drops_and_re_adds_when_the_target_is_case_sensitive()
+    {
+        Table src = T("Clienti", new Column("Nome", "nvarchar(50)", false, 1));
+        Table tgt = T("Clienti", new Column("NOME", "nvarchar(40)", false, 1));
+
+        string sql = new TableScriptEmitter(StringComparer.Ordinal).Emit(Diff(src, tgt));
+
+        sql.Should().Contain("DROP COLUMN [NOME]").And.Contain("ADD [Nome]");
+    }
+
+    /// <summary>
+    /// The whole chain, not just the emitter: ScriptGenerator has to hand the
+    /// comparer down from the comparison result, or the fix stops at the door.
+    /// </summary>
+    [Fact]
+    public void Generate_hands_the_results_comparer_down_to_the_table_emitter()
+    {
+        Table src = T("Clienti", new Column("Nome", "nvarchar(50)", false, 1));
+        Table tgt = T("Clienti", new Column("NOME", "nvarchar(40)", false, 1));
+        ComparisonResult result = new([Diff(src, tgt)])
+        {
+            NameComparer = StringComparer.OrdinalIgnoreCase,
+        };
+
+        string sql = new ScriptGenerator().Generate(result);
+
+        sql.Should().Contain("ALTER COLUMN [Nome]");
+        sql.Should().NotContain("DROP COLUMN");
+    }
+
     // ── EmitAlter — columns ────────────────────────────────────────────────
 
     [Fact]

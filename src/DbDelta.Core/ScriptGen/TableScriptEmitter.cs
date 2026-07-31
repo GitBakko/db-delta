@@ -7,8 +7,18 @@ namespace DbDelta.Core.ScriptGen;
 /// <summary>
 /// Emits CREATE / DROP / ALTER (add-column + add-constraint) for tables.
 /// </summary>
-public sealed class TableScriptEmitter : IScriptEmitter
+/// <param name="names">
+/// How the target server resolves identifier case — normally
+/// <c>ComparisonResult.NameComparer</c>. Columns and constraints have to be
+/// paired by the same rule the engine matched their table with: on a
+/// case-insensitive target, matching <c>Nome</c> against <c>NOME</c> ordinally
+/// makes one look dropped and the other added, and DROP COLUMN takes the data
+/// with it. Defaults to ordinal so direct callers keep the old behaviour.
+/// </param>
+public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEmitter
 {
+    private readonly StringComparer _names = names ?? StringComparer.Ordinal;
+
     /// <inheritdoc />
     public string Emit(DifferencePair pair)
     {
@@ -17,7 +27,7 @@ public sealed class TableScriptEmitter : IScriptEmitter
         {
             DifferenceStatus.OnlyInA => EmitCreate((Table)pair.SideA!),
             DifferenceStatus.OnlyInB => EmitDrop((Table)pair.SideB!),
-            DifferenceStatus.Different => EmitAlter((Table)pair.SideA!, (Table)pair.SideB!),
+            DifferenceStatus.Different => EmitAlter((Table)pair.SideA!, (Table)pair.SideB!, _names),
             DifferenceStatus.Identical => string.Empty,
             _ => string.Empty,
         };
@@ -40,7 +50,10 @@ public sealed class TableScriptEmitter : IScriptEmitter
         // caller in that mode (EmitRebuild) re-adds it by name after
         // sp_rename and an inline copy would collide ("Column already has a
         // DEFAULT bound to it").
-        Dictionary<string, DefaultConstraint> namedDefaults = NamedDefaultsByColumn(table);
+        // Ordinal: both the keys and the lookups come from `table` itself, so
+        // there is no cross-side pairing here for a collation to disagree with.
+        Dictionary<string, DefaultConstraint> namedDefaults =
+            NamedDefaultsByColumn(table, StringComparer.Ordinal);
 
         bool firstLine = true;
         for (int i = 0; i < table.Columns.Count; i++)
@@ -182,41 +195,37 @@ public sealed class TableScriptEmitter : IScriptEmitter
     private static string EmitDrop(Table table) =>
         $"DROP TABLE [{table.Schema}].[{table.Name}];";
 
-    private static string EmitAlter(Table newT, Table oldT)
+    private static string EmitAlter(Table newT, Table oldT, StringComparer names)
     {
         // Spec §3.4: identity column changes on an EXISTING column require a
         // full temp-table rebuild — you cannot ALTER an IDENTITY flag or its
         // seed/increment in place, and DROP COLUMN + ADD COLUMN would erase
         // the data we are trying to migrate.
-        if (RequiresFullRebuild(newT, oldT))
+        if (RequiresFullRebuild(newT, oldT, names))
         {
-            return EmitRebuild(newT, oldT);
+            return EmitRebuild(newT, oldT, names);
         }
 
         StringBuilder sb = new();
         string qualifiedName = $"[{newT.Schema}].[{newT.Name}]";
 
-        var newConstraintsByName =
-            newT.Constraints.ToDictionary(c => c.Name, StringComparer.Ordinal);
-        var oldConstraintsByName =
-            oldT.Constraints.ToDictionary(c => c.Name, StringComparer.Ordinal);
-        Dictionary<string, DefaultConstraint> namedDefaults = NamedDefaultsByColumn(newT);
+        var newConstraintsByName = newT.Constraints.ToDictionary(c => c.Name, names);
+        var oldConstraintsByName = oldT.Constraints.ToDictionary(c => c.Name, names);
+        Dictionary<string, DefaultConstraint> namedDefaults = NamedDefaultsByColumn(newT, names);
         // Columns whose named DEFAULT we emit inline on an ADD below. Section 5
         // must then NOT re-add the same constraint standalone, or SQL Server
         // rejects it with "Column already has a DEFAULT bound to it".
-        HashSet<string> inlinedNamedDefaults = new(StringComparer.Ordinal);
+        HashSet<string> inlinedNamedDefaults = new(names);
 
-        var existingColsByName =
-            oldT.Columns.ToDictionary(c => c.Name, StringComparer.Ordinal);
-        var newColsByName =
-            newT.Columns.ToDictionary(c => c.Name, StringComparer.Ordinal);
+        var existingColsByName = oldT.Columns.ToDictionary(c => c.Name, names);
+        var newColsByName = newT.Columns.ToDictionary(c => c.Name, names);
 
         // Columns this ALTER will drop or retype. A key or CHECK constraint that
         // depends on one of them blocks the column DDL with Msg 5074, so it has
         // to be dropped in section 1 and put back in section 5 — even when the
         // constraint itself is completely unchanged.
-        IReadOnlySet<string> touchedColumns = ColumnsDroppedOrAltered(newT, oldT);
-        HashSet<string> droppedForColumnDependency = new(StringComparer.Ordinal);
+        IReadOnlySet<string> touchedColumns = ColumnsDroppedOrAltered(newT, oldT, names);
+        HashSet<string> droppedForColumnDependency = new(names);
 
         // ── 1) DROP non-FK constraints first (FKs handled by ForeignKeyScriptEmitter).
         //       Dropping a constraint may also be a prerequisite for the column /
@@ -339,17 +348,18 @@ public sealed class TableScriptEmitter : IScriptEmitter
     /// but a DROP/ADD of the DF_ constraint.
     /// </para>
     /// </remarks>
-    internal static IReadOnlySet<string> ColumnsDroppedOrAltered(Table newT, Table oldT)
+    internal static IReadOnlySet<string> ColumnsDroppedOrAltered(Table newT, Table oldT, StringComparer names)
     {
         ArgumentNullException.ThrowIfNull(newT);
         ArgumentNullException.ThrowIfNull(oldT);
+        ArgumentNullException.ThrowIfNull(names);
 
-        HashSet<string> touched = new(StringComparer.Ordinal);
+        HashSet<string> touched = new(names);
         // A rebuild re-creates the whole table, so nothing is "altered in place".
-        if (RequiresFullRebuild(newT, oldT)) { return touched; }
+        if (RequiresFullRebuild(newT, oldT, names)) { return touched; }
 
-        var newColsByName = newT.Columns.ToDictionary(c => c.Name, StringComparer.Ordinal);
-        var oldColsByName = oldT.Columns.ToDictionary(c => c.Name, StringComparer.Ordinal);
+        var newColsByName = newT.Columns.ToDictionary(c => c.Name, names);
+        var oldColsByName = oldT.Columns.ToDictionary(c => c.Name, names);
 
         foreach (Column oldCol in oldT.Columns)
         {
@@ -408,12 +418,32 @@ public sealed class TableScriptEmitter : IScriptEmitter
     {
         PrimaryKey pk => pk.Columns.Any(touchedColumns.Contains),
         UniqueConstraint uq => uq.Columns.Any(touchedColumns.Contains),
-        // Catalog CHECK definitions bracket their column references, so a
-        // substring match on "[name]" is reliable here.
+        // Catalog CHECK definitions bracket their column references, so the
+        // bracketed tokens ARE the column list. Testing them against the set
+        // lets the set's own comparer decide, which keeps the case rule in one
+        // place instead of re-deriving a StringComparison here.
         CheckConstraint ck => ck.Expression is { } expr
-            && touchedColumns.Any(col => expr.Contains($"[{col}]", StringComparison.Ordinal)),
+            && BracketedNames(expr).Any(touchedColumns.Contains),
         _ => false,
     };
+
+    /// <summary>
+    /// The identifiers a catalog expression brackets, e.g. <c>([Qty]&gt;(0))</c>
+    /// yields <c>Qty</c>.
+    /// </summary>
+    private static IEnumerable<string> BracketedNames(string expression)
+    {
+        int i = 0;
+        while (true)
+        {
+            int open = expression.IndexOf('[', i);
+            if (open < 0) { yield break; }
+            int close = expression.IndexOf(']', open + 1);
+            if (close < 0) { yield break; }
+            yield return expression[(open + 1)..close];
+            i = close + 1;
+        }
+    }
 
     /// <summary>
     /// True when <paramref name="index"/> covers one of
@@ -435,10 +465,9 @@ public sealed class TableScriptEmitter : IScriptEmitter
     /// none of those are expressible via ALTER COLUMN, and DROP COLUMN +
     /// ADD COLUMN would silently lose row data.
     /// </summary>
-    internal static bool RequiresFullRebuild(Table newT, Table oldT)
+    internal static bool RequiresFullRebuild(Table newT, Table oldT, StringComparer names)
     {
-        var oldByName =
-            oldT.Columns.ToDictionary(c => c.Name, StringComparer.Ordinal);
+        var oldByName = oldT.Columns.ToDictionary(c => c.Name, names);
         foreach (Column newCol in newT.Columns)
         {
             if (!oldByName.TryGetValue(newCol.Name, out Column? oldCol)) { continue; }
@@ -458,14 +487,13 @@ public sealed class TableScriptEmitter : IScriptEmitter
     /// copy the rows over (excluding computed columns, which re-derive),
     /// DROP the original, then <c>sp_rename</c> the temp table into place.
     /// </summary>
-    private static string EmitRebuild(Table newT, Table oldT)
+    private static string EmitRebuild(Table newT, Table oldT, StringComparer names)
     {
         string qualifiedOld = $"[{newT.Schema}].[{newT.Name}]";
         string tmpName = $"{newT.Name}_tmp";
         string qualifiedTmp = $"[{newT.Schema}].[{tmpName}]";
 
-        HashSet<string> oldColNames =
-            new(oldT.Columns.Select(c => c.Name), StringComparer.Ordinal);
+        HashSet<string> oldColNames = new(oldT.Columns.Select(c => c.Name), names);
         List<string> commonInsertable =
         [
             .. newT.Columns
@@ -596,9 +624,9 @@ public sealed class TableScriptEmitter : IScriptEmitter
         _ => string.Empty,
     };
 
-    private static Dictionary<string, DefaultConstraint> NamedDefaultsByColumn(Table table)
+    private static Dictionary<string, DefaultConstraint> NamedDefaultsByColumn(Table table, StringComparer names)
     {
-        Dictionary<string, DefaultConstraint> map = new(StringComparer.Ordinal);
+        Dictionary<string, DefaultConstraint> map = new(names);
         foreach (DefaultConstraint df in table.Constraints.OfType<DefaultConstraint>())
         {
             map[df.ColumnName] = df;
