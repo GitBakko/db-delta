@@ -15,9 +15,62 @@ namespace DbDelta.Core.ScriptGen;
 /// makes one look dropped and the other added, and DROP COLUMN takes the data
 /// with it. Defaults to ordinal so direct callers keep the old behaviour.
 /// </param>
-public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEmitter
+/// <param name="backfillDefaults">
+/// Values, keyed <c>(schema, table, column)</c>, that seed the existing rows
+/// when this ALTER adds a NOT NULL column the source declares without a
+/// default. See <see cref="ColumnsNeedingABackfillDefault"/> for why one is
+/// needed at all.
+/// </param>
+public sealed class TableScriptEmitter(
+    StringComparer? names = null,
+    IReadOnlyDictionary<(string Schema, string Table, string Column), string>? backfillDefaults = null)
+    : IScriptEmitter
 {
     private readonly StringComparer _names = names ?? StringComparer.Ordinal;
+
+    /// <summary>
+    /// Prefix for the throwaway constraint that carries a backfill value onto
+    /// the rows already in the table. Named, so the script can drop exactly the
+    /// one it added and leave the column matching the source.
+    /// </summary>
+    private const string BackfillPrefix = "DF__dbdelta_backfill__";
+
+    /// <summary>
+    /// The columns an ALTER of <paramref name="oldT"/> into <paramref name="newT"/>
+    /// would add as <c>NOT NULL</c> with nothing to put in the rows that already
+    /// exist.
+    /// </summary>
+    /// <remarks>
+    /// <c>ALTER TABLE … ADD</c> of a NOT NULL column is legal only on an empty
+    /// table unless a DEFAULT travels with it (Msg 4901). The source schema
+    /// simply may not have one, and then no tool can deploy the change without
+    /// inventing a value — Redgate's rebuild leaves the column out of its
+    /// INSERT list and dies on the same data. Surfacing the list BEFORE the
+    /// script runs is what lets a human supply the value instead of finding out
+    /// halfway through a deploy.
+    /// </remarks>
+    public static IReadOnlyList<string> ColumnsNeedingABackfillDefault(
+        Table newT, Table oldT, StringComparer names)
+    {
+        ArgumentNullException.ThrowIfNull(newT);
+        ArgumentNullException.ThrowIfNull(oldT);
+        ArgumentNullException.ThrowIfNull(names);
+        if (RequiresFullRebuild(newT, oldT, names)) { return []; }
+
+        HashSet<string> existing = new(oldT.Columns.Select(c => c.Name), names);
+        Dictionary<string, DefaultConstraint> namedDefaults = NamedDefaultsByColumn(newT, names);
+        return
+        [
+            .. newT.Columns
+                .Where(c => !existing.Contains(c.Name))
+                .Where(c => !c.IsNullable
+                            && !c.IsIdentity
+                            && c.ComputedExpression is null
+                            && string.IsNullOrEmpty(c.DefaultExpression)
+                            && !namedDefaults.ContainsKey(c.Name))
+                .Select(c => c.Name)
+        ];
+    }
 
     /// <inheritdoc />
     public string Emit(DifferencePair pair)
@@ -27,7 +80,7 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
         {
             DifferenceStatus.OnlyInA => EmitCreate((Table)pair.SideA!),
             DifferenceStatus.OnlyInB => EmitDrop((Table)pair.SideB!),
-            DifferenceStatus.Different => EmitAlter((Table)pair.SideA!, (Table)pair.SideB!, _names),
+            DifferenceStatus.Different => EmitAlter((Table)pair.SideA!, (Table)pair.SideB!, _names, backfillDefaults),
             DifferenceStatus.Identical => string.Empty,
             _ => string.Empty,
         };
@@ -193,7 +246,11 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
     private static string EmitDrop(Table table) =>
         $"DROP TABLE {Sql.Q(table.Schema, table.Name)};";
 
-    private static string EmitAlter(Table newT, Table oldT, StringComparer names)
+    private static string EmitAlter(
+        Table newT,
+        Table oldT,
+        StringComparer names,
+        IReadOnlyDictionary<(string Schema, string Table, string Column), string>? backfillDefaults = null)
     {
         // Spec §3.4: identity column changes on an EXISTING column require a
         // full temp-table rebuild — you cannot ALTER an IDENTITY flag or its
@@ -297,13 +354,40 @@ public sealed class TableScriptEmitter(StringComparer? names = null) : IScriptEm
         foreach (Column newCol in newT.Columns)
         {
             if (existingColsByName.ContainsKey(newCol.Name)) { continue; }
+            // A NOT NULL column with nothing to seed the existing rows cannot be
+            // added at all (Msg 4901). When the operator supplied a backfill
+            // value it rides in on a NAMED throwaway constraint, which the next
+            // statement drops — the rows get a value, and the column is left
+            // exactly as the source declares it, with no default of its own.
+            string? backfill = null;
+            if (backfillDefaults is not null
+                && namedDefaults.GetValueOrDefault(newCol.Name) is null
+                && string.IsNullOrEmpty(newCol.DefaultExpression)
+                && !newCol.IsNullable
+                && !newCol.IsIdentity
+                && newCol.ComputedExpression is null)
+            {
+                backfillDefaults.TryGetValue((newT.Schema, newT.Name, newCol.Name), out backfill);
+            }
+
             sb.Append("ALTER TABLE ").Append(qualifiedName)
               .Append(" ADD ")
               .Append(FormatColumn(
                   newCol,
                   namedDefaults.GetValueOrDefault(newCol.Name),
-                  inlineNamedDefault: true))
-              .AppendLine(";");
+                  inlineNamedDefault: true));
+            if (backfill is not null)
+            {
+                string dfName = BackfillPrefix + newCol.Name;
+                sb.Append(" CONSTRAINT ").Append(Sql.Q(dfName)).Append(" DEFAULT ").Append(backfill)
+                  .AppendLine(";");
+                sb.Append("ALTER TABLE ").Append(qualifiedName)
+                  .Append(" DROP CONSTRAINT ").Append(Sql.Q(dfName)).AppendLine(";");
+            }
+            else
+            {
+                sb.AppendLine(";");
+            }
             if (namedDefaults.ContainsKey(newCol.Name)) { inlinedNamedDefaults.Add(newCol.Name); }
             addedColumns = true;
         }

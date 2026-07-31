@@ -82,12 +82,22 @@ public sealed class ScriptGenerator
     /// schemabound view over a schemabound view, where the wrong order is
     /// Msg 3729.
     /// </param>
+    /// <param name="backfillDefaults">
+    /// Values, keyed <c>(schema, table, column)</c>, to seed the rows that
+    /// already exist when a run adds a NOT NULL column the source declares
+    /// without a default — see <see cref="BackfillPreflight"/>. Each rides in on
+    /// a named throwaway constraint that the next statement drops, so the
+    /// column ends up exactly as the source declares it. A column with no entry
+    /// is emitted unchanged and fails on a populated table with Msg 4901, which
+    /// is the honest outcome when nobody has chosen a value.
+    /// </param>
     public string Generate(
         ComparisonResult result,
         IEnumerable<DifferencePair>? selection = null,
         ComparisonOptions options = ComparisonOptions.Default,
         IReadOnlyList<DependencyEdge>? dependencies = null,
-        IReadOnlyList<DependencyEdge>? dropDependencies = null)
+        IReadOnlyList<DependencyEdge>? dropDependencies = null,
+        IReadOnlyDictionary<(string Schema, string Table, string Column), string>? backfillDefaults = null)
     {
         ArgumentNullException.ThrowIfNull(result);
         dependencies ??= [];
@@ -460,7 +470,7 @@ public sealed class ScriptGenerator
         {
             DifferencePair pair = pairById[id];
             if (pair.Status != DifferenceStatus.OnlyInB) { continue; }
-            string? body = DispatchBuild(id.Kind, pair, result.NameComparer);
+            string? body = DispatchBuild(id.Kind, pair, result.NameComparer, backfillDefaults);
             if (!string.IsNullOrWhiteSpace(body)) { writer.WriteBatch(PhaseLabel(pair), body); }
         }
 
@@ -475,7 +485,7 @@ public sealed class ScriptGenerator
             // ENABLE TRIGGER against an object DROP TABLE has just destroyed
             // (Msg 4916) — the rebuild re-creates it enabled anyway.
             if (IsTriggerOnRebuiltTable(pair, rebuildTargets)) { continue; }
-            string? body = DispatchBuild(id.Kind, pair, result.NameComparer);
+            string? body = DispatchBuild(id.Kind, pair, result.NameComparer, backfillDefaults);
             if (!string.IsNullOrWhiteSpace(body)) { writer.WriteBatch(PhaseLabel(pair), body); }
         }
 
@@ -841,9 +851,12 @@ public sealed class ScriptGenerator
         return null;
     }
 
-    private static string? BuildOneTable(DifferencePair pair, StringComparer names)
+    private static string? BuildOneTable(
+        DifferencePair pair,
+        StringComparer names,
+        IReadOnlyDictionary<(string Schema, string Table, string Column), string>? backfillDefaults)
     {
-        string ddl = new TableScriptEmitter(names).Emit(pair);
+        string ddl = new TableScriptEmitter(names, backfillDefaults).Emit(pair);
         return string.IsNullOrWhiteSpace(ddl) ? null : ddl;
     }
 
@@ -899,13 +912,17 @@ public sealed class ScriptGenerator
 
     // ── Dispatch helper ─────────────────────────────────────────────────────
 
-    private string? DispatchBuild(string kind, DifferencePair pair, StringComparer names) =>
+    private string? DispatchBuild(
+        string kind,
+        DifferencePair pair,
+        StringComparer names,
+        IReadOnlyDictionary<(string Schema, string Table, string Column), string>? backfillDefaults) =>
         kind switch
         {
             "Sequence" => BuildOneSequence(pair),
             "UserDefinedType" => BuildOneUserDefinedType(pair),
             "TableType" => BuildOneTableTypeUdt(pair),
-            "Table" => BuildOneTable(pair, names),
+            "Table" => BuildOneTable(pair, names, backfillDefaults),
             "View" => BuildOneView(pair),
             "Function" => BuildOneFunction(pair),
             "Procedure" => BuildOneProcedure(pair),
