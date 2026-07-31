@@ -48,9 +48,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
             {
                 RebuildRows();
             }
-            else if (e.PropertyName == nameof(AppStateViewModel.TargetConnectionString))
+            else if (e.PropertyName is nameof(AppStateViewModel.TargetConnectionString)
+                                    or nameof(AppStateViewModel.ResultsAreStale))
             {
+                // Both commands, not just this one: DeployAsync writes a script
+                // built from the same stale pairs, and a script saved against
+                // the wrong server is executed by hand later with nobody left to
+                // notice.
+                DeployCommand.NotifyCanExecuteChanged();
                 ExecuteOnTargetCommand.NotifyCanExecuteChanged();
+                OnPropertyChanged(nameof(ResultsAreStale));
             }
         };
         Rows.CollectionChanged += (_, _) =>
@@ -615,7 +622,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
         StatusText = $"Script salvato in {file.Path.LocalPath} — {selected.Count} oggetti.";
     }
 
-    private bool CanDeploy() => Rows.Any(r => r.IsSelected);
+    private bool CanDeploy() => Rows.Any(r => r.IsSelected) && !AppState.ResultsAreStale;
+
+    /// <summary>
+    /// Surfaced to the view so the grid can say the rows no longer describe the
+    /// configured endpoints. Mirrors <see cref="AppStateViewModel.ResultsAreStale"/>.
+    /// </summary>
+    public bool ResultsAreStale => AppState.ResultsAreStale;
 
     /// <summary>
     /// Shows a confirmation dialog then executes the alignment script for the
@@ -666,7 +679,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private bool CanExecuteOnTarget() =>
         Rows.Any(r => r.IsSelected)
-        && !string.IsNullOrWhiteSpace(AppState.TargetConnectionString);
+        && !string.IsNullOrWhiteSpace(AppState.TargetConnectionString)
+        && !AppState.ResultsAreStale;
 
     /// <summary>
     /// Returns the <see cref="DifferencePair"/> for every currently selected row.

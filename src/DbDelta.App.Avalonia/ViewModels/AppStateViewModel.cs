@@ -87,6 +87,44 @@ public sealed partial class AppStateViewModel : ObservableObject
     public IReadOnlyList<DependencyEdge> TargetDependencies { get; private set; } = [];
 
     /// <summary>
+    /// The endpoint pair the results on screen were computed from, or null while
+    /// no comparison has completed. Set only on the success path of
+    /// <see cref="CompareAsync"/> and cleared the moment one starts.
+    /// </summary>
+    private (string Source, string Target)? _comparedEndpoints;
+
+    /// <summary>
+    /// True when the grid is showing rows that no longer describe the endpoints
+    /// currently configured.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is derived, not raised as a flag on each way out of
+    /// <see cref="CompareAsync"/>. A flag has to be set on all five error exits
+    /// and on every property that can repoint an endpoint, and the one that gets
+    /// missed is the one that ships: compare DEV against STAGING, tick twelve
+    /// rows of which five are DROPs, repoint the target at PROD, refresh, watch
+    /// the source time out — and the grid still holds twelve ticked rows
+    /// computed against a server that has nothing to do with PROD.
+    /// </para>
+    /// <para>
+    /// Comparing the stored pair against the live one makes every route to that
+    /// state stale by construction, including the ones that never touch
+    /// <see cref="CompareAsync"/> at all, like loading a project or picking a
+    /// saved connection.
+    /// </para>
+    /// </remarks>
+    public bool ResultsAreStale =>
+        LastComparisonRaw is not null
+        && (_comparedEndpoints is not { } endpoints
+            || !string.Equals(endpoints.Source, NormalizedSource, StringComparison.Ordinal)
+            || !string.Equals(endpoints.Target, NormalizedTarget, StringComparison.Ordinal));
+
+    private string NormalizedSource => (SourceConnectionString ?? string.Empty).Trim();
+
+    private string NormalizedTarget => (TargetConnectionString ?? string.Empty).Trim();
+
+    /// <summary>
     /// Active status filter for the result grid. <c>null</c> = no filter.
     /// Bound options match the raw <see cref="DifferenceDto.Status"/> string
     /// values ("Different" / "OnlyInA" / "OnlyInB" / "Identical").
@@ -194,6 +232,12 @@ public sealed partial class AppStateViewModel : ObservableObject
     {
         IsBusy = true;
         LastError = null;
+        // Anything already on screen stops describing the current endpoints the
+        // instant a new comparison starts, and only a completed one may say
+        // otherwise. Clearing here rather than on each error exit is what makes
+        // every early return — including ones added later — leave the results
+        // marked stale.
+        SetComparedEndpoints(null);
         try
         {
             // Trim defensively — pasted connection strings often carry a trailing
@@ -243,8 +287,7 @@ public sealed partial class AppStateViewModel : ObservableObject
 
             ComparisonEngine engine = new();
             ComparisonResult result = engine.Compare(srcRes.Value!, tgtRes.Value!, ComparisonOptions.Default);
-            LastComparisonRaw = result;
-            LastComparison = Mapper.ToDto(result);
+            PublishComparison(result, srcCs, tgtCs);
 
             // Keep the dependency edges: without them the deploy script the app
             // builds has NO topological ordering and degenerates to KindRank, so
@@ -284,6 +327,42 @@ public sealed partial class AppStateViewModel : ObservableObject
 
     private bool CanSwap() => !IsBusy;
 
-    partial void OnSourceConnectionStringChanged(string value) => CompareCommand.NotifyCanExecuteChanged();
-    partial void OnTargetConnectionStringChanged(string value) => CompareCommand.NotifyCanExecuteChanged();
+    /// <summary>
+    /// Publishes a completed comparison together with the endpoint pair it was
+    /// computed from.
+    /// </summary>
+    /// <remarks>
+    /// The two are set here and nowhere else so they cannot drift apart. The
+    /// whole point of <see cref="ResultsAreStale"/> is that rows carry their
+    /// provenance; a code path that could assign
+    /// <see cref="LastComparisonRaw"/> on its own would hand the grid rows with
+    /// no provenance and re-open the hole.
+    /// </remarks>
+    public void PublishComparison(ComparisonResult result, string source, string target)
+    {
+        LastComparisonRaw = result;
+        LastComparison = Mapper.ToDto(result);
+        SetComparedEndpoints((source, target));
+    }
+
+    private void SetComparedEndpoints((string Source, string Target)? endpoints)
+    {
+        _comparedEndpoints = endpoints;
+        OnPropertyChanged(nameof(ResultsAreStale));
+    }
+
+    partial void OnSourceConnectionStringChanged(string value)
+    {
+        CompareCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(ResultsAreStale));
+    }
+
+    partial void OnTargetConnectionStringChanged(string value)
+    {
+        CompareCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(ResultsAreStale));
+    }
+
+    partial void OnLastComparisonRawChanged(ComparisonResult? value) =>
+        OnPropertyChanged(nameof(ResultsAreStale));
 }

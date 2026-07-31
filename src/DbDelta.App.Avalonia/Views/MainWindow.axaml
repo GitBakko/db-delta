@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:DbDelta.App.ViewModels"
         xmlns:v="using:DbDelta.App.Views"
+        xmlns:c="using:DbDelta.App.Views.Controls"
         xmlns:json="using:DbDelta.Persistence.Json"
         x:Class="DbDelta.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
@@ -16,8 +17,10 @@
        triggering a stray horizontal scrollbar on the window. -->
   <Panel ClipToBounds="True">
 
-  <!-- App shell: 44px topbar / 56px header strip / flex middle / 24px statusbar -->
-  <Grid RowDefinitions="44,56,Auto,*,24">
+  <!-- App shell: 44px topbar / 56px header strip / error band / stale band /
+       flex middle / 24px statusbar. Both bands are Auto and collapse to zero
+       height when their notice is not showing. -->
+  <Grid RowDefinitions="44,56,Auto,Auto,*,24">
 
     <!-- ── Band 1: App topbar ─────────────────────────────────────────────── -->
     <Border Grid.Row="0"
@@ -306,30 +309,15 @@
          set the message and nobody ever saw it. The grid kept showing the
          PREVIOUS run's counts, which the user then read as current. Auto row:
          collapses to zero height while there is no error. -->
-    <Border Grid.Row="2"
-            Background="{StaticResource DangerSoftBrush}"
-            BorderBrush="{StaticResource DangerBrush}"
-            BorderThickness="0,0,0,1"
-            Padding="12,8"
-            IsVisible="{Binding AppState.LastError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-      <Grid ColumnDefinitions="Auto,*,Auto">
-        <Path Grid.Column="0"
-              Stroke="{StaticResource DangerBrush}"
-              StrokeThickness="1.8"
-              StrokeLineCap="Round"
-              StrokeJoin="Round"
-              Data="M 8,1 L 15,14 L 1,14 Z M 8,6 L 8,10 M 8,11.6 L 8,12.4"
-              Width="16" Height="16"
-              Margin="0,0,10,0"
-              VerticalAlignment="Center" />
-        <TextBlock Grid.Column="1"
-                   Text="{Binding AppState.LastError}"
-                   FontSize="12"
-                   Foreground="{StaticResource DangerFgBrush}"
-                   TextWrapping="Wrap"
-                   VerticalAlignment="Center" />
-        <Button Grid.Column="2"
-                Content="Chiudi"
+    <c:NoticeBand Grid.Row="2"
+                  Accent="{StaticResource DangerBrush}"
+                  AccentSoft="{StaticResource DangerSoftBrush}"
+                  AccentForeground="{StaticResource DangerFgBrush}"
+                  IconPath="M 8,1 L 15,14 L 1,14 Z M 8,6 L 8,10 M 8,11.6 L 8,12.4"
+                  Message="{Binding AppState.LastError}"
+                  IsVisible="{Binding AppState.LastError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+      <c:NoticeBand.Trailing>
+        <Button Content="Chiudi"
                 Command="{Binding DismissErrorCommand}"
                 Height="32"
                 Padding="12,0"
@@ -340,11 +328,25 @@
                 Foreground="{StaticResource FgStrongBrush}"
                 FontSize="12"
                 VerticalAlignment="Center" />
-      </Grid>
-    </Border>
+      </c:NoticeBand.Trailing>
+    </c:NoticeBand>
+
+    <!-- ── Band 3b: Stale results ───────────────────────────────────────────
+         The rows below were computed against a different pair of endpoints
+         than the ones now configured, so they must not read as current. Both
+         Salva and Esegui are disabled while this shows — see
+         AppStateViewModel.ResultsAreStale. No dismiss button: the only way out
+         is to compare again. -->
+    <c:NoticeBand Grid.Row="3"
+                  Accent="{StaticResource WarningBrush}"
+                  AccentSoft="{StaticResource WarningSoftBrush}"
+                  AccentForeground="{StaticResource WarningFgBrush}"
+                  IconPath="M 8,1 A 7,7 0 1 1 7.99,1 M 8,4.4 L 8,8.6 M 8,10.6 L 8,11.4"
+                  Message="Questi risultati provengono da un confronto precedente, calcolato su connessioni diverse da quelle configurate ora. Esegui di nuovo il confronto prima di generare o applicare uno script."
+                  IsVisible="{Binding ResultsAreStale}" />
 
     <!-- ── Band 4: Middle ─ welcome overlay OR populated body ──────────────── -->
-    <Panel Grid.Row="3">
+    <Panel Grid.Row="4">
 
       <!-- Welcome state: no project loaded yet -->
       <StackPanel HorizontalAlignment="Center"
@@ -484,7 +486,7 @@
     <!-- Status bar. ClipToBounds suppresses any minor pixel overflow from
          the redacted connection strings that previously bubbled up into a
          stray window-level horizontal scrollbar. -->
-    <Border Grid.Row="4"
+    <Border Grid.Row="5"
             Background="{StaticResource BgMutedBrush}"
             BorderBrush="{StaticResource BorderBrush}"
             BorderThickness="0,1,0,0"

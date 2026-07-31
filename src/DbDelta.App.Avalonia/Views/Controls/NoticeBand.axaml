@@ -1,0 +1,39 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:DbDelta.App.Views.Controls"
+             x:Class="DbDelta.App.Views.Controls.NoticeBand"
+             x:DataType="c:NoticeBand"
+             x:Name="Self">
+
+  <!-- Full-width strip between the header and the body: accent fill, accent
+       bottom rule, glyph, wrapping message, and an optional trailing slot for
+       an action button. Consumers set Accent / AccentSoft / AccentForeground /
+       IconPath / Message and drop content into Trailing. See CLAUDE.md UI rule
+       #3 — the second copy of this markup is the one that drifts. -->
+  <Border Background="{Binding AccentSoft, ElementName=Self}"
+          BorderBrush="{Binding Accent, ElementName=Self}"
+          BorderThickness="0,0,0,1"
+          Padding="12,8">
+    <Grid ColumnDefinitions="Auto,*,Auto">
+      <Path Grid.Column="0"
+            Stroke="{Binding Accent, ElementName=Self}"
+            StrokeThickness="1.8"
+            StrokeLineCap="Round"
+            StrokeJoin="Round"
+            Data="{Binding IconPath, ElementName=Self}"
+            Width="16" Height="16"
+            Margin="0,0,10,0"
+            VerticalAlignment="Center" />
+      <TextBlock Grid.Column="1"
+                 Text="{Binding Message, ElementName=Self}"
+                 FontSize="12"
+                 Foreground="{Binding AccentForeground, ElementName=Self}"
+                 TextWrapping="Wrap"
+                 VerticalAlignment="Center" />
+      <ContentPresenter Grid.Column="2"
+                        Content="{Binding Trailing, ElementName=Self}"
+                        VerticalAlignment="Center" />
+    </Grid>
+  </Border>
+
+</UserControl>
