@@ -14,22 +14,61 @@ public sealed class ComparisonEngine
         ArgumentNullException.ThrowIfNull(a);
         ArgumentNullException.ThrowIfNull(b);
 
+        // The target's collation decides the pairing, because the target is the
+        // one that will execute the DDL: if it cannot tell [dbo].[Clienti] from
+        // [dbo].[CLIENTI] then neither may we, or we hand it a DROP for a table
+        // it is about to be told to CREATE. See NameComparison.
+        ObjectIdentityComparer ids = new(NameComparison.ForCollation(b.DefaultCollation));
+
         List<DifferencePair> pairs = [];
-        pairs.AddRange(CompareSchemas(a.Schemas, b.Schemas));
-        pairs.AddRange(CompareTables(a, b, options));
-        pairs.AddRange(CompareModules(a.Views, b.Views));
-        pairs.AddRange(CompareModules(a.Procedures, b.Procedures));
-        pairs.AddRange(CompareModules(a.Functions, b.Functions));
-        pairs.AddRange(CompareTriggers(a.Triggers, b.Triggers));
-        pairs.AddRange(CompareSequences(a.Sequences, b.Sequences));
-        pairs.AddRange(CompareSynonyms(a.Synonyms, b.Synonyms));
-        pairs.AddRange(CompareUserDefinedTypes(a.UserDefinedTypes, b.UserDefinedTypes));
-        pairs.AddRange(CompareTableTypeUdts(a.TableTypeUdts, b.TableTypeUdts));
-        pairs.AddRange(CompareUsers(a.Users, b.Users));
-        pairs.AddRange(CompareRoles(a.Roles, b.Roles));
+        pairs.AddRange(CompareSchemas(a.Schemas, b.Schemas, ids));
+        pairs.AddRange(CompareTables(a, b, options, ids));
+        pairs.AddRange(CompareModules(a.Views, b.Views, ids));
+        pairs.AddRange(CompareModules(a.Procedures, b.Procedures, ids));
+        pairs.AddRange(CompareModules(a.Functions, b.Functions, ids));
+        pairs.AddRange(CompareTriggers(a.Triggers, b.Triggers, ids));
+        pairs.AddRange(CompareSequences(a.Sequences, b.Sequences, ids));
+        pairs.AddRange(CompareSynonyms(a.Synonyms, b.Synonyms, ids));
+        pairs.AddRange(CompareUserDefinedTypes(a.UserDefinedTypes, b.UserDefinedTypes, ids));
+        pairs.AddRange(CompareTableTypeUdts(a.TableTypeUdts, b.TableTypeUdts, ids));
+        pairs.AddRange(CompareUsers(a.Users, b.Users, ids));
+        pairs.AddRange(CompareRoles(a.Roles, b.Roles, ids));
         pairs.AddRange(ComparePermissions(a.Permissions, b.Permissions));
 
-        return new ComparisonResult(pairs);
+        return new ComparisonResult(pairs) { NameComparer = ids.Names };
+    }
+
+    /// <summary>
+    /// Builds the per-side identity map for one kind.
+    /// </summary>
+    /// <remarks>
+    /// Two objects in the SAME database can only collide under
+    /// <paramref name="ids"/> when that database is case-sensitive and the
+    /// target is not — it holds both <c>dbo.Clienti</c> and <c>dbo.CLIENTI</c>,
+    /// and the target could never hold both. Keeping one and discarding the
+    /// other would make the survivor look like a modification and the loser
+    /// vanish silently, so this refuses instead: an unrepresentable comparison
+    /// has to be visible.
+    /// </remarks>
+    private static Dictionary<ObjectIdentity, T> MapByIdentity<T>(
+        IEnumerable<T> items,
+        Func<T, ObjectIdentity> identityOf,
+        ObjectIdentityComparer ids)
+    {
+        Dictionary<ObjectIdentity, T> map = new(ids);
+        foreach (T item in items)
+        {
+            ObjectIdentity id = identityOf(item);
+            if (!map.TryAdd(id, item))
+            {
+                throw new InvalidOperationException(
+                    $"'{id.SchemaName}.{id.ObjectName}' ({id.Kind}) exists more than once under the "
+                    + "target's collation, which is case-insensitive: one database holds two objects "
+                    + "whose names differ only by case, and the other could never hold both. Compare "
+                    + "against a target whose collation matches the source, or rename one of them.");
+            }
+        }
+        return map;
     }
 
     // ── Schemas ─────────────────────────────────────────────────────────────
@@ -61,11 +100,11 @@ public sealed class ComparisonEngine
     /// </para>
     /// </remarks>
     private static IEnumerable<DifferencePair> CompareSchemas(
-        IReadOnlyList<Schema> ax, IReadOnlyList<Schema> bx)
+        IReadOnlyList<Schema> ax, IReadOnlyList<Schema> bx, ObjectIdentityComparer ids)
     {
-        var aByIdentity = ax.ToDictionary(s => s.Identity);
-        var bByIdentity = bx.ToDictionary(s => s.Identity);
-        HashSet<ObjectIdentity> all = [.. aByIdentity.Keys];
+        Dictionary<ObjectIdentity, Schema> aByIdentity = MapByIdentity(ax, s => s.Identity, ids);
+        Dictionary<ObjectIdentity, Schema> bByIdentity = MapByIdentity(bx, s => s.Identity, ids);
+        HashSet<ObjectIdentity> all = new(aByIdentity.Keys, ids);
         all.UnionWith(bByIdentity.Keys);
 
         foreach (ObjectIdentity id in all.OrderBy(i => i.SchemaName, StringComparer.OrdinalIgnoreCase))
@@ -84,11 +123,11 @@ public sealed class ComparisonEngine
     // ── M6: Users / Roles / Permissions ────────────────────────────────────
 
     private static IEnumerable<DifferencePair> CompareUsers(
-        IReadOnlyList<DatabaseUser> ax, IReadOnlyList<DatabaseUser> bx)
+        IReadOnlyList<DatabaseUser> ax, IReadOnlyList<DatabaseUser> bx, ObjectIdentityComparer ids)
     {
-        var aByIdentity = ax.ToDictionary(u => u.Identity);
-        var bByIdentity = bx.ToDictionary(u => u.Identity);
-        HashSet<ObjectIdentity> all = [.. aByIdentity.Keys];
+        Dictionary<ObjectIdentity, DatabaseUser> aByIdentity = MapByIdentity(ax, u => u.Identity, ids);
+        Dictionary<ObjectIdentity, DatabaseUser> bByIdentity = MapByIdentity(bx, u => u.Identity, ids);
+        HashSet<ObjectIdentity> all = new(aByIdentity.Keys, ids);
         all.UnionWith(bByIdentity.Keys);
 
         foreach (ObjectIdentity id in all.OrderBy(i => i.ObjectName, StringComparer.OrdinalIgnoreCase))
@@ -112,11 +151,11 @@ public sealed class ComparisonEngine
         && string.Equals(a.DefaultSchema, b.DefaultSchema, StringComparison.OrdinalIgnoreCase);
 
     private static IEnumerable<DifferencePair> CompareRoles(
-        IReadOnlyList<DatabaseRole> ax, IReadOnlyList<DatabaseRole> bx)
+        IReadOnlyList<DatabaseRole> ax, IReadOnlyList<DatabaseRole> bx, ObjectIdentityComparer ids)
     {
-        var aByIdentity = ax.ToDictionary(r => r.Identity);
-        var bByIdentity = bx.ToDictionary(r => r.Identity);
-        HashSet<ObjectIdentity> all = [.. aByIdentity.Keys];
+        Dictionary<ObjectIdentity, DatabaseRole> aByIdentity = MapByIdentity(ax, r => r.Identity, ids);
+        Dictionary<ObjectIdentity, DatabaseRole> bByIdentity = MapByIdentity(bx, r => r.Identity, ids);
+        HashSet<ObjectIdentity> all = new(aByIdentity.Keys, ids);
         all.UnionWith(bByIdentity.Keys);
 
         foreach (ObjectIdentity id in all.OrderBy(i => i.ObjectName, StringComparer.OrdinalIgnoreCase))
@@ -187,11 +226,12 @@ public sealed class ComparisonEngine
 
     private static IEnumerable<DifferencePair> CompareSequences(
         IReadOnlyList<Sequence> ax,
-        IReadOnlyList<Sequence> bx)
+        IReadOnlyList<Sequence> bx,
+        ObjectIdentityComparer ids)
     {
-        var aByIdentity = ax.ToDictionary(s => s.Identity);
-        var bByIdentity = bx.ToDictionary(s => s.Identity);
-        HashSet<ObjectIdentity> allIdentities = [.. aByIdentity.Keys];
+        Dictionary<ObjectIdentity, Sequence> aByIdentity = MapByIdentity(ax, s => s.Identity, ids);
+        Dictionary<ObjectIdentity, Sequence> bByIdentity = MapByIdentity(bx, s => s.Identity, ids);
+        HashSet<ObjectIdentity> allIdentities = new(aByIdentity.Keys, ids);
         allIdentities.UnionWith(bByIdentity.Keys);
 
         foreach (ObjectIdentity id in allIdentities.OrderBy(i => i.SchemaName).ThenBy(i => i.ObjectName))
@@ -221,11 +261,12 @@ public sealed class ComparisonEngine
 
     private static IEnumerable<DifferencePair> CompareSynonyms(
         IReadOnlyList<Synonym> ax,
-        IReadOnlyList<Synonym> bx)
+        IReadOnlyList<Synonym> bx,
+        ObjectIdentityComparer ids)
     {
-        var aByIdentity = ax.ToDictionary(s => s.Identity);
-        var bByIdentity = bx.ToDictionary(s => s.Identity);
-        HashSet<ObjectIdentity> allIdentities = [.. aByIdentity.Keys];
+        Dictionary<ObjectIdentity, Synonym> aByIdentity = MapByIdentity(ax, s => s.Identity, ids);
+        Dictionary<ObjectIdentity, Synonym> bByIdentity = MapByIdentity(bx, s => s.Identity, ids);
+        HashSet<ObjectIdentity> allIdentities = new(aByIdentity.Keys, ids);
         allIdentities.UnionWith(bByIdentity.Keys);
 
         foreach (ObjectIdentity id in allIdentities.OrderBy(i => i.SchemaName).ThenBy(i => i.ObjectName))
@@ -247,11 +288,12 @@ public sealed class ComparisonEngine
 
     private static IEnumerable<DifferencePair> CompareUserDefinedTypes(
         IReadOnlyList<UserDefinedType> ax,
-        IReadOnlyList<UserDefinedType> bx)
+        IReadOnlyList<UserDefinedType> bx,
+        ObjectIdentityComparer ids)
     {
-        var aByIdentity = ax.ToDictionary(t => t.Identity);
-        var bByIdentity = bx.ToDictionary(t => t.Identity);
-        HashSet<ObjectIdentity> allIdentities = [.. aByIdentity.Keys];
+        Dictionary<ObjectIdentity, UserDefinedType> aByIdentity = MapByIdentity(ax, t => t.Identity, ids);
+        Dictionary<ObjectIdentity, UserDefinedType> bByIdentity = MapByIdentity(bx, t => t.Identity, ids);
+        HashSet<ObjectIdentity> allIdentities = new(aByIdentity.Keys, ids);
         allIdentities.UnionWith(bByIdentity.Keys);
 
         foreach (ObjectIdentity id in allIdentities.OrderBy(i => i.SchemaName).ThenBy(i => i.ObjectName))
@@ -278,11 +320,12 @@ public sealed class ComparisonEngine
 
     private static IEnumerable<DifferencePair> CompareTableTypeUdts(
         IReadOnlyList<TableTypeUdt> ax,
-        IReadOnlyList<TableTypeUdt> bx)
+        IReadOnlyList<TableTypeUdt> bx,
+        ObjectIdentityComparer ids)
     {
-        var aByIdentity = ax.ToDictionary(t => t.Identity);
-        var bByIdentity = bx.ToDictionary(t => t.Identity);
-        HashSet<ObjectIdentity> allIdentities = [.. aByIdentity.Keys];
+        Dictionary<ObjectIdentity, TableTypeUdt> aByIdentity = MapByIdentity(ax, t => t.Identity, ids);
+        Dictionary<ObjectIdentity, TableTypeUdt> bByIdentity = MapByIdentity(bx, t => t.Identity, ids);
+        HashSet<ObjectIdentity> allIdentities = new(aByIdentity.Keys, ids);
         allIdentities.UnionWith(bByIdentity.Keys);
 
         foreach (ObjectIdentity id in allIdentities.OrderBy(i => i.SchemaName).ThenBy(i => i.ObjectName))
@@ -294,16 +337,18 @@ public sealed class ComparisonEngine
                 (null, null) => DifferenceStatus.Identical,
                 (null, _) => DifferenceStatus.OnlyInB,
                 (_, null) => DifferenceStatus.OnlyInA,
-                _ => TableTypeUdtsEqual(sideA, sideB) ? DifferenceStatus.Identical : DifferenceStatus.Different,
+                _ => TableTypeUdtsEqual(sideA, sideB, ids.Names)
+                    ? DifferenceStatus.Identical
+                    : DifferenceStatus.Different,
             };
             yield return new DifferencePair(id, status, sideA, sideB);
         }
     }
 
-    private static bool TableTypeUdtsEqual(TableTypeUdt a, TableTypeUdt b)
+    private static bool TableTypeUdtsEqual(TableTypeUdt a, TableTypeUdt b, StringComparer names)
     {
         if (a.Columns.Count != b.Columns.Count) { return false; }
-        var bByName = b.Columns.ToDictionary(c => c.Name, StringComparer.Ordinal);
+        var bByName = b.Columns.ToDictionary(c => c.Name, names);
         foreach (Column ac in a.Columns)
         {
             if (!bByName.TryGetValue(ac.Name, out Column? bc)) { return false; }
@@ -317,30 +362,35 @@ public sealed class ComparisonEngine
         return true;
     }
 
-    private static IEnumerable<DifferencePair> CompareTables(Database a, Database b, ComparisonOptions options)
+    private static IEnumerable<DifferencePair> CompareTables(
+        Database a,
+        Database b,
+        ComparisonOptions options,
+        ObjectIdentityComparer ids)
     {
-        var aByIdentity = a.Tables.ToDictionary(t => t.Identity);
-        var bByIdentity = b.Tables.ToDictionary(t => t.Identity);
-        HashSet<ObjectIdentity> allIdentities = [.. aByIdentity.Keys];
+        Dictionary<ObjectIdentity, Table> aByIdentity = MapByIdentity(a.Tables, t => t.Identity, ids);
+        Dictionary<ObjectIdentity, Table> bByIdentity = MapByIdentity(b.Tables, t => t.Identity, ids);
+        HashSet<ObjectIdentity> allIdentities = new(aByIdentity.Keys, ids);
         allIdentities.UnionWith(bByIdentity.Keys);
 
         foreach (ObjectIdentity id in allIdentities.OrderBy(i => i.SchemaName).ThenBy(i => i.ObjectName))
         {
             aByIdentity.TryGetValue(id, out Table? sideA);
             bByIdentity.TryGetValue(id, out Table? sideB);
-            DifferenceStatus status = ClassifyTable(sideA, sideB, options);
+            DifferenceStatus status = ClassifyTable(sideA, sideB, options, ids.Names);
             yield return new DifferencePair(id, status, sideA, sideB);
         }
     }
 
     private static IEnumerable<DifferencePair> CompareModules<TModule>(
         IReadOnlyList<TModule> ax,
-        IReadOnlyList<TModule> bx)
+        IReadOnlyList<TModule> bx,
+        ObjectIdentityComparer ids)
         where TModule : Module
     {
-        var aByIdentity = ax.ToDictionary(m => m.Identity);
-        var bByIdentity = bx.ToDictionary(m => m.Identity);
-        HashSet<ObjectIdentity> allIdentities = [.. aByIdentity.Keys];
+        Dictionary<ObjectIdentity, TModule> aByIdentity = MapByIdentity(ax, m => m.Identity, ids);
+        Dictionary<ObjectIdentity, TModule> bByIdentity = MapByIdentity(bx, m => m.Identity, ids);
+        HashSet<ObjectIdentity> allIdentities = new(aByIdentity.Keys, ids);
         allIdentities.UnionWith(bByIdentity.Keys);
 
         foreach (ObjectIdentity id in allIdentities.OrderBy(i => i.SchemaName).ThenBy(i => i.ObjectName))
@@ -384,7 +434,11 @@ public sealed class ComparisonEngine
             : DifferenceStatus.Different;
     }
 
-    private static DifferenceStatus ClassifyTable(Table? a, Table? b, ComparisonOptions options)
+    private static DifferenceStatus ClassifyTable(
+        Table? a,
+        Table? b,
+        ComparisonOptions options,
+        StringComparer names)
     {
         if (a is null && b is not null)
         {
@@ -401,11 +455,11 @@ public sealed class ComparisonEngine
             return DifferenceStatus.Identical;
         }
 
-        bool columnsDiffer = !ColumnsEqual(a.Columns, b.Columns, options);
+        bool columnsDiffer = !ColumnsEqual(a.Columns, b.Columns, options, names);
         bool constraintsDiffer = !options.HasFlag(ComparisonOptions.IgnoreKeys)
-            && !ConstraintsEqual(a.Constraints, b.Constraints);
+            && !ConstraintsEqual(a.Constraints, b.Constraints, names);
         bool indexesDiffer = !options.HasFlag(ComparisonOptions.IgnoreIndexes)
-            && !IndexesEqual(a.Indexes, b.Indexes);
+            && !IndexesEqual(a.Indexes, b.Indexes, names);
 
         return columnsDiffer || constraintsDiffer || indexesDiffer
             ? DifferenceStatus.Different
@@ -415,14 +469,15 @@ public sealed class ComparisonEngine
     private static bool ColumnsEqual(
         IReadOnlyList<Column> ax,
         IReadOnlyList<Column> bx,
-        ComparisonOptions options)
+        ComparisonOptions options,
+        StringComparer names)
     {
         if (ax.Count != bx.Count)
         {
             return false;
         }
 
-        var bByName = bx.ToDictionary(c => c.Name);
+        var bByName = bx.ToDictionary(c => c.Name, names);
         foreach (Column col in ax)
         {
             if (!bByName.TryGetValue(col.Name, out Column? other))
@@ -491,14 +546,15 @@ public sealed class ComparisonEngine
 
     private static bool ConstraintsEqual(
         IReadOnlyList<Constraint> ax,
-        IReadOnlyList<Constraint> bx)
+        IReadOnlyList<Constraint> bx,
+        StringComparer names)
     {
         if (ax.Count != bx.Count)
         {
             return false;
         }
 
-        var bByName = bx.ToDictionary(c => c.Name);
+        var bByName = bx.ToDictionary(c => c.Name, names);
         foreach (Constraint left in ax)
         {
             if (!bByName.TryGetValue(left.Name, out Constraint? right))
@@ -511,7 +567,7 @@ public sealed class ComparisonEngine
                 return false;
             }
 
-            if (!ConstraintShapeEqual(left, right))
+            if (!ConstraintShapeEqual(left, right, names))
             {
                 return false;
             }
@@ -520,41 +576,45 @@ public sealed class ComparisonEngine
         return true;
     }
 
-    private static bool ConstraintShapeEqual(Constraint left, Constraint right) => left switch
-    {
-        PrimaryKey pk when right is PrimaryKey other =>
-            pk.IsClustered == other.IsClustered && pk.Columns.SequenceEqual(other.Columns),
-        UniqueConstraint uq when right is UniqueConstraint other =>
-            uq.IsClustered == other.IsClustered && uq.Columns.SequenceEqual(other.Columns),
-        ForeignKey fk when right is ForeignKey other =>
-            fk.Columns.SequenceEqual(other.Columns)
-            && fk.ReferencedSchema == other.ReferencedSchema
-            && fk.ReferencedTable == other.ReferencedTable
-            && fk.ReferencedColumns.SequenceEqual(other.ReferencedColumns)
-            && fk.OnDelete == other.OnDelete
-            && fk.OnUpdate == other.OnUpdate
-            && fk.IsDisabled == other.IsDisabled
-            && fk.IsNotForReplication == other.IsNotForReplication,
-        CheckConstraint ck when right is CheckConstraint other =>
-            BodyNormalizer.ExpressionsEqual(ck.Expression, other.Expression)
-            && ck.IsDisabled == other.IsDisabled
-            && ck.IsNotForReplication == other.IsNotForReplication,
-        DefaultConstraint df when right is DefaultConstraint other =>
-            df.ColumnName == other.ColumnName
-            && BodyNormalizer.ExpressionsEqual(df.Expression, other.Expression),
-        _ => false,
-    };
+    private static bool ConstraintShapeEqual(
+        Constraint left,
+        Constraint right,
+        StringComparer names) => left switch
+        {
+            PrimaryKey pk when right is PrimaryKey other =>
+                pk.IsClustered == other.IsClustered && pk.Columns.SequenceEqual(other.Columns, names),
+            UniqueConstraint uq when right is UniqueConstraint other =>
+                uq.IsClustered == other.IsClustered && uq.Columns.SequenceEqual(other.Columns, names),
+            ForeignKey fk when right is ForeignKey other =>
+                fk.Columns.SequenceEqual(other.Columns, names)
+                && names.Equals(fk.ReferencedSchema, other.ReferencedSchema)
+                && names.Equals(fk.ReferencedTable, other.ReferencedTable)
+                && fk.ReferencedColumns.SequenceEqual(other.ReferencedColumns, names)
+                && fk.OnDelete == other.OnDelete
+                && fk.OnUpdate == other.OnUpdate
+                && fk.IsDisabled == other.IsDisabled
+                && fk.IsNotForReplication == other.IsNotForReplication,
+            CheckConstraint ck when right is CheckConstraint other =>
+                BodyNormalizer.ExpressionsEqual(ck.Expression, other.Expression)
+                && ck.IsDisabled == other.IsDisabled
+                && ck.IsNotForReplication == other.IsNotForReplication,
+            DefaultConstraint df when right is DefaultConstraint other =>
+                names.Equals(df.ColumnName, other.ColumnName)
+                && BodyNormalizer.ExpressionsEqual(df.Expression, other.Expression),
+            _ => false,
+        };
 
     private static bool IndexesEqual(
         IReadOnlyList<TableIndex> ax,
-        IReadOnlyList<TableIndex> bx)
+        IReadOnlyList<TableIndex> bx,
+        StringComparer names)
     {
         if (ax.Count != bx.Count)
         {
             return false;
         }
 
-        var bByName = bx.ToDictionary(i => i.Name);
+        var bByName = bx.ToDictionary(i => i.Name, names);
         foreach (TableIndex left in ax)
         {
             if (!bByName.TryGetValue(left.Name, out TableIndex? right))
@@ -584,7 +644,7 @@ public sealed class ComparisonEngine
 
             for (int i = 0; i < left.KeyColumns.Count; i++)
             {
-                if (left.KeyColumns[i].Name != right.KeyColumns[i].Name)
+                if (!names.Equals(left.KeyColumns[i].Name, right.KeyColumns[i].Name))
                 {
                     return false;
                 }
@@ -594,7 +654,7 @@ public sealed class ComparisonEngine
                 }
             }
 
-            if (!left.IncludedColumns.SequenceEqual(right.IncludedColumns))
+            if (!left.IncludedColumns.SequenceEqual(right.IncludedColumns, names))
             {
                 return false;
             }
@@ -605,23 +665,24 @@ public sealed class ComparisonEngine
 
     private static IEnumerable<DifferencePair> CompareTriggers(
         IReadOnlyList<Trigger> ax,
-        IReadOnlyList<Trigger> bx)
+        IReadOnlyList<Trigger> bx,
+        ObjectIdentityComparer ids)
     {
-        var aByIdentity = ax.ToDictionary(m => m.Identity);
-        var bByIdentity = bx.ToDictionary(m => m.Identity);
-        HashSet<ObjectIdentity> allIdentities = [.. aByIdentity.Keys];
+        Dictionary<ObjectIdentity, Trigger> aByIdentity = MapByIdentity(ax, m => m.Identity, ids);
+        Dictionary<ObjectIdentity, Trigger> bByIdentity = MapByIdentity(bx, m => m.Identity, ids);
+        HashSet<ObjectIdentity> allIdentities = new(aByIdentity.Keys, ids);
         allIdentities.UnionWith(bByIdentity.Keys);
 
         foreach (ObjectIdentity id in allIdentities.OrderBy(i => i.SchemaName).ThenBy(i => i.ObjectName))
         {
             aByIdentity.TryGetValue(id, out Trigger? sideA);
             bByIdentity.TryGetValue(id, out Trigger? sideB);
-            DifferenceStatus status = ClassifyTrigger(sideA, sideB);
+            DifferenceStatus status = ClassifyTrigger(sideA, sideB, ids.Names);
             yield return new DifferencePair(id, status, sideA, sideB);
         }
     }
 
-    private static DifferenceStatus ClassifyTrigger(Trigger? a, Trigger? b)
+    private static DifferenceStatus ClassifyTrigger(Trigger? a, Trigger? b, StringComparer names)
     {
         // Reuse the module-body classification first.
         DifferenceStatus body = ClassifyModule(a, b);
@@ -635,8 +696,8 @@ public sealed class ComparisonEngine
         // both sides are present.
         return a!.IsDisabled != b!.IsDisabled
             || a.IsNotForReplication != b.IsNotForReplication
-            || !string.Equals(a.ParentSchema, b.ParentSchema, StringComparison.Ordinal)
-            || !string.Equals(a.ParentTable, b.ParentTable, StringComparison.Ordinal)
+            || !names.Equals(a.ParentSchema, b.ParentSchema)
+            || !names.Equals(a.ParentTable, b.ParentTable)
             ? DifferenceStatus.Different
             : DifferenceStatus.Identical;
     }

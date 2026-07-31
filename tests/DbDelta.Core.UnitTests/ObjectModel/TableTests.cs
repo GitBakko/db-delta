@@ -6,8 +6,16 @@ namespace DbDelta.Core.UnitTests.ObjectModel;
 
 public class TableTests
 {
+    /// <summary>
+    /// The struct's own equality is compiler-generated over three strings, so
+    /// it is ordinal. That is a property of the record, NOT the pairing rule:
+    /// the comparison engine overrides it with a comparer derived from the
+    /// target's collation, because a case-insensitive server would otherwise be
+    /// told to drop <c>dbo.Customer</c> and create <c>dbo.customer</c>. See
+    /// <c>CollationPairingTests</c> for the behaviour that actually ships.
+    /// </summary>
     [Fact]
-    public void Identity_combines_schema_and_name_case_sensitively_by_default()
+    public void Identity_equality_on_the_struct_itself_is_ordinal()
     {
         var t1 = new Table("dbo", "Customer", []);
         var t2 = new Table("dbo", "Customer", []);
