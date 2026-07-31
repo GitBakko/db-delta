@@ -74,7 +74,6 @@ non può mordere, il commento nel test lo dice — vedi
 
 | Cosa | Stato |
 |------|-------|
-| **`VwAiCronoStatiDocumenti` e `VwAiWriteAuditLog` risultano Identical ma i corpi differiscono** anche togliendo ogni whitespace (`CHECKSUM` sui testi ripuliti diverge). **Falso negativo: non deployiamo qualcosa che dovremmo.** Reader e `ModuleHeader` esclusi; serve il corpo integrale dei due lati per diagnosticare | Bloccato sui dati |
 | Dialogo di backfill (Msg 4901) | Motore pronto e testato, manca la UI |
 | Gate: su errore niente cambia, su successo ricompare automatico, più indicatore di stato ultima run con popup degli errori | Spec del proprietario accettata, non iniziato. Richiede prima di agganciare `SqlConnection.InfoMessage` e catturare `SqlException.Errors`: oggi teniamo solo `ex.Message`, per questo la app mostra 2 errori dove SSMS ne mostra cento |
 | `DATA_COMPRESSION` (tabella e indice) non è nel modello | Gap confermato su `WebhookDeliveries` |
@@ -85,9 +84,24 @@ non può mordere, il commento nel test lo dice — vedi
 
 Su 166 create e ~110 modifiche i due strumenti concordano su tutto tranne sei
 oggetti, **e mai nella direzione opposta**: DbDelta non segnala mai qualcosa che
-Redgate consideri identico. Dei sei: due erano artefatti di classificazione, uno
-è un caso in cui abbiamo ragione noi (FK droppata e ri-aggiunta identica come
-collaterale), due sono i gap di modello qui sopra, due sono le viste.
+Redgate consideri identico.
+
+Dei sei, **quattro sono casi in cui abbiamo ragione noi**: due erano artefatti
+della mia classificazione (una tabella che entrambi droppano, contata fra i
+modificati); uno è una FK droppata e ri-aggiunta identica come collaterale del
+rebuild della tabella referenziata, quindi l'oggetto non cambia; e due sono le
+viste `VwAi*`, che per un pomeriggio hanno avuto l'aria del falso negativo più
+grave della giornata — **e non lo erano**. Messi i corpi affiancati, sono la
+stessa istruzione, una indentata e l'altra appiattita su una riga. Fissato in
+`ModuleDiffTests.A_view_reformatted_but_not_changed_is_identical`.
+
+Restano due gap reali, entrambi di modello, entrambi elencati sopra:
+`DATA_COMPRESSION` e le opzioni SET per-modulo.
+
+**Nota metodologica, perché mi ha fatto perdere tempo:** `CHECKSUM` sui testi
+ripuliti dava "diversi" su corpi che erano identici, e SSMS tronca a 256
+caratteri in Results to Text. Per confrontare due definizioni usa `=` con
+`COLLATE Latin1_General_BIN2`, e leggile con `CAST(definition AS xml)`.
 
 Fixture e procedura in `tests/Fixtures/Parity/README.md`.
 
