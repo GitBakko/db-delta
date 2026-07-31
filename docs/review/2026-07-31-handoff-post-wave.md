@@ -1,96 +1,118 @@
-# HANDOFF — cosa resta dopo la chiusura del post-wave
+# HANDOFF — il primo smoke live, e i due bug di deploy che ha trovato
 
 **Da leggere per primo in una sessione nuova.**
 
-- **HEAD:** `f2cdcf8` su `main`, working tree pulito. **Non ancora pushato.**
-- **Test:** 609 verdi su 10 progetti (Compat esclusa, gira solo di notte).
+- **HEAD:** `c9b152d` su `main`. **11 commit non pushati.**
+- **Test:** 631 verdi su 10 progetti (Compat esclusa, gira solo di notte).
 - **Gate formato:** `dotnet format DbDelta.sln --verify-no-changes` esce 0. Build senza avvisi.
-- **Chiuso in `21bf477..f2cdcf8`:** tutti i finding aperti che questo handoff
-  elencava — sette di correttezza, due di guardie/test, sette commenti falsi, e
-  la riformulazione del banner.
-- **Ancora dovuto prima di rc5:** lo **smoke live 243 → 242**. Serve la password
-  sa, quindi il proprietario. È l'unica cosa che blocca; W3-1/W3-2 (undo)
-  restano dietro di esso.
+- **In working tree:** un ritocco alla checkbox select-all, in attesa di conferma
+  visiva del proprietario. Nient'altro.
 
-## Cosa è stato chiuso, e come è stato verificato
+## La cosa importante di oggi
 
-Ogni fix porta un test **verificato invertendo il fix sotto di esso** — otto
-probe di mutazione, ognuna con `Errori: 0` controllato prima di credere al
-risultato.
+Il post-wave è stato chiuso (sedici finding, vedi in fondo), ma **il valore vero
+è arrivato dal primo smoke live** contro `192.168.3.243`, che ha trovato due bug
+che nessun test aveva mai visto — **entrambi rompevano ogni deploy di una forma
+che nel mondo reale è ordinaria.**
 
-### Correttezza (`21bf477`)
+### 1. Msg 207 — un vincolo su una colonna nuova non compila (`93e95b1`)
 
-| Cosa | Prova |
+```sql
+ALTER TABLE [dbo].[Corrieri_Regole] ADD [CondizioneEndpoint] nvarchar(8) NULL;
+ALTER TABLE [dbo].[Corrieri_Regole] ADD CONSTRAINT [CK_...] CHECK ([CondizioneEndpoint] ...);
+```
+
+SQL Server **compila un batch per intero prima di eseguirne una riga**, quindi il
+CHECK non risolve una colonna che a compile time non esiste ancora. Con
+`XACT_ABORT` si porta via tutto il deploy.
+
+**Colpiva ogni deploy che aggiunge una colonna più un vincolo su di essa.** Non
+un caso limite.
+
+`EmitAlter` emette un separatore di batch prima della sezione vincoli, **solo**
+se una colonna è stata davvero aggiunta. `DeploymentScriptWriter` spezza il body
+sui suoi `GO` e mette il gate su ogni pezzo, così nessun emitter può produrre un
+batch non protetto.
+
+### 2. Msg 4901 — colonna NOT NULL senza default su tabella popolata (`e87bab6`)
+
+Indeployabile per costruzione: non c'è un valore da mettere nelle righe che già
+esistono. **Verificato che nemmeno Redgate ce la fa** — il suo rebuild crea la
+tabella con le colonne `NOT NULL` ma **le lascia fuori dalla lista dell'INSERT**,
+quindi il suo script muore sugli stessi dati, più tardi e con un `DROP TABLE` già
+in coda. Su questo non eravamo indietro.
+
+`BackfillPreflight.Scan` le trova prima che parta una riga di SQL. Il generatore
+riprende i valori come mappa `(schema, tabella, colonna)`: ognuno entra su un
+vincolo usa-e-getta nominato che l'istruzione successiva droppa, così le righe
+prendono il valore e la colonna resta come la dichiara la sorgente. Senza un
+valore fornito la colonna esce invariata e fallisce ancora: **nulla viene
+inventato per conto dell'utente.**
+
+**Manca il dialogo che raccoglie i valori.** È il prossimo pezzo, e finché non
+c'è lo smoke si ferma su `Corrieri_TipiDocumentazioni`.
+
+## La lezione
+
+**Nessun test di questo repo poteva trovare quei due bug.** 631 test verdi, 68
+golden, un gate ScriptDom che verifica che ogni golden *parsi* — e lo script
+moriva alla prima tabella reale. I golden confrontano testo; ScriptDom valida la
+sintassi; nessuno dei due sa che SQL Server compila un batch intero prima di
+eseguirlo, o che una tabella ha righe dentro.
+
+Il primo smoke live ha trovato in due esecuzioni più difetti di deploy di quanti
+ne avesse trovati l'intera suite. **Non rimandare più lo smoke a dopo il
+refactor.**
+
+Corollario, dallo stesso pomeriggio: tre bug UI di fila (checkbox a larghezza
+zero, controllo vivo in `Header` invece che in `HeaderTemplate`, header più basso
+del glifo) di cui **il renderer headless ne riproduce uno solo**. Dove il test
+non può mordere, il commento nel test lo dice — vedi
+`ResultsGridSelectionTests`.
+
+## Aperto, in ordine di gravità
+
+| Cosa | Stato |
 |------|-------|
-| Il re-add orchestrato restituiva la forma FK **della sorgente** a una tabella fuori selezione. Ora un holder non selezionato riceve il proprio vincolo verbatim | `OrchestratedFkReAddTests.An_unselected_holder_gets_its_own_foreign_key_back_not_the_sources` |
-| Il feeder inbound camminava il lato SORGENTE, quindi una tabella solo-sorgente non spuntata raccoglieva un `ALTER TABLE … ADD CONSTRAINT` contro una tabella mai creata (Msg 4902). Ora cammina il lato TARGET e salta gli holder che lo script droppa | `..._source_only_table_left_unselected_gets_no_add_constraint`, `..._holder_the_script_drops_gets_no_add_constraint` |
-| Il secondo `DependencyResolver.Order` (S3) lanciava su un ciclo negli archi target | `DropOrderingTests.A_cycle_among_the_target_edges_falls_back_instead_of_throwing` |
-| `EmitIndexDelta` / `EmitFkAdds` accoppiavano i nomi ordinalmente | `CaseDriftKeyTests.An_unchanged_index_and_foreign_key_survive_a_name_case_difference` |
-| `SqlTypeFormatter` lasciava passare il nome di tipo non quotato | `IdentifierEscapingTests.A_column_type_name_is_quoted_whatever_punctuation_it_holds` |
-| `BracketedNames` non capiva il `]]` | `..._check_over_a_bracketed_column_is_dropped_before_that_column_is_retyped` |
-| La CLI usciva **1** su eccezione non gestita | `CompareCommandTests.Returns_exit_code_99_when_the_comparison_cannot_be_represented` (`f2cdcf8`) |
+| **`VwAiCronoStatiDocumenti` e `VwAiWriteAuditLog` risultano Identical ma i corpi differiscono** anche togliendo ogni whitespace (`CHECKSUM` sui testi ripuliti diverge). **Falso negativo: non deployiamo qualcosa che dovremmo.** Reader e `ModuleHeader` esclusi; serve il corpo integrale dei due lati per diagnosticare | Bloccato sui dati |
+| Dialogo di backfill (Msg 4901) | Motore pronto e testato, manca la UI |
+| Gate: su errore niente cambia, su successo ricompare automatico, più indicatore di stato ultima run con popup degli errori | Spec del proprietario accettata, non iniziato. Richiede prima di agganciare `SqlConnection.InfoMessage` e catturare `SqlException.Errors`: oggi teniamo solo `ex.Message`, per questo la app mostra 2 errori dove SSMS ne mostra cento |
+| `DATA_COMPRESSION` (tabella e indice) non è nel modello | Gap confermato su `WebhookDeliveries` |
+| `uses_ansi_nulls` / `uses_quoted_identifier` per-modulo non letti | Gap confermato su `SpClonaApplicationMenu`: corpo byte-identico, `QuotedId` 1 vs 0 |
+| Il gate non si azzera dopo un'esecuzione riuscita | Assorbito dal punto "Gate" sopra |
 
-### Guardie (`86a0f7e`)
+## Confronto con Redgate — dove siamo
 
-Il lint di `IdentifierQuotingTests` vedeva 2 forme su 6. Ora i pattern stanno in
-una tabella sola con il campione che deve accenderli, la camminata sui file
-esiste una volta invece di due, e il corpus arriva a
-`DbDelta.Providers.LiveDb`. Un terzo fact verifica che la scansione raggiunga
-davvero i file che dichiara — un refuso in un path svuota il corpus in
-silenzio. Le quattro evasioni sono state provate iniettandole in un file
-scansionato.
+Su 166 create e ~110 modifiche i due strumenti concordano su tutto tranne sei
+oggetti, **e mai nella direzione opposta**: DbDelta non segnala mai qualcosa che
+Redgate consideri identico. Dei sei: due erano artefatti di classificazione, uno
+è un caso in cui abbiamo ragione noi (FK droppata e ri-aggiunta identica come
+collaterale), due sono i gap di modello qui sopra, due sono le viste.
 
-`Source_side_edges_cannot_order_the_drop_and_the_fallback_gets_it_wrong` è stato
-cancellato: fissava il fallback rotto come comportamento atteso, e il test
-schemabound copre già il meccanismo.
-
-### Commenti e prodotto (`7743eab`)
-
-Sette doc falsi corretti (`DefaultCollation`, `TargetDependencies`,
-`ColumnsDroppedOrAltered`, `PublishComparison`, i tre in `ScriptGenerator`), più
-il banner di staleness: non afferma più che «le connessioni sono diverse», che è
-falso nel caso più frequente — un refresh fallito **sugli stessi endpoint**,
-perché `CompareAsync` azzera la coppia memorizzata prima di partire.
-`MainWindowViewModelTests` non aggira più `PublishComparison`.
-
-## Aperto — una cosa sola, ed è una scelta
-
-Il gate non si azzera dopo l'esecuzione riuscita dell'app: lo stesso script
-resta rieseguibile. È una scelta di prodotto (comoda o pericolosa a seconda del
-flusso), non un difetto. Lasciata com'è: cambiarla senza sapere quale dei due
-flussi il proprietario vuole sarebbe indovinare.
-
-## Le lezioni di questa ondata
-
-**Una guardia che vede solo le forme già scritte non guarda niente.** Il lint di
-S11 cercava due pattern perché due erano i pattern trovati quel giorno.
-`AppendLine("… [")`, `AppendFormat`, `string.Concat` e `"[" + x + "]"` gli
-passavano davanti. Quando scrivi un lint, il test che conta non è «passa sul
-repo pulito» ma «fallisce su ognuna delle forme che vieta», con la forma
-iniettata davvero in un file scansionato.
-
-**Un ordinamento nuovo è anche un modo nuovo di fallire.** S3 ha dato al DROP
-pass un ordine vero, e con esso un `DependencyCycleException` su input che prima
-venivano scriptati senza problemi. Il lato target di un server vivo può
-contenere cicli che il lato sorgente non può: sono stati creati in un ordine che
-il catalogo non mostra più. Un risolutore in più vuole sempre un fallback.
-
-**«La sorgente è autoritativa» vale solo su ciò che l'utente ha spuntato.** Due
-dei sette finding erano la stessa svista: passare la forma della sorgente a una
-tabella che lo script per il resto non tocca. La selezione non è un filtro sulla
-sola emissione DDL — decide di quali oggetti abbiamo il diritto di cambiare la
-forma.
+Fixture e procedura in `tests/Fixtures/Parity/README.md`.
 
 ## Vale ancora
 
-Tutto in `2026-07-30-handoff-criticals.md`: la sezione «Cosa NON fare», le
-trappole di processo e l'appendice del 2026-07-31.
+Tutto in `2026-07-30-handoff-criticals.md`: la sezione «Cosa NON fare» e le
+trappole di processo. Più queste, pagate oggi:
 
-E la trappola pagata di nuovo qui: **un probe di mutazione che non compila fa
-stampare a `dotnet test --no-build` il verde dell'assembly precedente.** Questa
-volta è stato un `IDE0046` su un `if` che la mutazione aveva reso semplificabile.
-Controlla `Errori: 0` prima di credere al risultato.
+- **Un probe di mutazione che non compila fa stampare a `dotnet test --no-build`
+  il verde dell'assembly precedente.** Controlla `Errori: 0` prima di credere al
+  risultato. `TreatWarningsAsErrors` è attivo, quindi un `if (false)` diventa
+  CS0162 e la mutazione non gira: usa mutazioni che compilano.
+- La suite completa in parallelo può far fallire in blocco i progetti
+  containerizzati per contesa su Docker. Rilancia il singolo progetto prima di
+  dare la colpa a una modifica.
+- L'app tiene bloccati i DLL: va chiusa prima di ogni build.
+- Per uno screenshot dell'app usa `PrintWindow` con flag 2, non
+  `CopyFromScreen`: da un processo in background `SetForegroundWindow` non ha
+  effetto e catturi la finestra sbagliata.
 
-Nuova, minore: la suite completa in parallelo può far fallire in blocco i
-progetti containerizzati per contesa su Docker subito dopo una serie di probe.
-Rilancia il singolo progetto prima di dare la colpa a una modifica.
+## Storico — i sedici finding del post-wave, chiusi in `21bf477..1ed46d8`
+
+Sette di correttezza (forma FK su tabella non selezionata, `ALTER TABLE` su
+tabella mai creata, ciclo negli archi target, accoppiamento ordinale di indici e
+FK, passthrough di `SqlTypeFormatter`, `]]` in `BracketedNames`, exit code della
+CLI), due di guardie (lint di quoting allargato da 2 a 6 forme più
+`DbDelta.Providers.LiveDb`; test morto cancellato), sette commenti falsi, più la
+riformulazione del banner di staleness. Ognuno con probe di mutazione eseguito.
