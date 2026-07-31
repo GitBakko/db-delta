@@ -2,11 +2,24 @@
 
 **Da leggere per primo in una sessione nuova.**
 
-- **HEAD:** `c9b152d` su `main`. **11 commit non pushati.**
-- **Test:** 631 verdi su 10 progetti (Compat esclusa, gira solo di notte).
+- **HEAD:** `f87b98a` su `main`, **origin sincronizzato**, working tree pulito.
+- **Test:** 632 verdi su 10 progetti (Compat esclusa, gira solo di notte).
 - **Gate formato:** `dotnet format DbDelta.sln --verify-no-changes` esce 0. Build senza avvisi.
-- **In working tree:** un ritocco alla checkbox select-all, in attesa di conferma
-  visiva del proprietario. Nient'altro.
+
+## Da dove ripartire
+
+**Il dialogo di backfill.** Il motore è già scritto e testato
+(`BackfillPreflight` + il parametro `backfillDefaults` di
+`ScriptGenerator.Generate`); manca solo la UI che raccoglie i valori. È il pezzo
+che sblocca lo smoke: finché non c'è, `Corrieri_TipiDocumentazioni` continua a
+fallire — correttamente, ma continua.
+
+Comportamento deciso dal proprietario: **avvisare, chiedere un default tecnico,
+applicarlo.** Quindi prima di generare o eseguire, se `BackfillPreflight.Scan`
+restituisce qualcosa, mostrare un dialogo con una riga per colonna (tabella,
+colonna, tipo, valore proposto da `SuggestedValue`, editabile) e passare la mappa
+a `Generate`. Va agganciato a **entrambi** i percorsi: «Genera script» e
+«Allinea destinazione».
 
 ## La cosa importante di oggi
 
