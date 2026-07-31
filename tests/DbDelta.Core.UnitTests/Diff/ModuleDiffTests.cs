@@ -179,4 +179,44 @@ public class ModuleDiffTests
             .Differences.Single(p => p.Identity.Kind == "Procedure")
             .Status.Should().Be(DifferenceStatus.Different);
     }
+
+    /// <summary>
+    /// The same view, one side re-indented and the other flattened onto one
+    /// line, is Identical.
+    /// </summary>
+    /// <remarks>
+    /// Taken from a real pair on 192.168.3.243 that Redgate reported as
+    /// modified and DbDelta did not, which read like a false negative until the
+    /// two definitions were put side by side and turned out to be the same
+    /// statement. SQL Server stores whatever text it was handed, so a module
+    /// re-deployed from a reformatted script drifts in whitespace without
+    /// changing meaning — and a diff that cannot be flattened by applying its
+    /// own script is a diff that never goes away. Deliberate since a58b4bb: if
+    /// this test is ever "fixed" to expect Different, that decision is being
+    /// reversed, not a bug repaired.
+    /// </remarks>
+    [Fact]
+    public void A_view_reformatted_but_not_changed_is_identical()
+    {
+        const string indented = """
+            CREATE VIEW dbo.VwAudit AS
+            SELECT
+                a.Id,
+                a.IdTenant,
+                CONVERT(NVARCHAR(36), a.BatchId) AS BatchId
+            FROM dbo.AuditLog a
+            LEFT JOIN dbo.Users u ON u.Id = a.IdUser;
+            """;
+        const string flattened =
+            "CREATE VIEW dbo.VwAudit AS SELECT a.Id, a.IdTenant, "
+            + "CONVERT(NVARCHAR(36), a.BatchId) AS BatchId "
+            + "FROM dbo.AuditLog a LEFT JOIN dbo.Users u ON u.Id = a.IdUser;";
+
+        Database a = Db(new View("dbo", "VwAudit", indented, IsEncrypted: false));
+        Database b = Db(new View("dbo", "VwAudit", flattened, IsEncrypted: false));
+
+        new ComparisonEngine().Compare(a, b, ComparisonOptions.None)
+            .Differences.Single(p => p.Identity.Kind == "View")
+            .Status.Should().Be(DifferenceStatus.Identical);
+    }
 }
