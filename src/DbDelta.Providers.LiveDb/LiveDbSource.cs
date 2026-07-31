@@ -27,6 +27,23 @@ public sealed class LiveDbSource : ISchemaSource
         try
         {
             await using SqlConnection connection = await ConnectionFactory.OpenAsync(_connectionString, cancellationToken);
+
+            // C3 — refuse to read a catalog we can only see part of. See
+            // ReadCatalogAccessAsync for why a partial read is worse than no
+            // read at all.
+            CatalogAccess access = await ReadCatalogAccessAsync(connection, cancellationToken);
+            if (access.MissingGrants() is { Count: > 0 } missing)
+            {
+                return Result<Database>.Failure(new Error(
+                    ErrorCode.InsufficientPermissions,
+                    $"The {DisplayName} endpoint is connected as '{access.PrincipalName}', which cannot read the "
+                    + $"whole catalog of database '{connection.Database}': {string.Join("; ", missing.Select(m => m.Lack))}. "
+                    + "Reading part of it is not safe — SQL Server simply omits what the principal cannot see, so "
+                    + "every hidden object would be reported as a difference and scripted as a DROP against the "
+                    + "other endpoint.",
+                    "Run, in that database: " + string.Join(" ", missing.Select(m => m.Grant))));
+            }
+
             // M13-PARITY.5 #32 — capture DB default collation up-front so the
             // emitter can skip COLLATE clauses on columns that match it.
             string? defaultCollation = await ReadDefaultCollationAsync(connection, cancellationToken);
@@ -120,6 +137,89 @@ public sealed class LiveDbSource : ISchemaSource
                 ErrorCode.CatalogQueryFailed,
                 ex.Message));
         }
+    }
+
+    /// <summary>
+    /// What this connection is allowed to read of the catalog, and who it is.
+    /// </summary>
+    private readonly record struct CatalogAccess(
+        bool SeesEveryObject,
+        bool ReadsDependencies,
+        string PrincipalName)
+    {
+        /// <summary>
+        /// The grants this principal is missing, each paired with the statement
+        /// that fixes it. Empty ⇒ the read is safe to attempt.
+        /// </summary>
+        public IReadOnlyList<(string Lack, string Grant)> MissingGrants()
+        {
+            List<(string Lack, string Grant)> missing = [];
+            if (!SeesEveryObject)
+            {
+                missing.Add((
+                    "it lacks VIEW DEFINITION, so sys.tables and its siblings hide every object it holds "
+                    + "no permission on",
+                    $"GRANT VIEW DEFINITION TO [{PrincipalName}];"));
+            }
+            if (!ReadsDependencies)
+            {
+                missing.Add((
+                    "it lacks SELECT on sys.sql_expression_dependencies, which by default is granted to "
+                    + "db_owner only, so the dependency edges that order the generated script would be "
+                    + "missing",
+                    $"GRANT SELECT ON sys.sql_expression_dependencies TO [{PrincipalName}];"));
+            }
+            return missing;
+        }
+    }
+
+    /// <summary>
+    /// C3 — asserts that this connection can read the whole catalog, before any
+    /// of it is read.
+    /// <para>
+    /// The sys.* views are filtered by metadata visibility: a principal only
+    /// sees rows for objects it holds some permission on. A least-privilege
+    /// source login with SELECT on 3 tables of 50 therefore reads a *subset* of
+    /// the schema, and the comparison engine classifies the 47 it cannot see as
+    /// target-only — i.e. the generated script drops them. Nothing downstream
+    /// can tell that apart from a genuine difference, so the read has to fail
+    /// here rather than succeed with a truncated catalog.
+    /// </para>
+    /// <para>
+    /// VIEW DEFINITION at database scope is the permission that lifts the
+    /// filter; the server-scope disjunct covers a login holding the covering
+    /// VIEW ANY DEFINITION instead. Both are evaluated by SQL Server itself, so
+    /// role membership and covering permissions are accounted for.
+    /// </para>
+    /// <para>
+    /// sys.sql_expression_dependencies is checked separately because it is not
+    /// covered by either: SELECT on it is granted to db_owner alone by default.
+    /// Without it <see cref="DependencyReader"/> throws, and were it made to
+    /// degrade to an empty edge list instead, the generator would silently fall
+    /// back to kind-then-alphabetical ordering — a quieter version of the same
+    /// "we only read part of it" failure.
+    /// </para>
+    /// </summary>
+    private static async Task<CatalogAccess> ReadCatalogAccessAsync(
+        SqlConnection connection,
+        CancellationToken ct)
+    {
+        const string sql = """
+            SELECT CASE WHEN HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'VIEW DEFINITION') = 1
+                          OR HAS_PERMS_BY_NAME(NULL, NULL, 'VIEW ANY DEFINITION') = 1
+                        THEN 1 ELSE 0 END AS SeesEveryObject,
+                   CASE WHEN HAS_PERMS_BY_NAME('sys.sql_expression_dependencies', 'OBJECT', 'SELECT') = 1
+                        THEN 1 ELSE 0 END AS ReadsDependencies,
+                   USER_NAME() AS PrincipalName;
+            """;
+        await using SqlCommand cmd = new(sql, connection);
+        await using SqlDataReader r = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        return await r.ReadAsync(ct).ConfigureAwait(false)
+            ? new CatalogAccess(
+                r.GetInt32(0) == 1,
+                r.GetInt32(1) == 1,
+                r.IsDBNull(2) ? "unknown" : r.GetString(2))
+            : new CatalogAccess(false, false, "unknown");
     }
 
     /// <summary>
