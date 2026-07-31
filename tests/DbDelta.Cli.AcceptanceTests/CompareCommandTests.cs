@@ -65,6 +65,54 @@ public class CompareCommandTests(CliFixture fixture)
         exitCode.Should().Be(ExpectedExitCodes.SuccessNoDifferences);
     }
 
+    /// <summary>
+    /// A comparison the engine refuses to represent: a case-SENSITIVE source
+    /// holding both <c>dbo.T</c> and <c>dbo.t</c>, against a case-insensitive
+    /// target that could never hold both. <c>MapByIdentity</c> throws rather
+    /// than pick one.
+    /// </summary>
+    /// <remarks>
+    /// System.CommandLine's default exception handler used to catch that and
+    /// return 1 — which §4.3 defines as "succeeded, differences found". A CI
+    /// pipeline read the crash as a normal drift report and moved on to a
+    /// script that was never generated. The exit code is the whole contract
+    /// here, so it is the whole assertion.
+    /// </remarks>
+    [Fact]
+    public async Task Returns_exit_code_99_when_the_comparison_cannot_be_represented()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        const string srcDb = "DbDeltaCsSrc";
+        const string tgtDb = "DbDeltaCiTgt";
+
+        await using (SqlConnection c = new(fixture.ConnectionString))
+        {
+            await c.OpenAsync(ct);
+            await using SqlCommand create = new(
+                $"IF DB_ID('{srcDb}') IS NULL CREATE DATABASE [{srcDb}] COLLATE Latin1_General_CS_AS;", c);
+            await create.ExecuteNonQueryAsync(ct);
+        }
+        await CreateDb(tgtDb, ct);
+
+        await using (SqlConnection c = new(ConnectionFor(srcDb)))
+        {
+            await c.OpenAsync(ct);
+            // Legal only because the database collation is case-sensitive.
+            await using SqlCommand tables = new(
+                "IF OBJECT_ID('dbo.T') IS NULL CREATE TABLE dbo.T(Id int);"
+                + "IF OBJECT_ID('dbo.t') IS NULL CREATE TABLE dbo.t(Id int);", c);
+            await tables.ExecuteNonQueryAsync(ct);
+        }
+
+        int exitCode = await RunCli(
+            ["compare", "--source", ConnectionFor(srcDb), "--target", ConnectionFor(tgtDb), "--format", "text"],
+            ct);
+
+        exitCode.Should().Be(
+            ExpectedExitCodes.InternalError,
+            "a crash must not be reported as the 'differences found' success code");
+    }
+
     private string ConnectionFor(string db) => CliRunner.ConnectionFor(fixture.ConnectionString, db);
     private Task CreateDb(string db, CancellationToken ct) => CliRunner.CreateDb(fixture.ConnectionString, db, ct);
     private Task CreateCustomerTable(string db, CancellationToken ct) => CliRunner.CreateCustomerTable(fixture.ConnectionString, db, ct);
