@@ -145,10 +145,92 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// </summary>
     internal void OnRowSelectionChanged()
     {
+        // A bulk toggle flips hundreds of rows in a loop; letting each one
+        // re-run the counters and both can-execute probes is quadratic and
+        // visibly janky on a real comparison. The bulk commands raise this
+        // once at the end instead.
+        if (_bulkUpdating) { return; }
         DeployCommand.NotifyCanExecuteChanged();
         ExecuteOnTargetCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(SelectionSummary));
         OnPropertyChanged(nameof(SelectedCount));
+        OnPropertyChanged(nameof(AllVisibleSelected));
+    }
+
+    private bool _bulkUpdating;
+
+    /// <summary>
+    /// The rows a bulk selection command acts on: everything the grid is
+    /// currently showing, and nothing else.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately filtered by <see cref="SearchPredicate"/> — the same
+    /// predicate the view uses — so "seleziona tutto" can never tick a row the
+    /// user cannot see. A hidden row silently added to the selection becomes a
+    /// statement in the deploy script that nobody reviewed. Identical rows are
+    /// excluded because they are not selectable at all.
+    /// </remarks>
+    private IEnumerable<DifferenceRowViewModel> VisibleSelectableRows() =>
+        Rows.Where(r => r.IsSelectable && SearchPredicate(r));
+
+    /// <summary>
+    /// Tri-state for the "select all" box: <see langword="true"/> when every
+    /// visible row is ticked, <see langword="false"/> when none is, and
+    /// <see langword="null"/> when only some are.
+    /// </summary>
+    public bool? AllVisibleSelected
+    {
+        get
+        {
+            int total = 0;
+            int selected = 0;
+            foreach (DifferenceRowViewModel row in VisibleSelectableRows())
+            {
+                total++;
+                if (row.IsSelected) { selected++; }
+            }
+            return total == 0 || selected == 0
+                ? false
+                : selected == total ? true : null;
+        }
+    }
+
+    /// <summary>
+    /// Ticks every visible row, or clears them when they are already all ticked.
+    /// </summary>
+    [RelayCommand]
+    private void ToggleAllVisible() =>
+        // Partially selected counts as "not all", so the first click completes
+        // the selection rather than throwing away what the user already ticked.
+        SetSelection(VisibleSelectableRows(), AllVisibleSelected != true);
+
+    /// <summary>
+    /// Ticks every row of one grid group, or clears them when they are already
+    /// all ticked. Bound from the group header, whose data context is the
+    /// group itself.
+    /// </summary>
+    [RelayCommand]
+    private void ToggleGroup(object? group)
+    {
+        if (group is not DataGridCollectionViewGroup g) { return; }
+        List<DifferenceRowViewModel> rows =
+            [.. g.Items.OfType<DifferenceRowViewModel>().Where(r => r.IsSelectable)];
+        if (rows.Count == 0) { return; }
+        SetSelection(rows, !rows.TrueForAll(r => r.IsSelected));
+    }
+
+    private void SetSelection(IEnumerable<DifferenceRowViewModel> rows, bool selected)
+    {
+        _bulkUpdating = true;
+        try
+        {
+            foreach (DifferenceRowViewModel row in rows) { row.IsSelected = selected; }
+        }
+        finally
+        {
+            _bulkUpdating = false;
+        }
+        OnRowSelectionChanged();
     }
 
     public AppStateViewModel AppState { get; }
@@ -463,7 +545,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    partial void OnSearchTextChanged(string value) => _rowsView?.Refresh();
+    partial void OnSearchTextChanged(string value)
+    {
+        _rowsView?.Refresh();
+        // The visible set just changed, so "all selected" may have flipped
+        // without a single row's IsSelected moving.
+        OnPropertyChanged(nameof(AllVisibleSelected));
+    }
 
     /// <summary>
     /// Rebuilds <see cref="Rows"/> from the latest comparison result.
@@ -511,6 +599,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(IdenticalsCount));
         OnPropertyChanged(nameof(TotalDiffsCount));
         OnPropertyChanged(nameof(SelectedCount));
+        OnPropertyChanged(nameof(AllVisibleSelected));
     }
 
     // ── New topbar commands ──────────────────────────────────────────────────

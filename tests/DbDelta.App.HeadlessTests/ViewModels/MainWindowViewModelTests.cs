@@ -226,4 +226,80 @@ public class MainWindowViewModelTests
         vm.OpenVersionHistoryCommand.CanExecute(null).Should().BeTrue();
         // Deliberately NOT executed — it would open a real browser.
     }
+
+    // ── Bulk selection ───────────────────────────────────────────────────────
+
+    [AvaloniaFact]
+    public void Toggle_all_selects_every_row_then_clears_them()
+    {
+        MainWindowViewModel vm = BuildVm(
+            MakeDto("Orders", "Different"),
+            MakeDto("Customers", "Different"));
+
+        vm.AllVisibleSelected.Should().Be(false, "nothing is ticked yet");
+
+        vm.ToggleAllVisibleCommand.Execute(null);
+        vm.SelectedCount.Should().Be(2);
+        vm.AllVisibleSelected.Should().Be(true);
+
+        vm.ToggleAllVisibleCommand.Execute(null);
+        vm.SelectedCount.Should().Be(0);
+        vm.AllVisibleSelected.Should().Be(false);
+    }
+
+    /// <summary>
+    /// A partial selection must COMPLETE on the next click, not throw away what
+    /// the user already ticked — the destructive reading of "toggle".
+    /// </summary>
+    [AvaloniaFact]
+    public void Toggle_all_completes_a_partial_selection_instead_of_clearing_it()
+    {
+        MainWindowViewModel vm = BuildVm(
+            MakeDto("Orders", "Different"),
+            MakeDto("Customers", "Different"));
+        vm.Rows[0].IsSelected = true;
+
+        vm.AllVisibleSelected.Should().BeNull("some but not all are ticked");
+
+        vm.ToggleAllVisibleCommand.Execute(null);
+
+        vm.SelectedCount.Should().Be(2);
+    }
+
+    /// <summary>
+    /// The whole point of scoping the bulk action to the visible rows: a row
+    /// filtered out of view must never be ticked behind the user's back, or it
+    /// becomes a statement in the deploy script nobody reviewed.
+    /// </summary>
+    [AvaloniaFact]
+    public void Toggle_all_ignores_rows_the_search_filter_hides()
+    {
+        MainWindowViewModel vm = BuildVm(
+            MakeDto("Orders", "Different"),
+            MakeDto("Customers", "Different"));
+        vm.SearchText = "ord";
+
+        vm.ToggleAllVisibleCommand.Execute(null);
+
+        vm.SelectedCount.Should().Be(1, "only the row matching the search may be ticked");
+        vm.Rows.Single(r => r.ObjectName == "Customers").IsSelected.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// Identical rows carry no DDL and are not selectable, so a bulk action must
+    /// leave them alone rather than inflate the count with rows the grid will
+    /// not even show a checkbox for.
+    /// </summary>
+    [AvaloniaFact]
+    public void Toggle_all_leaves_identical_rows_alone()
+    {
+        MainWindowViewModel vm = BuildVm(
+            MakeDto("Orders", "Different"),
+            MakeDto("Unchanged", "Identical"));
+
+        vm.ToggleAllVisibleCommand.Execute(null);
+
+        vm.SelectedCount.Should().Be(1);
+        vm.Rows.Single(r => r.ObjectName == "Unchanged").IsSelected.Should().BeFalse();
+    }
 }

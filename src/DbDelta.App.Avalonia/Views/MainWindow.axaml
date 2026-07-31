@@ -388,8 +388,22 @@
                 BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="0,0,0,1"
                 Padding="12,8">
-          <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
-            <TextBlock Grid.Column="0"
+          <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto">
+            <!-- Select / deselect every VISIBLE difference. Acts on what the
+                 search box and the filter leave on screen, never on hidden
+                 rows: a row silently added to the selection becomes a statement
+                 in the deploy script that nobody reviewed. -->
+            <CheckBox Grid.Column="0"
+                      Height="32"
+                      MinWidth="0"
+                      Margin="0,0,10,0"
+                      IsThreeState="True"
+                      VerticalAlignment="Center"
+                      IsChecked="{Binding AllVisibleSelected, Mode=OneWay}"
+                      Command="{Binding ToggleAllVisibleCommand}"
+                      ToolTip.Tip="Seleziona o deseleziona tutte le differenze visibili" />
+
+            <TextBlock Grid.Column="1"
                        Text="{Binding SelectionSummary}"
                        FontSize="12"
                        Foreground="{StaticResource FgMutedBrush}"
@@ -397,7 +411,7 @@
                        Margin="0,0,12,0" />
 
             <!-- Status badges: pill with status colour + count, white text -->
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
               <Border Background="#0064C8" CornerRadius="10" Padding="8,2"
                       IsVisible="{Binding DiffsModifiedCount, Converter={x:Static v:Converters.IsPositive}}">
                 <StackPanel Orientation="Horizontal" Spacing="4">
@@ -436,7 +450,7 @@
               </Border>
             </StackPanel>
 
-            <Button Grid.Column="3" Classes="ghost-emerald"
+            <Button Grid.Column="4" Classes="ghost-emerald"
                     Command="{Binding DeployCommand}"
                     CommandParameter="{Binding $parent[Window]}"
                     ToolTip.Tip="Genera script SQL di allineamento per le righe selezionate"
@@ -450,7 +464,7 @@
                 <TextBlock Text="Genera script" VerticalAlignment="Center" FontSize="12" />
               </StackPanel>
             </Button>
-            <Button Grid.Column="4" Classes="primary"
+            <Button Grid.Column="5" Classes="primary"
                     Command="{Binding ExecuteOnTargetCommand}"
                     CommandParameter="{Binding $parent[Window]}"
                     ToolTip.Tip="Esegui lo script di allineamento direttamente sulla destinazione">

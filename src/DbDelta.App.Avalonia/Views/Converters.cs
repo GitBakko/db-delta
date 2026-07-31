@@ -1,9 +1,49 @@
+using System.Globalization;
 using Avalonia;
+using Avalonia.Collections;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
+using DbDelta.App.ViewModels;
 using DbDelta.Core.Diff;
 
 namespace DbDelta.App.Views;
+
+/// <summary>
+/// Tri-state for a grid group's "select all" box: <see langword="true"/> when
+/// every selectable row in the group is ticked, <see langword="false"/> when
+/// none is, <see langword="null"/> when only some are.
+/// </summary>
+/// <remarks>
+/// A group header's data context is the <see cref="DataGridCollectionViewGroup"/>,
+/// which raises nothing when a row inside it is ticked — so binding to the group
+/// alone would paint the box once and then let it go stale. The second value is
+/// the view-model's selected-row count, which changes on every tick: it is not
+/// read, it exists to make the binding re-evaluate. Removing it silently freezes
+/// every group header at whatever it showed when the grid was built.
+/// </remarks>
+public sealed class GroupSelectionStateConverter : IMultiValueConverter
+{
+    public object? Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        if (values.Count == 0 || values[0] is not DataGridCollectionViewGroup group)
+        {
+            return false;
+        }
+
+        int total = 0;
+        int selected = 0;
+        foreach (object? item in group.Items)
+        {
+            if (item is not DifferenceRowViewModel row || !row.IsSelectable) { continue; }
+            total++;
+            if (row.IsSelected) { selected++; }
+        }
+        return total == 0 || selected == 0
+            ? false
+            : selected == total ? true : (bool?)null;
+    }
+}
 
 /// <summary>
 /// Static value converters used by the result grid. Centralised here so views
@@ -11,6 +51,9 @@ namespace DbDelta.App.Views;
 /// </summary>
 public static class Converters
 {
+    /// <summary>Shared instance of <see cref="GroupSelectionStateConverter"/>.</summary>
+    public static readonly IMultiValueConverter GroupSelectionState = new GroupSelectionStateConverter();
+
     /// <summary>
     /// Maps a <c>DifferenceDto.Status</c> string ("OnlyInA" / "OnlyInB" /
     /// "Different" / "Identical") to the matching diff-strip brush from
@@ -74,7 +117,7 @@ public static class Converters
         new FuncValueConverter<DateTime, string?>(static utc =>
             utc.ToLocalTime().ToString(
                 "dd/MM/yyyy HH:mm",
-                System.Globalization.CultureInfo.GetCultureInfo("it-IT")));
+                CultureInfo.GetCultureInfo("it-IT")));
 
     /// <summary>
     /// Converts a hex colour string (e.g. <c>"#0054BD"</c>) to a fresh
