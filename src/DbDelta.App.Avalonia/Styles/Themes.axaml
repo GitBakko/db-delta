@@ -47,6 +47,10 @@
             <Color x:Key="Success">#007339</Color>
             <Color x:Key="SuccessSoft">#DAF3E1</Color>
             <Color x:Key="SuccessFg">#005226</Color>
+            <!-- Fill for a SOLID success band carrying FgOnAccent text. Same as
+                 Success in light; the dark ramp lightens Success and needs its
+                 own deeper shade — see the dark entry. -->
+            <Color x:Key="SuccessStrong">#007339</Color>
 
             <Color x:Key="Warning">#AE5C00</Color>
             <Color x:Key="WarningSoft">#FDECD5</Color>
@@ -60,6 +64,8 @@
             <Color x:Key="Danger">#B31220</Color>
             <Color x:Key="DangerSoft">#FFE4E1</Color>
             <Color x:Key="DangerFg">#850513</Color>
+            <!-- Fill for a SOLID danger band carrying FgOnAccent text. -->
+            <Color x:Key="DangerStrong">#B31220</Color>
 
             <!-- Results-grid row hover / selected tints (per status). Used by
                  the DataGrid :pointerover / :selected style on Rectangle#
@@ -116,6 +122,9 @@
             <Color x:Key="Success">#4DC07A</Color>
             <Color x:Key="SuccessSoft">#102B1B</Color>
             <Color x:Key="SuccessFg">#94D9B0</Color>
+            <!-- NOT Success: the dark ramp lightens it to read as an accent on a
+                 near-black page, which leaves white text on it around 2:1. -->
+            <Color x:Key="SuccessStrong">#0F6B3C</Color>
 
             <Color x:Key="Warning">#D89958</Color>
             <Color x:Key="WarningSoft">#2C1F11</Color>
@@ -129,6 +138,8 @@
             <Color x:Key="Danger">#E55C7D</Color>
             <Color x:Key="DangerSoft">#3A1822</Color>
             <Color x:Key="DangerFg">#E89AAA</Color>
+            <!-- NOT Danger: white on the dark ramp's crimson measures 3.1:1. -->
+            <Color x:Key="DangerStrong">#9E1526</Color>
 
             <!-- Dark-mode row hover / selected tints. Low-luminance status
                  washes so the white text in dark mode stays legible (the
@@ -188,6 +199,7 @@
     <SolidColorBrush x:Key="SuccessBrush"         Color="{DynamicResource Success}" />
     <SolidColorBrush x:Key="SuccessSoftBrush"     Color="{DynamicResource SuccessSoft}" />
     <SolidColorBrush x:Key="SuccessFgBrush"       Color="{DynamicResource SuccessFg}" />
+    <SolidColorBrush x:Key="SuccessStrongBrush"   Color="{DynamicResource SuccessStrong}" />
 
     <SolidColorBrush x:Key="WarningBrush"         Color="{DynamicResource Warning}" />
     <SolidColorBrush x:Key="WarningSoftBrush"     Color="{DynamicResource WarningSoft}" />
@@ -197,6 +209,7 @@
     <SolidColorBrush x:Key="DangerBrush"          Color="{DynamicResource Danger}" />
     <SolidColorBrush x:Key="DangerSoftBrush"      Color="{DynamicResource DangerSoft}" />
     <SolidColorBrush x:Key="DangerFgBrush"        Color="{DynamicResource DangerFg}" />
+    <SolidColorBrush x:Key="DangerStrongBrush"    Color="{DynamicResource DangerStrong}" />
 
     <!-- Row status hover / selected brushes (theme-reactive) -->
     <SolidColorBrush x:Key="RowModifiedHoverBrush"      Color="{DynamicResource RowModifiedHover}" />

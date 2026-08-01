@@ -14,18 +14,23 @@
   <StackPanel Margin="24" Spacing="14">
 
     <!-- Alert header band -->
-    <Border Background="{StaticResource DangerBrush}" CornerRadius="6" Padding="14,10">
+    <!-- DangerStrong, not Danger: the dark ramp lightens Danger so it reads as
+         an accent on a near-black page, and white text on THAT measures 3.1:1.
+         Text and icon take FgOnAccent rather than a hardcoded White, so the
+         design system decides what "on an accent" means. -->
+    <Border x:Name="DangerBand"
+            Background="{StaticResource DangerStrongBrush}" CornerRadius="6" Padding="14,10">
       <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
         <Path Width="20" Height="20" Stretch="Uniform" VerticalAlignment="Center"
-              Fill="White"
+              Fill="{StaticResource FgOnAccentBrush}"
               Data="M 12,2 L 22,20 L 2,20 Z M 12,9 L 12,14 M 12,16 L 12,18" />
         <StackPanel Spacing="2">
           <TextBlock Text="Esecuzione diretta sul database di destinazione"
                      FontWeight="SemiBold" FontSize="14"
-                     Foreground="White" />
+                     Foreground="{StaticResource FgOnAccentBrush}" />
           <TextBlock Text="Lo script di allineamento verrà eseguito immediatamente sulla destinazione."
-                     FontSize="11"
-                     Foreground="#E8FFFFFF" />
+                     FontSize="12"
+                     Foreground="{StaticResource FgOnAccentBrush}" />
         </StackPanel>
       </StackPanel>
     </Border>

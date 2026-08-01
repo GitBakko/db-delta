@@ -14,9 +14,13 @@
   <Grid Margin="24" RowDefinitions="Auto,14,*,14,Auto">
 
     <!-- Verdict band. Success and failure differ by fill only; both carry
-         FgOnAccent, the design system's colour for content on an accent. -->
+         FgOnAccent, the design system's colour for content on an accent — over
+         the *Strong* fills, because the dark ramp lightens Success and Danger to
+         read as accents on a near-black page and near-white text on those
+         measures around 2:1. -->
     <Border Grid.Row="0" CornerRadius="6" Padding="14,10"
-            Background="{StaticResource SuccessBrush}"
+            x:Name="SuccessBand"
+            Background="{StaticResource SuccessStrongBrush}"
             IsVisible="{Binding Succeeded}">
       <StackPanel Spacing="2">
         <TextBlock Text="{Binding Headline}" FontWeight="SemiBold" FontSize="14"
@@ -26,7 +30,8 @@
       </StackPanel>
     </Border>
     <Border Grid.Row="0" CornerRadius="6" Padding="14,10"
-            Background="{StaticResource DangerBrush}"
+            x:Name="DangerBand"
+            Background="{StaticResource DangerStrongBrush}"
             IsVisible="{Binding !Succeeded}">
       <StackPanel Spacing="2">
         <TextBlock Text="{Binding Headline}" FontWeight="SemiBold" FontSize="14"
