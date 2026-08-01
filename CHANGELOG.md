@@ -8,6 +8,119 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 (Empty — next for v1.0.0 final: code signing, public alpha announcement.)
 
+## [1.0.0-rc5] — 2026-08-01 — fifth release candidate
+
+The first release candidate to have deployed a real database end to end and
+been re-compared to zero differences: 279 objects from one live database to
+another, then a fresh comparison finding nothing left to do. Everything below
+came out of that exercise and out of a full adversarial review of the codebase.
+
+### Added
+
+- **A dialog that asks for a value instead of failing on the rows that have
+  none.** A `NOT NULL` column with no default cannot be added to a table that
+  already has rows — no tool can, without inventing a value. Before generating
+  or executing, DbDelta now lists every such column (table, column, type) with
+  a suggested value of the right shape, and lets you edit it. The value seeds
+  the existing rows through a temporary constraint that the next statement
+  drops, so the column ends up exactly as the source declares it. Cancelling
+  cancels the whole action: without the values the script would die on the
+  first populated table anyway.
+- **Everything the server said, one click away.** Errors used to be reduced to
+  a single message. DbDelta now keeps every error SQL Server raised *and* every
+  `PRINT` the script emitted — the running commentary of which object was being
+  worked on when something failed. A pill in the status bar carries the verdict
+  and the error count for the last run; opening it shows the full transcript,
+  headed the way SSMS heads one, with a copy button.
+- **A successful run refreshes the results it just invalidated.** The grid used
+  to keep showing the objects that had just been aligned as different, with
+  their checkboxes still ticked. On failure nothing is touched, deliberately:
+  the script rolls itself back, so the rows still describe the target and the
+  selection is what you retry.
+- **Select or deselect every visible difference, and every group.** Scoped to
+  what the search box leaves on screen: a row added to the selection behind
+  your back becomes a statement in the deploy script nobody reviewed.
+- **Schemas are compared and deployed.** A source-only schema was never
+  reported and no `CREATE SCHEMA` was ever emitted, so any object living in a
+  schema the target lacked failed on its first statement.
+- **Per-module `QUOTED_IDENTIFIER` and `ANSI_NULLS`.** These are compiled into
+  a module, not taken from the session that runs it: with `QUOTED_IDENTIFIER`
+  off a `"quoted"` token is a string and not an identifier. Two byte-identical
+  definitions compiled under different settings are different objects, and are
+  now reported and deployed as such.
+- **`DATA_COMPRESSION`, for a table's own rows and for each index.** They are
+  independent settings on the server and routinely differ on the same table.
+  A change is a `REBUILD` rather than a drop and re-create.
+- **A metadata-visibility preflight.** A login that can see object names but
+  not their definitions produced a comparison that silently understated the
+  differences. DbDelta now refuses the load and says which permission is
+  missing.
+
+### Changed
+
+- **A deploy gets ten minutes per batch, not sixty seconds.** An index rebuild
+  or a large `CREATE INDEX` passes a minute without anything being wrong; the
+  old limit aborted the batch and rolled back everything before it. Not
+  unlimited — that belongs with a cancel button, which the execution dialog
+  does not yet have. The CLI's `dbdelta apply --command-timeout 0` is
+  unaffected: a console has Ctrl-C.
+- **Results stop being actionable once they stop describing the endpoints.**
+  Repoint a connection, or refresh and have it fail, and the buttons that would
+  deploy those rows are disabled with a banner saying why — rather than
+  offering to execute a script computed against a different server.
+
+### Fixed
+
+- **A module deployed from its own script now compares identical.** After a
+  clean deploy, 33 modules still reported Different, and re-generating the
+  script produced byte-for-byte the text already applied — a difference no
+  operator could remove. The emitter tested whether the last *character* of a
+  body was a semicolon, so a definition ending `";\n"` (most of them) had a
+  second one appended, and the comparison stripped only one of the two.
+- **A constraint over a column added in the same batch.** SQL Server compiles a
+  whole batch before running a line of it, so a `CHECK` over a column the same
+  batch adds cannot resolve that column. This broke *every* deploy that added a
+  column plus a constraint on it.
+- **Object pairing follows the target's collation.** On a case-insensitive
+  target, `dbo.Clienti` and `dbo.CLIENTI` are the same object; pairing them
+  ordinally produced a `DROP TABLE` for a table the same script was about to
+  create.
+- **An identity rebuild no longer destroys indexes, triggers and foreign
+  keys.** The rebuild re-emits the complete source-side set, including objects
+  that are identical on both sides and therefore appear in no delta.
+- **Foreign keys are dropped before anything they block.** Dropping a table or
+  retyping a column is blocked by an inbound key; those drops now happen in one
+  pass up front, covering keys held by tables that are not part of the change.
+- **Indexes, keys and CHECK constraints that depend on a column are cleared
+  before it is retyped or dropped, and restored afterwards** — including ones
+  identical on both sides, which no delta would have re-created.
+- **A DEFAULT-only change no longer drops the primary key and every index on
+  the column.**
+- **Constraint names are schema-scoped, index names are table-scoped.** Keying
+  them database-wide dropped the wrong one, or skipped a drop entirely, on any
+  database that reuses a name across schemas or tables.
+- **The deploy script header no longer echoes a password**, and no longer drops
+  permissions the user explicitly selected.
+- **Named DEFAULT constraints emit inline on their column**, which is the only
+  form `CREATE TABLE` accepts.
+- **Database-scoped permissions emit without an `ON` clause**, which is not
+  valid T-SQL.
+- **Triggers whose parent is a view are read.** Every `INSTEAD OF` trigger was
+  invisible to the comparison.
+- **The application starts with an unreadable settings file** instead of
+  failing at launch, while a save that cannot be completed still reports
+  failure rather than overwriting saved connections.
+- **A rollback is reported only when it actually happened.** "Nothing was
+  applied" and "we could not confirm" are different facts, and the old result
+  claimed the first for both.
+- **Errors and action outcomes are shown in the shell.** Two different status
+  fields existed and the one carrying deploy and save outcomes was displayed
+  nowhere.
+- **The select-all checkbox in the grid header is visible and clickable** —
+  it had zero width, then a clipped glyph, in three successive shapes.
+- **An index's `INCLUDE` list comes back in the index's own order**, so two
+  reads of an unchanged index no longer disagree and rebuild it.
+
 ## [1.0.0-rc4] — 2026-06-05 — fourth release candidate
 
 ### Added
