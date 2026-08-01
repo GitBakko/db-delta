@@ -27,7 +27,8 @@ public sealed class FunctionScriptEmitter
     {
         return f.IsEncrypted || f.Body is null
             ? $"-- WARNING: function {Sql.Q(f.Schema, f.Name)} is encrypted (WITH ENCRYPTION); body cannot be scripted."
-            : ModuleHeader.ToCreateOrAlterScript(f.Body, f.Schema, f.Name);
+            : ModuleHeader.ToCreateOrAlterScript(
+                f.Body, f.Schema, f.Name, f.UsesQuotedIdentifier, f.UsesAnsiNulls);
     }
 
     private static string EmitDrop(Function f) =>

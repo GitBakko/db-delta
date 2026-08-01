@@ -32,7 +32,8 @@ public sealed class ViewScriptEmitter
     {
         return v.IsEncrypted || v.Body is null
             ? $"-- WARNING: view {Sql.Q(v.Schema, v.Name)} is encrypted (WITH ENCRYPTION); body cannot be scripted."
-            : ModuleHeader.ToCreateOrAlterScript(v.Body, v.Schema, v.Name);
+            : ModuleHeader.ToCreateOrAlterScript(
+                v.Body, v.Schema, v.Name, v.UsesQuotedIdentifier, v.UsesAnsiNulls);
     }
 
     private static string EmitDrop(View v) =>

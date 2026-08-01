@@ -219,4 +219,45 @@ public class ModuleDiffTests
             .Differences.Single(p => p.Identity.Kind == "View")
             .Status.Should().Be(DifferenceStatus.Identical);
     }
+
+    /// <summary>
+    /// The mirror image of the test above, and the other half of the same parity
+    /// run: SpClonaApplicationMenu had a byte-identical body on both sides and
+    /// QUOTED_IDENTIFIER 1 on one, 0 on the other. We called it identical.
+    /// </summary>
+    /// <remarks>
+    /// The setting is compiled INTO the module, not taken from the session that
+    /// runs it. With QUOTED_IDENTIFIER OFF a "quoted" token is a string literal
+    /// rather than an identifier; with ANSI_NULLS OFF, <c>= NULL</c> matches NULLs
+    /// instead of yielding UNKNOWN. Same text, different object.
+    /// </remarks>
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    public void A_module_compiled_under_different_set_options_is_different(
+        bool quotedIdentifier, bool ansiNulls)
+    {
+        const string body = "CREATE VIEW dbo.v AS SELECT 1 AS Id";
+        Database a = Db(new View("dbo", "v", body, IsEncrypted: false));
+        Database b = Db(new View(
+            "dbo", "v", body, IsEncrypted: false,
+            UsesQuotedIdentifier: quotedIdentifier, UsesAnsiNulls: ansiNulls));
+
+        new ComparisonEngine().Compare(a, b, ComparisonOptions.None)
+            .Differences.Single(p => p.Identity.Kind == "View")
+            .Status.Should().Be(DifferenceStatus.Different);
+    }
+
+    [Fact]
+    public void Matching_set_options_leave_an_identical_module_identical()
+    {
+        const string body = "CREATE VIEW dbo.v AS SELECT 1 AS Id";
+        Database a = Db(new View("dbo", "v", body, IsEncrypted: false, UsesQuotedIdentifier: false));
+        Database b = Db(new View("dbo", "v", body, IsEncrypted: false, UsesQuotedIdentifier: false));
+
+        new ComparisonEngine().Compare(a, b, ComparisonOptions.None)
+            .Differences.Single(p => p.Identity.Kind == "View")
+            .Status.Should().Be(DifferenceStatus.Identical);
+    }
 }

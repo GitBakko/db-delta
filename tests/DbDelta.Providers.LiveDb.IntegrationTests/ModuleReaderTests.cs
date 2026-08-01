@@ -71,6 +71,50 @@ public class ModuleReaderTests(LiveDbFixture fixture)
         p.Body.Should().BeNull();
     }
 
+    /// <summary>
+    /// The settings a module was compiled under, read back from a real catalog.
+    /// A default is not good enough here: every module DbDelta had ever read was
+    /// assumed ON, so a procedure created under OFF compared as identical to one
+    /// created under ON and deployed as the wrong object.
+    /// </summary>
+    /// <remarks>
+    /// Seeded as separate batches on one connection, NOT through <c>EXEC</c>:
+    /// dynamic SQL runs with QUOTED_IDENTIFIER ON whatever the caller set, so a
+    /// module created that way always records ON and the test would pass on a
+    /// reader that had never looked.
+    /// </remarks>
+    [Fact]
+    public async Task LiveDbSource_reads_the_set_options_a_module_was_compiled_under()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        string conn = await CreateAndSeedAsync("DbDeltaModuleSetOptions", "SELECT 1;", ct);
+        await using (SqlConnection seed = new(conn))
+        {
+            await seed.OpenAsync(ct);
+            await ExecAsync(seed, "SET QUOTED_IDENTIFIER OFF; SET ANSI_NULLS OFF;", ct);
+            await ExecAsync(seed, "CREATE PROCEDURE dbo.uspOldSchool AS SELECT 1 AS Id;", ct);
+            await ExecAsync(seed, "SET QUOTED_IDENTIFIER ON; SET ANSI_NULLS ON;", ct);
+            await ExecAsync(seed, "CREATE PROCEDURE dbo.uspModern AS SELECT 1 AS Id;", ct);
+            await ExecAsync(seed, "CREATE VIEW dbo.vModern AS SELECT 1 AS Id;", ct);
+        }
+
+        Result<Database> result = await new LiveDbSource(conn).LoadAsync(ct);
+        result.IsSuccess.Should().BeTrue(result.Error?.Message);
+        Database db = result.Value!;
+
+        StoredProcedure old = db.Procedures.Single(p => p.Name == "uspOldSchool");
+        old.UsesQuotedIdentifier.Should().BeFalse();
+        old.UsesAnsiNulls.Should().BeFalse();
+
+        StoredProcedure modern = db.Procedures.Single(p => p.Name == "uspModern");
+        modern.UsesQuotedIdentifier.Should().BeTrue();
+        modern.UsesAnsiNulls.Should().BeTrue();
+
+        View view = db.Views.Single(v => v.Name == "vModern");
+        view.UsesQuotedIdentifier.Should().BeTrue();
+        view.UsesAnsiNulls.Should().BeTrue();
+    }
+
     private async Task<string> CreateAndSeedAsync(string dbName, string seedSql, CancellationToken ct)
     {
         await using (SqlConnection master = new(fixture.ConnectionString))

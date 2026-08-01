@@ -24,7 +24,9 @@ internal sealed class ModuleReader
         SELECT s.name AS SchemaName,
                v.name AS Name,
                sm.definition AS Body,
-               v.modify_date AS ModifyDate
+               v.modify_date AS ModifyDate,
+               CAST(ISNULL(sm.uses_quoted_identifier, 1) AS BIT) AS UsesQuotedIdentifier,
+               CAST(ISNULL(sm.uses_ansi_nulls, 1) AS BIT)        AS UsesAnsiNulls
         FROM sys.views AS v
         INNER JOIN sys.schemas AS s ON s.schema_id = v.schema_id
         LEFT JOIN sys.sql_modules AS sm ON sm.object_id = v.object_id
@@ -36,7 +38,9 @@ internal sealed class ModuleReader
         SELECT s.name AS SchemaName,
                p.name AS Name,
                sm.definition AS Body,
-               p.modify_date AS ModifyDate
+               p.modify_date AS ModifyDate,
+               CAST(ISNULL(sm.uses_quoted_identifier, 1) AS BIT) AS UsesQuotedIdentifier,
+               CAST(ISNULL(sm.uses_ansi_nulls, 1) AS BIT)        AS UsesAnsiNulls
         FROM sys.procedures AS p
         INNER JOIN sys.schemas AS s ON s.schema_id = p.schema_id
         LEFT JOIN sys.sql_modules AS sm ON sm.object_id = p.object_id
@@ -64,7 +68,10 @@ internal sealed class ModuleReader
             // sys.objects.modify_date is SERVER-local time — keep it Unspecified and
             // display it verbatim (the user reasons in the DB server's clock).
             DateTime? modifyDate = r.IsDBNull(3) ? null : r.GetDateTime(3);
-            views.Add(new View(schema, name, body, encrypted, modifyDate));
+            views.Add(new View(
+                schema, name, body, encrypted, modifyDate,
+                UsesQuotedIdentifier: r.GetBoolean(4),
+                UsesAnsiNulls: r.GetBoolean(5)));
         }
         return views;
     }
@@ -88,7 +95,10 @@ internal sealed class ModuleReader
             // sys.objects.modify_date is SERVER-local time — keep it Unspecified and
             // display it verbatim (the user reasons in the DB server's clock).
             DateTime? modifyDate = r.IsDBNull(3) ? null : r.GetDateTime(3);
-            procs.Add(new StoredProcedure(schema, name, body, encrypted, modifyDate));
+            procs.Add(new StoredProcedure(
+                schema, name, body, encrypted, modifyDate,
+                UsesQuotedIdentifier: r.GetBoolean(4),
+                UsesAnsiNulls: r.GetBoolean(5)));
         }
         return procs;
     }
@@ -98,7 +108,9 @@ internal sealed class ModuleReader
                o.name AS Name,
                sm.definition AS Body,
                o.type AS RawType,
-               o.modify_date AS ModifyDate
+               o.modify_date AS ModifyDate,
+               CAST(ISNULL(sm.uses_quoted_identifier, 1) AS BIT) AS UsesQuotedIdentifier,
+               CAST(ISNULL(sm.uses_ansi_nulls, 1) AS BIT)        AS UsesAnsiNulls
         FROM sys.objects AS o
         INNER JOIN sys.schemas AS s ON s.schema_id = o.schema_id
         LEFT JOIN sys.sql_modules AS sm ON sm.object_id = o.object_id
@@ -135,7 +147,10 @@ internal sealed class ModuleReader
             bool encrypted = body is null;
             // Server-local time, displayed verbatim — see ReadViewsAsync.
             DateTime? modifyDate = r.IsDBNull(4) ? null : r.GetDateTime(4);
-            functions.Add(new Function(schema, name, body, encrypted, kind, modifyDate));
+            functions.Add(new Function(
+                schema, name, body, encrypted, kind, modifyDate,
+                UsesQuotedIdentifier: r.GetBoolean(5),
+                UsesAnsiNulls: r.GetBoolean(6)));
         }
         return functions;
     }
@@ -148,7 +163,9 @@ internal sealed class ModuleReader
                po.name AS ParentTable,
                CAST(tr.is_disabled AS BIT)             AS IsDisabled,
                CAST(tr.is_not_for_replication AS BIT)  AS IsNotForReplication,
-               o.modify_date AS ModifyDate
+               o.modify_date AS ModifyDate,
+               CAST(ISNULL(sm.uses_quoted_identifier, 1) AS BIT) AS UsesQuotedIdentifier,
+               CAST(ISNULL(sm.uses_ansi_nulls, 1) AS BIT)        AS UsesAnsiNulls
         FROM sys.triggers AS tr
         INNER JOIN sys.objects AS o ON o.object_id = tr.object_id
         INNER JOIN sys.schemas AS ps ON ps.schema_id = o.schema_id
@@ -196,7 +213,9 @@ internal sealed class ModuleReader
                 ParentTable: parentTable,
                 IsDisabled: isDisabled,
                 IsNotForReplication: isNfr,
-                ModifyDate: modifyDate));
+                ModifyDate: modifyDate,
+                UsesQuotedIdentifier: r.GetBoolean(8),
+                UsesAnsiNulls: r.GetBoolean(9)));
         }
         return triggers;
     }

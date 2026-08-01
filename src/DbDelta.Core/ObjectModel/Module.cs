@@ -19,7 +19,27 @@ namespace DbDelta.Core.ObjectModel;
 /// clock</b> (Kind = Unspecified), displayed verbatim, never timezone-converted.
 /// <c>null</c> when the value was not available from the data source.
 /// </param>
-public abstract record Module(string Schema, string Name, string? Body, bool IsEncrypted, DateTime? ModifyDate = null)
+/// <param name="UsesQuotedIdentifier">
+/// The <c>QUOTED_IDENTIFIER</c> setting captured when the module was created
+/// (<c>sys.sql_modules.uses_quoted_identifier</c>). It is part of the module, not
+/// of the session running it: with it OFF a double-quoted token is a string
+/// literal rather than an identifier, so the same body means two different
+/// things. Two modules whose definitions are byte-identical but whose flags
+/// differ are genuinely different objects.
+/// </param>
+/// <param name="UsesAnsiNulls">
+/// Likewise for <c>ANSI_NULLS</c>: with it OFF, <c>= NULL</c> matches NULLs
+/// instead of yielding UNKNOWN, which silently changes what a WHERE clause
+/// returns.
+/// </param>
+public abstract record Module(
+    string Schema,
+    string Name,
+    string? Body,
+    bool IsEncrypted,
+    DateTime? ModifyDate = null,
+    bool UsesQuotedIdentifier = true,
+    bool UsesAnsiNulls = true)
 {
     /// <summary>The discriminator used in <see cref="ObjectIdentity"/> for this module kind.</summary>
     public abstract string Kind { get; }

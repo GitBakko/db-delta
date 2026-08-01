@@ -18,8 +18,10 @@ public sealed record Function(
     string? Body,
     bool IsEncrypted,
     FunctionKind FunctionKind,
-    DateTime? ModifyDate = null)
-    : Module(Schema, Name, Body, IsEncrypted, ModifyDate)
+    DateTime? ModifyDate = null,
+    bool UsesQuotedIdentifier = true,
+    bool UsesAnsiNulls = true)
+    : Module(Schema, Name, Body, IsEncrypted, ModifyDate, UsesQuotedIdentifier, UsesAnsiNulls)
 {
     public override string Kind => "Function";
 }

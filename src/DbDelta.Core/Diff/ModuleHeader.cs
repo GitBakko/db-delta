@@ -130,6 +130,40 @@ public static partial class ModuleHeader
     }
 
     /// <summary>
+    /// Same, wrapped in the SET options the module was compiled under when they
+    /// are not the script's own.
+    /// </summary>
+    /// <remarks>
+    /// The settings in force at CREATE time are baked into the module and govern
+    /// it forever after, so deploying a QUOTED_IDENTIFIER OFF procedure under the
+    /// preamble's blanket ON produces an object that means something else — a
+    /// "quoted" token becomes an identifier instead of a string. They are
+    /// restored straight after: leaving OFF in force would bake it into every
+    /// module the rest of the script creates.
+    /// <para>
+    /// Each part is its own batch because SET QUOTED_IDENTIFIER only takes effect
+    /// from the NEXT batch, and because a module definition must be the first
+    /// statement of its own batch anyway.
+    /// </para>
+    /// </remarks>
+    public static string ToCreateOrAlterScript(
+        string body,
+        string schema,
+        string name,
+        bool usesQuotedIdentifier,
+        bool usesAnsiNulls)
+    {
+        string ddl = ToCreateOrAlterScript(body, schema, name);
+        List<string> off = [];
+        if (!usesQuotedIdentifier) { off.Add("QUOTED_IDENTIFIER"); }
+        if (!usesAnsiNulls) { off.Add("ANSI_NULLS"); }
+        if (off.Count == 0) { return ddl; }
+
+        string options = string.Join(", ", off);
+        return $"SET {options} OFF;\nGO\n{ddl}\nGO\nSET {options} ON;";
+    }
+
+    /// <summary>
     /// Reverses <see cref="ScriptGen.Sql.Q(string)"/>: strips the outer brackets
     /// and collapses the doubled ones inside. Without the collapse a correctly
     /// quoted <c>[Ev]]il]</c> read back as <c>Ev]]il</c>, so the staleness

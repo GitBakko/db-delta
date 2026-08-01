@@ -426,6 +426,18 @@ public sealed class ComparisonEngine
             return DifferenceStatus.Different;
         }
 
+        // The SET options are part of the module, not of the session that runs
+        // it, so two byte-identical definitions compiled under different ones are
+        // different objects: with QUOTED_IDENTIFIER OFF a "quoted" token is a
+        // string literal and not an identifier, and with ANSI_NULLS OFF
+        // `= NULL` matches NULLs instead of yielding UNKNOWN. Found on
+        // SpClonaApplicationMenu in the parity run — same body, QuotedId 1 vs 0,
+        // and we called it identical.
+        if (a.UsesQuotedIdentifier != b.UsesQuotedIdentifier || a.UsesAnsiNulls != b.UsesAnsiNulls)
+        {
+            return DifferenceStatus.Different;
+        }
+
         // Reconcile the embedded CREATE-name with the catalog identity first: a
         // module renamed via sp_rename keeps its pre-rename name frozen in the
         // stored definition, which would otherwise read as a body difference even

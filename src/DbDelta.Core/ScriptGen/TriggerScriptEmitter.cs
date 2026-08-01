@@ -47,7 +47,8 @@ public sealed class TriggerScriptEmitter
             return $"-- WARNING: trigger {Sql.Q(t.Schema, t.Name)} is encrypted (WITH ENCRYPTION); body cannot be scripted.";
         }
 
-        string ddl = ModuleHeader.ToCreateOrAlterScript(t.Body, t.Schema, t.Name);
+        string ddl = ModuleHeader.ToCreateOrAlterScript(
+            t.Body, t.Schema, t.Name, t.UsesQuotedIdentifier, t.UsesAnsiNulls);
         return t.IsDisabled
             ? ddl + Environment.NewLine + EmitStateChange(t, disable: true)
             : ddl;
