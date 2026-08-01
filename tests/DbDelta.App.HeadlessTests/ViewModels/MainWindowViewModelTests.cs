@@ -2,6 +2,7 @@ using Avalonia.Headless.XUnit;
 using DbDelta.App.ViewModels;
 using DbDelta.Core.Diff;
 using DbDelta.Core.ObjectModel;
+using DbDelta.Persistence.Sql;
 using DbDelta.Shared.Dtos;
 using FluentAssertions;
 
@@ -225,6 +226,65 @@ public class MainWindowViewModelTests
         vm.OpenVersionHistoryCommand.Should().NotBeNull();
         vm.OpenVersionHistoryCommand.CanExecute(null).Should().BeTrue();
         // Deliberately NOT executed — it would open a real browser.
+    }
+
+    // ── After a direct execution ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Reported from the app on the first successful live deploy: the script
+    /// ran, and the grid went on showing the objects it had just aligned as
+    /// different, with the ticks still on them. Evidence that the comparison was
+    /// re-run is that it FAILED here — the endpoints these tests carry are not
+    /// connection strings, so a compare that starts sets LastError, and a
+    /// compare that never starts cannot.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task A_successful_execution_re_runs_the_comparison()
+    {
+        MainWindowViewModel vm = BuildVm(MakeDto("Orders", "Different"));
+        vm.AppState.SourceConnectionString = "not a connection string";
+        vm.AppState.TargetConnectionString = "nor is this";
+        vm.AppState.LastError = null;
+
+        await vm.AfterExecuteAsync(new SqlBatchResult(true, null, 3, 120), "Esecuzione completata.");
+
+        vm.AppState.LastError.Should().NotBeNull("the comparison was re-run");
+        vm.StatusText.Should().Contain("Esecuzione completata.");
+    }
+
+    /// <summary>
+    /// A failed run rolled itself back, so the rows still describe the target
+    /// exactly — and throwing them away would cost the operator the selection
+    /// they are about to retry.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task A_failed_execution_changes_nothing()
+    {
+        MainWindowViewModel vm = BuildVm(MakeDto("Orders", "Different"));
+        vm.AppState.SourceConnectionString = "not a connection string";
+        vm.AppState.TargetConnectionString = "nor is this";
+        vm.AppState.LastError = null;
+        vm.Rows[0].IsSelected = true;
+
+        await vm.AfterExecuteAsync(
+            new SqlBatchResult(false, "Msg 207", 1, 40, RolledBack: true), "Esecuzione fallita: Msg 207");
+
+        vm.AppState.LastError.Should().BeNull("no comparison may be started");
+        vm.Rows[0].IsSelected.Should().BeTrue("the selection is what the operator retries");
+        vm.StatusText.Should().Be("Esecuzione fallita: Msg 207");
+    }
+
+    /// <summary>Cancelling the confirm dialog is not an execution.</summary>
+    [AvaloniaFact]
+    public async Task A_cancelled_execution_leaves_the_status_bar_alone()
+    {
+        MainWindowViewModel vm = BuildVm(MakeDto("Orders", "Different"));
+        vm.StatusText = "Ready";
+
+        await vm.AfterExecuteAsync(null, "ignored");
+
+        vm.StatusText.Should().Be("Ready");
+        vm.AppState.LastError.Should().BeNull();
     }
 
     // ── Bulk selection ───────────────────────────────────────────────────────

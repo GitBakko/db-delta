@@ -774,9 +774,33 @@ public sealed partial class MainWindowViewModel : ObservableObject
         Views.ConfirmExecuteDialog dlg = new() { DataContext = vm };
         await dlg.ShowDialog(owner).ConfigureAwait(true);
 
-        if (vm.Result is not null)
+        await AfterExecuteAsync(vm.Result, vm.ResultMessage).ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// Settles the app after a direct execution: mirrors the outcome in the
+    /// status bar and, on success only, re-runs the comparison.
+    /// </summary>
+    /// <remarks>
+    /// A successful run has just made every row on screen a lie — the objects it
+    /// aligned still show as different, and the ticks are still there to be
+    /// deployed a second time. Refreshing by hand worked, but nobody should have
+    /// to know that. On FAILURE nothing is touched: the script rolls itself back,
+    /// so the rows still describe the target exactly, and throwing them away
+    /// would cost the operator the selection they are about to retry.
+    /// </remarks>
+    /// <param name="result">The outcome, or null when the user never executed.</param>
+    /// <param name="resultMessage">The dialog's rendering of that outcome.</param>
+    public async Task AfterExecuteAsync(SqlBatchResult? result, string resultMessage)
+    {
+        if (result is null) { return; } // cancelled before executing — nothing happened
+        StatusText = resultMessage;
+        if (!result.Success) { return; }
+
+        await AppState.CompareAsync(CancellationToken.None).ConfigureAwait(true);
+        if (AppState.LastError is null)
         {
-            StatusText = vm.ResultMessage; // mirror the dialog outcome in the status bar
+            StatusText = $"{resultMessage} Confronto aggiornato.";
         }
     }
 
