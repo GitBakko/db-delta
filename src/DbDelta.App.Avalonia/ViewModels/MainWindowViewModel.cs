@@ -769,7 +769,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 AppState.TargetConnectionString!,
                 script,
                 CancellationToken.None,
-                useOwnTransaction: false));
+                useOwnTransaction: false,
+                commandTimeoutSeconds: DeployCommandTimeoutSeconds));
 
         Views.ConfirmExecuteDialog dlg = new() { DataContext = vm };
         await dlg.ShowDialog(owner).ConfigureAwait(true);
@@ -804,6 +805,34 @@ public sealed partial class MainWindowViewModel : ObservableObject
             StatusText = $"{resultMessage} Confronto aggiornato.";
         }
     }
+
+    /// <summary>
+    /// Per-batch command timeout for a deploy run from the app, in seconds.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The executor's own default is 60 s, which is a fine default for the
+    /// ad-hoc statement it was written for and far too short for a deploy: an
+    /// index rebuild, a table rebuild carrying its rows, a CREATE INDEX over a
+    /// few million rows all pass a minute without anything being wrong. The
+    /// timeout then aborts the batch and XACT_ABORT rolls back everything that
+    /// came before it — minutes of correct work discarded, for a batch that was
+    /// merely long.
+    /// </para>
+    /// <para>
+    /// Deliberately NOT unlimited, which the CLI does offer as
+    /// <c>--command-timeout 0</c>. That is safe there because a console has
+    /// Ctrl-C; here the call passes <see cref="CancellationToken.None"/> and the
+    /// dialog has no cancel button — the window refuses to close while a run is
+    /// in flight, precisely so a transaction is never abandoned. An unlimited
+    /// timeout would make a batch blocked on someone else's lock unkillable
+    /// short of killing the app, which abandons the transaction it was trying to
+    /// protect. Ten minutes is long enough that no honest batch hits it, and
+    /// short enough to be a way out. Unlimited becomes available here when the
+    /// dialog can genuinely cancel (W3-5), not before.
+    /// </para>
+    /// </remarks>
+    private const int DeployCommandTimeoutSeconds = 600;
 
     private bool CanExecuteOnTarget() =>
         Rows.Any(r => r.IsSelected)
