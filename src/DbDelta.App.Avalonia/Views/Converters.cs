@@ -1,6 +1,7 @@
 using System.Globalization;
 using Avalonia;
 using Avalonia.Collections;
+using Avalonia.Controls;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
 using DbDelta.App.ViewModels;
@@ -159,6 +160,25 @@ public static class Converters
     /// </summary>
     public static readonly IValueConverter BoolToFontWeight = new FuncValueConverter<bool, FontWeight>(
         static bold => bold ? FontWeight.Bold : FontWeight.Normal);
+
+    /// <summary>
+    /// Paints a server message by what the server called it: crimson for an
+    /// error, ordinary body colour for a PRINT. Resolved from the app resources
+    /// so it follows the theme.
+    /// </summary>
+    public static readonly IValueConverter MessageSeverityBrush =
+        new FuncValueConverter<bool, IBrush?>(static isError => Resource(isError ? "DangerBrush" : "FgBrush"));
+
+    /// <summary>
+    /// Paints the last-run pill by its verdict: emerald when the run succeeded,
+    /// crimson when it did not. A failed run that reads like every other pill in
+    /// the strip is one nobody notices.
+    /// </summary>
+    public static readonly IValueConverter RunOutcomeBrush =
+        new FuncValueConverter<bool, IBrush?>(static ok => Resource(ok ? "SuccessBrush" : "DangerBrush"));
+
+    private static IBrush? Resource(string key) =>
+        Application.Current?.TryFindResource(key, out object? found) == true ? found as IBrush : null;
 
     /// <summary>
     /// Maps a SQL Server major version number to a version-branded stroke colour

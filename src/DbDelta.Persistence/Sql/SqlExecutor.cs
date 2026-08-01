@@ -20,12 +20,26 @@ namespace DbDelta.Persistence.Sql;
 /// to tell "nothing was applied" from "we do not know", which the previous
 /// result shape could not express.
 /// </param>
+/// <param name="Messages">
+/// Everything the server said while the script ran, in the order it said it:
+/// every PRINT, and on failure every error the exception carried rather than
+/// the one line <c>ex.Message</c> renders. This is the difference between the
+/// app showing two lines and SSMS showing a hundred.
+/// </param>
 public sealed record SqlBatchResult(
     bool Success,
     string? ErrorMessage,
     int BatchesExecuted,
     int TotalDurationMs,
-    bool RolledBack = false);
+    bool RolledBack = false,
+    IReadOnlyList<SqlServerMessage>? Messages = null)
+{
+    /// <summary>Everything the server said, never null.</summary>
+    public IReadOnlyList<SqlServerMessage> Messages { get; init; } = Messages ?? [];
+
+    /// <summary>Just the ones the server raised as errors.</summary>
+    public IReadOnlyList<SqlServerMessage> Errors => [.. Messages.Where(m => m.IsError)];
+}
 
 /// <summary>
 /// Runs a T-SQL script (potentially containing GO batch separators) against a
@@ -102,9 +116,32 @@ public static partial class SqlExecutor
         }
 
         var sw = Stopwatch.StartNew();
+        // Filled from two places — the InfoMessage callback and the catch
+        // blocks — and the callback runs on whichever thread completed the read,
+        // so the list is guarded rather than left to chance.
+        List<SqlServerMessage> messages = [];
+        void Collect(SqlErrorCollection errors)
+        {
+            lock (messages)
+            {
+                foreach (SqlError error in errors) { messages.Add(SqlServerMessage.From(error)); }
+            }
+        }
+        IReadOnlyList<SqlServerMessage> Collected()
+        {
+            lock (messages) { return [.. messages]; }
+        }
+
         try
         {
             await using SqlConnection cn = new(builder.ConnectionString);
+            // Severity 10 and below never throws, so without this every PRINT in
+            // the script — the running commentary of which object was being
+            // created — is discarded. Deliberately WITHOUT
+            // FireInfoMessageEventOnUserErrors: that flag reroutes errors up to
+            // severity 16 through this same callback instead of throwing, which
+            // would turn a failed deploy into a silent success.
+            cn.InfoMessage += (_, e) => Collect(e.Errors);
             await cn.OpenAsync(ct).ConfigureAwait(false);
 
             SqlTransaction? tx = useOwnTransaction
@@ -123,10 +160,12 @@ public static partial class SqlExecutor
                 }
                 if (tx is not null) { await tx.CommitAsync(ct).ConfigureAwait(false); }
                 sw.Stop();
-                return new SqlBatchResult(true, null, executed, (int)sw.ElapsedMilliseconds);
+                return new SqlBatchResult(
+                    true, null, executed, (int)sw.ElapsedMilliseconds, Messages: Collected());
             }
             catch (Exception ex)
             {
+                if (ex is SqlException sqlEx) { Collect(sqlEx.Errors); }
                 // A rollback must never be cancellable — passing `ct` here meant
                 // that when cancellation WAS the failure the rollback threw
                 // immediately and we fell through to connection dispose, which
@@ -139,7 +178,8 @@ public static partial class SqlExecutor
                     ConnectionStringRedactor.Redact(ex.Message),
                     executed,
                     (int)sw.ElapsedMilliseconds,
-                    rolledBack);
+                    rolledBack,
+                    Collected());
             }
             finally
             {
@@ -148,8 +188,14 @@ public static partial class SqlExecutor
         }
         catch (Exception ex)
         {
+            if (ex is SqlException sqlEx) { Collect(sqlEx.Errors); }
             sw.Stop();
-            return new SqlBatchResult(false, ConnectionStringRedactor.Redact(ex.Message), 0, (int)sw.ElapsedMilliseconds);
+            return new SqlBatchResult(
+                false,
+                ConnectionStringRedactor.Redact(ex.Message),
+                0,
+                (int)sw.ElapsedMilliseconds,
+                Messages: Collected());
         }
     }
 

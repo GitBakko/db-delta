@@ -1,0 +1,84 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DbDelta.App.ViewModels"
+        xmlns:v="using:DbDelta.App.Views"
+        xmlns:sql="using:DbDelta.Persistence.Sql"
+        x:Class="DbDelta.App.Views.LastRunDialog"
+        x:DataType="vm:LastRunViewModel"
+        Title="Ultima esecuzione"
+        Icon="/Assets/app-icon.png"
+        Width="860" Height="560"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BgBrush}">
+
+  <Grid Margin="24" RowDefinitions="Auto,14,*,14,Auto">
+
+    <!-- Verdict band. Success and failure differ by fill only; both carry
+         FgOnAccent, the design system's colour for content on an accent. -->
+    <Border Grid.Row="0" CornerRadius="6" Padding="14,10"
+            Background="{StaticResource SuccessBrush}"
+            IsVisible="{Binding Succeeded}">
+      <StackPanel Spacing="2">
+        <TextBlock Text="{Binding Headline}" FontWeight="SemiBold" FontSize="14"
+                   Foreground="{StaticResource FgOnAccentBrush}" />
+        <TextBlock Text="{Binding Subline}" FontSize="12"
+                   Foreground="{StaticResource FgOnAccentBrush}" />
+      </StackPanel>
+    </Border>
+    <Border Grid.Row="0" CornerRadius="6" Padding="14,10"
+            Background="{StaticResource DangerBrush}"
+            IsVisible="{Binding !Succeeded}">
+      <StackPanel Spacing="2">
+        <TextBlock Text="{Binding Headline}" FontWeight="SemiBold" FontSize="14"
+                   Foreground="{StaticResource FgOnAccentBrush}" />
+        <TextBlock Text="{Binding Subline}" FontSize="12"
+                   Foreground="{StaticResource FgOnAccentBrush}" />
+      </StackPanel>
+    </Border>
+
+    <!-- Everything the server said, in the order it said it: the PRINT lines
+         name the object each statement was working on, so the error that
+         follows one is attributable without counting batches by hand. -->
+    <Border Grid.Row="2" Classes="surface-raised" ClipToBounds="True" Padding="0"
+            IsVisible="{Binding HasMessages}">
+      <ScrollViewer HorizontalScrollBarVisibility="Auto">
+        <ItemsControl ItemsSource="{Binding Messages}" Margin="12">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="sql:SqlServerMessage">
+              <StackPanel Margin="0,0,0,8">
+                <TextBlock Text="{Binding Header}"
+                           IsVisible="{Binding IsError}"
+                           FontFamily="Cascadia Mono,Consolas,monospace"
+                           FontSize="11" FontWeight="SemiBold"
+                           Foreground="{StaticResource DangerBrush}" />
+                <TextBlock Text="{Binding Text}"
+                           FontFamily="Cascadia Mono,Consolas,monospace"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Foreground="{Binding IsError,
+                                                Converter={x:Static v:Converters.MessageSeverityBrush}}" />
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
+
+    <Border Grid.Row="2" Classes="surface-subtle" Padding="16"
+            IsVisible="{Binding !HasMessages}">
+      <TextBlock Text="{Binding EmptyText}" TextWrapping="Wrap"
+                 FontSize="12" Foreground="{StaticResource FgSubtleBrush}" />
+    </Border>
+
+    <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button Classes="ghost" Click="OnCopyClick">
+        <TextBlock Text="Copia tutto" />
+      </Button>
+      <Button Classes="primary" Click="OnCloseClick">
+        <TextBlock Text="Chiudi" />
+      </Button>
+    </StackPanel>
+
+  </Grid>
+
+</Window>

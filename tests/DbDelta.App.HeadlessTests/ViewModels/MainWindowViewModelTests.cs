@@ -250,6 +250,24 @@ public class MainWindowViewModelTests
 
         vm.AppState.LastError.Should().NotBeNull("the comparison was re-run");
         vm.StatusText.Should().Contain("Esecuzione completata.");
+        vm.LastRun.Should().NotBeNull("the status-bar pill outlives the dialog");
+    }
+
+    /// <summary>
+    /// The failure is the case the pill exists for: the outcome panel dies with
+    /// the dialog, and with it every error the server raised.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task A_failed_execution_is_still_kept_for_the_status_pill()
+    {
+        MainWindowViewModel vm = BuildVm(MakeDto("Orders", "Different"));
+
+        await vm.AfterExecuteAsync(
+            new SqlBatchResult(false, "Msg 207", 1, 40, Messages: [new(207, 16, 1, 3, null, "boom")]),
+            "Esecuzione fallita: Msg 207");
+
+        vm.LastRun!.Succeeded.Should().BeFalse();
+        vm.LastRun.ErrorCount.Should().Be(1);
     }
 
     /// <summary>

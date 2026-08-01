@@ -521,12 +521,27 @@
                      TextTrimming="CharacterEllipsis"
                      MaxWidth="500" />
         </StackPanel>
-        <Button Grid.Column="1"
-                Classes="status-pill"
-                Content="{Binding AppVersion}"
-                Command="{Binding OpenVersionHistoryCommand}"
-                ToolTip.Tip="Apri la version history nel browser"
-                VerticalAlignment="Center" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6"
+                    VerticalAlignment="Center">
+          <!-- Last-run pill. Appears only once something has run, and stays
+               until the next one: the execute dialog's outcome panel dies with
+               the dialog, taking every error the server raised with it. Click
+               opens the whole transcript. -->
+          <Button Classes="status-pill"
+                  Content="{Binding LastRun.PillLabel}"
+                  Command="{Binding ShowLastRunCommand}"
+                  CommandParameter="{Binding $parent[Window]}"
+                  IsVisible="{Binding LastRun, Converter={x:Static ObjectConverters.IsNotNull}}"
+                  Foreground="{Binding LastRun.Succeeded,
+                                       Converter={x:Static v:Converters.RunOutcomeBrush}}"
+                  ToolTip.Tip="Apri i messaggi del server per l'ultima esecuzione"
+                  VerticalAlignment="Center" />
+          <Button Classes="status-pill"
+                  Content="{Binding AppVersion}"
+                  Command="{Binding OpenVersionHistoryCommand}"
+                  ToolTip.Tip="Apri la version history nel browser"
+                  VerticalAlignment="Center" />
+        </StackPanel>
       </Grid>
     </Border>
 

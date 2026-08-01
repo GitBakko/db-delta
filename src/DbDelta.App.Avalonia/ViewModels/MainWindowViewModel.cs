@@ -795,6 +795,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         if (result is null) { return; } // cancelled before executing — nothing happened
         StatusText = resultMessage;
+        LastRun = new LastRunViewModel(result, DateTime.Now);
         if (!result.Success) { return; }
 
         await AppState.CompareAsync(CancellationToken.None).ConfigureAwait(true);
@@ -814,6 +815,26 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// </summary>
     private IReadOnlyList<DifferencePair> SelectedPairs() =>
         [.. Rows.Where(r => r.IsSelected).Select(r => r.Pair)];
+
+    /// <summary>
+    /// The most recent direct execution, or null until one has run. Survives its
+    /// dialog: the outcome panel is gone the moment the operator closes it, and
+    /// with it went every error the server had raised.
+    /// </summary>
+    [ObservableProperty]
+    private LastRunViewModel? _lastRun;
+
+    /// <summary>
+    /// Opens the transcript of that run — every error, and every PRINT that says
+    /// which object was being worked on when one arrived.
+    /// </summary>
+    [RelayCommand]
+    public async Task ShowLastRunAsync(Window? owner)
+    {
+        if (owner is null || LastRun is null) { return; }
+        Views.LastRunDialog dialog = new() { DataContext = LastRun };
+        await dialog.ShowDialog(owner).ConfigureAwait(true);
+    }
 
     private const string BackfillCancelledMessage =
         "Operazione annullata: mancano i valori per le colonne NOT NULL da aggiungere.";
