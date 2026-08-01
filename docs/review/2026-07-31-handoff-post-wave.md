@@ -2,24 +2,30 @@
 
 **Da leggere per primo in una sessione nuova.**
 
-- **HEAD:** `f87b98a` su `main`, **origin sincronizzato**, working tree pulito.
-- **Test:** 632 verdi su 10 progetti (Compat esclusa, gira solo di notte).
+- **HEAD:** `2d1fe03` su `main`, **da pushare**, working tree pulito.
+- **Test:** 665 verdi su 10 progetti (Compat esclusa, gira solo di notte).
 - **Gate formato:** `dotnet format DbDelta.sln --verify-no-changes` esce 0. Build senza avvisi.
 
 ## Da dove ripartire
 
-**Il dialogo di backfill.** Il motore è già scritto e testato
-(`BackfillPreflight` + il parametro `backfillDefaults` di
-`ScriptGenerator.Generate`); manca solo la UI che raccoglie i valori. È il pezzo
-che sblocca lo smoke: finché non c'è, `Corrieri_TipiDocumentazioni` continua a
-fallire — correttamente, ma continua.
+**Smoke cumulativo su 243 (`PcrmV2Pl_test` → `_test2`), poi rc5.** Tutta la lista
+di lavoro dell'handoff precedente è chiusa: backfill, gate, e i due gap di
+modello. Quello che manca è farci passare sopra un deploy vero e completo.
 
-Comportamento deciso dal proprietario: **avvisare, chiedere un default tecnico,
-applicarlo.** Quindi prima di generare o eseguire, se `BackfillPreflight.Scan`
-restituisce qualcosa, mostrare un dialogo con una riga per colonna (tabella,
-colonna, tipo, valore proposto da `SuggestedValue`, editabile) e passare la mappa
-a `Generate`. Va agganciato a **entrambi** i percorsi: «Genera script» e
-«Allinea destinazione».
+### Chiuso il 2026-08-01
+
+| Cosa | Dove |
+|------|------|
+| Dialogo di backfill (Msg 4901), su entrambi i percorsi | `cbb381b` |
+| Contrasto della banda del dialogo (misurato nei due temi) | `414ca72` |
+| Gate 1/2: su successo riconfronto automatico, su errore niente cambia | `b3a98a1` |
+| Gate 2/2: `InfoMessage` + `SqlException.Errors`, pill ultima run + trascrizione | `df79b15` |
+| `uses_quoted_identifier` / `uses_ansi_nulls` per modulo | `d95c7a1` |
+| `DATA_COMPRESSION` di tabella e di indice | `fcd4b12`, round-trip live in `2d1fe03` |
+
+**Il backfill è passato in produzione:** `Corrieri_TipiDocumentazioni` allineata
+sul 243, script pulito, `DEFAULT ('BRT')` e `DEFAULT ((0))` ognuno su un vincolo
+usa-e-getta droppato subito dopo.
 
 ## La cosa importante di oggi
 
@@ -87,11 +93,16 @@ non può mordere, il commento nel test lo dice — vedi
 
 | Cosa | Stato |
 |------|-------|
-| Dialogo di backfill (Msg 4901) | Motore pronto e testato, manca la UI |
-| Gate: su errore niente cambia, su successo ricompare automatico, più indicatore di stato ultima run con popup degli errori | Spec del proprietario accettata, non iniziato. Richiede prima di agganciare `SqlConnection.InfoMessage` e catturare `SqlException.Errors`: oggi teniamo solo `ex.Message`, per questo la app mostra 2 errori dove SSMS ne mostra cento |
-| `DATA_COMPRESSION` (tabella e indice) non è nel modello | Gap confermato su `WebhookDeliveries` |
-| `uses_ansi_nulls` / `uses_quoted_identifier` per-modulo non letti | Gap confermato su `SpClonaApplicationMenu`: corpo byte-identico, `QuotedId` 1 vs 0 |
-| Il gate non si azzera dopo un'esecuzione riuscita | Assorbito dal punto "Gate" sopra |
+| Smoke cumulativo 243 (`_test` → `_test2`) sul resto delle differenze | Il percorso è sbloccato, non ancora eseguito per intero |
+| rc5 | Dopo lo smoke |
+| Compressione per-partizione | Non modellata: un oggetto compresso a macchia di leopardo viene scriptato come la sua prima partizione. Deliberato, non un difetto trovato |
+| Banda cremisi di `ConfirmExecuteDialog`: bianco hardcoded su `DangerBrush` | 3,1:1 in tema scuro — stesso difetto della banda di backfill, non ancora corretto |
+
+**Attenzione a due cose che potrebbero comparire nello smoke cumulativo, perché
+sono nuove:** i moduli con `QUOTED_IDENTIFIER OFF` ora vengono emessi dentro un
+`SET … OFF` / `GO` / `SET … ON`, e le tabelle o gli indici con compressione
+diversa ora generano `REBUILD`. Entrambi sono coperti da test, nessuno dei due è
+mai girato su un database vero di quelle dimensioni.
 
 ## Confronto con Redgate — dove siamo
 
@@ -108,8 +119,11 @@ grave della giornata — **e non lo erano**. Messi i corpi affiancati, sono la
 stessa istruzione, una indentata e l'altra appiattita su una riga. Fissato in
 `ModuleDiffTests.A_view_reformatted_but_not_changed_is_identical`.
 
-Restano due gap reali, entrambi di modello, entrambi elencati sopra:
-`DATA_COMPRESSION` e le opzioni SET per-modulo.
+I due gap reali che restavano, entrambi di modello — `DATA_COMPRESSION` e le
+opzioni SET per-modulo — **sono stati chiusi il 2026-08-01**. Il prossimo
+confronto con Redgate sugli stessi due database dovrebbe quindi trovare quei
+due oggetti dalla nostra parte; se non li trova, è la verifica che è sbagliata,
+non il modello.
 
 **Nota metodologica, perché mi ha fatto perdere tempo:** `CHECKSUM` sui testi
 ripuliti dava "diversi" su corpi che erano identici, e SSMS tronca a 256
