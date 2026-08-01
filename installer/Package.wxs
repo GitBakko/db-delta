@@ -13,6 +13,26 @@
     <Icon Id="DbDeltaIcon.ico" SourceFile="..\src\DbDelta.App.Avalonia\Assets\app-icon.ico" />
     <Property Id="ARPPRODUCTICON" Value="DbDeltaIcon.ico" />
 
+    <!-- ARPPRODUCTICON alone left "Installed apps" showing a blank tile. Verified
+         on a real install of rc5: the property IS in the Property table and IS
+         set at RegisterProduct time (the verbose log shows
+         "Property(S): ARPPRODUCTICON = DbDeltaIcon.ico"), the icon IS extracted
+         to C:\Windows\Installer\{ProductCode}\, and DisplayIcon still comes out
+         as an empty string. So we write it ourselves, pointing at the app's own
+         executable — which carries the same art as a Win32 resource, so the two
+         can never drift apart.
+         ARPINSTALLLOCATION is the same story with less mystery: Windows
+         Installer simply does not set InstallLocation unless asked, so the ARP
+         entry could not say where the product lives. -->
+    <SetProperty Id="ARPINSTALLLOCATION" Value="[INSTALLFOLDER]" After="CostFinalize" Sequence="both" />
+
+    <Component Id="ArpDisplayIcon" Directory="INSTALLFOLDER" Guid="7C3F1B84-2E5D-4A19-9F0C-3D6B8A4E51C7">
+      <RegistryValue Root="HKLM"
+                     Key="Software\Microsoft\Windows\CurrentVersion\Uninstall\[ProductCode]"
+                     Name="DisplayIcon" Type="string"
+                     Value="[INSTALLFOLDER]DbDelta.App.exe" KeyPath="yes" />
+    </Component>
+
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="DbDelta">
         <Directory Id="CLIFOLDER" Name="cli" />
@@ -27,6 +47,7 @@
       <ComponentGroupRef Id="CliFiles" />
       <ComponentRef Id="AppShortcut" />
       <ComponentRef Id="CliPathEntry" />
+      <ComponentRef Id="ArpDisplayIcon" />
     </Feature>
 
     <!-- Start-Menu shortcut to the desktop app -->

@@ -32,10 +32,18 @@ end of verified work — tags/releases still need the owner's ok** (changed
       `DbDelta-1.0.0-rc2-win-x64.msi`; release/ci/docs green; Version-history
       page live with the `#v1.0.0-rc2` anchor (curl-verified).
       https://github.com/GitBakko/db-delta/releases/tag/v1.0.0-rc2
-- [ ] **Owner smoke of rc2 on a real machine** — uninstall rc1 → install rc2 →
-      check: exe/shortcut/ARP icon, no BCEVOLUTION_* false positives on
-      243/PcrmV2Pl_test vs 242/PcrmV2Pl, status-bar pill opens the page at
-      `#v1.0.0-rc2`.
+- [x] **Owner smoke of the installed MSI — DONE 2026-08-01 on rc5.** Uninstall
+      the previous 1.0.0 → install rc5 → verified: app exe + Start-Menu
+      shortcut + `dbdelta.exe` on the machine PATH + embedded Win32 icon +
+      the installed app launches. `dbdelta --version` reports
+      `1.0.0-rc5+f92a510`. **Found two ARP defects, both fixed in
+      `installer/Package.wxs` and verified by rebuilding the MSI and
+      re-installing:** the Apps-&-Features entry showed a blank icon
+      (`ARPPRODUCTICON` alone leaves `DisplayIcon` empty — the property IS in
+      the Property table, IS set at RegisterProduct time and the icon IS
+      extracted, and Windows still writes an empty string), and
+      `InstallLocation` was never set. The fix ships in the next tag; the rc5
+      MSI on the Release still carries both.
 
 - [x] **Pushed `main`** (now synced) — `ci.yml` (windows build+test, linux
       testcontainers integration) + `docs.yml` (DocFX→Pages) green on the
