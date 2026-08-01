@@ -125,6 +125,59 @@ public class IndexReaderTests(LiveDbFixture fixture)
             "the INCLUDE list is ordered by the index, not by the table's columns");
     }
 
+    /// <summary>
+    /// Compression, read back from a real catalog for both the table's own rows
+    /// and each index separately — they are independent settings and routinely
+    /// differ. Nothing read it at all before: a PAGE-compressed table deployed
+    /// as an uncompressed one and the next comparison said the two matched.
+    /// </summary>
+    [Fact]
+    public async Task LiveDbSource_reads_table_and_index_compression_separately()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        await using (SqlConnection bootstrap = new(fixture.ConnectionString))
+        {
+            await bootstrap.OpenAsync(ct);
+            await ExecAsync(bootstrap, "IF DB_ID('DbDeltaIxComp') IS NULL CREATE DATABASE DbDeltaIxComp;", ct);
+        }
+
+        string dbConn = new SqlConnectionStringBuilder(fixture.ConnectionString)
+        {
+            InitialCatalog = "DbDeltaIxComp"
+        }.ConnectionString;
+
+        await using (SqlConnection c = new(dbConn))
+        {
+            await c.OpenAsync(ct);
+            await ExecAsync(c, """
+                IF OBJECT_ID('dbo.Packed') IS NULL
+                BEGIN
+                    CREATE TABLE dbo.Packed (
+                        Id int IDENTITY(1,1) NOT NULL CONSTRAINT PK_Packed PRIMARY KEY,
+                        Payload nvarchar(400) NOT NULL
+                    ) WITH (DATA_COMPRESSION = PAGE);
+                    CREATE NONCLUSTERED INDEX IX_Packed_Row ON dbo.Packed (Payload)
+                        WITH (DATA_COMPRESSION = ROW);
+                    CREATE NONCLUSTERED INDEX IX_Packed_Plain ON dbo.Packed (Id, Payload);
+                END
+                IF OBJECT_ID('dbo.Plain') IS NULL
+                    CREATE TABLE dbo.Plain (Id int NOT NULL);
+                """, ct);
+        }
+
+        Result<Database> result = await new LiveDbSource(dbConn).LoadAsync(ct);
+        result.IsSuccess.Should().BeTrue(result.Error?.Message);
+        Database db = result.Value!;
+
+        Table packed = db.Tables.Single(t => t.Name == "Packed");
+        packed.DataCompression.Should().Be("PAGE", "the clustered index carries the table's rows");
+        packed.Indexes.Single(i => i.Name == "IX_Packed_Row").DataCompression.Should().Be("ROW");
+        packed.Indexes.Single(i => i.Name == "IX_Packed_Plain").DataCompression.Should().Be("NONE");
+
+        db.Tables.Single(t => t.Name == "Plain").DataCompression.Should().Be("NONE",
+            "a heap reports its own row too");
+    }
+
     private static async Task ExecAsync(SqlConnection c, string sql, CancellationToken ct)
     {
         await using SqlCommand cmd = new(sql, c);

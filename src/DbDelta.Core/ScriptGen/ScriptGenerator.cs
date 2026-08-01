@@ -1178,7 +1178,16 @@ public sealed class ScriptGenerator
             bool mustRestore = alreadyDropped.Contains((src.Schema, src.Name, s.Name));
             bool existsOnTarget = tgtByName.TryGetValue(s.Name, out TableIndex? t);
             bool shapeChanged = existsOnTarget && !IndexShapeEqual(s, t!, names);
-            if (existsOnTarget && !shapeChanged && !mustRestore) { continue; }
+            if (existsOnTarget && !shapeChanged && !mustRestore)
+            {
+                // Same index, different compression: a REBUILD carries the
+                // setting across without dropping an index the table is using.
+                if (!Compression.Equal(s.DataCompression, t!.DataCompression))
+                {
+                    sb.AppendLine(_indexEmitter.EmitRebuildForCompression(src.Schema, src.Name, s));
+                }
+                continue;
+            }
             sb.AppendLine(_indexEmitter.EmitCreate(src.Schema, src.Name, s));
         }
         return sb.ToString();

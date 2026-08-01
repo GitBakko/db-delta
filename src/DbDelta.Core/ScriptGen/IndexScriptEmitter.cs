@@ -37,6 +37,11 @@ public sealed class IndexScriptEmitter
             sb.Append(" WHERE ").Append(ix.FilterExpression);
         }
 
+        if (!Compression.IsNone(ix.DataCompression))
+        {
+            sb.Append(" WITH (DATA_COMPRESSION = ").Append(Compression.Normalize(ix.DataCompression)).Append(')');
+        }
+
         sb.Append(';');
         return sb.ToString();
     }
@@ -45,5 +50,21 @@ public sealed class IndexScriptEmitter
     {
         ArgumentNullException.ThrowIfNull(ix);
         return $"DROP INDEX {Sql.Q(ix.Name)} ON {Sql.Q(schema, table)};";
+    }
+
+    /// <summary>
+    /// Changes an existing index's compression in place.
+    /// </summary>
+    /// <remarks>
+    /// A REBUILD rather than a DROP + CREATE, which is what a shape change gets:
+    /// the columns are identical, so tearing the index down would take the same
+    /// minutes of work AND leave the table unindexed in the middle of them, for a
+    /// setting that a rebuild changes on its own.
+    /// </remarks>
+    public string EmitRebuildForCompression(string schema, string table, TableIndex ix)
+    {
+        ArgumentNullException.ThrowIfNull(ix);
+        return $"ALTER INDEX {Sql.Q(ix.Name)} ON {Sql.Q(schema, table)} "
+             + $"REBUILD WITH (DATA_COMPRESSION = {Compression.Normalize(ix.DataCompression)});";
     }
 }

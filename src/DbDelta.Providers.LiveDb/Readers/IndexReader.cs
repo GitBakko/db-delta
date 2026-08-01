@@ -22,7 +22,14 @@ internal sealed class IndexReader
             ic.key_ordinal       AS KeyOrdinal,
             ic.is_descending_key AS IsDescending,
             ic.is_included_column AS IsIncluded,
-            c.name               AS ColumnName
+            c.name               AS ColumnName,
+            -- First partition only: DbDelta does not model per-partition
+            -- compression, so an unevenly compressed index is scripted as its
+            -- first partition.
+            (SELECT TOP 1 p.data_compression_desc
+             FROM sys.partitions AS p
+             WHERE p.object_id = i.object_id AND p.index_id = i.index_id
+             ORDER BY p.partition_number) AS DataCompression
         FROM sys.indexes AS i
         INNER JOIN sys.tables AS t ON t.object_id = i.object_id
         INNER JOIN sys.index_columns AS ic ON ic.object_id = i.object_id
@@ -55,6 +62,7 @@ internal sealed class IndexReader
         bool isUnique = false;
         bool isClustered = false;
         string? filter = null;
+        string? currentCompression = null;
         List<IndexColumn> keys = [];
         List<string> included = [];
 
@@ -73,10 +81,11 @@ internal sealed class IndexReader
             bool isDesc = r.GetBoolean(8);
             bool isIncl = r.GetBoolean(9);
             string column = r.GetString(10);
+            string? compression = r.IsDBNull(11) ? null : r.GetString(11);
 
             if (currentIndexId is not null && (currentIndexId != indexId || currentObjectId != objectId))
             {
-                Flush(byObject, currentObjectId!.Value, currentName!, isUnique, isClustered, filter, keys, included);
+                Flush(byObject, currentObjectId!.Value, currentName!, isUnique, isClustered, filter, currentCompression, keys, included);
                 keys = [];
                 included = [];
             }
@@ -87,6 +96,7 @@ internal sealed class IndexReader
             isUnique = isUq;
             isClustered = indexType == 1;
             filter = hasFilter ? filterDef : null;
+            currentCompression = compression;
 
             if (isIncl)
             {
@@ -100,7 +110,7 @@ internal sealed class IndexReader
 
         if (currentIndexId is not null)
         {
-            Flush(byObject, currentObjectId!.Value, currentName!, isUnique, isClustered, filter, keys, included);
+            Flush(byObject, currentObjectId!.Value, currentName!, isUnique, isClustered, filter, currentCompression, keys, included);
         }
 
         return byObject;
@@ -113,6 +123,7 @@ internal sealed class IndexReader
         bool isUnique,
         bool isClustered,
         string? filter,
+        string? compression,
         List<IndexColumn> keys,
         List<string> included)
     {
@@ -122,7 +133,8 @@ internal sealed class IndexReader
             IsClustered: isClustered,
             FilterExpression: filter,
             KeyColumns: [.. keys],
-            IncludedColumns: [.. included]);
+            IncludedColumns: [.. included],
+            DataCompression: compression);
         if (!byObject.TryGetValue(objectId, out List<TableIndex>? list))
         {
             list = [];

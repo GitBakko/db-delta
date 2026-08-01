@@ -14,7 +14,15 @@ internal sealed class TableReader
             s.name        AS SchemaName,
             t.name        AS TableName,
             t.object_id   AS ObjectId,
-            t.modify_date AS ModifyDate
+            t.modify_date AS ModifyDate,
+            -- The table's OWN rows: heap (index_id 0) or clustered index
+            -- (index_id 1). Nonclustered indexes carry their own setting and are
+            -- read by IndexReader. First partition only — DbDelta does not model
+            -- per-partition compression.
+            (SELECT TOP 1 p.data_compression_desc
+             FROM sys.partitions AS p
+             WHERE p.object_id = t.object_id AND p.index_id <= 1
+             ORDER BY p.index_id, p.partition_number) AS DataCompression
         FROM sys.tables AS t
         INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
         WHERE t.is_ms_shipped = 0
@@ -52,7 +60,7 @@ internal sealed class TableReader
 
     public async Task<IReadOnlyList<Table>> ReadAsync(SqlConnection connection, CancellationToken ct)
     {
-        Dictionary<int, (string Schema, string Name, DateTime? ModifyDate)> tableShells = [];
+        Dictionary<int, (string Schema, string Name, DateTime? ModifyDate, string? Compression)> tableShells = [];
         await using (var tablesCmd = new SqlCommand(TablesQuery, connection))
         await using (SqlDataReader tablesReader = await tablesCmd.ExecuteReaderAsync(ct).ConfigureAwait(false))
         {
@@ -66,7 +74,8 @@ internal sealed class TableReader
                 DateTime? modifyDate = tablesReader.IsDBNull(3)
                     ? null
                     : tablesReader.GetDateTime(3);
-                tableShells[objectId] = (schemaName, tableName, modifyDate);
+                string? compression = tablesReader.IsDBNull(4) ? null : tablesReader.GetString(4);
+                tableShells[objectId] = (schemaName, tableName, modifyDate, compression);
             }
         }
 
@@ -118,7 +127,7 @@ internal sealed class TableReader
         }
 
         var tables = new List<Table>(tableShells.Count);
-        foreach (KeyValuePair<int, (string Schema, string Name, DateTime? ModifyDate)> kv in tableShells)
+        foreach (KeyValuePair<int, (string Schema, string Name, DateTime? ModifyDate, string? Compression)> kv in tableShells)
         {
             columnsByObjectId.TryGetValue(kv.Key, out List<Column>? cols);
             tables.Add(new Table(
@@ -127,7 +136,8 @@ internal sealed class TableReader
                 Columns: cols ?? [],
                 Constraints: [],
                 Indexes: [],
-                ModifyDate: kv.Value.ModifyDate));
+                ModifyDate: kv.Value.ModifyDate,
+                DataCompression: kv.Value.Compression));
         }
         return tables;
     }

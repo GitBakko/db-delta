@@ -156,7 +156,11 @@ public sealed class TableScriptEmitter(
         }
 
         sb.AppendLine();
-        sb.AppendLine(");");
+        // The table's own rows — heap or clustered index. Nonclustered indexes
+        // carry their own setting and get it on their CREATE INDEX.
+        sb.AppendLine(Compression.IsNone(table.DataCompression)
+            ? ");"
+            : $") WITH (DATA_COMPRESSION = {Compression.Normalize(table.DataCompression)});");
 
         // Primary key as a separate ALTER TABLE ADD CONSTRAINT (Redgate parity).
         if (includeNamedConstraints)
@@ -423,6 +427,16 @@ public sealed class TableScriptEmitter(
             // constraints alone changed keeps its single-batch shape.
             if (addedColumns) { sb.AppendLine("GO"); }
             sb.Append(constraints);
+        }
+
+        // ── 6) Compression of the table's own rows. Last, so it rebuilds the
+        //       table as it now is rather than as it was: a REBUILD before the
+        //       new columns exist would have to be paid for twice.
+        if (!Compression.Equal(newT.DataCompression, oldT.DataCompression))
+        {
+            sb.Append("ALTER TABLE ").Append(qualifiedName)
+              .Append(" REBUILD WITH (DATA_COMPRESSION = ")
+              .Append(Compression.Normalize(newT.DataCompression)).AppendLine(");");
         }
 
         return sb.ToString();

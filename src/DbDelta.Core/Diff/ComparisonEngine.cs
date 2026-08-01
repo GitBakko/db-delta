@@ -476,8 +476,12 @@ public sealed class ComparisonEngine
             && !ConstraintsEqual(a.Constraints, b.Constraints, names);
         bool indexesDiffer = !options.HasFlag(ComparisonOptions.IgnoreIndexes)
             && !IndexesEqual(a.Indexes, b.Indexes, names);
+        // The table's own rows — heap or clustered index. Not covered by the
+        // index comparison, which only sees the nonclustered ones. Confirmed
+        // missing on WebhookDeliveries in the parity run.
+        bool compressionDiffers = !Compression.Equal(a.DataCompression, b.DataCompression);
 
-        return columnsDiffer || constraintsDiffer || indexesDiffer
+        return columnsDiffer || constraintsDiffer || indexesDiffer || compressionDiffers
             ? DifferenceStatus.Different
             : DifferenceStatus.Identical;
     }
@@ -671,6 +675,14 @@ public sealed class ComparisonEngine
             }
 
             if (!left.IncludedColumns.SequenceEqual(right.IncludedColumns, names))
+            {
+                return false;
+            }
+
+            // Compression is a property of the index, not of its shape: two
+            // indexes over the same columns, one PAGE-compressed and one not,
+            // are a real difference and a REBUILD away from each other.
+            if (!Compression.Equal(left.DataCompression, right.DataCompression))
             {
                 return false;
             }
