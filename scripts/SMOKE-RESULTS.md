@@ -4,6 +4,38 @@ Sanitised summary of M13 smoke runs against the two real PcrmV2Pl
 databases. Raw HTML / JSON / SQL outputs live in `scripts/smoke/` and
 are git-ignored because they carry production schema names.
 
+## 2026-08-01 — commit `710394e` — **primo giro chiuso: deploy completo + convergenza a zero**
+
+Source `192.168.3.243` / `PcrmV2Pl_test` → target stesso server / `PcrmV2Pl_test2`,
+eseguito dall'app (non dalla CLI: il dialogo di backfill esiste solo lì).
+
+| Passo | Esito |
+|-------|------:|
+| Primo script, seleziona-tutto | 279 oggetti, 20.261 righe |
+| Esecuzione sulla destinazione | riuscita, pochi secondi, zero errori |
+| Riconfronto automatico | **33 differenze residue** |
+| Correzione `710394e` + Aggiorna | **0 differenze** |
+
+Cosa ha esercitato per la prima volta su dati veri:
+
+- **Backfill (Msg 4901)** — nessun dialogo, correttamente: gli unici due ADD di
+  colonna NOT NULL portavano un `DEFAULT` dichiarato dalla sorgente. Zero
+  `ADD … NOT NULL` senza default in tutto lo script.
+- **`SET QUOTED_IDENTIFIER OFF`** attorno a 4 moduli, tutti convergiti.
+- **`DATA_COMPRESSION`** — `REBUILD` su `WebhookDeliveries` e `WebhookOutbox`,
+  3 `ALTER INDEX … REBUILD`, 1 indice creato già compresso. Esattamente gli
+  oggetti che il confronto Redgate aveva segnalato.
+- **Distruttivo:** un solo `DROP TABLE` reale (`Tenants_Corrieri_TipiDocumenti`),
+  più 3 procedure, 1 vista, 1 indice, 1 FK.
+
+**I 33 residui erano il difetto peggiore della giornata** — un diff che il
+proprio script non appiattiva. Diagnosi e correzione in
+`docs/review/2026-07-31-handoff-post-wave.md`, sezione «Il diff che il proprio
+script non appiattiva».
+
+Nessun timeout: i sei REBUILD sono passati abbondantemente sotto il limite, alzato
+a 10 minuti per batch (`d7f09d4`) prima di partire.
+
 ## 2026-05-25 — commit `354e9e0` (M13 wave 1 + DRY.4 done)
 
 Source endpoint: `192.168.3.243` / `PcrmV2Pl_test2`

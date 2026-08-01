@@ -2,15 +2,19 @@
 
 **Da leggere per primo in una sessione nuova.**
 
-- **HEAD:** `2d1fe03` su `main`, **da pushare**, working tree pulito.
-- **Test:** 665 verdi su 10 progetti (Compat esclusa, gira solo di notte).
+- **HEAD:** `710394e` su `main`, **da pushare**, working tree pulito.
+- **Test:** 676 verdi su 10 progetti (Compat esclusa, gira solo di notte).
 - **Gate formato:** `dotnet format DbDelta.sln --verify-no-changes` esce 0. Build senza avvisi.
 
 ## Da dove ripartire
 
-**Smoke cumulativo su 243 (`PcrmV2Pl_test` → `_test2`), poi rc5.** Tutta la lista
-di lavoro dell'handoff precedente è chiusa: backfill, gate, e i due gap di
-modello. Quello che manca è farci passare sopra un deploy vero e completo.
+**rc5.** Lo smoke cumulativo è passato: 279 oggetti deployati su
+`PcrmV2Pl_test` → `_test2` in pochi secondi, poi riconfronto a **zero
+differenze**. È il primo giro chiuso end-to-end del prodotto — deploy completo e
+convergenza verificata, non solo «lo script gira».
+
+Ci sono voluti due passaggi, e il secondo ha trovato il difetto peggiore della
+giornata: vedi «Il diff che il proprio script non appiattiva» qui sotto.
 
 ### Chiuso il 2026-08-01
 
@@ -22,10 +26,61 @@ modello. Quello che manca è farci passare sopra un deploy vero e completo.
 | Gate 2/2: `InfoMessage` + `SqlException.Errors`, pill ultima run + trascrizione | `df79b15` |
 | `uses_quoted_identifier` / `uses_ansi_nulls` per modulo | `d95c7a1` |
 | `DATA_COMPRESSION` di tabella e di indice | `fcd4b12`, round-trip live in `2d1fe03` |
+| Timeout di deploy da 60 s a 10 min per batch | `d7f09d4` |
+| **Il diff che il proprio script non appiattiva** | `710394e` |
 
 **Il backfill è passato in produzione:** `Corrieri_TipiDocumentazioni` allineata
 sul 243, script pulito, `DEFAULT ('BRT')` e `DEFAULT ((0))` ognuno su un vincolo
 usa-e-getta droppato subito dopo.
+
+## Il diff che il proprio script non appiattiva (`710394e`)
+
+**Il difetto peggiore della giornata, e lo ha trovato solo un deploy completo.**
+Dopo aver deployato 279 oggetti senza errori, 33 moduli risultavano ancora
+diversi. Rigenerare lo script produceva **byte per byte lo stesso testo** già
+applicato: una differenza che nessun operatore avrebbe mai potuto togliere.
+
+Due difetti che si tenevano in piedi a vicenda, e servivano entrambi per fare
+danno:
+
+1. `ToCreateOrAlterScript` chiedeva se **l'ultimo carattere** del corpo fosse
+   `;`. Un corpo che finisce `";\n"` — cioè quasi tutti, perché i file finiscono
+   con un a-capo — rispondeva no, e il deploy scriveva `";\n;"` nella
+   destinazione.
+2. `BodyNormalizer` toglieva **un solo** `;` finale: la sorgente normalizzava a
+   `…`, la destinazione a `…;`.
+
+Ora l'emitter decide sul testo trimmato e il normalizzatore toglie tutti i `;`
+finali. La seconda metà conta da sola: i moduli già deployati portano il testo
+doppio dentro, e senza di essa resterebbero diversi finché qualcuno non ci
+deployasse sopra una seconda volta.
+
+**La rete di regressione è l'invariante che nessuno asseriva:** deploya un
+modulo, rileggilo, confrontalo — deve risultare identico
+(`DeployedModuleConvergesTests`). Tre sonde: emitter da solo, normalizzatore da
+solo, ed entrambi — l'ultima riproduce il caso di produzione sulle code `";\n"`,
+`";\r\n"`, `";\n\n\n"`.
+
+**Cosa NON era**, e vale la pena ricordarlo perché era il sospetto naturale: i
+flag `QUOTED_IDENTIFIER` aggiunti quel mattino erano puliti. La query di
+controllo lo ha dimostrato in un colpo — i flag non differivano mai fra i due
+lati, e le 6+4 righe a `QI=0` erano la prova che il wrapper funzionava. Senza
+quel dato avrei inseguito il mio stesso codice nuovo.
+
+```sql
+-- il confronto che separa "corpo diverso" da "flag diversi", su tutti i moduli
+SELECT CASE WHEN src.definition COLLATE Latin1_General_BIN2
+               = tgt.definition COLLATE Latin1_General_BIN2
+            THEN 'corpo uguale' ELSE 'corpo DIVERSO' END AS Corpo,
+       src.uses_quoted_identifier, tgt.uses_quoted_identifier,
+       src.uses_ansi_nulls, tgt.uses_ansi_nulls, COUNT(*) AS Quanti
+FROM PcrmV2Pl_test.sys.sql_modules AS src
+JOIN PcrmV2Pl_test.sys.objects  AS so ON so.object_id = src.object_id
+JOIN PcrmV2Pl_test2.sys.objects AS t  ON t.name = so.name
+JOIN PcrmV2Pl_test2.sys.sql_modules AS tgt ON tgt.object_id = t.object_id
+WHERE so.is_ms_shipped = 0
+GROUP BY 1, 2, 3, 4, 5;  -- (espandi le espressioni, SQL Server non accetta gli ordinali)
+```
 
 ## La cosa importante di oggi
 
@@ -93,8 +148,7 @@ non può mordere, il commento nel test lo dice — vedi
 
 | Cosa | Stato |
 |------|-------|
-| Smoke cumulativo 243 (`_test` → `_test2`) sul resto delle differenze | Il percorso è sbloccato, non ancora eseguito per intero |
-| rc5 | Dopo lo smoke |
+| rc5 | Sbloccata: smoke cumulativo passato con convergenza a zero |
 | Compressione per-partizione | Non modellata: un oggetto compresso a macchia di leopardo viene scriptato come la sua prima partizione. Deliberato, non un difetto trovato |
 | Banda cremisi di `ConfirmExecuteDialog`: bianco hardcoded su `DangerBrush` | 3,1:1 in tema scuro — stesso difetto della banda di backfill, non ancora corretto |
 
