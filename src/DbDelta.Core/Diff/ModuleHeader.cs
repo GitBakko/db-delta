@@ -122,10 +122,21 @@ public static partial class ModuleHeader
     /// trailing <c>;</c>. Shared by the view / procedure / function / trigger
     /// script emitters so the header-rewrite rules live in exactly one place.
     /// </summary>
+    /// <remarks>
+    /// The trailing <c>;</c> is decided on the TRIMMED text. Testing the raw
+    /// text asked whether the last CHARACTER was a semicolon, and a body ending
+    /// <c>";\n"</c> — which is most of them — answered no: the deploy wrote
+    /// <c>";\n;"</c> into the target, <see cref="BodyNormalizer"/> stripped only
+    /// one of the two, and the module compared Different against the source it
+    /// had just been copied from. Applying the script again changed nothing,
+    /// because the script was already emitting exactly what it had emitted the
+    /// first time. Found on 33 modules of a real database, after a deploy that
+    /// reported success.
+    /// </remarks>
     public static string ToCreateOrAlterScript(string body, string schema, string name)
     {
         ArgumentNullException.ThrowIfNull(body);
-        string ddl = EnsureCreateOrAlter(AlignNameToCatalog(body.TrimStart(), schema, name));
+        string ddl = EnsureCreateOrAlter(AlignNameToCatalog(body.TrimStart(), schema, name)).TrimEnd();
         return ddl.EndsWith(';') ? ddl : ddl + ";";
     }
 
