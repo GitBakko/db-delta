@@ -687,6 +687,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IReadOnlyList<DifferencePair> selected = SelectedPairs();
         if (selected.Count == 0) { StatusText = "Nessuna differenza selezionata."; return; }
 
+        // Asked BEFORE the save dialog: a cancel here means no script at all, so
+        // there is no point making the user choose a file first.
+        IReadOnlyDictionary<(string Schema, string Table, string Column), string>? backfill =
+            await AskForBackfillAsync(owner, selected).ConfigureAwait(true);
+        if (backfill is null) { StatusText = BackfillCancelledMessage; return; }
+
         FilePickerSaveOptions opts = new()
         {
             Title = "Salva script di allineamento",
@@ -703,7 +709,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             AppState.TargetConnectionString ?? string.Empty,
             DateTime.UtcNow,
             AppState.SourceDependencies,
-            AppState.TargetDependencies);
+            AppState.TargetDependencies,
+            backfill);
 
         await using Stream s = await file.OpenWriteAsync().ConfigureAwait(true);
         await using StreamWriter w = new(s, Encoding.UTF8);
@@ -734,6 +741,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IReadOnlyList<DifferencePair> selected = SelectedPairs();
         if (selected.Count == 0) { StatusText = "Nessuna differenza selezionata."; return; }
 
+        IReadOnlyDictionary<(string Schema, string Table, string Column), string>? backfill =
+            await AskForBackfillAsync(owner, selected).ConfigureAwait(true);
+        if (backfill is null) { StatusText = BackfillCancelledMessage; return; }
+
         // Script built up-front; the dialog owns the whole confirm → execute →
         // outcome flow and runs this delegate in-dialog (busy state + result
         // panel). Result stays null when the user cancels before executing.
@@ -744,7 +755,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             AppState.TargetConnectionString ?? string.Empty,
             DateTime.UtcNow,
             AppState.SourceDependencies,
-            AppState.TargetDependencies);
+            AppState.TargetDependencies,
+            backfill);
 
         ConfirmExecuteViewModel vm = new(
             objectCount: selected.Count,
@@ -778,4 +790,39 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// </summary>
     private IReadOnlyList<DifferencePair> SelectedPairs() =>
         [.. Rows.Where(r => r.IsSelected).Select(r => r.Pair)];
+
+    private const string BackfillCancelledMessage =
+        "Operazione annullata: mancano i valori per le colonne NOT NULL da aggiungere.";
+
+    /// <summary>
+    /// Runs the Msg 4901 preflight over the selection and, when it finds
+    /// anything, asks the operator for a value per column.
+    /// </summary>
+    /// <returns>
+    /// The map to hand the generator — empty when there was nothing to ask —
+    /// or <c>null</c> when the user cancelled, which aborts the whole action:
+    /// generating or executing anyway produces a script that dies on the first
+    /// populated table, halfway through.
+    /// </returns>
+    /// <remarks>
+    /// Shared by «Genera script» and «Allinea destinazione» deliberately. The
+    /// two paths build the same script from the same selection; a question asked
+    /// on only one of them is a deploy that fails from the button that was not
+    /// wired.
+    /// </remarks>
+    private async Task<IReadOnlyDictionary<(string Schema, string Table, string Column), string>?>
+        AskForBackfillAsync(Window owner, IReadOnlyList<DifferencePair> selected)
+    {
+        IReadOnlyList<BackfillRequirement> required =
+            BackfillPreflight.Scan(AppState.LastComparisonRaw!, selected);
+        if (required.Count == 0)
+        {
+            return FrozenDictionary<(string Schema, string Table, string Column), string>.Empty;
+        }
+
+        Views.BackfillDialog dialog = new() { DataContext = new BackfillViewModel(required) };
+        return await dialog
+            .ShowDialog<IReadOnlyDictionary<(string Schema, string Table, string Column), string>?>(owner)
+            .ConfigureAwait(true);
+    }
 }

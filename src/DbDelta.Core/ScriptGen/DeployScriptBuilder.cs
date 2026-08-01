@@ -53,6 +53,14 @@ public static class DeployScriptBuilder
     /// exists only on the target, so it appears in none of the source edges and
     /// the source list cannot order its drop at all.
     /// </param>
+    /// <param name="backfillDefaults">
+    /// Seed values the operator supplied for the columns
+    /// <see cref="BackfillPreflight"/> flagged — a NOT NULL column with no
+    /// default cannot be added to a populated table at all (Msg 4901). Null or
+    /// missing entries are not filled in on the user's behalf: the column is
+    /// emitted as the source declares it and the deploy fails, which is the
+    /// honest outcome.
+    /// </param>
     public static string Build(
         ComparisonResult fullResult,
         IReadOnlyList<DifferencePair> selectedPairs,
@@ -60,7 +68,8 @@ public static class DeployScriptBuilder
         string targetEndpointSummary,
         DateTime nowUtc,
         IReadOnlyList<Dependency.DependencyEdge> dependencies,
-        IReadOnlyList<Dependency.DependencyEdge> targetDependencies)
+        IReadOnlyList<Dependency.DependencyEdge> targetDependencies,
+        IReadOnlyDictionary<(string Schema, string Table, string Column), string>? backfillDefaults = null)
     {
         ArgumentNullException.ThrowIfNull(fullResult);
         ArgumentNullException.ThrowIfNull(selectedPairs);
@@ -93,7 +102,8 @@ public static class DeployScriptBuilder
             selection: selectedPairs,
             options: OptionsFor(selectedPairs),
             dependencies: dependencies,
-            dropDependencies: targetDependencies);
+            dropDependencies: targetDependencies,
+            backfillDefaults: backfillDefaults);
 
         return header.ToString() + body;
     }

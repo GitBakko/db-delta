@@ -1,0 +1,97 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DbDelta.App.ViewModels"
+        x:Class="DbDelta.App.Views.BackfillDialog"
+        x:DataType="vm:BackfillViewModel"
+        Title="Valori per le colonne NOT NULL"
+        Icon="/Assets/app-icon.png"
+        Width="760" Height="520"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BgBrush}">
+
+  <Grid Margin="24" RowDefinitions="Auto,14,Auto,14,*,14,Auto">
+
+    <!-- Warning header band -->
+    <Border Grid.Row="0" Background="{StaticResource WarningBrush}" CornerRadius="6" Padding="14,10">
+      <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+        <Path Width="20" Height="20" Stretch="Uniform" VerticalAlignment="Center"
+              Fill="{StaticResource WarningFgBrush}"
+              Data="M 12,2 L 22,20 L 2,20 Z M 12,9 L 12,14 M 12,16 L 12,18" />
+        <StackPanel Spacing="2">
+          <TextBlock Text="Colonne NOT NULL senza valore predefinito"
+                     FontWeight="SemiBold" FontSize="14"
+                     Foreground="{StaticResource WarningFgBrush}" />
+          <TextBlock FontSize="11" Foreground="{StaticResource WarningFgBrush}">
+            <Run Text="{Binding ColumnCount}" /><Run Text=" colonne non possono essere aggiunte alle righe già presenti senza un valore." />
+          </TextBlock>
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <!-- Why this is being asked -->
+    <TextBlock Grid.Row="2" TextWrapping="Wrap" FontSize="11"
+               Foreground="{StaticResource FgSubtleBrush}"
+               Text="Il valore indicato viene usato SOLO per riempire le righe esistenti: entra su un vincolo temporaneo che l'istruzione successiva elimina, quindi la colonna resta esattamente come la dichiara la provenienza. È un'espressione T-SQL, con le sue parentesi e i suoi apici — ad esempio ((0)) oppure ('GLS')." />
+
+    <!-- One row per column -->
+    <Border Grid.Row="4" Classes="surface-raised" ClipToBounds="True" Padding="0">
+      <DataGrid ItemsSource="{Binding Rows}"
+                AutoGenerateColumns="False"
+                IsReadOnly="True"
+                CanUserResizeColumns="True"
+                CanUserSortColumns="False"
+                GridLinesVisibility="Horizontal"
+                HeadersVisibility="Column"
+                ColumnHeaderHeight="32">
+        <DataGrid.Columns>
+
+          <DataGridTextColumn Header="Tabella" Width="2*"
+                              Binding="{Binding QualifiedTable}" />
+
+          <DataGridTextColumn Header="Colonna" Width="1.6*"
+                              Binding="{Binding ColumnName}" />
+
+          <DataGridTextColumn Header="Tipo" Width="1.2*"
+                              Binding="{Binding DataType}" />
+
+          <!-- A live TextBox rather than an editable text column: a DataGrid
+               cell commits its edit on losing focus, and the click that loses it
+               here is the click on «Applica» — the last value typed would be
+               dropped exactly when it matters. A two-way bound TextBox writes on
+               every keystroke, so what is on screen is what is sent. -->
+          <DataGridTemplateColumn Header="Valore" Width="2.4*">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate x:DataType="vm:BackfillRowViewModel">
+                <TextBox Text="{Binding Value, Mode=TwoWay}"
+                         Margin="4,0"
+                         Height="32"
+                         VerticalAlignment="Center"
+                         VerticalContentAlignment="Center"
+                         FontFamily="Cascadia Mono,Consolas,monospace"
+                         FontSize="11" />
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
+
+        </DataGrid.Columns>
+      </DataGrid>
+    </Border>
+
+    <!-- Action bar -->
+    <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <TextBlock Text="Compila ogni riga per continuare."
+                 VerticalAlignment="Center" FontSize="11"
+                 Foreground="{StaticResource DangerBrush}"
+                 IsVisible="{Binding !CanConfirm}" />
+      <Button Classes="ghost" Click="OnAnnullaClick">
+        <TextBlock Text="Annulla" />
+      </Button>
+      <Button Classes="primary" Click="OnApplicaClick"
+              IsEnabled="{Binding CanConfirm}">
+        <TextBlock Text="Applica" />
+      </Button>
+    </StackPanel>
+
+  </Grid>
+
+</Window>

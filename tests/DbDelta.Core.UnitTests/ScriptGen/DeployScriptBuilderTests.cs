@@ -74,6 +74,38 @@ public class DeployScriptBuilderTests
         script.Should().Contain("2025-06-15 09:30:00 UTC");
     }
 
+    /// <summary>
+    /// The values the backfill dialog collects have to survive the app's own
+    /// entry point, not just the generator's. Both buttons — «Genera script» and
+    /// «Allinea destinazione» — build their script through here, so a map
+    /// dropped at this seam is a deploy that dies on the first populated table
+    /// with the operator's answer already given.
+    /// </summary>
+    [Fact]
+    public void Build_passes_the_operator_supplied_backfill_values_through()
+    {
+        Table target = new("dbo", "TipiDoc", [new Column("Id", "int", false, 1)]);
+        Table source = new("dbo", "TipiDoc",
+            [new Column("Id", "int", false, 1), new Column("Corriere", "nvarchar(16)", false, 2)]);
+        DifferencePair pair = new(source.Identity, DifferenceStatus.Different, source, target);
+
+        string script = DeployScriptBuilder.Build(
+            new ComparisonResult([pair]),
+            [pair],
+            "src",
+            "tgt",
+            DateTime.UtcNow,
+            [],
+            [],
+            new Dictionary<(string, string, string), string>
+            {
+                [("dbo", "TipiDoc", "Corriere")] = "('GLS')",
+            });
+
+        script.Should().Contain("DEFAULT ('GLS')");
+        script.Should().Contain("DROP CONSTRAINT [DF__dbdelta_backfill__Corriere];");
+    }
+
     [Fact]
     public void Build_emits_full_verbose_envelope_without_orphan_GO()
     {
