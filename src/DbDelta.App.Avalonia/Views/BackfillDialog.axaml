@@ -11,17 +11,25 @@
 
   <Grid Margin="24" RowDefinitions="Auto,14,Auto,14,*,14,Auto">
 
-    <!-- Warning header band -->
-    <Border Grid.Row="0" Background="{StaticResource WarningBrush}" CornerRadius="6" Padding="14,10">
+    <!-- Warning header band: WarningStrong fill + FgOnAccent text and icon.
+         Two tokens were wrong here before, in opposite directions. WarningFg is
+         for text on the PALE warning surface, so on a solid band it was dark
+         brown on amber — reported from the app within minutes. And plain
+         Warning is not the fill: the dark ramp lightens it to read as an accent
+         on a near-black page, which puts white text at 2.4:1. WarningStrong is
+         the deep amber that carries FgOnAccent in both themes. -->
+    <Border Grid.Row="0" x:Name="WarningBand"
+            Background="{StaticResource WarningStrongBrush}" CornerRadius="6" Padding="14,10">
       <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
         <Path Width="20" Height="20" Stretch="Uniform" VerticalAlignment="Center"
-              Fill="{StaticResource WarningFgBrush}"
+              Fill="{StaticResource FgOnAccentBrush}"
               Data="M 12,2 L 22,20 L 2,20 Z M 12,9 L 12,14 M 12,16 L 12,18" />
         <StackPanel Spacing="2">
           <TextBlock Text="Colonne NOT NULL senza valore predefinito"
                      FontWeight="SemiBold" FontSize="14"
-                     Foreground="{StaticResource WarningFgBrush}" />
-          <TextBlock FontSize="11" Foreground="{StaticResource WarningFgBrush}">
+                     Foreground="{StaticResource FgOnAccentBrush}" />
+          <TextBlock FontSize="12" FontWeight="Medium"
+                     Foreground="{StaticResource FgOnAccentBrush}">
             <Run Text="{Binding ColumnCount}" /><Run Text=" colonne non possono essere aggiunte alle righe già presenti senza un valore." />
           </TextBlock>
         </StackPanel>

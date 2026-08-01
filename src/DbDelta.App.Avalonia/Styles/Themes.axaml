@@ -51,6 +51,11 @@
             <Color x:Key="Warning">#AE5C00</Color>
             <Color x:Key="WarningSoft">#FDECD5</Color>
             <Color x:Key="WarningFg">#883C00</Color>
+            <!-- Fill for a SOLID warning band carrying FgOnAccent text. In
+                 light mode that is Warning itself (white on it clears AA); the
+                 dark ramp lightens Warning to sit on a near-black page, and
+                 white on THAT is 2.4:1 — see the dark entry. -->
+            <Color x:Key="WarningStrong">#AE5C00</Color>
 
             <Color x:Key="Danger">#B31220</Color>
             <Color x:Key="DangerSoft">#FFE4E1</Color>
@@ -115,6 +120,11 @@
             <Color x:Key="Warning">#D89958</Color>
             <Color x:Key="WarningSoft">#2C1F11</Color>
             <Color x:Key="WarningFg">#E5BC85</Color>
+            <!-- NOT Warning: the dark ramp lightens it so it reads as an accent
+                 against a near-black page, which leaves white text on it at
+                 2.4:1. A solid band takes this deeper amber instead, where
+                 FgOnAccent clears AA. -->
+            <Color x:Key="WarningStrong">#8A4A00</Color>
 
             <Color x:Key="Danger">#E55C7D</Color>
             <Color x:Key="DangerSoft">#3A1822</Color>
@@ -182,6 +192,7 @@
     <SolidColorBrush x:Key="WarningBrush"         Color="{DynamicResource Warning}" />
     <SolidColorBrush x:Key="WarningSoftBrush"     Color="{DynamicResource WarningSoft}" />
     <SolidColorBrush x:Key="WarningFgBrush"       Color="{DynamicResource WarningFg}" />
+    <SolidColorBrush x:Key="WarningStrongBrush"   Color="{DynamicResource WarningStrong}" />
 
     <SolidColorBrush x:Key="DangerBrush"          Color="{DynamicResource Danger}" />
     <SolidColorBrush x:Key="DangerSoftBrush"      Color="{DynamicResource DangerSoft}" />
