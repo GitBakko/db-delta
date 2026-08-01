@@ -1,0 +1,24 @@
+# Line endings.
+#
+# .editorconfig declares `end_of_line = crlf` for every file, and the analyzers
+# enforce it: IDE0055 is an ERROR here (TreatWarningsAsErrors), and it reads the
+# newline characters between tokens as formatting. Without this file the repo
+# stored LF and only Windows checkouts got CRLF back — so the Windows CI job was
+# green while the Linux jobs failed to BUILD on a newline nobody could see, on a
+# file that was perfectly formatted on the machine that wrote it.
+#
+# `text eol=crlf` keeps the stored form LF (no churn in the object store) and
+# converts on checkout, so every platform compiles the same bytes the analyzer
+# was configured for.
+* text=auto
+
+*.cs      text eol=crlf
+*.csproj  text eol=crlf
+*.props   text eol=crlf
+*.targets text eol=crlf
+*.sln     text eol=crlf
+*.axaml   text eol=crlf
+*.editorconfig text eol=crlf
+
+# Shell scripts must stay LF whatever the platform, or they do not run.
+*.sh text eol=lf
