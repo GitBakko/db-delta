@@ -6,7 +6,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
-(Empty — next for v1.0.0 final: code signing, public alpha announcement.)
+### Fixed
+- **The Apps & Features entry had no icon and no install location.** Found by
+  installing the rc5 MSI rather than running from a build folder:
+  `ARPPRODUCTICON` alone leaves `DisplayIcon` an empty string, so the entry
+  showed a blank tile. `DisplayIcon` is now written explicitly, pointing at the
+  application's own executable, and `InstallLocation` is set.
+
+**The first final release will be `1.0.1`, not `1.0.0`.** Every release
+candidate carries the numeric ProductVersion `1.0.0`, and Windows Installer does
+not upgrade between identical versions — a `1.0.0` final would have made every
+RC user uninstall by hand first. Verified by installing a `1.0.1` MSI over rc5:
+one entry in Apps & Features, not two, and the CLI's folder neither duplicated
+nor lost from the machine PATH.
+
+Still gated on code signing (needs a certificate) and the public
+announcement.
 
 ## [1.0.0-rc5] — 2026-08-01 — fifth release candidate
 

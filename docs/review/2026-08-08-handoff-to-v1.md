@@ -36,20 +36,32 @@ senza timestamp la firma scade con il certificato.
 `README.md` con il link alla MSI dell'ultima Release e al sito DocFX
 (https://gitbakko.github.io/db-delta/), note di rilascio, pubblicazione.
 
-### Poi: taggare `v1.0.0`
+### Poi: taggare `v1.0.1`
+
+**La prima release definitiva è `1.0.1`, non `1.0.0` — deciso dal proprietario
+l'2026-08-08.** Motivo: rc1…rc5 hanno tutte `ProductVersion` numerica `1.0.0`,
+e `MajorUpgrade` non scatta fra versioni identiche, quindi una `1.0.0` finale
+avrebbe costretto ogni utente di una RC a disinstallare a mano. Con `1.0.1`
+l'upgrade è automatico.
 
 La pipeline pubblica un tag senza `-` come **non-prerelease «Latest»** da sola —
-il flag viene da `contains(github.ref_name, '-')`. Nient'altro da cambiare.
+il flag viene da `contains(github.ref_name, '-')` — e ricava la `MsiVersion` dal
+numero prima del primo `-`, quindi `v1.0.1` diventa `MsiVersion=1.0.1` senza
+toccare niente.
 
-**Attenzione al numero:** rc1…rc5 hanno tutte `ProductVersion` numerica `1.0.0`,
-e la v1.0.0 finale avrà la stessa. `MajorUpgrade` non scatta fra versioni
-identiche, quindi chi ha una RC installata **deve disinstallarla prima**. Se
-vuoi che l'upgrade sia automatico, la finale deve avere una `MsiVersion`
-diversa (es. `1.0.1`), e allora va deciso ora.
+**L'upgrade è stato verificato**, non dedotto: MSI `1.0.1` costruita in locale e
+installata SOPRA la rc5 senza disinstallarla prima. Esito in
+`scripts/SMOKE-RESULTS.md`. Le due cose che potevano rompersi e non si sono
+rotte: una sola voce in Installazione applicazioni (non due), e la cartella
+della CLI **non** duplicata né persa dal PATH di macchina — `MajorUpgrade`
+programma `RemoveExistingProducts` dopo `InstallValidate`, quindi il vecchio
+prodotto esce prima che il nuovo entri e la sua disinstallazione non porta via
+la voce PATH appena scritta.
 
 **La correzione ARP dell'installer (`4b36cb4`) è committata ma NON è nella MSI di
-rc5.** Entra automaticamente nel prossimo tag. Se vuoi vederla prima della
-finale, serve un rc6; se no, arriva con la v1.0.0.
+rc5.** Entra automaticamente nel prossimo tag: arriva con la v1.0.1, e la prova
+di upgrade qui sopra l'ha già esercitata (`DisplayIcon` e `InstallLocation`
+risultano popolate dopo l'aggiornamento).
 
 ## Rinviato per decisione del proprietario
 

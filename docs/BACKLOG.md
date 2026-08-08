@@ -55,9 +55,16 @@ end of verified work — tags/releases still need the owner's ok** (changed
       Two release-pipeline fixes were needed along the way: a `prerelease` flag
       from the tag name (`00455c7`) and a numeric MSI ProductVersion for
       hyphen/semver-label tags (`12017f2` — WiX rejects `1.0.0-rc1`).
-- [ ] **v1.0.0 FINAL** still gated on code signing (A, cert blocked) +
-      public announcement (A). When ready, tag `v1.0.0` — the pipeline now
-      publishes it as a non-prerelease "Latest" automatically.
+- [ ] **v1.0.1 FINAL** — **the first final release is `1.0.1`, not `1.0.0`**
+      (owner decision, 2026-08-08): every RC carries numeric ProductVersion
+      `1.0.0` and `MajorUpgrade` does not fire between identical versions, so a
+      `1.0.0` final would force every RC user to uninstall by hand. The upgrade
+      path was verified, not assumed — a locally built `1.0.1` MSI installed
+      over rc5 leaves one ARP entry and one PATH entry (see
+      `scripts/SMOKE-RESULTS.md`, 2026-08-08). Still gated on code signing
+      (A, cert blocked) + public announcement (A). When ready, tag `v1.0.1` —
+      the pipeline publishes a label-free tag as non-prerelease "Latest" and
+      derives `MsiVersion=1.0.1` on its own, nothing to change.
 
 ## C. Optional / ongoing hardening
 

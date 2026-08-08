@@ -4,6 +4,42 @@ Sanitised summary of M13 smoke runs against the two real PcrmV2Pl
 databases. Raw HTML / JSON / SQL outputs live in `scripts/smoke/` and
 are git-ignored because they carry production schema names.
 
+## 2026-08-08 — prova di UPGRADE della MSI: 1.0.0-rc5 → 1.0.1
+
+La prima release definitiva sarà **1.0.1** e non 1.0.0, così `MajorUpgrade`
+scatta sopra le RC (che hanno tutte `ProductVersion` numerica 1.0.0) invece di
+costringere ogni utente a disinstallare a mano. Nessuno aveva mai eseguito un
+upgrade di questo prodotto, quindi è stato provato prima di deciderlo per buono:
+MSI `1.0.1` costruita in locale e installata **sopra** la rc5, senza
+disinstallarla.
+
+| Verifica | Prima | Dopo |
+|----------|-------|------|
+| Voci in Installazione applicazioni | 1 (1.0.0) | **1** (1.0.1) — non due |
+| `DbDelta\cli` nel PATH di macchina | ×1 | **×1** — non duplicata, non persa |
+| `DisplayIcon` | vuota | `C:\Program Files\DbDelta\DbDelta.App.exe` |
+| `InstallLocation` | vuota | `C:\Program Files\DbDelta\` |
+| app + CLI + collegamento | ok | ok, entrambi riportano `1.0.1` |
+
+`msiexec` esce 0 senza alcuna disinstallazione manuale. Le due cose che potevano
+rompersi sono proprio quelle due righe di mezzo: una seconda voce ARP fantasma,
+e la voce PATH scritta dal nuovo prodotto e poi portata via dalla disinstallazione
+del vecchio. Non succede perché `MajorUpgrade` programma
+`RemoveExistingProducts` subito dopo `InstallValidate` — verificato nel log, non
+dedotto:
+
+```
+1. InstallValidate
+2. RemoveExistingProducts   <-- il vecchio esce qui
+3. InstallFiles             <-- il nuovo entra dopo
+4. InstallFinalize
+```
+
+La correzione ARP di `4b36cb4` viaggia con questa MSI, ed è ciò che popola le due
+righe centrali della tabella. La macchina è stata riportata alla **rc5
+rilasciata** dopo la prova: una build locale stampata `1.0.1` avrebbe un pill di
+versione che punta a un'ancora inesistente sul sito.
+
 ## 2026-08-01 — commit `710394e` — **primo giro chiuso: deploy completo + convergenza a zero**
 
 Source `192.168.3.243` / `PcrmV2Pl_test` → target stesso server / `PcrmV2Pl_test2`,
