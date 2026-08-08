@@ -1,6 +1,9 @@
 # HANDOFF — il primo smoke live, e i due bug di deploy che ha trovato
 
-**Da leggere per primo in una sessione nuova.**
+> **STORICO.** L'handoff corrente è `2026-08-08-handoff-to-v1.md`. Questo
+> documento resta perché contiene la diagnosi dei 33 moduli, il confronto con
+> Redgate e i due bug del primo smoke — tutto materiale ancora valido. Lo stato
+> e le voci aperte qui sotto sono superati.
 
 - **HEAD:** `710394e` su `main`, **da pushare**, working tree pulito.
 - **Test:** 676 verdi su 10 progetti (Compat esclusa, gira solo di notte).
