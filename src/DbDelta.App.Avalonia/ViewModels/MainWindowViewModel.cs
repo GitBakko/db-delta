@@ -614,6 +614,21 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public async Task NewProjectAsync(Window? owner)
     {
         if (owner is null) { return; }
+
+        // A project is open: starting a new one drops the current comparison,
+        // the rows the user has ticked, and anything not yet saved or executed.
+        if (AppState.CurrentProject is not null)
+        {
+            bool go = await Views.ConfirmDialog.AskAsync(
+                owner,
+                title: "Nuovo progetto",
+                headline: "Vuoi abbandonare il progetto corrente?",
+                body: "Le modifiche non salvate e le operazioni non ancora eseguite "
+                    + "andranno perse. Salva prima il progetto se vuoi conservarle.",
+                confirmLabel: "Abbandona e crea").ConfigureAwait(true);
+            if (!go) { return; }
+        }
+
         await RunSetupDialogAsync(owner, project: null).ConfigureAwait(true);
     }
 
