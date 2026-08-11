@@ -6,22 +6,52 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [1.0.1] — 2026-08-11 — first final release
+
+**The first final release is `1.0.1`, not `1.0.0`.** Every release candidate
+carries the numeric ProductVersion `1.0.0`, and Windows Installer does not
+upgrade between identical versions — a `1.0.0` final would have made every RC
+user uninstall by hand first. Verified by installing a `1.0.1` MSI over rc5:
+one entry in Apps & Features, not two, and the CLI's folder neither duplicated
+nor lost from the machine PATH.
+
+The MSI is still unsigned. Code signing needs a certificate that has not been
+obtained; it can be added later without changing anything else in the product.
+
 ### Fixed
-- **The Apps & Features entry had no icon and no install location.** Found by
+
+- **A server, once picked, could not be changed.** The server field in the
+  new-project dialog was an autocomplete box that filtered its own list by the
+  text it had just written: selecting a server left exactly one entry matching,
+  so correcting a wrong pick was impossible, and clearing the field to start
+  over took the app down. Browsing and typing are now two controls — a
+  drop-down that always lists every known server, and a text field that stays
+  editable so a server the network scan cannot see is still reachable.
+- **Three of the four ways into the new-project dialog opened it half-wired.**
+  Only the startup path filled the server list from the connection store and
+  started the network scan. "Nuovo", "Modifica" and loading a project from the
+  recent list each built the dialog themselves and got neither, so the picker
+  came up empty. The scan now belongs to the dialog and the seeding to the
+  view-model, where a caller cannot forget them.
+- **The "Nuovo" toolbar button did nothing.** It had been left as an empty stub
+  and never wired to the dialog it was supposed to open.
+- **Loading a project threw away the discovered servers.** They come from the
+  network scan and the connection store, not from the project, and clearing
+  them emptied the picker exactly when the user was about to change endpoint.
+
+### Added
+
+- **"Nuovo" asks before discarding an open project.** Starting a new project
+  silently dropped the current comparison, the ticked rows, and anything not
+  yet saved or executed.
+
+### Changed
+
+- **The Apps & Features entry has an icon and an install location.** Found by
   installing the rc5 MSI rather than running from a build folder:
   `ARPPRODUCTICON` alone leaves `DisplayIcon` an empty string, so the entry
   showed a blank tile. `DisplayIcon` is now written explicitly, pointing at the
   application's own executable, and `InstallLocation` is set.
-
-**The first final release will be `1.0.1`, not `1.0.0`.** Every release
-candidate carries the numeric ProductVersion `1.0.0`, and Windows Installer does
-not upgrade between identical versions — a `1.0.0` final would have made every
-RC user uninstall by hand first. Verified by installing a `1.0.1` MSI over rc5:
-one entry in Apps & Features, not two, and the CLI's folder neither duplicated
-nor lost from the machine PATH.
-
-Still gated on code signing (needs a certificate) and the public
-announcement.
 
 ## [1.0.0-rc5] — 2026-08-01 — fifth release candidate
 
