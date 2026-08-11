@@ -372,6 +372,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         // Reuse the setup dialog so the user can confirm credentials (DPAPI
         // auto-fill restores passwords for RememberCredentials endpoints).
         var vm = ProjectSetupViewModel.FromProject(project, _credentials);
+        vm.SeedRecentServersFrom(AppState.Connections?.Entries);
         Views.ProjectSetupDialog dialog = new() { DataContext = vm };
 
         DbDeltaProject? result =
@@ -604,11 +605,48 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     // ── New topbar commands ──────────────────────────────────────────────────
 
-    /// <summary>Stub — opens the Wave 2C new-project dialog when ready.</summary>
+    /// <summary>
+    /// Opens the setup dialog on a blank project. On OK the result replaces
+    /// <c>AppState.CurrentProject</c> and a comparison is fired, exactly as the
+    /// startup dialog does.
+    /// </summary>
     [RelayCommand]
-    public void NewProject()
+    public async Task NewProjectAsync(Window? owner)
     {
-        // Wave 2C stub — no-op until ProjectSetupDialog routing is wired.
+        if (owner is null) { return; }
+        await RunSetupDialogAsync(owner, project: null).ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// Shared setup-dialog round trip: build the view-model, seed the server
+    /// picker from the connection store, show, and adopt the result.
+    /// </summary>
+    /// <remarks>
+    /// The seeding is the point. "Nuovo" and "Modifica" each used to new up the
+    /// dialog themselves and neither passed the connection store, so both
+    /// opened with an empty server drop-down.
+    /// </remarks>
+    private async Task<DbDeltaProject?> RunSetupDialogAsync(Window owner, DbDeltaProject? project)
+    {
+        var vm = ProjectSetupViewModel.FromProject(project, _credentials);
+        vm.SeedRecentServersFrom(AppState.Connections?.Entries);
+        Views.ProjectSetupDialog dialog = new() { DataContext = vm };
+
+        DbDeltaProject? result =
+            await dialog.ShowDialog<DbDeltaProject?>(owner).ConfigureAwait(true);
+        if (result is null) { return null; }
+
+        AppState.SourceConnectionString = dialog.LastSourceConnectionString ?? string.Empty;
+        AppState.TargetConnectionString = dialog.LastTargetConnectionString ?? string.Empty;
+        AppState.CurrentProject = result;
+
+        if (!string.IsNullOrWhiteSpace(AppState.SourceConnectionString)
+            && !string.IsNullOrWhiteSpace(AppState.TargetConnectionString))
+        {
+            await AppState.CompareCommand.ExecuteAsync(CancellationToken.None).ConfigureAwait(true);
+        }
+
+        return result;
     }
 
     /// <summary>
@@ -625,22 +663,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             return;
         }
 
-        var vm = ProjectSetupViewModel.FromProject(AppState.CurrentProject, _credentials);
-        Views.ProjectSetupDialog dialog = new() { DataContext = vm };
-
-        DbDeltaProject? edited =
-            await dialog.ShowDialog<DbDeltaProject?>(owner).ConfigureAwait(true);
-        if (edited is null) { return; }
-
-        AppState.SourceConnectionString = dialog.LastSourceConnectionString ?? string.Empty;
-        AppState.TargetConnectionString = dialog.LastTargetConnectionString ?? string.Empty;
-        AppState.CurrentProject = edited;
-
-        if (!string.IsNullOrWhiteSpace(AppState.SourceConnectionString)
-            && !string.IsNullOrWhiteSpace(AppState.TargetConnectionString))
-        {
-            await AppState.CompareCommand.ExecuteAsync(CancellationToken.None).ConfigureAwait(true);
-        }
+        await RunSetupDialogAsync(owner, AppState.CurrentProject).ConfigureAwait(true);
     }
 
     /// <summary>Re-runs the comparison and rebuilds the grid. Bypasses the

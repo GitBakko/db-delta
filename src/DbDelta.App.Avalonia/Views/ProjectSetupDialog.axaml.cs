@@ -15,6 +15,19 @@ public partial class ProjectSetupDialog : Window
     public ProjectSetupDialog()
     {
         InitializeComponent();
+
+        // Fire the shared network scan as soon as the dialog is up, so the
+        // server drop-down fills itself. It lives here rather than at each call
+        // site because it was wired into the startup path alone: "Nuovo",
+        // "Modifica" and load-from-MRU all opened with an empty picker.
+        Opened += (_, _) =>
+        {
+            if (DataContext is ProjectSetupViewModel vm
+                && vm.ScanForCommand.CanExecute(null))
+            {
+                _ = vm.ScanForCommand.ExecuteAsync(null);
+            }
+        };
     }
 
     // ── Database chevron clicks ───────────────────────────────────────────────

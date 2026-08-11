@@ -93,6 +93,7 @@
                text label regardless of Stretch=Uniform aspect-fit. -->
           <Button Classes="ghost"
                   Command="{Binding NewProjectCommand}"
+                  CommandParameter="{Binding $parent[Window]}"
                   ToolTip.Tip="Crea un nuovo progetto DbDelta"
                   Padding="6"
                   VerticalContentAlignment="Center">

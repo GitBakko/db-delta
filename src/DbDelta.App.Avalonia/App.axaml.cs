@@ -45,30 +45,12 @@ public partial class App : Application
                 // user/password pairs on server selection (DPAPI on Windows).
                 ProjectSetupViewModel setupVm = new(credentials);
 
-                // Seed the "Usati di recente" section in the server picker
-                // from the connection store (deduped by lowered server name,
-                // ordered by LastUsedUtc desc). The auto-scan that follows will
-                // append a "Risultati scansione" section below it.
-                List<(string Name, string? IpAddress)> recents =
-                [.. connections.Entries
-                    .Where(e => !string.IsNullOrWhiteSpace(e.ServerName))
-                    .GroupBy(e => e.ServerName, StringComparer.OrdinalIgnoreCase)
-                    .Select(g => g.OrderByDescending(e => e.LastUsedUtc).First())
-                    .OrderByDescending(e => e.LastUsedUtc)
-                    .Select(e => (Name: e.ServerName, IpAddress: (string?)null))];
-                setupVm.SeedRecentServers(recents);
+                // Seed the "Usati di recente" section in the server picker from
+                // the connection store; the dialog's own auto-scan appends a
+                // "Risultati scansione" section below it.
+                setupVm.SeedRecentServersFrom(connections.Entries);
 
                 ProjectSetupDialog dialog = new() { DataContext = setupVm };
-
-                // Auto-fire the shared network scan as soon as the dialog opens
-                // so the picker populates without the user having to click.
-                dialog.Opened += (_, _) =>
-                {
-                    if (setupVm.ScanForCommand.CanExecute(null))
-                    {
-                        _ = setupVm.ScanForCommand.ExecuteAsync(null);
-                    }
-                };
 
                 DbDeltaProject? result =
                     await dialog.ShowDialog<DbDeltaProject?>(mainWindow)

@@ -529,9 +529,9 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
         Encrypt = endpoint.Authentication.Encrypt;
         TrustServerCertificate = endpoint.Authentication.TrustServerCertificate;
 
-        // Clear runtime state.
-        ServerSuggestions.Clear();
-        HasServerSuggestions = false;
+        // Clear runtime state — but NOT ServerSuggestions: those come from the
+        // network scan and the connection store, not from the project, and
+        // dropping them left the picker empty right after a load.
         AvailableDatabases.Clear();
         HasDatabases = false;
         ServerVersion = null;

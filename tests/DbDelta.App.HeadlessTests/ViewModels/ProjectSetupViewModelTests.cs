@@ -18,6 +18,18 @@ public class ProjectSetupViewModelTests
         ep.Password = "p4ssw0rd";
     }
 
+    private static ConnectionEntry Entry(string server, string db, int day) => new(
+        Id: Guid.NewGuid(),
+        Name: $"{server}.{db}",
+        ServerName: server,
+        DatabaseName: db,
+        ConnectionStringTemplate: "",
+        EnvironmentTag: "Dev",
+        EnvironmentColorHex: "#0054BD",
+        IsPinned: false,
+        CreatedUtc: new DateTime(2026, 8, day, 0, 0, 0, DateTimeKind.Utc),
+        LastUsedUtc: new DateTime(2026, 8, day, 0, 0, 0, DateTimeKind.Utc));
+
     private static DbDeltaProject BuildFullProject()
     {
         ProjectConnectionRef srcConn = new(
@@ -255,17 +267,47 @@ public class ProjectSetupViewModelTests
     }
 
     [AvaloniaFact]
-    public void LoadFrom_clears_runtime_scan_state()
+    public void LoadFrom_clears_the_state_that_belongs_to_the_old_connection()
     {
         ProjectSetupViewModel vm = new();
-        // Simulate a server scan result existing before load.
-        vm.Source.ServerSuggestions.Add(new Persistence.Sql.DiscoveredServer("OLD", null));
+        vm.Source.AvailableDatabases.Add("OLD_DB");
+        vm.Source.HasDatabases = true;
+        vm.Source.ServerVersion = "SQL Server 2016";
+
+        vm.LoadFrom(BuildFullProject());
+
+        vm.Source.AvailableDatabases.Should().BeEmpty();
+        vm.Source.HasDatabases.Should().BeFalse();
+        vm.Source.ServerVersion.Should().BeNull();
+    }
+
+    /// <summary>
+    /// Discovered servers come from the network and the connection store, not
+    /// from the project — wiping them on load left the picker empty exactly
+    /// when the user was about to change endpoint.
+    /// </summary>
+    [AvaloniaFact]
+    public void LoadFrom_keeps_the_discovered_servers()
+    {
+        ProjectSetupViewModel vm = new();
+        vm.Source.ServerSuggestions.Add(new Persistence.Sql.DiscoveredServer("SCANNED", null));
         vm.Source.HasServerSuggestions = true;
 
-        DbDeltaProject original = BuildFullProject();
-        vm.LoadFrom(original);
+        vm.LoadFrom(BuildFullProject());
 
-        vm.Source.ServerSuggestions.Should().BeEmpty();
-        vm.Source.HasServerSuggestions.Should().BeFalse();
+        vm.Source.ServerSuggestions.Should().ContainSingle(s => s.Name == "SCANNED");
+        vm.Source.HasServerSuggestions.Should().BeTrue();
+    }
+
+    [AvaloniaFact]
+    public void SeedRecentServersFrom_lists_each_server_once_most_recent_first()
+    {
+        ProjectSetupViewModel vm = new();
+        vm.SeedRecentServersFrom(
+            [Entry("SRV-A", "one", 1), Entry("SRV-A", "two", 3), Entry("SRV-B", "three", 2)]);
+
+        string[] servers = [.. vm.Source.ServerSuggestions.Where(s => !s.IsHeaderOnly).Select(s => s.Name)];
+        servers.Should().Equal("SRV-A", "SRV-B");
+        vm.Target.ServerSuggestions.Should().NotBeEmpty("both panels share the picker");
     }
 }

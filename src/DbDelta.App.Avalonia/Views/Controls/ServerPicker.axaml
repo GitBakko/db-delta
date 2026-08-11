@@ -19,7 +19,7 @@
                 HorizontalAlignment="Stretch"
                 ItemsSource="{Binding Servers, ElementName=Self}"
                 ItemTemplate="{StaticResource DiscoveredServerItemTemplate}"
-                IsVisible="{Binding HasServers, ElementName=Self}"
+                IsEnabled="{Binding HasServers, ElementName=Self}"
                 PlaceholderText="Seleziona un server rilevato…"
                 ToolTip.Tip="Elenco dei server usati di recente e trovati dalla scansione">
         <ComboBox.Styles>

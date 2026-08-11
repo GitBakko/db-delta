@@ -122,6 +122,30 @@ public sealed partial class ProjectSetupViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Same, straight from the connection store: one row per distinct server,
+    /// most recently used first.
+    /// </summary>
+    /// <remarks>
+    /// Every route that opens this dialog needs it — startup, "Nuovo",
+    /// "Modifica", loading a project from the MRU. It used to be inlined in the
+    /// startup path only, so the other three opened with an empty picker.
+    /// </remarks>
+    public void SeedRecentServersFrom(IEnumerable<ConnectionEntry>? entries)
+    {
+        if (entries is null) { return; }
+
+        List<(string Name, string? IpAddress)> recents =
+        [.. entries
+            .Where(e => !string.IsNullOrWhiteSpace(e.ServerName))
+            .GroupBy(e => e.ServerName, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.OrderByDescending(e => e.LastUsedUtc).First())
+            .OrderByDescending(e => e.LastUsedUtc)
+            .Select(e => (Name: e.ServerName, IpAddress: (string?)null))];
+
+        SeedRecentServers(recents);
+    }
+
+    /// <summary>
     /// Copies the source-panel connection fields into the target panel so the
     /// user can run a same-server compare with one click. Triggered by the
     /// "Clona configurazione" footer button.
