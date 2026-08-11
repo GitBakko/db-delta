@@ -3,7 +3,6 @@
         xmlns:vm="using:DbDelta.App.ViewModels"
         xmlns:v="using:DbDelta.App.Views"
         xmlns:c="using:DbDelta.App.Views.Controls"
-        xmlns:sql="using:DbDelta.Persistence.Sql"
         x:Class="DbDelta.App.Views.ProjectSetupDialog"
         x:DataType="vm:ProjectSetupViewModel"
         Title="Nuovo progetto"
@@ -95,37 +94,13 @@
                          Text="{Binding ServerCountText}"
                          IsVisible="{Binding HasServerSuggestions}" />
             </StackPanel>
-            <Grid ColumnDefinitions="*,Auto,Auto">
-              <AutoCompleteBox x:Name="SrcServerBox" Grid.Column="0"
-                               Text="{Binding ServerName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                               ItemsSource="{Binding ServerSuggestions}"
-                               ValueMemberBinding="{Binding Name}"
-                               FilterMode="Custom"
-                               MinimumPrefixLength="0" MinimumPopulateDelay="0"
-                               PlaceholderText="Scrivi o seleziona…">
-                <AutoCompleteBox.ItemTemplate>
-                  <!-- Shared DataTemplate — see Styles/Templates.axaml. -->
-                  <StaticResource ResourceKey="DiscoveredServerItemTemplate" />
-                </AutoCompleteBox.ItemTemplate>
-              </AutoCompleteBox>
-              <Button Grid.Column="1" Classes="ghost" Margin="6,0,0,0"
-                      Click="OnSrcServerDropToggleClick" IsVisible="{Binding HasServerSuggestions}"
-                      ToolTip.Tip="Mostra elenco server rilevati">
-                <Path Width="12" Height="12" Stretch="Uniform"
-                      Stroke="{Binding $parent[Button].Foreground}"
-                      StrokeThickness="1.8" StrokeLineCap="Round" StrokeJoin="Round"
-                      Fill="Transparent" Data="M 5,8 L 12,15 L 19,8" />
-              </Button>
-              <Button Grid.Column="2" Classes="ghost-violet" Margin="6,0,0,0"
-                      MinWidth="120" MaxWidth="120"
-                      Command="{Binding $parent[Window].((vm:ProjectSetupViewModel)DataContext).ScanForCommand}"
-                      CommandParameter="source"
-                      ToolTip.Tip="Cerca server SQL in rete (popola entrambi i pannelli)">
-                <c:LoadingContent IdleText="Scansiona"
-                                  IsBusy="{Binding IsScanningServers}"
-                                  IconPath="M 11,4 A 7,7 0 1 1 4,11 A 7,7 0 0 1 11,4 M 16,16 L 20,20" />
-              </Button>
-            </Grid>
+            <c:ServerPicker x:Name="SrcServerPicker"
+                            Servers="{Binding ServerSuggestions}"
+                            HasServers="{Binding HasServerSuggestions}"
+                            ServerName="{Binding ServerName, Mode=TwoWay}"
+                            IsScanning="{Binding IsScanningServers}"
+                            ScanCommand="{Binding $parent[Window].((vm:ProjectSetupViewModel)DataContext).ScanForCommand}"
+                            ScanCommandParameter="source" />
             <!-- Error-only scan status (counter is inline above) -->
             <TextBlock Text="{Binding ScanStatusMessage}" FontSize="11"
                        Foreground="{StaticResource FgMutedBrush}"
@@ -212,37 +187,13 @@
                          Text="{Binding ServerCountText}"
                          IsVisible="{Binding HasServerSuggestions}" />
             </StackPanel>
-            <Grid ColumnDefinitions="*,Auto,Auto">
-              <AutoCompleteBox x:Name="TgtServerBox" Grid.Column="0"
-                               Text="{Binding ServerName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                               ItemsSource="{Binding ServerSuggestions}"
-                               ValueMemberBinding="{Binding Name}"
-                               FilterMode="Custom"
-                               MinimumPrefixLength="0" MinimumPopulateDelay="0"
-                               PlaceholderText="Scrivi o seleziona…">
-                <AutoCompleteBox.ItemTemplate>
-                  <!-- Shared DataTemplate — see Styles/Templates.axaml. -->
-                  <StaticResource ResourceKey="DiscoveredServerItemTemplate" />
-                </AutoCompleteBox.ItemTemplate>
-              </AutoCompleteBox>
-              <Button Grid.Column="1" Classes="ghost" Margin="6,0,0,0"
-                      Click="OnTgtServerDropToggleClick" IsVisible="{Binding HasServerSuggestions}"
-                      ToolTip.Tip="Mostra elenco server rilevati">
-                <Path Width="12" Height="12" Stretch="Uniform"
-                      Stroke="{Binding $parent[Button].Foreground}"
-                      StrokeThickness="1.8" StrokeLineCap="Round" StrokeJoin="Round"
-                      Fill="Transparent" Data="M 5,8 L 12,15 L 19,8" />
-              </Button>
-              <Button Grid.Column="2" Classes="ghost-violet" Margin="6,0,0,0"
-                      MinWidth="120" MaxWidth="120"
-                      Command="{Binding $parent[Window].((vm:ProjectSetupViewModel)DataContext).ScanForCommand}"
-                      CommandParameter="target"
-                      ToolTip.Tip="Cerca server SQL in rete (popola entrambi i pannelli)">
-                <c:LoadingContent IdleText="Scansiona"
-                                  IsBusy="{Binding IsScanningServers}"
-                                  IconPath="M 11,4 A 7,7 0 1 1 4,11 A 7,7 0 0 1 11,4 M 16,16 L 20,20" />
-              </Button>
-            </Grid>
+            <c:ServerPicker x:Name="TgtServerPicker"
+                            Servers="{Binding ServerSuggestions}"
+                            HasServers="{Binding HasServerSuggestions}"
+                            ServerName="{Binding ServerName, Mode=TwoWay}"
+                            IsScanning="{Binding IsScanningServers}"
+                            ScanCommand="{Binding $parent[Window].((vm:ProjectSetupViewModel)DataContext).ScanForCommand}"
+                            ScanCommandParameter="target" />
             <TextBlock Text="{Binding ScanStatusMessage}" FontSize="11"
                        Foreground="{StaticResource FgMutedBrush}"
                        IsVisible="{Binding ScanStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />

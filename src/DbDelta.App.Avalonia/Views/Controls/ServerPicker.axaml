@@ -1,0 +1,50 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:DbDelta.App.Views.Controls"
+             xmlns:sql="using:DbDelta.Persistence.Sql"
+             x:Class="DbDelta.App.Views.Controls.ServerPicker"
+             x:DataType="c:ServerPicker"
+             x:Name="Self">
+
+  <!-- Server picker: a ComboBox that always lists every known server (recents
+       + scan results) and a plain TextBox holding the name that is actually
+       used. Picking from the list writes into the box; the box stays editable
+       so a server the scan cannot see (other subnet, SQL Browser off) is still
+       reachable. See CLAUDE.md UI rule #3 (DRY) — this markup used to be
+       copy-pasted into the Source and Target panels. -->
+  <StackPanel Spacing="6">
+
+    <Grid ColumnDefinitions="*,Auto">
+      <ComboBox x:Name="PART_ServerList" Grid.Column="0"
+                HorizontalAlignment="Stretch"
+                ItemsSource="{Binding Servers, ElementName=Self}"
+                ItemTemplate="{StaticResource DiscoveredServerItemTemplate}"
+                IsVisible="{Binding HasServers, ElementName=Self}"
+                PlaceholderText="Seleziona un server rilevato…"
+                ToolTip.Tip="Elenco dei server usati di recente e trovati dalla scansione">
+        <ComboBox.Styles>
+          <!-- Section headers are dividers, not servers: never selectable. -->
+          <Style Selector="ComboBoxItem" x:DataType="sql:DiscoveredServer">
+            <Setter Property="IsEnabled" Value="{Binding !IsHeaderOnly}" />
+          </Style>
+        </ComboBox.Styles>
+      </ComboBox>
+
+      <Button Grid.Column="1" Classes="ghost-violet" Margin="6,0,0,0"
+              MinWidth="120" MaxWidth="120"
+              Command="{Binding ScanCommand, ElementName=Self}"
+              CommandParameter="{Binding ScanCommandParameter, ElementName=Self}"
+              ToolTip.Tip="Cerca server SQL in rete (popola entrambi i pannelli)">
+        <c:LoadingContent IdleText="Scansiona"
+                          IsBusy="{Binding IsScanning, ElementName=Self}"
+                          IconPath="M 11,4 A 7,7 0 1 1 4,11 A 7,7 0 0 1 11,4 M 16,16 L 20,20" />
+      </Button>
+    </Grid>
+
+    <TextBox x:Name="PART_ServerName"
+             Text="{Binding ServerName, ElementName=Self, Mode=TwoWay}"
+             PlaceholderText="Nome server…" />
+
+  </StackPanel>
+
+</UserControl>
