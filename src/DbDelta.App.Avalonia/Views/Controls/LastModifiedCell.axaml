@@ -1,0 +1,42 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:DbDelta.App.Views.Controls"
+             x:Class="DbDelta.App.Views.Controls.LastModifiedCell"
+             x:DataType="c:LastModifiedCell"
+             x:Name="Self">
+
+  <!-- One "Ultima modifica" cell, used by BOTH the source and the target
+       column. The marker (arrow + bold) says which of the two sides changed
+       last; it is bold AND a glyph, never colour alone. Consumers set Text,
+       IsNewer and Tip. -->
+  <UserControl.Styles>
+    <!-- Bold via a bound class rather than a bool→FontWeight converter: one
+         less converter to register, and the weight stays a styling concern. -->
+    <Style Selector="TextBlock.newer">
+      <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+  </UserControl.Styles>
+
+  <StackPanel Orientation="Horizontal" Spacing="4"
+              VerticalAlignment="Center" Margin="4,0"
+              ToolTip.Tip="{Binding Tip, ElementName=Self}">
+
+    <!-- Bigger than the timestamp next to it and on the success ramp: at the
+         digits' own size and in the generic accent it read as punctuation. -->
+    <TextBlock x:Name="PartArrow"
+               Text="▲"
+               FontSize="13"
+               VerticalAlignment="Center"
+               Foreground="{DynamicResource SuccessBrush}"
+               IsVisible="{Binding IsNewer, ElementName=Self}" />
+
+    <TextBlock x:Name="PartValue"
+               Classes.newer="{Binding IsNewer, ElementName=Self}"
+               Text="{Binding Text, ElementName=Self}"
+               FontFamily="Cascadia Mono,Consolas,monospace"
+               FontSize="11"
+               VerticalAlignment="Center" />
+
+  </StackPanel>
+
+</UserControl>

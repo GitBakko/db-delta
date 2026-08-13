@@ -14,6 +14,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   active, and the choice is remembered in
   `%LOCALAPPDATA%\DbDelta\ui-settings.json`. "Sistema" tracks the Windows
   light/dark setting; a saved Chiaro or Scuro overrides it.
+- **The results grid marks which side changed last.** In the two "Ultima
+  modifica" columns, the more recent of the two dates is now shown in bold with
+  an arrow, so the direction to align in is visible without reading both
+  timestamps. Only rows where the comparison means something are marked: both
+  dates present, different, and the object actually differing. The tooltip
+  notes that each date comes from its own server's clock.
 
 ## [1.0.1] — 2026-08-11 — first final release
 

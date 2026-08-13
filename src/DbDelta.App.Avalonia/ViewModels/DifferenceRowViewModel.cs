@@ -83,6 +83,42 @@ public sealed partial class DifferenceRowViewModel(DifferencePair pair, Differen
             : string.Empty;
 
     /// <summary>
+    /// True when this row has a comparable pair of dates: both sides present,
+    /// not the same instant, and something the user could actually align.
+    /// </summary>
+    /// <remarks>
+    /// Rules out three cases that would otherwise render a meaningless winner:
+    /// kinds whose readers never surface a modify_date (Sequence, Synonym,
+    /// UserDefinedType — see <c>Mapper.ExtractModifyDate</c>), objects that
+    /// exist on one side only, and identical objects whose dates drifted apart
+    /// through an ALTER that changed nothing.
+    /// </remarks>
+    private bool HasComparableDates =>
+        IsSelectable
+        && !IsSourceOnly
+        && !IsTargetOnly
+        && Dto.LastModifiedSource.HasValue
+        && Dto.LastModifiedTarget.HasValue
+        && Dto.LastModifiedSource.Value != Dto.LastModifiedTarget.Value;
+
+    /// <summary>True when the source side carries the more recent change.</summary>
+    public bool IsSourceNewer =>
+        HasComparableDates && Dto.LastModifiedSource!.Value > Dto.LastModifiedTarget!.Value;
+
+    /// <summary>True when the target side carries the more recent change.</summary>
+    public bool IsTargetNewer =>
+        HasComparableDates && Dto.LastModifiedTarget!.Value > Dto.LastModifiedSource!.Value;
+
+    /// <summary>
+    /// Explains the marker. The two dates are read from two different servers,
+    /// each keeping its own clock, so "more recent" is only as trustworthy as
+    /// the agreement between them — the tooltip says so rather than letting the
+    /// arrow pass for an absolute fact.
+    /// </summary>
+    public string NewerTooltip =>
+        "Modifica più recente fra i due lati, secondo l'orologio di ciascun server";
+
+    /// <summary>
     /// Italian display label for <see cref="Kind"/>. Plural forms chosen so the
     /// same label reads correctly in the "Tipo di oggetto" group header (e.g.
     /// "Tabelle (5)") and in the per-row "Tipo entità" column.

@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:DbDelta.App.ViewModels"
              xmlns:v="using:DbDelta.App.Views"
+             xmlns:c="using:DbDelta.App.Views.Controls"
              xmlns:ag="using:Avalonia.Collections"
              x:Class="DbDelta.App.Views.ResultsGridView"
              x:DataType="vm:MainWindowViewModel">
@@ -203,15 +204,14 @@
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
 
-          <!-- Col 2: Last modified source -->
+          <!-- Col 2: Last modified source. The arrow marks whichever side
+               changed last, so the user can see which way to align. -->
           <DataGridTemplateColumn Header="Ultima modifica (orig)" Width="140" CanUserSort="True">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:DifferenceRowViewModel">
-                <TextBlock Text="{Binding LastModifiedSourceDisplay}"
-                           FontFamily="Cascadia Mono,Consolas,monospace"
-                           FontSize="11"
-                           VerticalAlignment="Center"
-                           Margin="4,0" />
+                <c:LastModifiedCell Text="{Binding LastModifiedSourceDisplay}"
+                                    IsNewer="{Binding IsSourceNewer}"
+                                    Tip="{Binding NewerTooltip}" />
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
@@ -302,15 +302,13 @@
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
 
-          <!-- Col 6: Last modified target -->
+          <!-- Col 6: Last modified target — same shared cell as col 2. -->
           <DataGridTemplateColumn Header="Ultima modifica (dest)" Width="140" CanUserSort="True">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:DifferenceRowViewModel">
-                <TextBlock Text="{Binding LastModifiedTargetDisplay}"
-                           FontFamily="Cascadia Mono,Consolas,monospace"
-                           FontSize="11"
-                           VerticalAlignment="Center"
-                           Margin="4,0" />
+                <c:LastModifiedCell Text="{Binding LastModifiedTargetDisplay}"
+                                    IsNewer="{Binding IsTargetNewer}"
+                                    Tip="{Binding NewerTooltip}" />
               </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
