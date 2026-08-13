@@ -8,7 +8,7 @@
 
 Open-source schema comparison and deployment tool for Microsoft SQL Server. An OSS alternative to Redgate SQL Compare.
 
-> **Status:** Stable — [v1.0.1](https://github.com/GitBakko/db-delta/releases/tag/v1.0.1) is the first final release.
+> **Status:** Stable — [v1.0.2](https://github.com/GitBakko/db-delta/releases/tag/v1.0.2) is the current release; [v1.0.1](https://github.com/GitBakko/db-delta/releases/tag/v1.0.1) was the first final one.
 > v1 scope: Live DB ↔ Live DB, 13 object kinds, Windows-first, SQL Server 2016+ and Azure SQL DB.
 
 📖 **Documentation site:** <https://gitbakko.github.io/db-delta/> · [Version history](https://gitbakko.github.io/db-delta/articles/version-history.html)
@@ -25,11 +25,12 @@ Notes:
 - The MSI is **unsigned**, so Windows SmartScreen will warn on first run —
   choose *More info → Run anyway*. Code signing is planned but not yet in
   place; it will land in a later release without changing anything else.
-- **Coming from a release candidate?** Install v1.0.1 straight over it. The
-  RCs all carry the numeric ProductVersion `1.0.0`, which is why the first
-  final release is `1.0.1` and not `1.0.0` — Windows Installer does not
-  upgrade between identical versions. Upgrading *between* RCs still requires
-  uninstalling the previous one first.
+- **Coming from an earlier version?** Install the current MSI straight over it.
+  The one exception is the release candidates: they all carry the numeric
+  ProductVersion `1.0.0`, which is why the first final release was `1.0.1` and
+  not `1.0.0` — Windows Installer does not upgrade between identical versions,
+  and it compares only the first three fields. Upgrading *between* RCs still
+  requires uninstalling the previous one first.
 
 ## What it does
 

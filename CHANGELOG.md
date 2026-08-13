@@ -6,6 +6,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [1.0.2] — 2026-08-13 — theme follows Windows, and the grid points at the newer side
+
+Two additions to the shell, both driven by what the app looked like in use
+rather than by what the tests could see.
+
+`1.0.2` and not `1.0.1.1`: Windows Installer compares only the first three
+fields of `ProductVersion` and ignores a fourth, so a `1.0.1.1` MSI would have
+read as identical to `1.0.1` and refused to upgrade in place — the same trap
+that made the first final release `1.0.1` instead of `1.0.0`.
+
 ### Added
 
 - **The theme can now follow Windows.** The topbar button used to flip between
