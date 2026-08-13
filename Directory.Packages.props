@@ -1,6 +1,7 @@
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinning>true</CentralPackageTransitivePinning>
   </PropertyGroup>
   <ItemGroup Label="Core runtime">
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="6.0.1" />
@@ -40,6 +41,9 @@
     <PackageVersion Include="AutoFixture.Xunit3" Version="4.18.1" />
     <PackageVersion Include="Verify.Xunit" Version="28.5.0" />
     <PackageVersion Include="Testcontainers.MsSql" Version="4.1.0" />
+    <!-- Transitive via Testcontainers, pinned past GHSA-q939-rpr3-3284 (NU1903).
+         Testcontainers 4.13.0 still ships SSH.NET 2025.1.0, so upgrading it does not help. -->
+    <PackageVersion Include="SSH.NET" Version="2026.0.0" />
     <PackageVersion Include="bunit" Version="1.34.0" />
     <PackageVersion Include="FsCheck.Xunit" Version="3.0.0" />
     <PackageVersion Include="FsCheck" Version="3.0.0" />
