@@ -269,27 +269,36 @@
         <!-- 8: divider -->
         <Border Grid.Column="8" Classes="topbar-divider" />
 
-        <!-- 9: theme toggle — moon when light (click → go dark), sun when dark -->
+        <!-- 9: theme cycle — Chiaro → Scuro → Sistema → Chiaro. The icon shows
+             the state the app is IN, and the tooltip names it; with three
+             states an "invites the next state" icon stops being readable. -->
         <Button Grid.Column="9"
                 Classes="ghost"
-                Command="{Binding ToggleThemeCommand}"
-                ToolTip.Tip="Tema chiaro / scuro"
+                Command="{Binding CycleThemeCommand}"
+                ToolTip.Tip="{Binding ThemeTooltip}"
                 VerticalAlignment="Center">
           <Panel>
-            <!-- Moon icon (visible in light mode — invites switch to dark) -->
+            <!-- Sun icon — pinned to light -->
             <Path Width="16" Height="16" Stretch="Uniform"
                   Stroke="{Binding $parent[Button].Foreground}"
                   StrokeThickness="1.6" StrokeLineCap="Round"
                   Fill="Transparent"
-                  IsVisible="{Binding !IsDarkTheme}"
-                  Data="M 12,4 A 8,8 0 1 0 20,12 A 6,6 0 0 1 12,4 Z" />
-            <!-- Sun icon (visible in dark mode — invites switch to light) -->
-            <Path Width="16" Height="16" Stretch="Uniform"
-                  Stroke="{Binding $parent[Button].Foreground}"
-                  StrokeThickness="1.6" StrokeLineCap="Round"
-                  Fill="Transparent"
-                  IsVisible="{Binding IsDarkTheme}"
+                  IsVisible="{Binding IsThemeLight}"
                   Data="M 12,5 A 7,7 0 1 1 11.99,5 M 12,1 L 12,3 M 12,21 L 12,23 M 4.2,4.2 L 5.6,5.6 M 18.4,18.4 L 19.8,19.8 M 1,12 L 3,12 M 21,12 L 23,12 M 4.2,19.8 L 5.6,18.4 M 18.4,5.6 L 19.8,4.2" />
+            <!-- Moon icon — pinned to dark -->
+            <Path Width="16" Height="16" Stretch="Uniform"
+                  Stroke="{Binding $parent[Button].Foreground}"
+                  StrokeThickness="1.6" StrokeLineCap="Round"
+                  Fill="Transparent"
+                  IsVisible="{Binding IsThemeDark}"
+                  Data="M 12,4 A 8,8 0 1 0 20,12 A 6,6 0 0 1 12,4 Z" />
+            <!-- Monitor icon — following the operating system -->
+            <Path Width="16" Height="16" Stretch="Uniform"
+                  Stroke="{Binding $parent[Button].Foreground}"
+                  StrokeThickness="1.6" StrokeLineCap="Round"
+                  Fill="Transparent"
+                  IsVisible="{Binding IsThemeSystem}"
+                  Data="M 3,5 L 21,5 L 21,16 L 3,16 Z M 9,20 L 15,20 M 12,16 L 12,20" />
           </Panel>
         </Button>
 

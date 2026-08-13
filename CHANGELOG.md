@@ -6,6 +6,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added
+
+- **The theme can now follow Windows.** The topbar button used to flip between
+  light and dark and forgot the choice at every launch, always reopening light.
+  It now cycles Chiaro → Scuro → Sistema, the icon shows which of the three is
+  active, and the choice is remembered in
+  `%LOCALAPPDATA%\DbDelta\ui-settings.json`. "Sistema" tracks the Windows
+  light/dark setting; a saved Chiaro or Scuro overrides it.
+
 ## [1.0.1] — 2026-08-11 — first final release
 
 **The first final release is `1.0.1`, not `1.0.0`.** Every release candidate

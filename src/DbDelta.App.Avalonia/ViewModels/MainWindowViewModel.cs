@@ -28,20 +28,37 @@ public sealed partial class MainWindowViewModel : ObservableObject
 {
     private readonly JsonRecentProjectsStore _recentProjects;
     private readonly ICredentialStore? _credentials;
+    private readonly JsonUiSettingsStore? _uiSettings;
 
     public MainWindowViewModel(AppStateViewModel appState)
         : this(appState, JsonRecentProjectsStore.CreateDefault(), credentials: null)
     {
     }
 
+    /// <param name="appState">Shared application state.</param>
+    /// <param name="recentProjects">MRU store behind the topbar project combo.</param>
+    /// <param name="credentials">Credential store, or null when unavailable.</param>
+    /// <param name="uiSettings">
+    /// Backing store for the theme preference. Null keeps the choice
+    /// session-only, which is what the short overload above wants.
+    /// </param>
+    /// <param name="initialTheme">
+    /// The theme already applied to the application by startup. Passed in
+    /// rather than loaded here so the window is never built under the wrong
+    /// variant and repainted a frame later.
+    /// </param>
     public MainWindowViewModel(
         AppStateViewModel appState,
         JsonRecentProjectsStore recentProjects,
-        ICredentialStore? credentials)
+        ICredentialStore? credentials,
+        JsonUiSettingsStore? uiSettings = null,
+        AppTheme initialTheme = AppTheme.System)
     {
         AppState = appState;
         _recentProjects = recentProjects;
         _credentials = credentials;
+        _uiSettings = uiSettings;
+        _theme = initialTheme;
         AppState.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(AppStateViewModel.LastComparison))
@@ -257,18 +274,83 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     [ObservableProperty]
-    private bool _isDarkTheme;
+    [NotifyPropertyChangedFor(nameof(IsThemeLight))]
+    [NotifyPropertyChangedFor(nameof(IsThemeDark))]
+    [NotifyPropertyChangedFor(nameof(IsThemeSystem))]
+    [NotifyPropertyChangedFor(nameof(ThemeTooltip))]
+    private AppTheme _theme;
+
+    /// <summary>True when the shell is pinned to the light variant.</summary>
+    public bool IsThemeLight => Theme == AppTheme.Light;
+
+    /// <summary>True when the shell is pinned to the dark variant.</summary>
+    public bool IsThemeDark => Theme == AppTheme.Dark;
+
+    /// <summary>True when the shell follows the operating system.</summary>
+    public bool IsThemeSystem => Theme == AppTheme.System;
+
+    /// <summary>
+    /// Tooltip for the topbar theme button. One button carries three states, so
+    /// the tooltip is what names the current one.
+    /// </summary>
+    public string ThemeTooltip => Theme switch
+    {
+        AppTheme.Light => "Tema: chiaro",
+        AppTheme.Dark => "Tema: scuro",
+        AppTheme.System => "Tema: sistema",
+        _ => "Tema: sistema",
+    };
+
+    /// <summary>
+    /// Maps a stored preference onto the Avalonia variant. Shared with
+    /// <c>App.OnFrameworkInitializationCompleted</c>, which applies the
+    /// persisted theme before the main window is built.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="AppTheme.System"/> maps to <see cref="ThemeVariant.Default"/>
+    /// and NOT to Light: Default is the only value that lets Avalonia resolve
+    /// the variant from the OS setting.
+    /// </remarks>
+    public static ThemeVariant ToVariant(AppTheme theme) => theme switch
+    {
+        AppTheme.Light => ThemeVariant.Light,
+        AppTheme.Dark => ThemeVariant.Dark,
+        AppTheme.System => ThemeVariant.Default,
+        _ => ThemeVariant.Default,
+    };
 
     [ObservableProperty]
     private string? _projectFilePath;
 
+    /// <summary>
+    /// Advances the theme one step: Chiaro → Scuro → Sistema → Chiaro.
+    /// </summary>
     [RelayCommand]
-    public void ToggleTheme()
+    public async Task CycleThemeAsync()
     {
-        IsDarkTheme = !IsDarkTheme;
+        Theme = Theme switch
+        {
+            AppTheme.Light => AppTheme.Dark,
+            AppTheme.Dark => AppTheme.System,
+            AppTheme.System => AppTheme.Light,
+            _ => AppTheme.Light,
+        };
+
         if (Avalonia.Application.Current is { } app)
         {
-            app.RequestedThemeVariant = IsDarkTheme ? ThemeVariant.Dark : ThemeVariant.Light;
+            app.RequestedThemeVariant = ToVariant(Theme);
+        }
+
+        if (_uiSettings is null) { return; }
+        try
+        {
+            await _uiSettings.SaveThemeAsync(Theme, CancellationToken.None).ConfigureAwait(true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // A preference we could not write down is not worth interrupting the
+            // user over — the theme they clicked is already applied on screen.
+            Debug.WriteLine($"Failed to persist theme: {ex.Message}");
         }
     }
 

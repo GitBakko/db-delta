@@ -24,9 +24,20 @@ public partial class App : Application
 
             var recentProjects =
                 Persistence.Json.JsonRecentProjectsStore.CreateDefault();
+
+            // Apply the saved theme BEFORE the window exists, so it is never
+            // painted under the wrong variant and corrected a frame later.
+            // Blocking is safe here: the store awaits with ConfigureAwait(false),
+            // so nothing needs this thread to complete.
+            var uiSettings = Persistence.Json.JsonUiSettingsStore.CreateDefault();
+            Persistence.Json.AppTheme theme =
+                uiSettings.LoadThemeAsync(CancellationToken.None).GetAwaiter().GetResult();
+            RequestedThemeVariant = MainWindowViewModel.ToVariant(theme);
+
             MainWindow mainWindow = new()
             {
-                DataContext = new MainWindowViewModel(appState, recentProjects, credentials),
+                DataContext = new MainWindowViewModel(
+                    appState, recentProjects, credentials, uiSettings, theme),
                 WindowState = Avalonia.Controls.WindowState.Maximized,
             };
             desktop.MainWindow = mainWindow;
