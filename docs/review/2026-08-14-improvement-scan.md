@@ -26,6 +26,28 @@ Deciso dal proprietario, non riaprire senza una ragione nuova:
 
 ---
 
+# Stato di avanzamento
+
+Aggiornato il 2026-08-14, stessa sessione dello scan.
+
+| Voce | Stato | Commit |
+|---|---|---|
+| 1 — CI non fa da gate | **fatta** | `f91ee6e` |
+| 4 — Diff pane, SQL sotto il nome sbagliato | **fatta** | `d210b1a` |
+| 3 — Dialogo di conferma: script + cosa si elimina | **fatta** | `0cde9a9` |
+| 11a — Censimento + banner ambra | **fatta** | `6c2e2e9` |
+| 11b — `EmitRebuild` deve RIFIUTARE su indici non riemettibili | aperta | — |
+| 2, 5, 6, 7, 8, 9, 10, 12, 13, 14 | aperte | — |
+
+**La 11b è ora la voce più importante che resta**, ed è cambiata di natura: il
+censimento ha reso il punto cieco *visibile*, ma `TableScriptEmitter.cs:668-691`
+continua a ricostruire la tabella da un modello che non ha mai contenuto il suo
+columnstore e poi a droppare l'originale. Il test live
+`UnexaminedCensusTests.A_columnstore_only_difference_compares_Identical_and_the_census_says_why`
+riproduce già lo scenario e può fare da base.
+
+---
+
 # Parte 1 — La classifica
 
 | # | Cosa | Sforzo | Valore |
