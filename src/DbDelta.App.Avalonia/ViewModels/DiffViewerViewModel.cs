@@ -47,10 +47,25 @@ public sealed partial class DiffViewerViewModel(IObjectBodyResolver? resolver = 
         OnPropertyChanged(nameof(HasContent));
 
     /// <summary>
-    /// Loads the diff for the given row. Clears previous state, resolves
-    /// both SQL bodies, computes diff rows and sections, and sets the initial
+    /// Loads the diff for the given row: clears previous state, resolves both
+    /// SQL bodies, computes diff rows and sections, and sets the initial
     /// section index.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Throws whatever the resolver throws. The caller
+    /// (<c>AppStateViewModel.LoadDiffAsync</c>) reports it — this used to be a
+    /// fire-and-forget call with no catch anywhere, so a resolver failure was an
+    /// unobserved exception and nothing on screen changed.
+    /// </para>
+    /// <para>
+    /// Two invariants hold that did not before, and both exist to stop ONE
+    /// failure mode: object A's SQL sitting under object B's name. The panes are
+    /// cleared BEFORE the first await, not left holding the previous object; and
+    /// every pane assignment happens only after BOTH bodies have resolved, so a
+    /// failure on the second side cannot leave a half-populated view either.
+    /// </para>
+    /// </remarks>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1062",
         Justification = "ArgumentNullException.ThrowIfNull is a recognised null guard.")]
     public async Task LoadAsync(DifferenceRowViewModel row, CancellationToken ct)
@@ -58,15 +73,27 @@ public sealed partial class DiffViewerViewModel(IObjectBodyResolver? resolver = 
         ArgumentNullException.ThrowIfNull(row);
         if (_resolver is null) { return; }
 
+        SourceBody = null;
+        TargetBody = null;
+        Rows = [];
+        Sections = [];
+        CurrentSectionIndex = -1;
+        ObjectQualifiedName = row.QualifiedName;
+
         IsLoading = true;
         try
         {
-            ObjectQualifiedName = row.QualifiedName;
-            SourceBody = await _resolver.ResolveSourceBodyAsync(row.Kind, row.SchemaName, row.ObjectName, ct)
-                .ConfigureAwait(false);
-            TargetBody = await _resolver.ResolveTargetBodyAsync(row.Kind, row.SchemaName, row.ObjectName, ct)
-                .ConfigureAwait(false);
-            Rows = LineDiffer.Compute(SourceBody, TargetBody);
+            // No ConfigureAwait(false) here, unlike the rest of the app: every
+            // assignment below publishes into ItemsControl bindings, which Avalonia
+            // requires on the UI thread. These were the only two view-model awaits
+            // in the app that continued on the thread pool.
+            string? source = await _resolver.ResolveSourceBodyAsync(row.Kind, row.SchemaName, row.ObjectName, ct);
+            string? target = await _resolver.ResolveTargetBodyAsync(row.Kind, row.SchemaName, row.ObjectName, ct);
+            ct.ThrowIfCancellationRequested();
+
+            SourceBody = source;
+            TargetBody = target;
+            Rows = LineDiffer.Compute(source, target);
             Sections = LineDiffer.SectionsFrom(Rows);
             CurrentSectionIndex = Sections.Count > 0 ? 0 : -1;
 
@@ -77,7 +104,12 @@ public sealed partial class DiffViewerViewModel(IObjectBodyResolver? resolver = 
         }
         finally
         {
-            IsLoading = false;
+            // A superseded load must not switch the spinner off under the load
+            // that replaced it: arrow-keying the grid starts one per row.
+            if (!ct.IsCancellationRequested)
+            {
+                IsLoading = false;
+            }
         }
     }
 

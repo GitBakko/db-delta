@@ -176,14 +176,53 @@ public sealed partial class AppStateViewModel : ObservableObject
     [ObservableProperty]
     private DifferenceRowViewModel? _selectedRow;
 
+    /// <summary>
+    /// Cancels the in-flight body load when the selection moves on. Arrow-keying
+    /// the grid starts one load per row it passes through, and each opens its own
+    /// SQL connection; uncancelled, a slow early one could finish last and leave
+    /// the pane on a row the user had already left.
+    /// </summary>
+    private CancellationTokenSource? _diffLoadCts;
+
     partial void OnSelectedRowChanged(DifferenceRowViewModel? value)
     {
         OnPropertyChanged(nameof(ShouldShowDiffViewer));
+
+        _diffLoadCts?.Cancel();
+        _diffLoadCts?.Dispose();
+        _diffLoadCts = null;
+
         if (value is null) { return; }
         // Identical rows have nothing to diff — skip the viewer activation so
         // the bottom pane stays collapsed.
         if (value.IsIdentical) { return; }
-        _ = DiffViewer.LoadAsync(value, CancellationToken.None);
+
+        CancellationTokenSource cts = new();
+        _diffLoadCts = cts;
+        _ = LoadDiffAsync(value, cts.Token);
+    }
+
+    /// <summary>
+    /// Gives the fire-and-forget body load the catch it never had. The resolver
+    /// opens its own SQL connection per call and throws freely, and the discarded
+    /// Task meant the failure surfaced NOWHERE: the user kept reading the previous
+    /// object's SQL under the newly selected object's name, and could tick that row
+    /// and deploy it. An empty pane plus the error banner is the honest outcome.
+    /// </summary>
+    private async Task LoadDiffAsync(DifferenceRowViewModel row, CancellationToken ct)
+    {
+        try
+        {
+            await DiffViewer.LoadAsync(row, ct).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer selection — not a failure.
+        }
+        catch (Exception ex)
+        {
+            LastError = $"Impossibile leggere il corpo di {row.QualifiedName}: {ex.Message}";
+        }
     }
 
     /// <summary>True when the diff viewer panel should be visible. Identical

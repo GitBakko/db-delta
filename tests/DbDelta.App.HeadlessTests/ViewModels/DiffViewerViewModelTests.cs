@@ -1,4 +1,5 @@
 using Avalonia.Headless.XUnit;
+using Avalonia.Threading;
 using DbDelta.App.ViewModels;
 using DbDelta.Core.Abstractions;
 using DbDelta.Core.Diff;
@@ -119,7 +120,66 @@ public class DiffViewerViewModelTests
         vm.Rows.Count.Should().Be(0);
     }
 
-    // ── Stub ──────────────────────────────────────────────────────────────────
+    // ── A failed load must not leave one object's SQL under another's name ────
+
+    /// <summary>
+    /// The panes are cleared BEFORE the first await, so an object that fails to
+    /// resolve shows nothing rather than inheriting the previously selected
+    /// object's SQL under its own name.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task LoadAsync_clears_the_previous_object_before_it_can_fail()
+    {
+        DiffViewerViewModel vm = new(new StubResolver("A\nB\nC", "A\nX\nC"));
+        await vm.LoadAsync(MakeRow("Clienti"), CancellationToken.None);
+        vm.Rows.Should().NotBeEmpty("precondition: the first object loaded");
+
+        vm.SetResolver(new ThrowingResolver("connessione persa"));
+        Func<Task> act = () => vm.LoadAsync(MakeRow("Ordini"), CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        vm.Rows.Should().BeEmpty("a failed object must not inherit the previous object's diff");
+        vm.SourceBody.Should().BeNull();
+        vm.TargetBody.Should().BeNull();
+        vm.ObjectQualifiedName.Should().Contain("Ordini");
+    }
+
+    /// <summary>
+    /// The half-populated case: the source side resolves and the target side
+    /// throws. Nothing is published unless BOTH sides arrived.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task LoadAsync_leaves_both_panes_empty_when_only_the_target_side_fails()
+    {
+        DiffViewerViewModel vm = new(new ThrowingResolver("timeout", failOnSource: false));
+
+        Func<Task> act = () => vm.LoadAsync(MakeRow(), CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        vm.SourceBody.Should().BeNull("a resolved source must not show against a target that never arrived");
+        vm.Rows.Should().BeEmpty();
+    }
+
+    /// <summary>
+    /// The user-visible half: selecting a row whose body cannot be read reports
+    /// the failure on the error banner. This was a discarded Task with no catch
+    /// anywhere, so the exception was unobserved and the screen never changed.
+    /// </summary>
+    [AvaloniaFact]
+    public void A_failed_body_load_reaches_the_error_banner()
+    {
+        AppStateViewModel state = new();
+        state.DiffViewer.SetResolver(new ThrowingResolver("connessione persa"));
+
+        state.SelectedRow = MakeRow("Ordini");
+        Dispatcher.UIThread.RunJobs();
+
+        state.LastError.Should().NotBeNullOrWhiteSpace();
+        state.LastError.Should().Contain("Ordini").And.Contain("connessione persa");
+        state.DiffViewer.Rows.Should().BeEmpty();
+    }
+
+    // ── Stubs ─────────────────────────────────────────────────────────────────
 
     /// <summary>
     /// Hand-rolled stub for <see cref="IObjectBodyResolver"/>.
@@ -132,5 +192,21 @@ public class DiffViewerViewModelTests
 
         public Task<string?> ResolveTargetBodyAsync(string kind, string schemaName, string objectName, CancellationToken ct) =>
             Task.FromResult(targetBody);
+    }
+
+    /// <summary>
+    /// Resolver that fails the way the live one can: it opens its own SQL
+    /// connection per call. With <paramref name="failOnSource"/> false the source
+    /// resolves and only the TARGET throws — the half-populated case.
+    /// </summary>
+    private sealed class ThrowingResolver(string message, bool failOnSource = true) : IObjectBodyResolver
+    {
+        public Task<string?> ResolveSourceBodyAsync(string kind, string schemaName, string objectName, CancellationToken ct) =>
+            failOnSource
+                ? Task.FromException<string?>(new InvalidOperationException(message))
+                : Task.FromResult<string?>("SELECT 1");
+
+        public Task<string?> ResolveTargetBodyAsync(string kind, string schemaName, string objectName, CancellationToken ct) =>
+            Task.FromException<string?>(new InvalidOperationException(message));
     }
 }
