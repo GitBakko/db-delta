@@ -47,8 +47,9 @@ public class AccentBandContrastTests
 
     private static Window ConfirmWindow() => new ConfirmExecuteDialog
     {
+        // One dropped object, so the crimson deletion panel is rendered too.
         DataContext = new ConfirmExecuteViewModel(
-            1, 1, 0, 0, "src", "tgt",
+            1, 1, ["dbo.Vecchia  (Table)"], 0, "src", "tgt", "DROP TABLE dbo.Vecchia;",
             () => Task.FromResult(new SqlBatchResult(true, null, 1, 1))),
     };
 

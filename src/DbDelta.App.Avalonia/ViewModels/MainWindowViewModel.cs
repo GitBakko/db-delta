@@ -878,13 +878,24 @@ public sealed partial class MainWindowViewModel : ObservableObject
             AppState.TargetDependencies,
             backfill);
 
+        // The DROPs by name, not just how many. The dialog is the last gate
+        // before an irreversible change and the pairs are already in hand.
+        IReadOnlyList<string> dropped =
+        [
+            .. selected
+                .Where(p => p.Status == DifferenceStatus.OnlyInB)
+                .Select(p => $"{p.Identity.SchemaName}.{p.Identity.ObjectName}  ({p.Identity.Kind})")
+                .Order(StringComparer.OrdinalIgnoreCase)
+        ];
+
         ConfirmExecuteViewModel vm = new(
             objectCount: selected.Count,
             differentCount: selected.Count(p => p.Status == DifferenceStatus.Different),
-            onlyInTargetCount: selected.Count(p => p.Status == DifferenceStatus.OnlyInB),
+            droppedObjects: dropped,
             onlyInSourceCount: selected.Count(p => p.Status == DifferenceStatus.OnlyInA),
             sourceSummary: ConnectionStringRedactor.Redact(AppState.SourceConnectionString ?? string.Empty),
             targetSummary: ConnectionStringRedactor.Redact(AppState.TargetConnectionString),
+            script: script,
             executeAsync: () => SqlExecutor.ExecuteAsync(
                 AppState.TargetConnectionString!,
                 script,

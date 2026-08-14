@@ -1,4 +1,6 @@
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using DbDelta.App.ViewModels;
 
@@ -30,4 +32,14 @@ public partial class ConfirmExecuteDialog : Window
     private void OnAnnullaClick(object? sender, RoutedEventArgs e) => Close(null);
 
     private void OnChiudiClick(object? sender, RoutedEventArgs e) => Close(null);
+
+    /// <summary>
+    /// Puts the script on the clipboard, which is how it reaches a review, a
+    /// ticket or SSMS. Silent when there is no clipboard (headless).
+    /// </summary>
+    private async void OnCopyScriptClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not ConfirmExecuteViewModel vm || Clipboard is null) { return; }
+        await Clipboard.SetValueAsync(DataFormat.Text, vm.Script).ConfigureAwait(true);
+    }
 }

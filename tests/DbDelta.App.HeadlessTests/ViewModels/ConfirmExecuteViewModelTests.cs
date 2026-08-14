@@ -1,5 +1,8 @@
+using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.VisualTree;
 using DbDelta.App.ViewModels;
+using DbDelta.App.Views;
 using DbDelta.Persistence.Sql;
 using FluentAssertions;
 
@@ -7,14 +10,18 @@ namespace DbDelta.App.HeadlessTests.ViewModels;
 
 public class ConfirmExecuteViewModelTests
 {
-    private static ConfirmExecuteViewModel MakeVm(SqlBatchResult result) =>
+    private static ConfirmExecuteViewModel MakeVm(
+        SqlBatchResult result,
+        IReadOnlyList<string>? dropped = null,
+        string script = "DROP TABLE dbo.Vecchia;\nGO\n") =>
         new(
             objectCount: 3,
             differentCount: 1,
-            onlyInTargetCount: 1,
+            droppedObjects: dropped ?? ["dbo.Vecchia  (Table)"],
             onlyInSourceCount: 1,
             sourceSummary: "Server=src;Database=A",
             targetSummary: "Server=tgt;Database=B",
+            script: script,
             executeAsync: () => Task.FromResult(result));
 
     [AvaloniaFact]
@@ -68,5 +75,96 @@ public class ConfirmExecuteViewModelTests
         vm.OnlyInSourceCount.Should().Be(1);
         vm.SourceSummary.Should().Be("Server=src;Database=A");
         vm.TargetSummary.Should().Be("Server=tgt;Database=B");
+    }
+
+    // ── The last gate before an irreversible change ───────────────────────────
+
+    /// <summary>
+    /// The dialog carries the exact SQL it will run. It used to take only counts,
+    /// while the caller had the script as a local one statement above.
+    /// </summary>
+    [AvaloniaFact]
+    public void Carries_the_script_it_will_run_and_counts_its_lines()
+    {
+        ConfirmExecuteViewModel vm = MakeVm(
+            new SqlBatchResult(true, null, 1, 1),
+            script: "DROP TABLE dbo.A;\nGO\nDROP TABLE dbo.B;\nGO\n");
+
+        vm.Script.Should().Contain("DROP TABLE dbo.A;");
+        vm.ScriptLineCount.Should().Be(4, "a trailing newline does not open a fifth line");
+        vm.ScriptToggleLabel.Should().Be("Mostra lo script (4 righe)");
+    }
+
+    /// <summary>A script with no trailing newline still counts its last line.</summary>
+    [AvaloniaFact]
+    public void Counts_the_last_line_of_a_script_that_does_not_end_in_a_newline()
+    {
+        ConfirmExecuteViewModel vm = MakeVm(new SqlBatchResult(true, null, 1, 1), script: "SELECT 1;\nGO");
+
+        vm.ScriptLineCount.Should().Be(2);
+    }
+
+    /// <summary>
+    /// The drop count comes from the names themselves, so the tally and the list
+    /// cannot disagree — and the wording says what happens, not where the objects
+    /// live.
+    /// </summary>
+    [AvaloniaFact]
+    public void Names_what_gets_deleted_and_says_so_in_the_warning()
+    {
+        ConfirmExecuteViewModel vm = MakeVm(
+            new SqlBatchResult(true, null, 1, 1),
+            dropped: ["dbo.Vecchia  (Table)", "dbo.vObsoleta  (View)"]);
+
+        vm.OnlyInTargetCount.Should().Be(2);
+        vm.HasDrops.Should().BeTrue();
+        vm.DroppedObjectsText.Should().Contain("dbo.Vecchia").And.Contain("dbo.vObsoleta");
+        vm.DropWarning.Should().Contain("ELIMINATI").And.Contain("non è annullabile");
+    }
+
+    /// <summary>Singular wording, and no danger panel when nothing is dropped.</summary>
+    [AvaloniaFact]
+    public void Uses_singular_wording_for_one_drop_and_hides_the_panel_for_none()
+    {
+        ConfirmExecuteViewModel one = MakeVm(new SqlBatchResult(true, null, 1, 1), dropped: ["dbo.Sola  (Table)"]);
+        one.DropWarning.Should().StartWith("1 oggetto verrà ELIMINATO");
+
+        ConfirmExecuteViewModel none = MakeVm(new SqlBatchResult(true, null, 1, 1), dropped: []);
+        none.HasDrops.Should().BeFalse();
+        none.OnlyInTargetCount.Should().Be(0);
+        none.DroppedObjectsText.Should().BeEmpty();
+    }
+
+    /// <summary>
+    /// The one thing headless CAN check about layout, and the risk the script
+    /// pane introduces: the window is SizeToContent="Height" and CanResize=False,
+    /// so an unbounded pane would grow it past the screen with no way back. Both
+    /// the script and the drop list sit in capped ScrollViewers.
+    /// </summary>
+    [AvaloniaFact]
+    public void A_huge_script_does_not_grow_the_window_past_the_screen()
+    {
+        string huge = string.Join('\n', Enumerable.Range(0, 5000).Select(i => $"-- riga {i}"));
+        ConfirmExecuteDialog dlg = new()
+        {
+            DataContext = new ConfirmExecuteViewModel(
+                1, 1, [.. Enumerable.Range(0, 200).Select(i => $"dbo.T{i}  (Table)")], 0,
+                "src", "tgt", huge,
+                () => Task.FromResult(new SqlBatchResult(true, null, 1, 1))),
+        };
+        dlg.Show();
+
+        Expander expander = dlg.GetVisualDescendants().OfType<Expander>().Single();
+        expander.IsExpanded = true;
+        dlg.UpdateLayout();
+
+        // The window's own Bounds do NOT answer this in headless — measured with
+        // the cap removed, they stay small either way, so asserting on them proves
+        // nothing. The pane's own height does.
+        ScrollViewer scriptPane = dlg.GetVisualDescendants().OfType<ScrollViewer>()
+            .Single(s => s.Name == "ScriptPane");
+
+        scriptPane.Bounds.Height.Should().BeLessThan(260,
+            "5000 script lines must scroll inside the pane, not grow a window that cannot be resized");
     }
 }

@@ -78,12 +78,14 @@
               <Run Text="{Binding DifferentCount}" /><Run Text=" diversi" />
             </TextBlock>
           </StackPanel>
+          <!-- Not "solo destinazione": that is where these objects are, not what
+               happens to them. This count is the DROP count. -->
           <StackPanel Orientation="Horizontal" Spacing="6">
             <Ellipse Width="8" Height="8" VerticalAlignment="Center"
                      Fill="{StaticResource DiffOnlyTargetBrush}" />
-            <TextBlock FontSize="11" VerticalAlignment="Center"
-                       Foreground="{StaticResource FgSubtleBrush}">
-              <Run Text="{Binding OnlyInTargetCount}" /><Run Text=" solo destinazione" />
+            <TextBlock FontSize="11" VerticalAlignment="Center" FontWeight="SemiBold"
+                       Foreground="{StaticResource DangerBrush}">
+              <Run Text="{Binding OnlyInTargetCount}" /><Run Text=" da ELIMINARE" />
             </TextBlock>
           </StackPanel>
           <StackPanel Orientation="Horizontal" Spacing="6">
@@ -97,6 +99,42 @@
         </StackPanel>
       </StackPanel>
     </Border>
+
+    <!-- What gets deleted, by name. A count alone reads as inventory; with undo
+         deferred this dialog is the last gate before the DROP runs. -->
+    <Border CornerRadius="6" Padding="14,12"
+            Background="{StaticResource DangerSoftBrush}"
+            IsVisible="{Binding HasDrops}">
+      <StackPanel Spacing="8">
+        <TextBlock Text="{Binding DropWarning}"
+                   FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"
+                   Foreground="{StaticResource DangerBrush}" />
+        <ScrollViewer MaxHeight="96" HorizontalScrollBarVisibility="Auto">
+          <SelectableTextBlock Text="{Binding DroppedObjectsText}"
+                               FontFamily="Cascadia Mono,Consolas,monospace" FontSize="11"
+                               Foreground="{StaticResource FgStrongBrush}" />
+        </ScrollViewer>
+      </StackPanel>
+    </Border>
+
+    <!-- The script itself, collapsed. It is already built and in hand — reading
+         it used to cost a cancel, a second pass through "Genera script", a second
+         answer to the backfill preflight, a file save and an external editor. -->
+    <Expander Header="{Binding ScriptToggleLabel}" IsExpanded="False">
+      <Grid RowDefinitions="Auto,8,Auto">
+        <Border Grid.Row="0" Classes="surface-raised" ClipToBounds="True" Padding="0">
+          <ScrollViewer x:Name="ScriptPane" MaxHeight="220" HorizontalScrollBarVisibility="Auto">
+            <SelectableTextBlock Text="{Binding Script}" Margin="12"
+                                 FontFamily="Cascadia Mono,Consolas,monospace" FontSize="11"
+                                 Foreground="{StaticResource FgStrongBrush}" />
+          </ScrollViewer>
+        </Border>
+        <Button Grid.Row="2" Classes="ghost" HorizontalAlignment="Right"
+                Click="OnCopyScriptClick">
+          <TextBlock Text="Copia script" />
+        </Button>
+      </Grid>
+    </Expander>
 
     <!-- Transaction note -->
     <TextBlock Text="L'esecuzione avviene in una transazione: in caso di errore viene eseguito il rollback completo e la destinazione resta invariata."
