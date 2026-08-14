@@ -14,25 +14,35 @@ public sealed class SqlExecutorTests : IAsyncLifetime
 {
     private MsSqlContainer? _container;
     private string? _connectionString;
+    private string? _skipReason;
 
     public async ValueTask InitializeAsync()
     {
-        bool dockerAvailable = await IsDockerAvailableAsync();
-        if (!dockerAvailable)
-        {
-            return;
-        }
-
         // Match the image used by LiveDbFixture so a single docker pull
         // services every integration test project; the default unpinned
         // MsSqlBuilder() requires the CU-suffixed image to be pre-cached
         // and Assert.Skip cannot intercept DockerImageNotFoundException.
-        _container = new MsSqlBuilder()
+        MsSqlContainer container = new MsSqlBuilder()
             .WithImage("mcr.microsoft.com/mssql/server:2022-latest")
             .WithPassword("Y0urStrong!Pass")
             .Build();
-        await _container.StartAsync();
-        _connectionString = _container.GetConnectionString();
+
+        try
+        {
+            await container.StartAsync();
+            _container = container;
+            _connectionString = container.GetConnectionString();
+        }
+        catch (Exception ex)
+        {
+            // No daemon probe: guessing lied in BOTH directions — it saw the
+            // Windows named pipe and let a Linux image fail the whole project,
+            // and on Linux it never looked at the unix socket at all. Let the
+            // container itself answer, and carry the real reason into the skip
+            // so a green run still says why it did not assert anything.
+            _skipReason = $"Testcontainers could not start MS SQL: {ex.Message}";
+            await container.DisposeAsync();
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -43,13 +53,23 @@ public sealed class SqlExecutorTests : IAsyncLifetime
         }
     }
 
-    [Fact]
-    public async Task ExecuteAsync_simple_create_drop_script_succeeds()
+    /// <summary>
+    /// The live connection string, or a skip carrying why there is none.
+    /// </summary>
+    private string RequireSql()
     {
         if (_connectionString is null)
         {
-            Assert.Skip("Docker not available — skipping SQL executor integration test.");
+            Assert.Skip(_skipReason ?? "Testcontainers MS SQL is unavailable.");
         }
+
+        return _connectionString;
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_simple_create_drop_script_succeeds()
+    {
+        string conn = RequireSql();
 
         const string script = """
             CREATE TABLE t_executor_test (id INT NOT NULL);
@@ -59,7 +79,7 @@ public sealed class SqlExecutorTests : IAsyncLifetime
             """;
 
         SqlBatchResult result = await SqlExecutor.ExecuteAsync(
-            _connectionString,
+            conn,
             script,
             CancellationToken.None);
 
@@ -71,10 +91,7 @@ public sealed class SqlExecutorTests : IAsyncLifetime
     [Fact]
     public async Task ExecuteAsync_failing_batch_rolls_back_and_reports_error()
     {
-        if (_connectionString is null)
-        {
-            Assert.Skip("Docker not available — skipping SQL executor integration test.");
-        }
+        string conn = RequireSql();
 
         // First batch succeeds; second batch will fail — the whole transaction
         // should be rolled back, so the table must not exist after the call.
@@ -86,7 +103,7 @@ public sealed class SqlExecutorTests : IAsyncLifetime
             """;
 
         SqlBatchResult result = await SqlExecutor.ExecuteAsync(
-            _connectionString,
+            conn,
             script,
             CancellationToken.None);
 
@@ -95,7 +112,7 @@ public sealed class SqlExecutorTests : IAsyncLifetime
 
         // Table must not exist because the transaction was rolled back.
         SqlBatchResult checkResult = await SqlExecutor.ExecuteAsync(
-            _connectionString,
+            conn,
             """
             IF OBJECT_ID(N'dbo.t_rollback_test') IS NOT NULL
                 THROW 50000, 'Table still exists — rollback failed!', 1;
@@ -107,7 +124,7 @@ public sealed class SqlExecutorTests : IAsyncLifetime
     [Fact]
     public async Task ExecuteAsync_without_own_transaction_lets_script_self_manage_rollback()
     {
-        if (_connectionString is null) { Assert.Skip("Docker not available."); }
+        string conn = RequireSql();
 
         const string script = """
             SET XACT_ABORT ON;
@@ -122,28 +139,13 @@ public sealed class SqlExecutorTests : IAsyncLifetime
             """;
 
         SqlBatchResult result = await SqlExecutor.ExecuteAsync(
-            _connectionString!, script, CancellationToken.None, useOwnTransaction: false);
+            conn, script, CancellationToken.None, useOwnTransaction: false);
 
         result.Success.Should().BeFalse();
         SqlBatchResult check = await SqlExecutor.ExecuteAsync(
-            _connectionString!,
+            conn,
             "IF OBJECT_ID(N'dbo.t_selfmanage_test') IS NOT NULL THROW 50000, 'leaked', 1;",
             CancellationToken.None);
         check.Success.Should().BeTrue("the script's own XACT_ABORT must have rolled back");
-    }
-
-    private static async Task<bool> IsDockerAvailableAsync()
-    {
-        try
-        {
-            using System.Net.Sockets.TcpClient tc = new();
-            await tc.ConnectAsync("localhost", 2375).WaitAsync(TimeSpan.FromSeconds(2));
-            return true;
-        }
-        catch
-        {
-            // Docker daemon not reachable on localhost:2375 — also try the named pipe.
-            return File.Exists(@"\\.\pipe\docker_engine");
-        }
     }
 }

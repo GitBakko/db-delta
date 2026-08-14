@@ -43,13 +43,20 @@ jobs:
       - name: Build
         run: dotnet build --no-restore --configuration Release
 
+      # The runner shell is pwsh, which does NOT abort on a native command's
+      # non-zero exit: without the `&&` chain the step would report only the
+      # LAST dotnet test's exit code and swallow every failure before it.
+      # `&&` at end of line is a pwsh pipeline-chain operator (continuation +
+      # short-circuit), so the first failing project stops the step.
       - name: Run non-DB tests
         run: |
-          dotnet test tests/DbDelta.Core.UnitTests --no-build --configuration Release --logger "trx;LogFileName=core.trx"
-          dotnet test tests/DbDelta.Architecture.Tests --no-build --configuration Release --logger "trx;LogFileName=arch.trx"
-          dotnet test tests/DbDelta.ScriptGen.GoldenTests --no-build --configuration Release --logger "trx;LogFileName=golden.trx"
-          dotnet test tests/DbDelta.Persistence.UnitTests --no-build --configuration Release --logger "trx;LogFileName=persistence.trx"
-          dotnet test tests/DbDelta.Persistence.IntegrationTests --no-build --configuration Release --logger "trx;LogFileName=dpapi.trx"
+          dotnet test tests/DbDelta.Core.UnitTests --no-build --configuration Release --logger "trx;LogFileName=core.trx" &&
+          dotnet test tests/DbDelta.Shared.UnitTests --no-build --configuration Release --logger "trx;LogFileName=shared.trx" &&
+          dotnet test tests/DbDelta.Architecture.Tests --no-build --configuration Release --logger "trx;LogFileName=arch.trx" &&
+          dotnet test tests/DbDelta.ScriptGen.GoldenTests --no-build --configuration Release --logger "trx;LogFileName=golden.trx" &&
+          dotnet test tests/DbDelta.Property.Tests --no-build --configuration Release --logger "trx;LogFileName=property.trx" &&
+          dotnet test tests/DbDelta.Persistence.UnitTests --no-build --configuration Release --logger "trx;LogFileName=persistence.trx" &&
+          dotnet test tests/DbDelta.Persistence.IntegrationTests --no-build --configuration Release --logger "trx;LogFileName=dpapi.trx" &&
           dotnet test tests/DbDelta.App.HeadlessTests --no-build --configuration Release --logger "trx;LogFileName=headless.trx"
 
       - name: Upload Windows test results
@@ -80,15 +87,21 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget-
 
+      # Persistence.IntegrationTests belongs in BOTH jobs and runs a disjoint
+      # half in each: its DPAPI tests self-skip off Windows, and its Testcontainers
+      # SQL tests can only get a Linux container here. Windows alone would leave
+      # SqlExecutor's rollback semantics asserted nowhere.
       - name: Build cross-platform test projects (skip App + Architecture)
         run: |
           dotnet build tests/DbDelta.Providers.LiveDb.IntegrationTests/DbDelta.Providers.LiveDb.IntegrationTests.csproj --configuration Release
           dotnet build tests/DbDelta.Cli.AcceptanceTests/DbDelta.Cli.AcceptanceTests.csproj --configuration Release
+          dotnet build tests/DbDelta.Persistence.IntegrationTests/DbDelta.Persistence.IntegrationTests.csproj --configuration Release
 
       - name: Run integration tests (Testcontainers MS SQL)
         run: |
           dotnet test tests/DbDelta.Providers.LiveDb.IntegrationTests/DbDelta.Providers.LiveDb.IntegrationTests.csproj --no-build --configuration Release --logger "trx;LogFileName=providers.trx"
           dotnet test tests/DbDelta.Cli.AcceptanceTests/DbDelta.Cli.AcceptanceTests.csproj --no-build --configuration Release --logger "trx;LogFileName=cli.trx"
+          dotnet test tests/DbDelta.Persistence.IntegrationTests/DbDelta.Persistence.IntegrationTests.csproj --no-build --configuration Release --logger "trx;LogFileName=persistence-sql.trx"
 
       - name: Upload Linux test results
         if: always()

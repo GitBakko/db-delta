@@ -26,8 +26,15 @@ namespace DbDelta.Compat.Tests;
 /// instances, not in this matrix.
 ///
 /// Gated off by default: each test self-skips unless <c>DBDELTA_COMPAT=1</c> is
-/// set (nightly CI) and a Docker daemon is reachable. Pulling 2017/2019 images
-/// makes this suite far too heavy for the per-PR run.
+/// set. Pulling 2017/2019 images makes this suite far too heavy for the per-PR run.
+///
+/// That env var is set by exactly one place — the nightly job, where Docker is
+/// guaranteed — so once it is set a container that will not start is a REAL
+/// failure and must go red. There is deliberately no daemon probe: the previous
+/// one looked for TCP <c>localhost:2375</c> and the Windows named pipe, never the
+/// Linux unix socket, so on the Linux nightly runner it answered "no Docker" and
+/// skipped all three engines in 77 ms without pulling an image. The matrix had
+/// therefore never actually run.
 /// </remarks>
 [Trait("Category", "Compat")]
 public sealed class CompatMatrixTests
@@ -46,7 +53,7 @@ public sealed class CompatMatrixTests
     [MemberData(nameof(ServerImages))]
     public async Task Read_diff_apply_roundtrip_converges(string image)
     {
-        await SkipUnlessEnabledAsync();
+        SkipUnlessEnabled();
         CancellationToken ct = TestContext.Current.CancellationToken;
 
         await using MsSqlContainer container = new MsSqlBuilder()
@@ -153,30 +160,11 @@ public sealed class CompatMatrixTests
     private static string WithCatalog(string conn, string database) =>
         new SqlConnectionStringBuilder(conn) { InitialCatalog = database }.ConnectionString;
 
-    private static async Task SkipUnlessEnabledAsync()
+    private static void SkipUnlessEnabled()
     {
         if (Environment.GetEnvironmentVariable("DBDELTA_COMPAT") != "1")
         {
             Assert.Skip("Compat matrix is nightly-only. Set DBDELTA_COMPAT=1 to run.");
-        }
-
-        if (!await IsDockerAvailableAsync())
-        {
-            Assert.Skip("Docker not available — skipping compat matrix.");
-        }
-    }
-
-    private static async Task<bool> IsDockerAvailableAsync()
-    {
-        try
-        {
-            using System.Net.Sockets.TcpClient tc = new();
-            await tc.ConnectAsync("localhost", 2375).WaitAsync(TimeSpan.FromSeconds(2));
-            return true;
-        }
-        catch
-        {
-            return File.Exists(@"\\.\pipe\docker_engine");
         }
     }
 }
