@@ -82,6 +82,38 @@ public class JsonReportGeneratorTests
         json.Should().Contain("  "); // indentation
     }
 
+    /// <summary>
+    /// Structured for a pipeline that wants to gate on coverage, and summarised
+    /// for the human reading the same file.
+    /// </summary>
+    [Fact]
+    public void Unexamined_families_travel_in_the_json_report()
+    {
+        ComparisonResult result = new([])
+        {
+            Unexamined = new([new("INDEX_NON_ROWSTORE", 3)]),
+        };
+
+        string json = Sut.Generate(result);
+
+        using var doc = JsonDocument.Parse(json);
+        JsonElement group = doc.RootElement.GetProperty("unexamined").EnumerateArray().Single();
+        group.GetProperty("key").GetString().Should().Be("INDEX_NON_ROWSTORE");
+        group.GetProperty("count").GetInt32().Should().Be(3);
+        group.GetProperty("label").GetString().Should().Contain("columnstore");
+        doc.RootElement.GetProperty("unexaminedSummary").GetString().Should().Contain("13 tipologie");
+    }
+
+    /// <summary>A fully covered comparison reports an empty array and no sentence.</summary>
+    [Fact]
+    public void A_fully_covered_comparison_reports_no_unexamined_families()
+    {
+        using var doc = JsonDocument.Parse(Sut.Generate(new ComparisonResult([])));
+
+        doc.RootElement.GetProperty("unexamined").GetArrayLength().Should().Be(0);
+        doc.RootElement.GetProperty("unexaminedSummary").GetString().Should().BeEmpty();
+    }
+
     private static Table Stub(string schema, string name) => new(schema, name, []);
 
     private static View StubView(string schema, string name) =>

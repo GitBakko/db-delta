@@ -20,7 +20,7 @@
   <!-- App shell: 44px topbar / 56px header strip / error band / stale band /
        flex middle / 24px statusbar. Both bands are Auto and collapse to zero
        height when their notice is not showing. -->
-  <Grid RowDefinitions="44,56,Auto,Auto,*,24">
+  <Grid RowDefinitions="44,56,Auto,Auto,Auto,*,24">
 
     <!-- ── Band 1: App topbar ─────────────────────────────────────────────── -->
     <Border Grid.Row="0"
@@ -357,8 +357,25 @@
                   Message="Questi risultati provengono da un confronto precedente e non sono stati verificati sulle connessioni configurate ora. Esegui di nuovo il confronto prima di generare o applicare uno script."
                   IsVisible="{Binding ResultsAreStale}" />
 
+    <!-- ── Band 3c: Scope of the verdict ────────────────────────────────────
+         "Nessuna differenza" means none among the thirteen kinds DbDelta models,
+         and nothing used to say so. The silent case is the dangerous one: a table
+         missing its clustered columnstore index compares Identical, because
+         IndexReader filters to type IN (1,2) on BOTH sides and neither ever
+         mentions it. Auto row, so it collapses when the endpoints hold nothing
+         outside those kinds. No dismiss button — it describes the results below
+         and disappears with them. -->
+    <c:NoticeBand Grid.Row="4"
+                  x:Name="ScopeBand"
+                  Accent="{StaticResource WarningBrush}"
+                  AccentSoft="{StaticResource WarningSoftBrush}"
+                  AccentForeground="{StaticResource WarningFgBrush}"
+                  IconPath="M 8,1 A 7,7 0 1 1 7.99,1 M 8,4.4 L 8,8.6 M 8,10.6 L 8,11.4"
+                  Message="{Binding AppState.UnexaminedSummary}"
+                  IsVisible="{Binding AppState.UnexaminedSummary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
     <!-- ── Band 4: Middle ─ welcome overlay OR populated body ──────────────── -->
-    <Panel Grid.Row="4">
+    <Panel Grid.Row="5">
 
       <!-- Welcome state: no project loaded yet -->
       <StackPanel HorizontalAlignment="Center"
@@ -498,7 +515,7 @@
     <!-- Status bar. ClipToBounds suppresses any minor pixel overflow from
          the redacted connection strings that previously bubbled up into a
          stray window-level horizontal scrollbar. -->
-    <Border Grid.Row="5"
+    <Border Grid.Row="6"
             Background="{StaticResource BgMutedBrush}"
             BorderBrush="{StaticResource BorderBrush}"
             BorderThickness="0,1,0,0"

@@ -176,6 +176,37 @@ public class HtmlReportGeneratorTests
         html.Should().Contain("2"); // 2 different
     }
 
+    /// <summary>
+    /// A report that lists "Identiche: 214" and stops implies those were checked
+    /// in full. When the read skipped families, the report has to say so.
+    /// </summary>
+    [Fact]
+    public void Report_discloses_what_the_comparison_did_not_examine()
+    {
+        ComparisonResult result = new([PairIdentical("Table", "dbo", "Fatti")])
+        {
+            Unexamined = new([new("INDEX_NON_ROWSTORE", 3), new("ASSEMBLY", 1)]),
+        };
+
+        string html = new HtmlReportGenerator().Generate(result);
+
+        html.Should().Contain("<div class=\"scope-caveat\">");
+        html.Should().Contain("3 indici non rowstore");
+        html.Should().Contain("1 assembly CLR");
+    }
+
+    /// <summary>
+    /// No caveat when there is nothing to disclose. Asserted on the element, not
+    /// the class name: the stylesheet carries the rule unconditionally.
+    /// </summary>
+    [Fact]
+    public void Report_omits_the_caveat_when_nothing_was_skipped()
+    {
+        string html = new HtmlReportGenerator().Generate(new ComparisonResult([PairIdentical("Table", "dbo", "Fatti")]));
+
+        html.Should().NotContain("<div class=\"scope-caveat\">");
+    }
+
     // ── factory helpers ─────────────────────────────────────────────────────
 
     private static DifferencePair PairDifferent(string kind, string schema, string name) =>

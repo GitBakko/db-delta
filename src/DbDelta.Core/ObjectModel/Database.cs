@@ -73,6 +73,19 @@ public sealed record Database(
     public string? DefaultCollation { get; init; }
 
     /// <summary>
+    /// The families of objects this snapshot did NOT capture, counted. Empty for
+    /// hand-built fixtures and for a database holding nothing outside the
+    /// thirteen modelled kinds.
+    /// </summary>
+    /// <remarks>
+    /// Carried so the verdict can disclose its own scope. Without it a database
+    /// whose only drift is an unmodelled object — a missing columnstore index,
+    /// a changed CLR assembly — compares Identical and says so without
+    /// qualification. See <see cref="UnexaminedCensus"/>.
+    /// </remarks>
+    public UnexaminedCensus Unexamined { get; init; } = UnexaminedCensus.Empty;
+
+    /// <summary>
     /// M3 ctor — tables + views + procedures. Kept so existing call sites still compile.
     /// </summary>
     public Database(

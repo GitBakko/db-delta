@@ -33,6 +33,7 @@ public sealed class HtmlReportGenerator
         sb.AppendLine("<body>");
 
         AppendHeader(sb, result);
+        AppendScopeCaveat(sb, result);
         AppendKindSections(sb, result);
 
         sb.AppendLine("</body>");
@@ -67,6 +68,7 @@ public sealed class HtmlReportGenerator
         sb.Append(';');
         sb.Append("color:#fff;}");
         sb.Append("""
+            .scope-caveat{padding:12px 28px;background:#FFF4D6;border-bottom:1px solid #E6D28A;color:#5A4600;font-size:13px;line-height:1.5;}
             main{padding:20px 28px;}
             details{background:#fff;border:1px solid #D6DBE2;border-radius:8px;margin-bottom:12px;overflow:hidden;}
             details>summary{padding:12px 16px;font-weight:600;cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;}
@@ -130,6 +132,21 @@ public sealed class HtmlReportGenerator
         sb.Append("<span class=\"identical\">Identiche: ").Append(identical.ToString(CultureInfo.InvariantCulture)).Append("</span>");
         sb.AppendLine("</div>");
         sb.AppendLine("</header>");
+    }
+
+    /// <summary>
+    /// States what the comparison did not look at, directly under the totals.
+    /// A report that lists "Identiche: 214" and stops implies those 214 were
+    /// checked in full; they were checked against the thirteen modelled kinds.
+    /// Emits nothing when there is nothing to disclose.
+    /// </summary>
+    private static void AppendScopeCaveat(StringBuilder sb, ComparisonResult result)
+    {
+        if (result.Unexamined.IsEmpty) { return; }
+
+        sb.Append("<div class=\"scope-caveat\">");
+        sb.Append(WebUtility.HtmlEncode(result.Unexamined.Summary));
+        sb.AppendLine("</div>");
     }
 
     private static void AppendKindSections(StringBuilder sb, ComparisonResult result)

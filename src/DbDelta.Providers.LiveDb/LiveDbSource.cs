@@ -102,6 +102,12 @@ public sealed class LiveDbSource : ISchemaSource
             IReadOnlyList<DependencyEdge> dependencies =
                 await new DependencyReader().ReadAsync(connection, cancellationToken);
 
+            // What the readers above do NOT cover, counted in one round trip, so
+            // the verdict can state its own scope. A database holding nothing
+            // outside the thirteen kinds yields an empty census and no message.
+            UnexaminedCensus unexamined =
+                await new UnexaminedReader().ReadAsync(connection, cancellationToken);
+
             string dbName = new SqlConnectionStringBuilder(_connectionString).InitialCatalog;
             Database db = new(dbName, schemas, tables, views, procs, functions, triggers)
             {
@@ -114,6 +120,7 @@ public sealed class LiveDbSource : ISchemaSource
                 Permissions = permissions,
                 Dependencies = dependencies,
                 DefaultCollation = defaultCollation,
+                Unexamined = unexamined,
             };
             return Result<Database>.Success(db);
         }

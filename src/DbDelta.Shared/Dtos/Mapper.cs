@@ -20,7 +20,15 @@ public static class Mapper
                 Status: d.Status.ToString(),
                 LastModifiedSource: ExtractModifyDate(d.SideA),
                 LastModifiedTarget: ExtractModifyDate(d.SideB)))
-        ]);
+        ])
+        {
+            Unexamined =
+            [
+                .. result.Unexamined.Groups.Select(g =>
+                    new UnexaminedGroupDto(g.Key, UnexaminedCensus.LabelFor(g.Key), g.Count))
+            ],
+            UnexaminedSummary = result.Unexamined.Summary,
+        };
     }
 
     private static DateTime? ExtractModifyDate(object? side) => side switch

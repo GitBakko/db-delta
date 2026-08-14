@@ -416,6 +416,22 @@ public sealed partial class AppStateViewModel : ObservableObject
         OnPropertyChanged(nameof(ResultsAreStale));
     }
 
-    partial void OnLastComparisonRawChanged(ComparisonResult? value) =>
+    /// <summary>
+    /// The scope caveat for the results on screen, or null when the comparison
+    /// covered everything both endpoints hold.
+    /// </summary>
+    /// <remarks>
+    /// Without it "nessuna differenza" is read as "the two databases match",
+    /// which the tool cannot know: it models thirteen object kinds, and a table
+    /// missing its clustered columnstore index compares Identical because
+    /// neither side ever reports the index.
+    /// </remarks>
+    public string? UnexaminedSummary =>
+        LastComparisonRaw?.Unexamined is { IsEmpty: false } census ? census.Summary : null;
+
+    partial void OnLastComparisonRawChanged(ComparisonResult? value)
+    {
         OnPropertyChanged(nameof(ResultsAreStale));
+        OnPropertyChanged(nameof(UnexaminedSummary));
+    }
 }

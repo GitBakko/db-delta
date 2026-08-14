@@ -24,6 +24,16 @@ internal static class TextFormatter
                   .Append(pair.Identity.SchemaName).Append('.').AppendLine(pair.Identity.ObjectName);
             }
         }
+
+        // The scope of the verdict, last so it is the line still on screen. An
+        // empty output with no caveat reads as "the two databases match"; it
+        // means "no difference among the kinds DbDelta compares".
+        if (!result.Unexamined.IsEmpty)
+        {
+            sb.AppendLine();
+            sb.AppendLine(result.Unexamined.Summary);
+        }
+
         return sb.ToString();
     }
 }

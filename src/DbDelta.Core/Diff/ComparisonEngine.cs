@@ -35,7 +35,15 @@ public sealed class ComparisonEngine
         pairs.AddRange(CompareRoles(a.Roles, b.Roles, ids));
         pairs.AddRange(ComparePermissions(a.Permissions, b.Permissions, ids.Names));
 
-        return new ComparisonResult(pairs) { NameComparer = ids.Names };
+        // Carry what neither side was examined for. Merged here so every consumer
+        // of a result gets the caveat without re-deriving it — a verdict of
+        // "Identical" that omits its own scope is the silent half of this tool's
+        // worst failure mode.
+        return new ComparisonResult(pairs)
+        {
+            NameComparer = ids.Names,
+            Unexamined = UnexaminedCensus.Merge(a.Unexamined, b.Unexamined),
+        };
     }
 
     /// <summary>
