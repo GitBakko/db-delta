@@ -28,7 +28,7 @@ Deciso dal proprietario, non riaprire senza una ragione nuova:
 
 # Stato di avanzamento
 
-Aggiornato il 2026-08-14, stessa sessione dello scan.
+Aggiornato il 2026-08-16.
 
 | Voce | Stato | Commit |
 |---|---|---|
@@ -36,15 +36,26 @@ Aggiornato il 2026-08-14, stessa sessione dello scan.
 | 4 — Diff pane, SQL sotto il nome sbagliato | **fatta** | `d210b1a` |
 | 3 — Dialogo di conferma: script + cosa si elimina | **fatta** | `0cde9a9` |
 | 11a — Censimento + banner ambra | **fatta** | `6c2e2e9` |
-| 11b — `EmitRebuild` deve RIFIUTARE su indici non riemettibili | aperta | — |
+| 11b — `EmitRebuild` deve RIFIUTARE su indici non riemettibili | **fatta** | `04886b1` · `b250d4f` · `3c32b71` |
 | 2, 5, 6, 7, 8, 9, 10, 12, 13, 14 | aperte | — |
 
-**La 11b è ora la voce più importante che resta**, ed è cambiata di natura: il
-censimento ha reso il punto cieco *visibile*, ma `TableScriptEmitter.cs:668-691`
-continua a ricostruire la tabella da un modello che non ha mai contenuto il suo
-columnstore e poi a droppare l'originale. Il test live
-`UnexaminedCensusTests.A_columnstore_only_difference_compares_Identical_and_the_census_says_why`
-riproduce già lo scenario e può fare da base.
+**La 11 è chiusa in entrambe le metà.** Il reader porta ogni tipo di indice e
+`TableIndex.TypeDesc`; `IndexScriptEmitter.EmitCreate` /
+`EmitRebuildForCompression` e `TableScriptEmitter.EmitRebuild` alzano
+`UnscriptableIndexException` prima che esista una riga di script; la CLI esce 30
+e l'app mostra il banner. `DROP INDEX` resta permesso su ogni tipo — è valido, e
+rifiutarlo bloccherebbe una convergenza che il target sa completare.
+
+Non fatta, e deliberatamente: **l'emissione** di un columnstore. È il rifiuto
+che ferma la perdita; scrivere il `CREATE` è una voce a sé, e nessuno l'ha
+ancora chiesta.
+
+**La voce più importante che resta è la 12** — i vincoli auto-nominati appaiati
+per nome, che è l'altra metà del punto 11 ma dal lato del falso *positivo*:
+churn di DROP/ADD su chiavi primarie di produzione, per sempre e su ogni tabella
+con un DEFAULT inline. A costo minore: la **2** (annullare il compare, timeout
+di lettura) e la **6** (il report HTML che la GUI non sa invocare) sono ore e si
+vedono subito.
 
 ---
 
@@ -482,6 +493,14 @@ resto come Different-ma-non-scriptabile, e far **rifiutare** a `EmitRebuild` una
 tabella che porta un indice che non sa riemettere, **prima** che una riga di SQL
 tocchi il server. L'emissione completa del columnstore può seguire dopo: è il
 rifiuto che ferma la distruzione silenziosa.
+
+> **Fatta** il 2026-08-16 — `04886b1` (reader + modello), `b250d4f` (il
+> rifiuto), `3c32b71` (CLI exit 30, banner dell'app). Due dettagli che l'analisi
+> non aveva previsto: il `--` di commento nel corpo del diff viewer, perché un
+> pannello che mostra due testi identici su una riga Different è lo stesso bug
+> vuoto del punto 4 visto dall'altro capo; e la guardia su
+> `EmitRebuildForCompression`, che per un columnstore emetterebbe
+> `DATA_COMPRESSION = COLUMNSTORE` — valore che un REBUILD rowstore non accetta.
 
 ## 12. I vincoli auto-nominati sono appaiati per nome
 
