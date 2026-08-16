@@ -8,16 +8,17 @@ rompere).
 
 ## Stato
 
-- **L'ondata 11b è su `origin/main`**, spinta il 2026-08-16 (`0e95089..44e00f8`).
+- **L'ondata 11b è su `origin/main`**, spinta il 2026-08-16 (`0e95089..db40740`).
   Una riga di handoff sullo stato del push invecchia il commit dopo: chiedilo a
   `git status -sb`, non a questo file.
 - **v1.0.2 pubblicata** (2026-08-13). Nessuna release nuova in questa ondata:
   tutto quanto segue è post-1.0.2 e non ancora rilasciato.
 - **804 test verdi** in locale su dieci progetti (i 3 della matrice compat
   restano skipped senza `DBDELTA_COMPAT=1`).
-- **CI verde su tutti e tre i job** all'ultima misura, e per la prima volta la
-  CI vuol dire qualcosa — vedi sotto. I quattro commit nuovi non l'hanno ancora
-  attraversata.
+- **CI verde su `db40740`**, job `ci` e `docs`, con `Verify formatting` e i
+  Testcontainers Linux dentro. La matrice compat non gira sui push: è notturna,
+  e l'ultima misura è il run `31925658819`. Da `f91ee6e` un badge verde vuol
+  dire qualcosa — vedi sotto.
 - Restano di proprietà del proprietario: **code signing** (bloccato sul
   certificato) e **annuncio pubblico**. L'**undo** resta rinviato.
 
@@ -144,6 +145,24 @@ la roadmap ha l'evidenza `file:riga` per ciascuna.
    combacerà mai con l'hash dell'altro server, quindi ogni tabella con un
    DEFAULT inline è Different per sempre e lo script droppa e ricrea vincoli su
    chiavi primarie di produzione. Giorni.
+
+   La roadmap ha l'evidenza `file:riga` e la proposta. Quello che si aggiunge
+   dall'aver lavorato in quei file adesso: **le strutture che confrontano un
+   vincolo sono TRE, in due assembly**, e la lezione ricorrente di questo repo è
+   che chi ne cambia una sola lascia le altre a dissentire.
+   - `ComparisonEngine.ConstraintsEqual` / `ConstraintShapeEqual` — decide lo
+     status.
+   - `TableScriptEmitter.ConstraintShapeEqual` — **una seconda copia**, il cui
+     doc-comment dichiara apertamente di rispecchiare la prima. Decide se
+     `EmitAlter` emette DROP+ADD.
+   - `TableScriptEmitter.EmitRebuild` — droppa i named non-FK del target e li
+     **ri-aggiunge per nome** da `newT`. Se un vincolo auto-nominato smette di
+     essere emesso col suo nome, quel giro va rivisto insieme, o il rebuild
+     ricrea sul target l'hash della sorgente.
+
+   Utile anche sapere che il rifiuto della 11b vive **accanto** a questo codice:
+   `EmitRebuild` ora comincia con un `foreach` sugli indici. Non è in conflitto,
+   ma è la stessa funzione.
 2. **Voce 2 — il compare non si annulla e muore a 30 s.** Ore, e il token è già
    filato correttamente fin dentro i reader: mancano i cinque call site e un
    pulsante.
