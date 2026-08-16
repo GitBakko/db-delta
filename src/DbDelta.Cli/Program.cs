@@ -2,6 +2,7 @@ using System.CommandLine;
 using DbDelta.Cli;
 using DbDelta.Cli.Commands;
 using DbDelta.Core.Abstractions;
+using DbDelta.Core.ScriptGen;
 
 RootCommand root = new("DbDelta — open-source SQL Server schema compare and deployment tool")
 {
@@ -33,6 +34,19 @@ catch (OperationCanceledException)
         "Operation cancelled.",
         "Re-run the command to start again."));
     return ExitCodes.DeploymentCancelled;
+}
+catch (UnscriptableIndexException ex)
+{
+    // Not unexpected, and not a bug to report: the generator refused on
+    // purpose, because the script it was asked for would drop an index it
+    // cannot write back. 30, the code §4.3 reserves for a script that could not
+    // be produced — never 99 with an invitation to open an issue.
+    CliErrorMapper.WriteError(new Error(
+        ErrorCode.DataPreservationImpossible,
+        ex.Message,
+        $"Re-create {ex.IndexName} by hand after the deploy, or leave "
+        + $"{ex.Schema}.{ex.Table} out of this run."));
+    return ExitCodes.ScriptGenerationFailure;
 }
 catch (Exception ex)
 {

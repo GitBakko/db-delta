@@ -813,6 +813,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
             await AskForBackfillAsync(owner, selected).ConfigureAwait(true);
         if (backfill is null) { StatusText = BackfillCancelledMessage; return; }
 
+        // Built before the save dialog for the same reason the backfill question
+        // is asked before it: a refusal means there is no script, so there is no
+        // point making the user name a file for it first.
+        if (TryBuildDeployScript(selected, backfill) is not string script) { return; }
+
         FilePickerSaveOptions opts = new()
         {
             Title = "Salva script di allineamento",
@@ -822,16 +827,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IStorageFile? file = await owner.StorageProvider.SaveFilePickerAsync(opts).ConfigureAwait(true);
         if (file is null) { return; }
 
-        string script = DeployScriptBuilder.Build(
-            AppState.LastComparisonRaw,
-            selected,
-            AppState.SourceConnectionString ?? string.Empty,
-            AppState.TargetConnectionString ?? string.Empty,
-            DateTime.UtcNow,
-            AppState.SourceDependencies,
-            AppState.TargetDependencies,
-            backfill);
-
         await using Stream s = await file.OpenWriteAsync().ConfigureAwait(true);
         await using StreamWriter w = new(s, Encoding.UTF8);
         await w.WriteAsync(script).ConfigureAwait(true);
@@ -840,6 +835,47 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     private bool CanDeploy() => Rows.Any(r => r.IsSelected) && !AppState.ResultsAreStale;
+
+    /// <summary>
+    /// The deploy script, or <c>null</c> after putting the generator's refusal
+    /// in the error banner. Shared by <see cref="DeployAsync"/> and
+    /// <see cref="ExecuteOnTargetAsync"/> — both build the same script and both
+    /// must decline the same way.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="UnscriptableIndexException"/> is a deliberate refusal, not a
+    /// fault: the script would drop a columnstore / XML / spatial / hash index
+    /// and hold no statement to re-create it. Left to escape, a
+    /// <c>[RelayCommand]</c> rethrows it on the UI thread and the window dies —
+    /// the one outcome worse than not deploying.
+    /// </remarks>
+    internal string? TryBuildDeployScript(
+        IReadOnlyList<DifferencePair> selected,
+        IReadOnlyDictionary<(string Schema, string Table, string Column), string> backfill)
+    {
+        try
+        {
+            return DeployScriptBuilder.Build(
+                AppState.LastComparisonRaw!,
+                selected,
+                AppState.SourceConnectionString ?? string.Empty,
+                AppState.TargetConnectionString ?? string.Empty,
+                DateTime.UtcNow,
+                AppState.SourceDependencies,
+                AppState.TargetDependencies,
+                backfill);
+        }
+        catch (UnscriptableIndexException ex)
+        {
+            AppState.LastError =
+                $"Script non generato: l'indice {ex.IndexName} su {ex.Schema}.{ex.Table} è di tipo "
+                + $"{ex.TypeDesc ?? "sconosciuto"} e DbDelta non sa ricrearlo. Allineare questa tabella "
+                + "lo eliminerebbe senza rimetterlo. Togli la tabella dalla selezione, oppure ricrea "
+                + "l'indice a mano dopo il rilascio.";
+            StatusText = "Nessuno script generato: vedi il messaggio in alto.";
+            return null;
+        }
+    }
 
     /// <summary>
     /// Surfaced to the view so the grid can say the rows no longer describe the
@@ -868,15 +904,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         // Script built up-front; the dialog owns the whole confirm → execute →
         // outcome flow and runs this delegate in-dialog (busy state + result
         // panel). Result stays null when the user cancels before executing.
-        string script = DeployScriptBuilder.Build(
-            AppState.LastComparisonRaw,
-            selected,
-            AppState.SourceConnectionString ?? string.Empty,
-            AppState.TargetConnectionString ?? string.Empty,
-            DateTime.UtcNow,
-            AppState.SourceDependencies,
-            AppState.TargetDependencies,
-            backfill);
+        if (TryBuildDeployScript(selected, backfill) is not string script) { return; }
 
         // The DROPs by name, not just how many. The dialog is the last gate
         // before an irreversible change and the pairs are already in hand.
@@ -897,7 +925,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             targetSummary: ConnectionStringRedactor.Redact(AppState.TargetConnectionString),
             script: script,
             executeAsync: () => SqlExecutor.ExecuteAsync(
-                AppState.TargetConnectionString!,
+                AppState.TargetConnectionString,
                 script,
                 CancellationToken.None,
                 useOwnTransaction: false,
