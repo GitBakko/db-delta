@@ -112,6 +112,27 @@ non si emette mai. L'etichetta è passata a «opzioni di indici non rowstore».
 **Non fatta, e deliberatamente: emettere un columnstore.** È il rifiuto che
 ferma la perdita. Scrivere il `CREATE` è una voce a sé e nessuno l'ha chiesta.
 
+**Misurata dal vivo, non dedotta** — A/B sulla stessa coppia reale
+(`PcrmV2Pl_test` → `PcrmV2Pl_Badii` su `.243`), stessa CLI compilata prima
+(`0e95089`) e dopo:
+
+| | pre | post |
+|---|---|---|
+| oggetti | 841 | 841 |
+| Identical / Different / OnlyInA / OnlyInB | 786 / 13 / 24 / 18 | identico |
+| status spostati | — | **0** |
+| script generato | — | **byte-identico** (`cmp`) |
+
+Il censimento di quella coppia dice `52 proprietà estese` e **nessun indice non
+rowstore**: il reader allargato è un no-op *provato* lì, e il percorso di
+rifiuto **non** è stato esercitato su quei server. Resta coperto
+dall'acceptance, che gira lo stesso scenario attraverso il confine di processo
+contro un SQL Server 2022 vero.
+
+Un effetto collaterale confermato su dati veri nella stessa corsa: **`dbdelta
+script` esce 0 con 13 differenze pendenti**. È la voce 5, non una regressione di
+questa ondata.
+
 ## Da dove si riparte
 
 Nell'ordine in cui le rimetterei in fila — la scelta resta del proprietario, e
@@ -203,6 +224,10 @@ Alle tre di `2026-08-08-handoff-to-v1.md` — `DeployedModuleConvergesTests`,
   che quel testo lungo stia bene nella banda, no. Vale anche per il rifiuto sul
   percorso **Esegui**: la catena è la stessa, ma nessuno l'ha guardata girare
   con due server veri.
+- **Il rifiuto non è mai stato provato contro `.243`/`.242`**, perché nessuno
+  dei database lì porta un indice non rowstore. Servirebbero due database
+  usa-e-getta seminati apposta; proposto e **scartato dal proprietario**
+  (2026-08-16) perché l'acceptance copre già lo scenario contro un server vero.
 - **Indici su viste indicizzate restano invisibili**, non solo non scriptabili:
   `IndexReader` fa `INNER JOIN sys.tables`. Il censimento li conta a parte
   (`INDEX_ON_VIEW`) e nient'altro li nomina.
