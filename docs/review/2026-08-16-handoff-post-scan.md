@@ -8,8 +8,8 @@ rompere).
 
 ## Stato
 
-- **HEAD `3c32b71`** su `main`, working tree pulito. **`origin` è indietro di
-  quattro commit** — il push non è ancora stato dato.
+- **`main` pulito e avanti a `origin`** di tutta l'ondata 11b (i tre commit
+  `feat` in tabella più questo): **il push non è ancora stato dato**.
 - **v1.0.2 pubblicata** (2026-08-13). Nessuna release nuova in questa ondata:
   tutto quanto segue è post-1.0.2 e non ancora rilasciato.
 - **804 test verdi** in locale su dieci progetti (i 3 della matrice compat
