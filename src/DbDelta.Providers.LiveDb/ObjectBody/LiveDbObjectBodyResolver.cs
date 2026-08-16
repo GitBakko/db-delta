@@ -351,7 +351,7 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
     {
         const string sql = """
             SELECT kc.parent_object_id, kc.name, kc.type, i.type AS IndexType,
-                   ic.key_ordinal, c.name AS ColumnName
+                   ic.key_ordinal, c.name AS ColumnName, kc.is_system_named
             FROM sys.key_constraints AS kc
             INNER JOIN sys.indexes AS i ON i.object_id = kc.parent_object_id
                                         AND i.index_id = kc.unique_index_id
@@ -366,6 +366,7 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
         string? currentName = null;
         string? currentType = null;
         bool isClustered = false;
+        bool isSystemNamed = false;
         List<string> currentCols = [];
 
         await using SqlCommand cmd = new(sql, connection);
@@ -378,22 +379,24 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
             string type = r.GetString(2).Trim();
             byte indexType = r.GetByte(3);
             string column = r.GetString(5);
+            bool systemNamed = r.GetBoolean(6);
 
             if (currentName is not null && currentName != name)
             {
-                AppendKeyConstraint(byObject, objectId, currentName, currentType!, isClustered, currentCols);
+                AppendKeyConstraint(byObject, objectId, currentName, currentType!, isClustered, isSystemNamed, currentCols);
                 currentCols = [];
             }
 
             currentName = name;
             currentType = type;
             isClustered = indexType == 1;
+            isSystemNamed = systemNamed;
             currentCols.Add(column);
         }
 
         if (currentName is not null)
         {
-            AppendKeyConstraint(byObject, objectId, currentName, currentType!, isClustered, currentCols);
+            AppendKeyConstraint(byObject, objectId, currentName, currentType!, isClustered, isSystemNamed, currentCols);
         }
     }
 
@@ -403,12 +406,13 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
         string name,
         string type,
         bool isClustered,
+        bool isSystemNamed,
         List<string> columns)
     {
         Constraint c = type switch
         {
-            "PK" => new PrimaryKey(name, [.. columns], isClustered),
-            "UQ" => new UniqueConstraint(name, [.. columns], isClustered),
+            "PK" => new PrimaryKey(name, [.. columns], isClustered) { IsSystemNamed = isSystemNamed },
+            "UQ" => new UniqueConstraint(name, [.. columns], isClustered) { IsSystemNamed = isSystemNamed },
             _ => throw new InvalidOperationException($"Unexpected key constraint type '{type}'."),
         };
         Append(byObject, objectId, c);
@@ -517,7 +521,8 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
         CancellationToken ct)
     {
         const string sql = """
-            SELECT cc.name, cc.definition, cc.is_disabled, cc.is_not_for_replication
+            SELECT cc.name, cc.definition, cc.is_disabled, cc.is_not_for_replication,
+                   cc.is_system_named
             FROM sys.check_constraints AS cc
             WHERE cc.parent_object_id = @objectId
             ORDER BY cc.name;
@@ -532,7 +537,8 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
                 Name: r.GetString(0),
                 Expression: r.GetString(1),
                 IsDisabled: r.GetBoolean(2),
-                IsNotForReplication: r.GetBoolean(3));
+                IsNotForReplication: r.GetBoolean(3))
+            { IsSystemNamed = r.GetBoolean(4) };
             Append(byObject, objectId, ck);
         }
     }
@@ -544,7 +550,7 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
         CancellationToken ct)
     {
         const string sql = """
-            SELECT dc.name, c.name AS ColumnName, dc.definition
+            SELECT dc.name, c.name AS ColumnName, dc.definition, dc.is_system_named
             FROM sys.default_constraints AS dc
             INNER JOIN sys.columns AS c ON c.object_id = dc.parent_object_id
                                         AND c.column_id = dc.parent_column_id
@@ -560,7 +566,8 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
             DefaultConstraint df = new(
                 Name: r.GetString(0),
                 ColumnName: r.GetString(1),
-                Expression: r.GetString(2));
+                Expression: r.GetString(2))
+            { IsSystemNamed = r.GetBoolean(3) };
             Append(byObject, objectId, df);
         }
     }

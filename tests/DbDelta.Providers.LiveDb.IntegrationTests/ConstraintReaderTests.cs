@@ -67,6 +67,57 @@ public class ConstraintReaderTests(LiveDbFixture fixture)
         df.Name.Should().Be("DF_Customer_CreatedAt");
         df.ColumnName.Should().Be("CreatedAt");
         df.Expression.Should().Contain("sysutcdatetime");
+
+        // The negative half of the auto-named test below: every name here came
+        // from the DDL, so a reader that hardcoded the flag would fail here.
+        customer.Constraints.Should().OnlyContain(c => !c.IsSystemNamed);
+    }
+
+    [Fact]
+    public async Task LiveDbSource_flags_the_constraints_SQL_Server_named_itself()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        await using (SqlConnection bootstrap = new(fixture.ConnectionString))
+        {
+            await bootstrap.OpenAsync(ct);
+            await ExecAsync(bootstrap, "IF DB_ID('DbDeltaAutoNamed') IS NULL CREATE DATABASE DbDeltaAutoNamed;", ct);
+        }
+
+        string dbConn = new SqlConnectionStringBuilder(fixture.ConnectionString)
+        {
+            InitialCatalog = "DbDeltaAutoNamed"
+        }.ConnectionString;
+
+        await using (SqlConnection c = new(dbConn))
+        {
+            await c.OpenAsync(ct);
+            await ExecAsync(c, """
+                IF OBJECT_ID('dbo.Ordini') IS NULL
+                BEGIN
+                    CREATE TABLE dbo.Ordini (
+                        Id    int          NOT NULL PRIMARY KEY,
+                        Stato int          NOT NULL DEFAULT ((0)),
+                        Qta   int          NOT NULL CHECK ([Qta] > (0)),
+                        Codice nvarchar(10) NOT NULL UNIQUE
+                    );
+                END
+                """, ct);
+        }
+
+        LiveDbSource source = new(dbConn);
+        Result<Database> result = await source.LoadAsync(ct);
+        result.IsSuccess.Should().BeTrue(result.Error?.Message);
+
+        Table ordini = result.Value!.Tables.Single(t => t.Name == "Ordini");
+        ordini.Constraints.Should().HaveCount(4);
+        ordini.Constraints.Should().OnlyContain(c => c.IsSystemNamed);
+
+        // The shape the whole feature exists for: a suffix derived from the
+        // constraint's own object_id, which the other server cannot reproduce.
+        ordini.Constraints.OfType<PrimaryKey>().Single().Name.Should().StartWith("PK__Ordini__");
+        ordini.Constraints.OfType<UniqueConstraint>().Single().Name.Should().StartWith("UQ__Ordini__");
+        ordini.Constraints.OfType<CheckConstraint>().Single().Name.Should().StartWith("CK__Ordini__");
+        ordini.Constraints.OfType<DefaultConstraint>().Single().Name.Should().StartWith("DF__Ordini__");
     }
 
     [Fact]

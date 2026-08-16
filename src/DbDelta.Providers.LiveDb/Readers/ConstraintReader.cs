@@ -17,7 +17,8 @@ internal sealed class ConstraintReader
             kc.type             AS ConstraintType,
             i.type              AS IndexType,
             ic.key_ordinal      AS KeyOrdinal,
-            c.name              AS ColumnName
+            c.name              AS ColumnName,
+            kc.is_system_named  AS IsSystemNamed
         FROM sys.key_constraints AS kc
         INNER JOIN sys.indexes AS i ON i.object_id = kc.parent_object_id
                                     AND i.index_id = kc.unique_index_id
@@ -63,7 +64,8 @@ internal sealed class ConstraintReader
             cc.name                AS ConstraintName,
             cc.definition          AS Expression,
             cc.is_disabled         AS IsDisabled,
-            cc.is_not_for_replication AS IsNotForReplication
+            cc.is_not_for_replication AS IsNotForReplication,
+            cc.is_system_named     AS IsSystemNamed
         FROM sys.check_constraints AS cc
         INNER JOIN sys.tables AS t ON t.object_id = cc.parent_object_id
         WHERE t.is_ms_shipped = 0
@@ -75,7 +77,8 @@ internal sealed class ConstraintReader
             dc.parent_object_id    AS ObjectId,
             dc.name                AS ConstraintName,
             c.name                 AS ColumnName,
-            dc.definition          AS Expression
+            dc.definition          AS Expression,
+            dc.is_system_named     AS IsSystemNamed
         FROM sys.default_constraints AS dc
         INNER JOIN sys.columns AS c ON c.object_id = dc.parent_object_id
                                     AND c.column_id = dc.parent_column_id
@@ -107,6 +110,7 @@ internal sealed class ConstraintReader
         string? currentName = null;
         string? currentType = null;
         bool isClustered = false;
+        bool isSystemNamed = false;
         List<string> currentCols = [];
 
         await using SqlCommand cmd = new(KeysQuery, connection);
@@ -119,10 +123,11 @@ internal sealed class ConstraintReader
             string type = reader.GetString(2).Trim();
             byte indexType = reader.GetByte(3);
             string column = reader.GetString(5);
+            bool systemNamed = reader.GetBoolean(6);
 
             if (currentName is not null && (currentName != name || currentObjectId != objectId))
             {
-                FlushKey(byObject, currentObjectId!.Value, currentName, currentType!, isClustered, currentCols);
+                FlushKey(byObject, currentObjectId!.Value, currentName, currentType!, isClustered, isSystemNamed, currentCols);
                 currentCols = [];
             }
 
@@ -130,12 +135,13 @@ internal sealed class ConstraintReader
             currentName = name;
             currentType = type;
             isClustered = indexType == 1;
+            isSystemNamed = systemNamed;
             currentCols.Add(column);
         }
 
         if (currentName is not null)
         {
-            FlushKey(byObject, currentObjectId!.Value, currentName, currentType!, isClustered, currentCols);
+            FlushKey(byObject, currentObjectId!.Value, currentName, currentType!, isClustered, isSystemNamed, currentCols);
         }
     }
 
@@ -145,12 +151,13 @@ internal sealed class ConstraintReader
         string name,
         string type,
         bool isClustered,
+        bool isSystemNamed,
         List<string> columns)
     {
         Constraint c = type switch
         {
-            "PK" => new PrimaryKey(name, [.. columns], isClustered),
-            "UQ" => new UniqueConstraint(name, [.. columns], isClustered),
+            "PK" => new PrimaryKey(name, [.. columns], isClustered) { IsSystemNamed = isSystemNamed },
+            "UQ" => new UniqueConstraint(name, [.. columns], isClustered) { IsSystemNamed = isSystemNamed },
             _ => throw new InvalidOperationException($"Unexpected key constraint type '{type}'."),
         };
         Append(byObject, objectId, c);
@@ -257,7 +264,8 @@ internal sealed class ConstraintReader
                 Name: r.GetString(1),
                 Expression: r.GetString(2),
                 IsDisabled: r.GetBoolean(3),
-                IsNotForReplication: r.GetBoolean(4));
+                IsNotForReplication: r.GetBoolean(4))
+            { IsSystemNamed = r.GetBoolean(5) };
             Append(byObject, objectId, ck);
         }
     }
@@ -275,7 +283,8 @@ internal sealed class ConstraintReader
             DefaultConstraint df = new(
                 Name: r.GetString(1),
                 ColumnName: r.GetString(2),
-                Expression: r.GetString(3));
+                Expression: r.GetString(3))
+            { IsSystemNamed = r.GetBoolean(4) };
             Append(byObject, objectId, df);
         }
     }
