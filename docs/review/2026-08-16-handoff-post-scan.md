@@ -8,8 +8,9 @@ rompere).
 
 ## Stato
 
-- **`main` pulito e avanti a `origin`** di tutta l'ondata 11b (i tre commit
-  `feat` in tabella più questo): **il push non è ancora stato dato**.
+- **L'ondata 11b è su `origin/main`**, spinta il 2026-08-16 (`0e95089..44e00f8`).
+  Una riga di handoff sullo stato del push invecchia il commit dopo: chiedilo a
+  `git status -sb`, non a questo file.
 - **v1.0.2 pubblicata** (2026-08-13). Nessuna release nuova in questa ondata:
   tutto quanto segue è post-1.0.2 e non ancora rilasciato.
 - **804 test verdi** in locale su dieci progetti (i 3 della matrice compat
