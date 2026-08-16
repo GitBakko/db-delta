@@ -17,14 +17,20 @@ namespace DbDelta.Providers.LiveDb.IntegrationTests;
 public class UnexaminedCensusTests(LiveDbFixture fixture)
 {
     /// <summary>
-    /// The failure the census exists to disclose, demonstrated end to end: two
-    /// databases whose ONLY difference is a columnstore index compare Identical,
-    /// because IndexReader takes type IN (1,2) and neither side ever reports it.
-    /// The verdict is not wrong so much as narrower than it sounds — and the
-    /// census is what says so.
+    /// This test used to assert <c>Identical</c>, and the assertion was the
+    /// point: the columnstore index was invisible to both sides, so a real
+    /// difference read as none. Widening <c>IndexReader</c> past
+    /// <c>type IN (1,2)</c> closed that, and the status flipped — which is the
+    /// good news the handoff said to REWRITE this test for, not to silence.
     /// </summary>
+    /// <remarks>
+    /// The census entry stays, narrowed: the index is now detected and
+    /// compared by name and columns, but its type-specific options are still
+    /// unread and DbDelta still cannot emit a CREATE for it — which is why
+    /// <c>TableScriptEmitter</c> refuses a rebuild of a table carrying one.
+    /// </remarks>
     [Fact]
-    public async Task A_columnstore_only_difference_compares_Identical_and_the_census_says_why()
+    public async Task A_columnstore_only_difference_no_longer_compares_Identical()
     {
         CancellationToken ct = TestContext.Current.CancellationToken;
         string withIndex = await SeedAsync("DbDeltaCensusA", columnstore: true, ct);
@@ -37,10 +43,14 @@ public class UnexaminedCensusTests(LiveDbFixture fixture)
 
         DifferencePair fatti = result.Differences
             .Single(d => d.Identity.Kind == "Table" && d.Identity.ObjectName == "Fatti");
-        fatti.Status.Should().Be(DifferenceStatus.Identical,
-            "the columnstore index is invisible to both sides — this is the blind spot, not a bug in this test");
+        fatti.Status.Should().Be(DifferenceStatus.Different,
+            "the columnstore index exists on one side only, and the reader now sees it");
 
-        result.Unexamined.IsEmpty.Should().BeFalse("the verdict must disclose that it skipped the index");
+        ((Table)fatti.SideA!).Indexes.Single(i => i.Name == "NCCI_Fatti").IsRowstore
+            .Should().BeFalse("it is carried as a columnstore, not mistaken for a rowstore index");
+        ((Table)fatti.SideB!).Indexes.Should().BeEmpty();
+
+        result.Unexamined.IsEmpty.Should().BeFalse("their type-specific options are still not examined");
         result.Unexamined.Groups.Should().Contain(g => g.Key == "INDEX_NON_ROWSTORE" && g.Count >= 1);
         result.Unexamined.Summary.Should().Contain("columnstore");
     }

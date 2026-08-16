@@ -42,10 +42,12 @@ internal sealed class UnexaminedReader
                       WHERE schema_id <> SCHEMA_ID('sys')
             UNION ALL SELECT 'FULLTEXT_CATALOG', COUNT(*) FROM sys.fulltext_catalogs
 
-            -- Indexes IndexReader filters away: it takes type IN (1,2) only, and
-            -- joins sys.tables, so columnstore/XML/spatial/hash and every index on
-            -- an indexed view are invisible on BOTH sides — which is how a table
-            -- missing its columnstore index compares Identical.
+            -- IndexReader now carries every index type, so a missing columnstore
+            -- IS reported as a difference. What it still cannot do is WRITE one:
+            -- the type-specific options (column order, archive compression,
+            -- partitioning) are neither read nor compared, and no CREATE is ever
+            -- emitted. The count stays, narrowed to that. Indexes on indexed
+            -- views remain invisible outright — IndexReader joins sys.tables.
             UNION ALL SELECT 'INDEX_NON_ROWSTORE', COUNT(*)
                       FROM sys.indexes AS i
                       INNER JOIN sys.objects AS o ON o.object_id = i.object_id

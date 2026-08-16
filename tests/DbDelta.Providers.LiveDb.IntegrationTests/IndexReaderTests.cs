@@ -178,6 +178,62 @@ public class IndexReaderTests(LiveDbFixture fixture)
             "a heap reports its own row too");
     }
 
+    /// <summary>
+    /// The types the reader used to filter away with <c>AND i.type IN (1, 2)</c>.
+    /// Read against a real catalog, because the shape of <c>sys.index_columns</c>
+    /// for a columnstore is nothing like a rowstore index's — every column comes
+    /// back with <c>key_ordinal = 0</c> — and a query that compiles can still
+    /// return the wrong rows.
+    /// </summary>
+    [Fact]
+    public async Task Non_rowstore_indexes_are_read_and_carry_their_type()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        await using (SqlConnection bootstrap = new(fixture.ConnectionString))
+        {
+            await bootstrap.OpenAsync(ct);
+            await ExecAsync(bootstrap, "IF DB_ID('DbDeltaIxKinds') IS NULL CREATE DATABASE DbDeltaIxKinds;", ct);
+        }
+
+        string dbConn = new SqlConnectionStringBuilder(fixture.ConnectionString)
+        {
+            InitialCatalog = "DbDeltaIxKinds"
+        }.ConnectionString;
+
+        await using (SqlConnection c = new(dbConn))
+        {
+            await c.OpenAsync(ct);
+            await ExecAsync(c, """
+                IF OBJECT_ID('dbo.Fatti') IS NULL
+                BEGIN
+                    CREATE TABLE dbo.Fatti (
+                        Id      int NOT NULL CONSTRAINT PK_Fatti PRIMARY KEY,
+                        Importo decimal(18,2) NOT NULL,
+                        Note    xml NULL
+                    );
+                    CREATE NONCLUSTERED COLUMNSTORE INDEX NCCI_Fatti ON dbo.Fatti (Importo);
+                    CREATE PRIMARY XML INDEX PXML_Fatti ON dbo.Fatti (Note);
+                    CREATE NONCLUSTERED INDEX IX_Fatti_Importo ON dbo.Fatti (Importo);
+                END
+                """, ct);
+        }
+
+        Result<Database> result = await new LiveDbSource(dbConn).LoadAsync(ct);
+        result.IsSuccess.Should().BeTrue(result.Error?.Message);
+
+        Table fatti = result.Value!.Tables.Single(t => t.Name == "Fatti");
+
+        TableIndex ncci = fatti.Indexes.Single(i => i.Name == "NCCI_Fatti");
+        ncci.TypeDesc.Should().Be("NONCLUSTERED COLUMNSTORE");
+        ncci.IsRowstore.Should().BeFalse();
+
+        fatti.Indexes.Single(i => i.Name == "PXML_Fatti").IsRowstore.Should().BeFalse();
+
+        TableIndex plain = fatti.Indexes.Single(i => i.Name == "IX_Fatti_Importo");
+        plain.TypeDesc.Should().Be("NONCLUSTERED");
+        plain.IsRowstore.Should().BeTrue("the rowstore index next to them must be untouched by the widening");
+    }
+
     private static async Task ExecAsync(SqlConnection c, string sql, CancellationToken ct)
     {
         await using SqlCommand cmd = new(sql, c);

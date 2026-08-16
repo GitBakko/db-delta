@@ -20,10 +20,11 @@ public readonly record struct UnexaminedGroup(string Key, int Count);
 /// <remarks>
 /// <para>
 /// DbDelta models thirteen object kinds. Everything outside them passes through
-/// invisibly, and the failure that produces is silent in the worst direction: a
-/// database whose only drift is a missing clustered columnstore index compares
-/// <c>Identical</c>, because <c>IndexReader</c> filters to <c>type IN (1, 2)</c>
-/// on both sides and neither side ever mentions the index.
+/// invisibly, and the failure that produces is silent in the worst direction:
+/// what is never read cannot be compared, and — worse — cannot be put back by a
+/// script that drops the object holding it. Non-rowstore indexes were the first
+/// family to make that concrete and are now read for exactly that reason; the
+/// rest of this list is still invisible.
 /// </para>
 /// <para>
 /// This does not fix that. It makes the tool say which families it skipped, so
@@ -101,7 +102,10 @@ public sealed record UnexaminedCensus(IReadOnlyList<UnexaminedGroup> Groups)
         ["FULLTEXT_CATALOG"] = "cataloghi full-text",
 
         // Read but deliberately not modelled
-        ["INDEX_NON_ROWSTORE"] = "indici non rowstore (columnstore, XML, spaziali, hash)",
+        // Detected and compared by name and columns since the reader was
+        // widened; what stays unexamined are their type-specific options, and
+        // DbDelta never writes a CREATE for one.
+        ["INDEX_NON_ROWSTORE"] = "opzioni di indici non rowstore (columnstore, XML, spaziali, hash)",
         ["INDEX_ON_VIEW"] = "indici su viste indicizzate",
         ["EXTENDED_PROPERTY"] = "proprietà estese",
         ["DDL_TRIGGER_DATABASE"] = "trigger DDL di database",

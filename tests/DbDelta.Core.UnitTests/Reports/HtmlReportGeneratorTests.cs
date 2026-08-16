@@ -191,7 +191,7 @@ public class HtmlReportGeneratorTests
         string html = new HtmlReportGenerator().Generate(result);
 
         html.Should().Contain("<div class=\"scope-caveat\">");
-        html.Should().Contain("3 indici non rowstore");
+        html.Should().Contain("3 opzioni di indici non rowstore");
         html.Should().Contain("1 assembly CLR");
     }
 

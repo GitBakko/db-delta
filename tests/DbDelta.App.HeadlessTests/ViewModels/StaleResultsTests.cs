@@ -149,7 +149,7 @@ public class StaleResultsTests
             Staging);
 
         skipped.UnexaminedSummary.Should().NotBeNull();
-        skipped.UnexaminedSummary.Should().Contain("3 indici non rowstore");
+        skipped.UnexaminedSummary.Should().Contain("3 opzioni di indici non rowstore");
     }
 
     /// <summary>

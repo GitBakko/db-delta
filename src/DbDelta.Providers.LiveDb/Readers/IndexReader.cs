@@ -8,6 +8,16 @@ namespace DbDelta.Providers.LiveDb.Readers;
 /// clustered/non-clustered key indexes, unique indexes, filtered indexes, and
 /// included columns.
 /// </summary>
+/// <remarks>
+/// Every index TYPE comes back, not just rowstore. The filter used to be
+/// <c>AND i.type IN (1, 2)</c>, and the cost was not a missing feature but
+/// silent destruction: a columnstore index was absent from BOTH models, so two
+/// databases differing only by one compared Identical, and an identity-change
+/// rebuild — CREATE <c>_tmp</c>, copy, DROP the original — dropped the index
+/// with the table and nothing put it back, under a green banner.
+/// The emitter still cannot WRITE the non-rowstore types; carrying
+/// <see cref="TableIndex.TypeDesc"/> is what lets it refuse instead.
+/// </remarks>
 internal sealed class IndexReader
 {
     private const string IndexesQuery = """
@@ -29,7 +39,8 @@ internal sealed class IndexReader
             (SELECT TOP 1 p.data_compression_desc
              FROM sys.partitions AS p
              WHERE p.object_id = i.object_id AND p.index_id = i.index_id
-             ORDER BY p.partition_number) AS DataCompression
+             ORDER BY p.partition_number) AS DataCompression,
+            i.type_desc          AS IndexTypeDesc
         FROM sys.indexes AS i
         INNER JOIN sys.tables AS t ON t.object_id = i.object_id
         INNER JOIN sys.index_columns AS ic ON ic.object_id = i.object_id
@@ -39,7 +50,9 @@ internal sealed class IndexReader
         WHERE t.is_ms_shipped = 0
           AND i.is_primary_key = 0
           AND i.is_unique_constraint = 0
-          AND i.type IN (1, 2)
+          -- No type filter. The only shape excluded here is the heap (type 0),
+          -- which has no name and is not an index: the table's own rows are
+          -- modelled by Table.DataCompression instead.
           AND i.name IS NOT NULL
         -- index_column_id is the tiebreak that makes INCLUDE order deterministic:
         -- key_ordinal is 1..n for key columns but ZERO for every included one, so
@@ -63,6 +76,7 @@ internal sealed class IndexReader
         bool isClustered = false;
         string? filter = null;
         string? currentCompression = null;
+        string? currentTypeDesc = null;
         List<IndexColumn> keys = [];
         List<string> included = [];
 
@@ -82,10 +96,11 @@ internal sealed class IndexReader
             bool isIncl = r.GetBoolean(9);
             string column = r.GetString(10);
             string? compression = r.IsDBNull(11) ? null : r.GetString(11);
+            string? typeDesc = r.IsDBNull(12) ? null : r.GetString(12);
 
             if (currentIndexId is not null && (currentIndexId != indexId || currentObjectId != objectId))
             {
-                Flush(byObject, currentObjectId!.Value, currentName!, isUnique, isClustered, filter, currentCompression, keys, included);
+                Flush(byObject, currentObjectId!.Value, currentName!, isUnique, isClustered, filter, currentCompression, currentTypeDesc, keys, included);
                 keys = [];
                 included = [];
             }
@@ -97,6 +112,7 @@ internal sealed class IndexReader
             isClustered = indexType == 1;
             filter = hasFilter ? filterDef : null;
             currentCompression = compression;
+            currentTypeDesc = typeDesc;
 
             if (isIncl)
             {
@@ -110,7 +126,7 @@ internal sealed class IndexReader
 
         if (currentIndexId is not null)
         {
-            Flush(byObject, currentObjectId!.Value, currentName!, isUnique, isClustered, filter, currentCompression, keys, included);
+            Flush(byObject, currentObjectId!.Value, currentName!, isUnique, isClustered, filter, currentCompression, currentTypeDesc, keys, included);
         }
 
         return byObject;
@@ -124,6 +140,7 @@ internal sealed class IndexReader
         bool isClustered,
         string? filter,
         string? compression,
+        string? typeDesc,
         List<IndexColumn> keys,
         List<string> included)
     {
@@ -134,7 +151,8 @@ internal sealed class IndexReader
             FilterExpression: filter,
             KeyColumns: [.. keys],
             IncludedColumns: [.. included],
-            DataCompression: compression);
+            DataCompression: compression,
+            TypeDesc: typeDesc);
         if (!byObject.TryGetValue(objectId, out List<TableIndex>? list))
         {
             list = [];
