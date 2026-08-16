@@ -240,7 +240,16 @@ public sealed class TableScriptEmitter(
             IndexScriptEmitter ixEmitter = new();
             foreach (TableIndex ix in indexes)
             {
-                sb.AppendLine(ixEmitter.EmitCreate(table.Schema, table.Name, ix));
+                // This body is read, not run: the diff viewer renders it. An
+                // index with no CREATE still has to APPEAR, or the pane shows
+                // two identical texts for a table the grid calls Different —
+                // and the emitter would throw at the reader rather than let the
+                // user see what changed.
+                sb.AppendLine(ix.IsRowstore
+                    ? ixEmitter.EmitCreate(table.Schema, table.Name, ix)
+                    : $"-- {ix.TypeDesc} INDEX {Sql.Q(ix.Name)} ON {Sql.Q(table.Schema, table.Name)} "
+                      + $"({string.Join(", ", ix.KeyColumns.Select(k => Sql.Q(k.Name)))})"
+                      + " — read, not scriptable by DbDelta");
             }
         }
 
@@ -628,8 +637,23 @@ public sealed class TableScriptEmitter(
     /// copy the rows over (excluding computed columns, which re-derive),
     /// DROP the original, then <c>sp_rename</c> the temp table into place.
     /// </summary>
+    /// <remarks>
+    /// Refuses outright on a source table carrying an index this tool cannot
+    /// re-emit. The <c>DROP TABLE</c> below takes every index with it, and
+    /// <see cref="ScriptGenerator"/> puts them back by re-creating the full
+    /// source-side set — so an index that has no CREATE is an index the rebuild
+    /// destroys and no statement restores. The guard sits here, next to the
+    /// DROP it protects, as well as in <see cref="IndexScriptEmitter"/>: the
+    /// re-create pass lives in another file and another class, and a rebuild
+    /// that quietly stopped calling it would take the loss back with it.
+    /// </remarks>
     private static string EmitRebuild(Table newT, Table oldT, StringComparer names)
     {
+        foreach (TableIndex ix in newT.Indexes)
+        {
+            UnscriptableIndexException.ThrowIfNotRowstore(newT.Schema, newT.Name, ix);
+        }
+
         string qualifiedOld = $"{Sql.Q(newT.Schema, newT.Name)}";
         string tmpName = $"{newT.Name}_tmp";
         string qualifiedTmp = $"{Sql.Q(newT.Schema, tmpName)}";

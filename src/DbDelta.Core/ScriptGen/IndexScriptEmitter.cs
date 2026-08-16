@@ -7,11 +7,20 @@ namespace DbDelta.Core.ScriptGen;
 /// Emits standalone CREATE INDEX / DROP INDEX statements. Called by
 /// <see cref="ScriptGenerator"/> after all tables have been created.
 /// </summary>
+/// <remarks>
+/// This emitter speaks rowstore only. Anything it is asked to CREATE or REBUILD
+/// that is not <c>CLUSTERED</c> / <c>NONCLUSTERED</c> raises
+/// <see cref="UnscriptableIndexException"/> rather than writing a statement that
+/// would compile and build the wrong index. <see cref="EmitDrop"/> is exempt:
+/// <c>DROP INDEX</c> is valid for every type, and refusing to drop what the
+/// source no longer has would block a convergence the target can complete.
+/// </remarks>
 public sealed class IndexScriptEmitter
 {
     public string EmitCreate(string schema, string table, TableIndex ix)
     {
         ArgumentNullException.ThrowIfNull(ix);
+        UnscriptableIndexException.ThrowIfNotRowstore(schema, table, ix);
         StringBuilder sb = new();
         sb.Append("CREATE ");
         if (ix.IsUnique)
@@ -64,6 +73,9 @@ public sealed class IndexScriptEmitter
     public string EmitRebuildForCompression(string schema, string table, TableIndex ix)
     {
         ArgumentNullException.ThrowIfNull(ix);
+        // A columnstore reports COLUMNSTORE / COLUMNSTORE_ARCHIVE here, which is
+        // not a DATA_COMPRESSION value a rowstore REBUILD accepts.
+        UnscriptableIndexException.ThrowIfNotRowstore(schema, table, ix);
         return $"ALTER INDEX {Sql.Q(ix.Name)} ON {Sql.Q(schema, table)} "
              + $"REBUILD WITH (DATA_COMPRESSION = {Compression.Normalize(ix.DataCompression)});";
     }
