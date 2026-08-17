@@ -603,6 +603,15 @@
                    FontSize="11"
                    Foreground="{StaticResource FgSubtleBrush}"
                    HorizontalAlignment="Center" />
+        <!-- The only way out of a compare against a server that stopped
+             answering. Neutral (ghost = raised fill) per UI rule 1: aborting a
+             read-only operation destroys nothing. -->
+        <Button Classes="ghost"
+                Command="{Binding AppState.CompareCancelCommand}"
+                HorizontalAlignment="Center"
+                ToolTip.Tip="Interrompe la lettura dei cataloghi">
+          <TextBlock Text="Annulla" />
+        </Button>
       </StackPanel>
     </Border>
   </Border>

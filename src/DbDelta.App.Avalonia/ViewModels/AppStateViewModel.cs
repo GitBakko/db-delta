@@ -276,7 +276,17 @@ public sealed partial class AppStateViewModel : ObservableObject
              + ctrl;
     }
 
-    [RelayCommand(CanExecute = nameof(CanCompare))]
+    /// <remarks>
+    /// <c>IncludeCancelCommand</c> generates <c>CompareCancelCommand</c>, which
+    /// the overlay's Annulla button binds to. It can only cancel a run the
+    /// command itself started, which is why every call site goes through
+    /// <c>CompareCommand</c> and none calls this method directly.
+    /// A compare is read-only and holds no transaction — unlike the deploy
+    /// path, which stays deliberately uncancellable. What the token does NOT
+    /// shorten is <c>engine.Compare</c> below: it is synchronous and runs on
+    /// the UI thread, so Annulla ends the reading, not the diffing.
+    /// </remarks>
+    [RelayCommand(CanExecute = nameof(CanCompare), IncludeCancelCommand = true)]
     public async Task CompareAsync(CancellationToken ct)
     {
         IsBusy = true;
@@ -321,6 +331,12 @@ public sealed partial class AppStateViewModel : ObservableObject
             LiveDbSource tgt = new(tgtCs, "target");
 
             Result<Database> srcRes = await src.LoadAsync(ct).ConfigureAwait(true);
+            // Cancelling a read in flight does not necessarily raise: the driver
+            // reports an aborted command as SqlException -2, which LiveDbSource
+            // turns into a CannotConnect *Result*. Without this the red banner
+            // would blame the network for what the user just asked for. Throwing
+            // rather than returning funnels it into the one catch below.
+            ct.ThrowIfCancellationRequested();
             if (!srcRes.IsSuccess)
             {
                 LastError = srcRes.Error!.Message;
@@ -328,6 +344,7 @@ public sealed partial class AppStateViewModel : ObservableObject
             }
 
             Result<Database> tgtRes = await tgt.LoadAsync(ct).ConfigureAwait(true);
+            ct.ThrowIfCancellationRequested();
             if (!tgtRes.IsSuccess)
             {
                 LastError = tgtRes.Error!.Message;
@@ -356,6 +373,13 @@ public sealed partial class AppStateViewModel : ObservableObject
                 await Connections.AutosaveAsync(srcCs, ct).ConfigureAwait(true);
                 await Connections.AutosaveAsync(tgtCs, ct).ConfigureAwait(true);
             }
+        }
+        catch (OperationCanceledException)
+        {
+            // The user pressed Annulla — not a failure, so no banner. The
+            // results stay marked stale from SetComparedEndpoints(null) above,
+            // and that is right: nothing finished, so nothing may claim to
+            // describe these endpoints.
         }
         catch (Exception ex)
         {

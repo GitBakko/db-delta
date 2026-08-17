@@ -763,9 +763,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
         await RunSetupDialogAsync(owner, AppState.CurrentProject).ConfigureAwait(true);
     }
 
-    /// <summary>Re-runs the comparison and rebuilds the grid. Bypasses the
-    /// CompareCommand's CanExecute gate (which can transiently return false
-    /// during state transitions) by invoking the underlying method directly.</summary>
+    /// <summary>Re-runs the comparison and rebuilds the grid.</summary>
+    /// <remarks>
+    /// Through <c>ExecuteAsync</c>, which runs the command without consulting
+    /// its CanExecute gate — that gate can transiently return false during
+    /// state transitions, and this path has always meant to bypass it. Calling
+    /// <c>CompareAsync</c> directly would bypass the command's token too, and
+    /// the overlay's Annulla button would be dead for exactly this button.
+    /// The IsBusy guard stays: <c>ExecuteAsync</c> cancels the run in flight
+    /// before starting a new one, so without it a second Aggiorna would abort
+    /// the first instead of being ignored.
+    /// </remarks>
     [RelayCommand]
     public async Task RefreshAsync()
     {
@@ -776,7 +784,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             return;
         }
         if (AppState.IsBusy) { return; }
-        await AppState.CompareAsync(CancellationToken.None).ConfigureAwait(true);
+        await AppState.CompareCommand.ExecuteAsync(null).ConfigureAwait(true);
     }
 
     /// <summary>
@@ -958,7 +966,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
         LastRun = new LastRunViewModel(result, DateTime.Now);
         if (!result.Success) { return; }
 
-        await AppState.CompareAsync(CancellationToken.None).ConfigureAwait(true);
+        // Through the command, like every other call site: a refresh nobody can
+        // stop is the one that runs right after a deploy, on a catalog that has
+        // just changed under it.
+        await AppState.CompareCommand.ExecuteAsync(null).ConfigureAwait(true);
         if (AppState.LastError is null)
         {
             StatusText = $"{resultMessage} Confronto aggiornato.";
