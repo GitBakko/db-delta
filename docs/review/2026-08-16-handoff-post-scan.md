@@ -11,10 +11,13 @@ rompere).
 - **L'ondata 11b è su `origin/main`**, spinta il 2026-08-16 (`0e95089..db40740`).
   Una riga di handoff sullo stato del push invecchia il commit dopo: chiedilo a
   `git status -sb`, non a questo file.
+- **La voce 12 è committata in locale e NON spinta** (`9b81ca0` il modello,
+  `142fcb7` il confronto e l'emissione). Il push resta manuale, del
+  proprietario.
 - **v1.0.2 pubblicata** (2026-08-13). Nessuna release nuova in questa ondata:
   tutto quanto segue è post-1.0.2 e non ancora rilasciato.
-- **804 test verdi** in locale su dieci progetti (i 3 della matrice compat
-  restano skipped senza `DBDELTA_COMPAT=1`).
+- **822 test verdi** in locale su dieci progetti (i 3 della matrice compat
+  restano skipped senza `DBDELTA_COMPAT=1`). Erano 804 prima della 12.
 - **CI verde su `db40740`**, job `ci` e `docs`, con `Verify formatting` e i
   Testcontainers Linux dentro. La matrice compat non gira sui push: è notturna,
   e l'ultima misura è il run `31925658819`. Da `f91ee6e` un badge verde vuol
@@ -24,7 +27,7 @@ rompere).
 
 ## Cosa è cambiato in questa ondata
 
-Cinque voci su quattordici dello scan.
+Sei voci su quattordici dello scan.
 
 | Voce | Commit | Effetto |
 |---|---|---|
@@ -33,6 +36,7 @@ Cinque voci su quattordici dello scan.
 | 3 — dialogo di conferma | `0cde9a9` | mostra lo script e nomina ciò che verrà eliminato |
 | 11a — censimento | `6c2e2e9` | «nessuna differenza» dichiara il proprio perimetro |
 | 11b — rifiuto | `04886b1` `b250d4f` `3c32b71` | un rebuild non può più distruggere in silenzio un indice che non sa riscrivere |
+| 12 — vincoli auto-nominati | `9b81ca0` `142fcb7` | una tabella con un DEFAULT inline non è più Different per sempre, e nessun hash viaggia fra due server |
 
 ### 1 — La CI, misurata sul runner reale
 
@@ -135,39 +139,96 @@ Un effetto collaterale confermato su dati veri nella stessa corsa: **`dbdelta
 script` esce 0 con 13 differenze pendenti**. È la voce 5, non una regressione di
 questa ondata.
 
+### 12 — I vincoli auto-nominati: appaiati per FORMA, creati senza nome
+
+Il suffisso di `DF__Ordini__Stato__3B75D760` viene dall'`object_id` di quel
+vincolo, quindi lo stesso schema deployato due volte produce due nomi che
+dissentono **per costruzione**. Appaiati per nome, ogni tabella con un DEFAULT
+inline o un CHECK/PK senza nome era Different per sempre, e lo script droppava
+l'hash del target per aggiungere quello della sorgente — su chiavi primarie di
+produzione.
+
+Il modello (`9b81ca0`) porta `Constraint.IsSystemNamed`, letto da
+`sys.key_constraints`/`sys.check_constraints`/`sys.default_constraints`. È una
+proprietà `init`, non un membro posizionale: ogni costruzione posizionale
+esistente compila ancora e resta `false`, cioè il comportamento vecchio.
+
+La decisione (`142fcb7`) sta tutta in `Core/Diff/ConstraintPairing.cs`, una
+classe che risponde a **una** domanda — *quale vincolo di là È questo vincolo di
+qua* — prima e separatamente da *è cambiato*. Auto-nominato → si appaia per
+forma: colonne per PK/UQ, espressione normalizzata per CHECK, colonna per
+DEFAULT. Tutto il resto → per nome.
+
+**Le strutture erano QUATTRO, non tre.** Alle tre che questo file aveva elencato
+si aggiunge quella che nessuno aveva contato: le tre query parallele di
+`LiveDbObjectBodyResolver`, da cui il diff viewer costruisce i corpi. Un corpo
+che stampa ancora l'hash mostra una differenza su una riga che la griglia ora
+chiama Identical — l'esatto bug della voce 4, visto dall'altro capo. Il test
+`The_diff_viewer_body_is_identical_on_both_sides` è lì per quello.
+
+Quattro cose che l'analisi dello scan non aveva previsto:
+
+- **La chiave di appaiamento è IDENTITÀ, deliberatamente più stretta della
+  shape-equality che i chiamanti applicano dopo.** Una PK sulle stesse colonne
+  passata a NONCLUSTERED è la stessa PK, *cambiata*. Se la forma completa
+  entrasse nella chiave, ogni modifica diventerebbe un non-appaiamento: i
+  chiamanti la gestiscono (drop + add), ma nessuno riuscirebbe più a dire «lo
+  stesso vincolo, cambiato».
+- **I due lati devono concordare su COME si appaiano, prima di poterlo fare.**
+  Una sorgente con un DEFAULT inline contro un target con `CONSTRAINT DF_Stato
+  DEFAULT` sono due vincoli davvero diversi: il target porta un nome che la
+  sorgente non ha mai chiesto. Lo script lo droppa e lascia che il server conii
+  il proprio.
+- **Consume-once nel motore.** `ConstraintsEqual` toglie dalla lista il vincolo
+  appaiato. Senza, due CHECK sorgente con la stessa espressione reclamano
+  entrambi l'unico del target, il conteggio torna, e la tabella esce Identical
+  con un vincolo mai esaminato.
+- **`droppedForColumnDependency` va chiavato sul nome della SORGENTE.** La
+  sezione 5 di `EmitAlter` cerca lì il ripristino di un vincolo droppato solo
+  per liberare una colonna alterata, e per un auto-nominato i due nomi
+  differiscono: con la chiave del target il ripristino non scatterebbe mai e il
+  vincolo resterebbe perso. I DROP, invece, usano sempre il nome vero del
+  target — è l'unico posto dove quell'hash è giusto.
+
+Le **FK restano appaiate per nome**, di proposito: il loro lato di emissione è
+chiavato sul nome in tre strutture di `ScriptGenerator` (`orchestratedFks`,
+`fkDropKeys`, il delta FK), e cambiare la regola qui da solo lascerebbe motore e
+emittente in disaccordo sulla stessa chiave.
+
+**Provato:** 10 test nuovi in `SystemNamedConstraintTests` (CREATE, ALTER,
+rebuild, catena completa motore+emittente, corpo del diff viewer), 7 aggiunti a
+`ConstraintDiffTests`, più le asserzioni su `is_system_named` in
+`ConstraintReaderTests` (live). Due probe di mutazione, entrambe cadute:
+`PairsByShape` che ritorna sempre `false`, e `NameClause` che emette sempre il
+nome.
+
+**Non fatto, e dichiarato:** `IgnoreConstraintNames` resta scollegato — è un
+flag morto, e tocca alla voce 9 decidere se quei flag si implementano o si
+cancellano. E lo **smoke dal vivo su `.243`/`.242` non è stato fatto**: questa è
+la voce dove servirebbe di più, perché il bug vive negli `object_id` veri, e i
+database lì portano DEFAULT inline. L'unica prova su metadati veri è il giro
+Testcontainers (33 LiveDb + 20 acceptance + 7 persistence, verdi con Docker su).
+
 ## Da dove si riparte
 
 Nell'ordine in cui le rimetterei in fila — la scelta resta del proprietario, e
 la roadmap ha l'evidenza `file:riga` per ciascuna.
 
-1. **Voce 12 — i vincoli auto-nominati appaiati per nome.** È l'altra metà del
-   punto 11 dal lato del falso *positivo*: `DF__Ordini__Stato__3B75D760` non
-   combacerà mai con l'hash dell'altro server, quindi ogni tabella con un
-   DEFAULT inline è Different per sempre e lo script droppa e ricrea vincoli su
-   chiavi primarie di produzione. Giorni.
-
-   La roadmap ha l'evidenza `file:riga` e la proposta. Quello che si aggiunge
-   dall'aver lavorato in quei file adesso: **le strutture che confrontano un
-   vincolo sono TRE, in due assembly**, e la lezione ricorrente di questo repo è
-   che chi ne cambia una sola lascia le altre a dissentire.
-   - `ComparisonEngine.ConstraintsEqual` / `ConstraintShapeEqual` — decide lo
-     status.
-   - `TableScriptEmitter.ConstraintShapeEqual` — **una seconda copia**, il cui
-     doc-comment dichiara apertamente di rispecchiare la prima. Decide se
-     `EmitAlter` emette DROP+ADD.
-   - `TableScriptEmitter.EmitRebuild` — droppa i named non-FK del target e li
-     **ri-aggiunge per nome** da `newT`. Se un vincolo auto-nominato smette di
-     essere emesso col suo nome, quel giro va rivisto insieme, o il rebuild
-     ricrea sul target l'hash della sorgente.
-
-   Utile anche sapere che il rifiuto della 11b vive **accanto** a questo codice:
-   `EmitRebuild` ora comincia con un `foreach` sugli indici. Non è in conflitto,
-   ma è la stessa funzione.
-2. **Voce 2 — il compare non si annulla e muore a 30 s.** Ore, e il token è già
-   filato correttamente fin dentro i reader: mancano i cinque call site e un
-   pulsante.
-3. **Voce 6 — il report HTML che la GUI non sa invocare.** Ore, zero codice di
+1. **Voce 2 — il compare non si annulla e muore a 30 s.** Ore, e il token è già
+   filato correttamente fin dentro i reader: mancano i cinque call site
+   (`App.axaml.cs:99`, `MainWindowViewModel.cs:476`, `:743`, `:779`, `:922`, che
+   passano tutti `None`), un pulsante nell'overlay
+   `Views/MainWindow.axaml:563-591`, e un `CommandTimeout` che sotto
+   `Providers.LiveDb` oggi non compare mai.
+2. **Voce 6 — il report HTML che la GUI non sa invocare.** Ore, zero codice di
    motore nuovo: `LastComparisonRaw` **è** l'input che il generatore prende.
+3. **Voce 5 — `dbdelta script` esce 0 con differenze pendenti.** Non è dedotta:
+   è stata vista sui dati veri dell'A/B della 11b, 13 differenze e exit 0.
+
+   Prima di aprire una voce che tocca i vincoli, leggi la sezione 12 qui sopra:
+   le strutture che li confrontano sono **quattro**, in tre assembly, e la
+   lezione ricorrente di questo repo è che chi ne cambia una sola lascia le
+   altre a dissentire.
 
 ## Reti da non rompere (l'elenco cresce)
 
@@ -192,6 +253,15 @@ Alle tre di `2026-08-08-handoff-to-v1.md` — `DeployedModuleConvergesTests`,
    (acceptance)** — l'unico test che attraversa il confine di processo su questa
    catena. Se torna 99, non è il test: è il `catch` di `Program.cs` che qualcuno
    ha scavalcato.
+8. **`SystemNamedConstraintTests` (Core)** — dieci test, e due sono controlli in
+   negativo: `A_new_table_still_creates_an_explicitly_named_constraint_by_name`
+   e `A_named_target_constraint_facing_an_auto_named_source_one_is_replaced`.
+   **Se l'appaiamento per forma diventa la regola generale, o se l'emittente
+   smette del tutto di scrivere i nomi, cadono quei due e sono loro ad avere
+   ragione.** `A_table_differing_only_by_the_hash_produces_no_script` è l'unico
+   che attraversa motore **ed** emittente insieme: se cade solo lui, i due lati
+   hanno ripreso a dissentire, ed è esattamente il modo in cui questa famiglia
+   di bug si riapre.
 
 ## Trappole pagate in questa sessione
 
@@ -224,6 +294,10 @@ Alle tre di `2026-08-08-handoff-to-v1.md` — `DeployedModuleConvergesTests`,
   togliere la prima non fa cadere niente. Serve il test che entra dal solo
   `TableScriptEmitter.Emit(pair)`, senza il generatore attorno: è quello a
   distinguere «la guardia c'è» da «qualcun altro la copre».
+- **Con Docker spento i test DB-backed vanno ROSSI, non skipped**: 33 LiveDb +
+  20 acceptance + 3 di persistence, 56 in tutto. È la voce 1 che funziona — le
+  sonde che indovinavano sono state cancellate apposta — ma davanti a quel muro
+  rosso la prima domanda è `docker ps`, non `git diff`.
 - **Nullable e lambda:** sostituire una chiamata inline con un helper può
   rendere superfluo un `!` che prima serviva, e `IDE0370` è un **errore**, non un
   avviso. Il pattern `if (Metodo(...) is not string x) { return; }` restituisce
@@ -255,6 +329,18 @@ Alle tre di `2026-08-08-handoff-to-v1.md` — `DeployedModuleConvergesTests`,
   non rowstore e la tabella viene ricostruita, l'indice sparisce senza errore —
   ed è corretto, perché la sorgente non ce l'ha e la convergenza lo vuole via.
   Vale la pena saperlo prima di leggerlo come un buco.
+- **Le FK auto-nominate hanno ancora il bug della 12.** `ForeignKeysQuery` non
+  legge `is_system_named` e `ConstraintPairing` esclude le FK per scelta, quindi
+  un `FK__Ordini__Cliente__2B3F6F97` continua a non combaciare mai fra due
+  server. È contenuto — una FK inline senza nome è molto più rara di un DEFAULT
+  inline — ma è lo stesso churn. Chiuderlo vuol dire rifare le tre strutture di
+  `ScriptGenerator` chiavate sul nome, non aggiungere una colonna alla query.
+- **La 12 non è mai stata provata contro `.243`/`.242`.** È la voce dove lo
+  smoke conterebbe di più, perché il bug vive negli `object_id` veri e quei
+  database portano DEFAULT inline. Coperta solo dai Testcontainers.
+- **`IgnoreConstraintNames` resta un flag dichiarato e morto.** Non è una svista
+  della 12: la voce 9 deve prima decidere se quei flag si implementano o si
+  cancellano.
 
 ## Dove guardare
 

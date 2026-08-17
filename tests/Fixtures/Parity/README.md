@@ -97,9 +97,12 @@ Common acceptable cosmetic differences:
 - Identifier quoting style — both `[dbo].[Customer]` and
   `"dbo"."Customer"` are equivalent.
 - Naming of system-generated constraints (`PK__Customer__3214EC07…`)
-  may differ between source and target; Redgate ignores by default,
-  DbDelta currently compares by name. Flag these as **cosmetic**
-  unless a destructive drop actually fires.
+  may differ between source and target; both tools ignore it. Since
+  `142fcb7` DbDelta pairs those by shape, not by name, and creates them
+  with no `CONSTRAINT` clause so the target mints its own — a script
+  that carries a `PK__`/`DF__` hash across servers is a **bug**, not a
+  cosmetic difference. Explicitly named constraints are still compared
+  by name on both sides.
 
 A **bug** is anything that would either fail to compile on a real
 target or leave the target in a state that no longer matches the

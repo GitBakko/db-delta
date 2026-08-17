@@ -28,7 +28,7 @@ Deciso dal proprietario, non riaprire senza una ragione nuova:
 
 # Stato di avanzamento
 
-Aggiornato il 2026-08-16.
+Aggiornato il 2026-08-17.
 
 | Voce | Stato | Commit |
 |---|---|---|
@@ -37,7 +37,8 @@ Aggiornato il 2026-08-16.
 | 3 — Dialogo di conferma: script + cosa si elimina | **fatta** | `0cde9a9` |
 | 11a — Censimento + banner ambra | **fatta** | `6c2e2e9` |
 | 11b — `EmitRebuild` deve RIFIUTARE su indici non riemettibili | **fatta** | `04886b1` · `b250d4f` · `3c32b71` |
-| 2, 5, 6, 7, 8, 9, 10, 12, 13, 14 | aperte | — |
+| 12 — Vincoli auto-nominati appaiati per nome | **fatta** | `9b81ca0` · `142fcb7` |
+| 2, 5, 6, 7, 8, 9, 10, 13, 14 | aperte | — |
 
 **La 11 è chiusa in entrambe le metà.** Il reader porta ogni tipo di indice e
 `TableIndex.TypeDesc`; `IndexScriptEmitter.EmitCreate` /
@@ -50,11 +51,20 @@ Non fatta, e deliberatamente: **l'emissione** di un columnstore. È il rifiuto
 che ferma la perdita; scrivere il `CREATE` è una voce a sé, e nessuno l'ha
 ancora chiesta.
 
-**La voce più importante che resta è la 12** — i vincoli auto-nominati appaiati
-per nome, che è l'altra metà del punto 11 ma dal lato del falso *positivo*:
-churn di DROP/ADD su chiavi primarie di produzione, per sempre e su ogni tabella
-con un DEFAULT inline. A costo minore: la **2** (annullare il compare, timeout
-di lettura) e la **6** (il report HTML che la GUI non sa invocare) sono ore e si
+**La 12 è chiusa, meno una metà dichiarata.** `is_system_named` viaggia dalle tre
+query fino a `Constraint.IsSystemNamed`; `ConstraintPairing` appaia per **forma**
+ciò che il server ha nominato da sé e per nome tutto il resto; l'emittente crea i
+primi **senza** clausola `CONSTRAINT`, così è il target a coniare il proprio
+nome, e continua a droppare col nome vero del target.
+
+Non fatto, e per una ragione: **`IgnoreConstraintNames` resta scollegato**. È un
+flag dichiarato e morto, e la voce **9** deve prima decidere se quei flag si
+implementano o si cancellano — cablarne uno adesso significherebbe scegliere al
+posto suo. Il falso positivo che questa voce esisteva per uccidere non passa
+comunque più da lì: i vincoli auto-nominati non sono mai confrontati per nome.
+
+Le voci che restano a costo minore sono la **2** (annullare il compare, timeout
+di lettura) e la **6** (il report HTML che la GUI non sa invocare): ore, e si
 vedono subito.
 
 ---
