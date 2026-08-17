@@ -3,6 +3,11 @@
     <PackageReference Include="Microsoft.Data.SqlClient" />
   </ItemGroup>
   <ItemGroup>
+    <!-- ConnectionFactory is internal and stays internal; the read timeout it
+         injects is worth one assertion that does not need a server. -->
+    <InternalsVisibleTo Include="DbDelta.Providers.LiveDb.IntegrationTests" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\DbDelta.Core\DbDelta.Core.csproj" />
   </ItemGroup>
 </Project>

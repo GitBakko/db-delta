@@ -133,10 +133,15 @@ public sealed class LiveDbSource : ISchemaSource
         }
         catch (SqlException ex) when (ex.Number is 53 or -2)
         {
+            // -2 is both "could not reach the server" and "the query ran out of
+            // time", and the two want opposite remedies. Name them both rather
+            // than send someone to the firewall over a slow catalog read.
             return Result<Database>.Failure(new Error(
                 ErrorCode.CannotConnect,
                 ex.Message,
-                "Verify server name, network connectivity, and firewall rules."));
+                "Verify server name, network connectivity, and firewall rules. If the timeout "
+                + $"expired during execution, the read already waited {ConnectionFactory.ReadCommandTimeoutSeconds} s — "
+                + "raise it with 'Command Timeout=<seconds>' in the connection string."));
         }
         catch (SqlException ex)
         {
