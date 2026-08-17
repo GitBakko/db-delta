@@ -582,19 +582,28 @@ public sealed class ComparisonEngine
             return false;
         }
 
-        var bByName = bx.ToDictionary(c => c.Name, names);
+        // Not a name-keyed dictionary: a system-named constraint pairs by shape,
+        // because its name carries an object_id the other server cannot match.
+        // See ConstraintPairing.
+        //
+        // Consume-once matters. Two source CHECKs with the same expression must
+        // not both claim the target's single one and leave its other constraint
+        // unexamined — the counts would still match and the table would come out
+        // Identical.
+        List<Constraint> unpaired = [.. bx];
         foreach (Constraint left in ax)
         {
-            if (!bByName.TryGetValue(left.Name, out Constraint? right))
+            Constraint? right = ConstraintPairing.Match(left, unpaired, names);
+            if (right is null)
             {
                 return false;
             }
 
-            if (left.Kind != right.Kind)
-            {
-                return false;
-            }
+            unpaired.Remove(right);
 
+            // Type mismatch falls through ConstraintShapeEqual's default arm, so
+            // no separate Kind check is needed — and Match already only pairs
+            // constraints of the same type.
             if (!ConstraintShapeEqual(left, right, names))
             {
                 return false;

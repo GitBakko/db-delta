@@ -131,13 +131,13 @@ public sealed class TableScriptEmitter(
                         break;
                     case UniqueConstraint uq:
                         AppendLineSeparator(sb, ref firstLine);
-                        sb.Append("    CONSTRAINT ").Append(Sql.Q(uq.Name)).Append(" UNIQUE ")
+                        sb.Append("    ").Append(NameClause(uq)).Append("UNIQUE ")
                           .Append(uq.IsClustered ? "CLUSTERED " : "NONCLUSTERED ")
                           .Append('(').Append(string.Join(", ", uq.Columns.Select(Sql.Q))).Append(')');
                         break;
                     case CheckConstraint ck:
                         AppendLineSeparator(sb, ref firstLine);
-                        sb.Append("    CONSTRAINT ").Append(Sql.Q(ck.Name)).Append(" CHECK ")
+                        sb.Append("    ").Append(NameClause(ck)).Append("CHECK ")
                           .Append(ck.Expression);
                         break;
                     case DefaultConstraint:
@@ -168,7 +168,7 @@ public sealed class TableScriptEmitter(
             foreach (PrimaryKey pk in table.Constraints.OfType<PrimaryKey>())
             {
                 sb.Append("ALTER TABLE ").Append(Sql.Q(table.Schema, table.Name))
-                  .Append(" ADD CONSTRAINT ").Append(Sql.Q(pk.Name)).Append(' ')
+                  .Append(" ADD ").Append(NameClause(pk))
                   .Append(FormatStandaloneConstraintBody(pk)).AppendLine(";");
             }
         }
@@ -277,8 +277,6 @@ public sealed class TableScriptEmitter(
         StringBuilder sb = new();
         string qualifiedName = $"{Sql.Q(newT.Schema, newT.Name)}";
 
-        var newConstraintsByName = newT.Constraints.ToDictionary(c => c.Name, names);
-        var oldConstraintsByName = oldT.Constraints.ToDictionary(c => c.Name, names);
         Dictionary<string, DefaultConstraint> namedDefaults = NamedDefaultsByColumn(newT, names);
         // Columns whose named DEFAULT we emit inline on an ADD below. Section 5
         // must then NOT re-add the same constraint standalone, or SQL Server
@@ -306,12 +304,15 @@ public sealed class TableScriptEmitter(
             if (oldC is ForeignKey) { continue; }
             // Constraint disappeared from source → drop on target.
             // Constraint shape changed → drop now and re-create below.
-            bool stillPresent = newConstraintsByName.TryGetValue(oldC.Name, out Constraint? newSame);
-            bool shapeChanged = stillPresent && !ConstraintShapeEqual(oldC, newSame!, names);
-            bool blocksColumnDdl = stillPresent && !shapeChanged
+            Constraint? newSame = ConstraintPairing.Match(oldC, newT.Constraints, names);
+            bool shapeChanged = newSame is not null && !ConstraintShapeEqual(oldC, newSame, names);
+            bool blocksColumnDdl = newSame is not null && !shapeChanged
                 && DependsOnColumn(oldC, touchedColumns);
-            if (blocksColumnDdl) { droppedForColumnDependency.Add(oldC.Name); }
-            if (!stillPresent || shapeChanged || blocksColumnDdl)
+            // Keyed on the SOURCE side's name, which is what section 5 looks up.
+            // For a system-named constraint the two names differ, and keying
+            // this on the target's would leave the restore never triggered.
+            if (blocksColumnDdl) { droppedForColumnDependency.Add(newSame!.Name); }
+            if (newSame is null || shapeChanged || blocksColumnDdl)
             {
                 sb.Append("ALTER TABLE ").Append(qualifiedName)
                   .Append(" DROP CONSTRAINT ").Append(Sql.Q(oldC.Name)).AppendLine(";");
@@ -414,15 +415,15 @@ public sealed class TableScriptEmitter(
             if (c is ForeignKey) { continue; }
             // Already emitted inline on the column's ADD in section 3 / 4.
             if (c is DefaultConstraint dc && inlinedNamedDefaults.Contains(dc.ColumnName)) { continue; }
-            bool existsOnTarget = oldConstraintsByName.TryGetValue(c.Name, out Constraint? oldSame);
-            bool shapeChanged = existsOnTarget && !ConstraintShapeEqual(oldSame!, c, names);
+            Constraint? oldSame = ConstraintPairing.Match(c, oldT.Constraints, names);
+            bool shapeChanged = oldSame is not null && !ConstraintShapeEqual(oldSame, c, names);
             // Unchanged, but section 1 had to drop it to free an altered column.
             bool mustRestore = droppedForColumnDependency.Contains(c.Name);
-            if (existsOnTarget && !shapeChanged && !mustRestore) { continue; }
+            if (oldSame is not null && !shapeChanged && !mustRestore) { continue; }
             string body = FormatStandaloneConstraintBody(c);
             if (body.Length == 0) { continue; }
             constraints.Append("ALTER TABLE ").Append(qualifiedName)
-              .Append(" ADD CONSTRAINT ").Append(Sql.Q(c.Name)).Append(' ')
+              .Append(" ADD ").Append(NameClause(c))
               .Append(body).AppendLine(";");
         }
 
@@ -723,7 +724,7 @@ public sealed class TableScriptEmitter(
             string body = FormatStandaloneConstraintBody(c);
             if (body.Length == 0) { continue; }
             sb.Append("ALTER TABLE ").Append(qualifiedOld)
-              .Append(" ADD CONSTRAINT ").Append(Sql.Q(c.Name)).Append(' ')
+              .Append(" ADD ").Append(NameClause(c))
               .Append(body).AppendLine(";");
         }
         return sb.ToString();
@@ -779,6 +780,22 @@ public sealed class TableScriptEmitter(
         _ => false,
     };
 
+    /// <summary>
+    /// The <c>CONSTRAINT [name] </c> prefix a constraint is created with —
+    /// empty for one SQL Server named itself, so the target server mints its
+    /// own.
+    /// </summary>
+    /// <remarks>
+    /// Copying <c>DF__Ordini__Stato__3B75D760</c> onto the other server would
+    /// pin a name derived from an <c>object_id</c> that means nothing there, and
+    /// turn a constraint the two servers can agree on into one they never will:
+    /// the target would then hold an explicitly named constraint where the
+    /// source holds an anonymous one, which is a real difference, forever.
+    /// Trailing space included so the caller appends the body directly.
+    /// </remarks>
+    private static string NameClause(Constraint c) =>
+        c.IsSystemNamed ? string.Empty : $"CONSTRAINT {Sql.Q(c.Name)} ";
+
     private static string FormatStandaloneConstraintBody(Constraint c) => c switch
     {
         PrimaryKey pk => $"PRIMARY KEY {(pk.IsClustered ? "CLUSTERED" : "NONCLUSTERED")} ({string.Join(", ", pk.Columns.Select(Sql.Q))})",
@@ -810,8 +827,9 @@ public sealed class TableScriptEmitter(
     /// </param>
     /// <param name="inlineNamedDefault">
     /// <see langword="true"/> to emit <paramref name="namedDefault"/> inline as
-    /// <c>CONSTRAINT [name] DEFAULT (expr)</c> — the only form CREATE TABLE
-    /// accepts, and the form that keeps ALTER TABLE ADD legal on a populated
+    /// <c>CONSTRAINT [name] DEFAULT (expr)</c> — or as a bare
+    /// <c>DEFAULT (expr)</c> when SQL Server named it — the only form CREATE
+    /// TABLE accepts, and the form that keeps ALTER TABLE ADD legal on a populated
     /// table. <see langword="false"/> to omit it because the caller re-adds it
     /// standalone afterwards (the rebuild path).
     /// </param>
@@ -850,7 +868,9 @@ public sealed class TableScriptEmitter(
         sb.Append(c.IsNullable ? " NULL" : " NOT NULL");
         if (namedDefault is not null && inlineNamedDefault)
         {
-            sb.Append(" CONSTRAINT ").Append(Sql.Q(namedDefault.Name)).Append(" DEFAULT ")
+            // A system-named default is emitted anonymously — same value, and
+            // the target server mints the name its own object_id implies.
+            sb.Append(' ').Append(NameClause(namedDefault)).Append("DEFAULT ")
               .Append(namedDefault.Expression);
         }
         else if (namedDefault is null && !string.IsNullOrEmpty(c.DefaultExpression))
