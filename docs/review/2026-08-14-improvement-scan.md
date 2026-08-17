@@ -38,7 +38,8 @@ Aggiornato il 2026-08-17.
 | 11a — Censimento + banner ambra | **fatta** | `6c2e2e9` |
 | 11b — `EmitRebuild` deve RIFIUTARE su indici non riemettibili | **fatta** | `04886b1` · `b250d4f` · `3c32b71` |
 | 12 — Vincoli auto-nominati appaiati per nome | **fatta** | `9b81ca0` · `142fcb7` |
-| 2, 5, 6, 7, 8, 9, 10, 13, 14 | aperte | — |
+| 2 — Compare non annullabile, letture a 30 s | **fatta** | `8cfbc91` · `cf81ee9` |
+| 5, 6, 7, 8, 9, 10, 13, 14 | aperte | — |
 
 **La 11 è chiusa in entrambe le metà.** Il reader porta ogni tipo di indice e
 `TableIndex.TypeDesc`; `IndexScriptEmitter.EmitCreate` /
@@ -63,9 +64,22 @@ implementano o si cancellano — cablarne uno adesso significherebbe scegliere a
 posto suo. Il falso positivo che questa voce esisteva per uccidere non passa
 comunque più da lì: i vincoli auto-nominati non sono mai confrontati per nome.
 
-Le voci che restano a costo minore sono la **2** (annullare il compare, timeout
-di lettura) e la **6** (il report HTML che la GUI non sa invocare): ore, e si
-vedono subito.
+**La 2 è chiusa, in due metà indipendenti.** Le letture del catalogo hanno un
+`Command Timeout` di 300 s iniettato una volta sola in `ConnectionFactory` — la
+proprietà `SqlConnection.CommandTimeout` è di sola lettura, quindi la stringa di
+connessione è l'unica leva, ed è per questo che una riga copre tutti i comandi;
+chi il timeout se l'era già scritto se lo tiene, `0` (illimitato) compreso. E il
+compare si annulla: `CompareCancelCommand` generato dal toolkit, un **Annulla**
+neutro nell'overlay, e i due call site che chiamavano il metodo scavalcando il
+comando ora ci passano — altrimenti il pulsante sarebbe morto proprio su
+«Aggiorna».
+
+Due limiti dichiarati: `engine.Compare` è sincrono sul thread UI, quindi
+Annulla accorcia la lettura e non il confronto; e il pulsante non è mai stato
+visto dal vivo, solo in headless.
+
+La voce che resta a costo minore è la **6** (il report HTML che la GUI non sa
+invocare): ore, e si vede subito.
 
 ---
 

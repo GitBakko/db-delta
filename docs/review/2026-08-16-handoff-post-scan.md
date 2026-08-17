@@ -11,13 +11,14 @@ rompere).
 - **L'ondata 11b è su `origin/main`**, spinta il 2026-08-16 (`0e95089..db40740`).
   Una riga di handoff sullo stato del push invecchia il commit dopo: chiedilo a
   `git status -sb`, non a questo file.
-- **La voce 12 è committata in locale e NON spinta** (`9b81ca0` il modello,
-  `142fcb7` il confronto e l'emissione). Il push resta manuale, del
-  proprietario.
+- **Le voci 12 e 2 sono committate in locale e NON spinte** — `9b81ca0`
+  `142fcb7` per la 12, `8cfbc91` `cf81ee9` per la 2, più i docs. Il push resta
+  manuale, del proprietario.
 - **v1.0.2 pubblicata** (2026-08-13). Nessuna release nuova in questa ondata:
   tutto quanto segue è post-1.0.2 e non ancora rilasciato.
-- **822 test verdi** in locale su dieci progetti (i 3 della matrice compat
-  restano skipped senza `DBDELTA_COMPAT=1`). Erano 804 prima della 12.
+- **830 test verdi** in locale su dieci progetti (i 3 della matrice compat
+  restano skipped senza `DBDELTA_COMPAT=1`). Erano 804 prima della 12, 822 prima
+  della 2.
 - **CI verde su `db40740`**, job `ci` e `docs`, con `Verify formatting` e i
   Testcontainers Linux dentro. La matrice compat non gira sui push: è notturna,
   e l'ultima misura è il run `31925658819`. Da `f91ee6e` un badge verde vuol
@@ -27,7 +28,7 @@ rompere).
 
 ## Cosa è cambiato in questa ondata
 
-Sei voci su quattordici dello scan.
+Sette voci su quattordici dello scan.
 
 | Voce | Commit | Effetto |
 |---|---|---|
@@ -37,6 +38,7 @@ Sei voci su quattordici dello scan.
 | 11a — censimento | `6c2e2e9` | «nessuna differenza» dichiara il proprio perimetro |
 | 11b — rifiuto | `04886b1` `b250d4f` `3c32b71` | un rebuild non può più distruggere in silenzio un indice che non sa riscrivere |
 | 12 — vincoli auto-nominati | `9b81ca0` `142fcb7` | una tabella con un DEFAULT inline non è più Different per sempre, e nessun hash viaggia fra due server |
+| 2 — annullamento + timeout | `8cfbc91` `cf81ee9` | un compare contro un server lento non si finisce più a colpi di Task Manager |
 
 ### 1 — La CI, misurata sul runner reale
 
@@ -209,21 +211,78 @@ la voce dove servirebbe di più, perché il bug vive negli `object_id` veri, e i
 database lì portano DEFAULT inline. L'unica prova su metadati veri è il giro
 Testcontainers (33 LiveDb + 20 acceptance + 7 persistence, verdi con Docker su).
 
+### 2 — Annullare il compare, e non morire a 30 s
+
+Due metà indipendenti, due commit.
+
+**Le letture (`8cfbc91`).** Tutte stavano sul default ADO.NET di 30 s, incluse
+quelle che non sono piccole: la lettura delle colonne unisce quattro viste di
+catalogo per l'intero database, quella degli indici porta una sottoquery per
+riga su `sys.partitions`. Il percorso di deploy aveva 600 s da sempre; quello
+di lettura, che scandisce tutto, era rimasto al default.
+
+`SqlConnection.CommandTimeout` **è di sola lettura**: la stringa di connessione
+è l'unica leva. Questo è anche il motivo per cui una sola modifica in
+`ConnectionFactory.OpenAsync` copre tutti i comandi di lettura — un `SqlCommand`
+creato da quella connessione eredita il valore. Coperti entrambi i chiamanti,
+`LiveDbSource` e `LiveDbObjectBodyResolver`.
+
+Due dettagli che non si indovinano:
+
+- **`ShouldSerialize("Command Timeout")`, non `ContainsKey`.** Il secondo
+  risponde «è una keyword nota?», che è sempre vero: con `ContainsKey` il
+  timeout non verrebbe iniettato mai. Il probe lo prova.
+- **`Command Timeout=0` vuol dire illimitato e va lasciato stare.** Una guardia
+  del tipo «se vale 30, alzalo» mangerebbe sia lo 0 sia il 30 scritto apposta.
+  Chi l'ha scritto se lo tiene, e la stringa torna indietro **identica**.
+
+`SqlException -2` è insieme «non raggiungo il server» e «la query è scaduta», e
+il rimedio suggerito nominava solo il firewall. Ora li nomina entrambi e dice
+quanto la lettura ha già aspettato.
+
+**L'annullamento (`cf81ee9`).** `CompareAsync` filava già il token dentro le due
+letture: mancava un token che qualcuno potesse cancellare.
+`IncludeCancelCommand` genera `CompareCancelCommand`, e l'overlay ci lega un
+**Annulla** neutro (`Classes="ghost"`, che in questo repo È il neutro pieno; il
+`MinHeight` 32 arriva dallo stile base, niente colori inline).
+
+Tre cose che l'analisi non aveva previsto:
+
+- **Tre dei «cinque call site» erano già a posto.** `ExecuteAsync(object?)`
+  ignora il parametro, quindi il `CancellationToken.None` scritto in tre punti
+  era un *parametro di comando* buttato via: quelle chiamate giravano già sul
+  CTS del comando. I call site veri erano **due**, quelli che chiamavano il
+  metodo direttamente — «Aggiorna» e il refresh dopo un'esecuzione riuscita — ed
+  è esattamente dove il pulsante sarebbe stato morto.
+- **`ExecuteAsync` non consulta `CanExecute`**, quindi lo scavalcamento
+  deliberato documentato su `RefreshAsync` sopravvive. La guardia `IsBusy`
+  invece **resta**: `ExecuteAsync` cancella la corsa in volo prima di
+  ricominciare, quindi senza guardia un secondo «Aggiorna» aborta il primo
+  invece di essere ignorato.
+- **Annullare non alza per forza un'eccezione.** Una lettura interrotta a metà
+  torna dal driver come `SqlException -2`, che `LiveDbSource` trasforma in un
+  *Result* `CannotConnect`: il solo `catch (OperationCanceledException)` avrebbe
+  lasciato la banda rossa a incolpare la rete di ciò che l'utente aveva appena
+  chiesto. Serve `ct.ThrowIfCancellationRequested()` dopo ogni lettura.
+
+**Annulla accorcia la lettura, non il confronto**: `engine.Compare` è sincrono e
+gira sul thread UI. Sta scritto nel doc-comment, perché è la prima domanda di
+chi guarda la barra ferma.
+
 ## Da dove si riparte
 
 Nell'ordine in cui le rimetterei in fila — la scelta resta del proprietario, e
 la roadmap ha l'evidenza `file:riga` per ciascuna.
 
-1. **Voce 2 — il compare non si annulla e muore a 30 s.** Ore, e il token è già
-   filato correttamente fin dentro i reader: mancano i cinque call site
-   (`App.axaml.cs:99`, `MainWindowViewModel.cs:476`, `:743`, `:779`, `:922`, che
-   passano tutti `None`), un pulsante nell'overlay
-   `Views/MainWindow.axaml:563-591`, e un `CommandTimeout` che sotto
-   `Providers.LiveDb` oggi non compare mai.
-2. **Voce 6 — il report HTML che la GUI non sa invocare.** Ore, zero codice di
+1. **Voce 6 — il report HTML che la GUI non sa invocare.** Ore, zero codice di
    motore nuovo: `LastComparisonRaw` **è** l'input che il generatore prende.
-3. **Voce 5 — `dbdelta script` esce 0 con differenze pendenti.** Non è dedotta:
+2. **Voce 5 — `dbdelta script` esce 0 con differenze pendenti.** Non è dedotta:
    è stata vista sui dati veri dell'A/B della 11b, 13 differenze e exit 0.
+3. **Guardare l'app girare.** Non è una voce dello scan, ed è il debito più
+   vecchio di questa ondata: il dialogo di conferma (voce 3), il banner di
+   rifiuto (11b) e ora il pulsante Annulla sono tutti provati in headless e
+   nessuno è mai stato visto da un essere umano. Servono due connessioni vere e
+   dieci minuti.
 
    Prima di aprire una voce che tocca i vincoli, leggi la sezione 12 qui sopra:
    le strutture che li confrontano sono **quattro**, in tre assembly, e la
@@ -262,6 +321,12 @@ Alle tre di `2026-08-08-handoff-to-v1.md` — `DeployedModuleConvergesTests`,
    che attraversa motore **ed** emittente insieme: se cade solo lui, i due lati
    hanno ripreso a dissentire, ed è esattamente il modo in cui questa famiglia
    di bug si riapre.
+9. **`CompareCancellationTests` (headless)** — due dei quattro test non guardano
+   un comportamento ma un **instradamento**: che «Aggiorna» e il refresh
+   post-esecuzione passino da `CompareCommand` invece di chiamare `CompareAsync`
+   diretto. È invisibile nell'app finché non serve, e il giorno che qualcuno
+   «semplifica» rimettendo la chiamata diretta il pulsante Annulla muore in
+   silenzio proprio lì. Se cadono quelli, hanno ragione loro.
 
 ## Trappole pagate in questa sessione
 
@@ -294,6 +359,11 @@ Alle tre di `2026-08-08-handoff-to-v1.md` — `DeployedModuleConvergesTests`,
   togliere la prima non fa cadere niente. Serve il test che entra dal solo
   `TableScriptEmitter.Emit(pair)`, senza il generatore attorno: è quello a
   distinguere «la guardia c'è» da «qualcun altro la copre».
+- **`--no-build` fa girare l'assembly di prima quando la build fallisce**, e
+  stampa un verde o un rosso che non c'entrano niente col codice sullo schermo.
+  Ripreso in pieno con un probe scritto come `catch (…) when (false)`: è
+  `error CS8359`, la build è morta e il test rosso mostrato era quello del probe
+  precedente. Un probe di mutazione deve **prima** stampare `Errori: 0`.
 - **Con Docker spento i test DB-backed vanno ROSSI, non skipped**: 33 LiveDb +
   20 acceptance + 3 di persistence, 56 in tutto. È la voce 1 che funziona — le
   sonde che indovinavano sono state cancellate apposta — ma davanti a quel muro
@@ -341,6 +411,18 @@ Alle tre di `2026-08-08-handoff-to-v1.md` — `DeployedModuleConvergesTests`,
 - **`IgnoreConstraintNames` resta un flag dichiarato e morto.** Non è una svista
   della 12: la voce 9 deve prima decidere se quei flag si implementano o si
   cancellano.
+- **Il pulsante Annulla non è mai stato visto dal vivo**, e neanche annullato
+  per davvero: il test headless cancella il token *prima* della chiamata, così
+  `OpenAsync` restituisce un task cancellato senza toccare la rete. Il secondo
+  ingresso nello stesso `catch` — la lettura interrotta a metà, che il driver
+  riporta come `SqlException -2` — lo può produrre solo un server vero.
+- **`engine.Compare` non è annullabile** ed è sincrono sul thread UI: su un
+  catalogo grosso il pulsante è cliccabile ma non succede niente finché il
+  confronto non finisce. Va saputo prima di leggerlo come un bug.
+- **Il timeout di 300 s non è stato misurato contro un server lento davvero.**
+  Il test prova che il valore arriva sulla connessione e che quello dell'utente
+  vince; che 300 s bastino per un catalogo enorme è una scommessa ragionata, non
+  un dato.
 
 ## Dove guardare
 
