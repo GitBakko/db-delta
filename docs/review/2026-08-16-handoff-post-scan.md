@@ -11,9 +11,9 @@ rompere).
 - **L'ondata 11b è su `origin/main`**, spinta il 2026-08-16 (`0e95089..db40740`).
   Una riga di handoff sullo stato del push invecchia il commit dopo: chiedilo a
   `git status -sb`, non a questo file.
-- **Le voci 12 e 2 sono committate in locale e NON spinte** — `9b81ca0`
-  `142fcb7` per la 12, `8cfbc91` `cf81ee9` per la 2, più i docs. Il push resta
-  manuale, del proprietario.
+- **Le voci 12 e 2 sono su `origin/main`**, spinte il 2026-08-17
+  (`3e0676e..f833df0`): `9b81ca0` `142fcb7` per la 12, `8cfbc91` `cf81ee9` per
+  la 2, più i docs.
 - **v1.0.2 pubblicata** (2026-08-13). Nessuna release nuova in questa ondata:
   tutto quanto segue è post-1.0.2 e non ancora rilasciato.
 - **830 test verdi** in locale su dieci progetti (i 3 della matrice compat
