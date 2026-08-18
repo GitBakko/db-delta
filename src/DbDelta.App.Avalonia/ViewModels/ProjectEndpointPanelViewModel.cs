@@ -115,7 +115,19 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
         HasDatabases = false;
         AvailableDatabases.Clear();
 
-        // Refresh IP from suggestions list (if any) and try DPAPI auto-fill.
+        // …and forget the credentials with them. They belong to the server that
+        // was named a moment ago, not to this one. Left in place they were sent
+        // onward by ScheduleAutoConnect below, which opens the connection 450 ms
+        // later — to a host that may well have arrived from the scan, i.e. from
+        // an unauthenticated UDP reply, over a string that carries
+        // TrustServerCertificate from the panel. Clearing them is also what
+        // makes IsAutoConnectEligible say no until the user has re-entered them:
+        // under SQL auth it requires both fields.
+        UserName = string.Empty;
+        Password = string.Empty;
+
+        // Refresh IP from suggestions list (if any) and try DPAPI auto-fill —
+        // which puts back the credentials stored for THIS server, if any.
         ServerIpAddress = ServerSuggestions
             .FirstOrDefault(s => string.Equals(s.Name, value, StringComparison.OrdinalIgnoreCase))?.IpAddress;
         _ = TryAutoFillCredentialsAsync(value);

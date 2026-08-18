@@ -67,10 +67,20 @@ public sealed class PermissionScriptEmitter
     /// the clause is both valid and correct, because the deployment script runs
     /// in the target database's context.
     /// </remarks>
+    /// <exception cref="UnscriptablePermissionException">
+    /// The row is not database-scoped and its securable has no name. Omitting
+    /// the clause there does not narrow the statement — it widens it to the
+    /// whole database, which is the one outcome worse than not deploying.
+    /// </exception>
     private static void AppendOnTarget(StringBuilder sb, Permission p)
     {
         string? target = FormatTarget(p);
-        if (target is null) { return; }
+        if (target is null)
+        {
+            UnscriptablePermissionException.ThrowIfTargetUnnamed(p);
+            return;
+        }
+
         sb.Append(" ON ").Append(target);
     }
 

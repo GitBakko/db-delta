@@ -48,6 +48,17 @@ catch (UnscriptableIndexException ex)
         + $"{ex.Schema}.{ex.Table} out of this run."));
     return ExitCodes.ScriptGenerationFailure;
 }
+catch (UnscriptablePermissionException ex)
+{
+    // Same refusal, same code, different securable: emitting this row would
+    // have granted over the whole database instead of over one object.
+    CliErrorMapper.WriteError(new Error(
+        ErrorCode.DataPreservationImpossible,
+        ex.Message,
+        "Re-run with a login that can see the securable, or drop --include-permissions "
+        + "to leave permissions out of this run."));
+    return ExitCodes.ScriptGenerationFailure;
+}
 catch (Exception ex)
 {
     CliErrorMapper.WriteError(new Error(

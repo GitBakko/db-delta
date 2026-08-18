@@ -7,14 +7,19 @@ vedi «Manutenzione» in fondo.
 
 ## Stato — 2026-08-18
 
-- `main` = `647eb86`, origin sincronizzato, working tree pulito.
 - **v1.0.2 pubblicata** (2026-08-13), «Latest», MSI non firmata allegata.
-- 830 test verdi in locale su dieci progetti; compat notturna a parte.
-- CI verde (`ci` + `docs`). Da `f91ee6e` un badge verde significa qualcosa.
-- **55 voci aperte, verificate una per una sul codice del 2026-08-18**, non
+- **790 test verdi** nei sette progetti che girano senza Docker (Core 473,
+  Headless 160, Persistence.Unit 65, Golden 68, Property 12, Architecture 6,
+  Shared 6). I tre DB-backed (LiveDb, Cli acceptance, Persistence integration)
+  vogliono Docker e vanno **rossi**, non skipped, quando è spento: davanti a
+  quel muro la prima domanda è `docker ps`. `dotnet format --verify-no-changes`
+  esce 0.
+- **51 voci aperte, verificate una per una sul codice del 2026-08-18**, non
   ereditate dai documenti: 33 confermate, 3 parziali, 5 non verificabili senza
   il proprietario o un server vero, 14 riclassificate come scelte deliberate e
-  spostate in fondo.
+  spostate in fondo. **Le 4 critiche sono chiuse** — vedi P0.
+- L'hash di `main` e lo stato di origin invecchiano il commit dopo: chiedili a
+  `git status -sb` e `git log -1`, non a questo file.
 
 Le date sono di **registrazione**: quando la voce è stata scritta la prima
 volta, non quando è stata verificata. Sforzo: XS = poche righe, S = ore,
@@ -24,15 +29,21 @@ M = un giorno, L = giorni.
 
 ## P0 — Critiche: perdono dati, allargano privilegi o uccidono il processo
 
-Quattro voci, **tutte registrate il 2026-07-30 e mai toccate in 19 giorni**.
-Tre costano poche righe.
+**Vuota.** Le quattro voci, tutte registrate il 2026-07-30, sono state chiuse il
+2026-08-18 dal commit che porta questa riga.
 
-| Voce | Reg. | Sforzo | Evidenza verificata |
-|---|---|---|---|
-| **Permesso su oggetto non risolto → GRANT a livello DATABASE.** `FormatTarget` ha `_ => null` come ultimo ramo e `AppendOnTarget` su null non scrive la clausola `ON`: `GRANT <azione> TO [principal];` allarga il privilegio dall'oggetto all'intero database | 2026-07-30 | XS | `Core/ScriptGen/PermissionScriptEmitter.cs:70-75` e `:77-86`; il LEFT JOIN che produce il null è `Providers.LiveDb/Readers/PermissionReader.cs:26-36` |
-| **Due permessi con la stessa `ObjectIdentity` uccidono l'app.** Il `ToDictionary` è nudo e il sito di chiamata non ha `try`: l'`ArgumentException` risale dall'handler `PropertyChanged` e termina il processo a metà comparazione. `Permission.DiffKey` include `ClassDesc`, `Identity` no | 2026-07-30 | XS | `App.Avalonia/ViewModels/MainWindowViewModel.cs:653-655` e `:62-66`; `Core/ObjectModel/Permission.cs:23-30` |
-| **`stackalloc` senza tetto + nomi di dispositivo riservati.** Un nome progetto lungo incollato dà `StackOverflowException`, che nessun handler può catturare; un progetto chiamato `NUL`/`CON`/`COM1` finisce sul dispositivo nullo senza errore | 2026-07-30 | XS | `Persistence/Json/ProjectsFolder.cs:39-49` e `:32-37`; chiamanti `MainWindowViewModel.cs:376`, `ProjectSetupDialog.axaml.cs:93` |
-| **Le credenziali del server precedente vengono auto-connesse al server nuovo.** `OnServerNameChanged` azzera i database ma non `UserName`/`Password`, poi `ScheduleAutoConnect` apre la connessione dopo 450 ms verso un host suggerito da una risposta **UDP non autenticata** (il parser valida solo `buffer[0]==0x05`), con `TrustServerCertificate` dal pannello | 2026-07-30 | S | `App.Avalonia/ViewModels/ProjectEndpointPanelViewModel.cs:107-123`, `:403-436`, `:447-460`; `Persistence/Sql/SqlServerDiscovery.cs:196-199` |
+| Voce chiusa | Come | Prova |
+|---|---|---|
+| Permesso su oggetto non risolto → GRANT a livello DATABASE | `AppendOnTarget` non tace più su un target senza nome: alza `UnscriptablePermissionException`, sul modello del rifiuto già usato per gli indici. CLI exit 30, banner nell'app | `UnscriptablePermissionRefusalTests` — 3 rifiuti + 2 controlli in negativo (`DATABASE` senza `ON`, oggetto nominato con `ON`) |
+| Due permessi con la stessa `ObjectIdentity` uccidono l'app | **Cancellato il join**, non guardato: la lista DTO è una proiezione posizionale della lista grezza (`Mapper.ToDto` è un solo `Select`), quindi la coppia della riga *i* **è** `raw[i]`. Non può lanciare e non può perdere una riga | `DuplicateIdentityRowsTests`. **Sonda di mutazione fatta:** rimessa la `ToDictionary`, il test cade |
+| `stackalloc` senza tetto + nomi di dispositivo riservati | Tetto di 100 caratteri sullo stem, niente più buffer dimensionato sull'input, `CON`/`PRN`/`AUX`/`NUL`/`COM0-9`/`LPT0-9` prefissati con `_`, punto finale tolto. Il confronto è sulla parte prima del punto, come fa Windows | `ProjectsFolderTests` — 200.000 caratteri, sei nomi riservati, `NUL.v2`, più due controlli in negativo |
+| Le credenziali seguivano l'utente sul server nuovo | `OnServerNameChanged` azzera `UserName`/`Password` **prima** dell'auto-fill DPAPI, che rimette quelle di QUESTO server se esistono. Con i campi vuoti `IsAutoConnectEligible` dice no da sé | `EndpointCredentialResetTests` — azzeramento, `IsValid` che torna false, più il controllo in negativo su Windows auth |
+
+**Non fatto, e dichiarato:** l'irrobustimento del parser UDP di
+`SqlServerDiscovery` (valida solo `buffer[0]==0x05`). Il vettore è chiuso dal
+lato che conta — nessuna credenziale parte più da sola verso un host suggerito —
+ma un pacchetto malformato resta interpretato in modo permissivo. Voce a sé,
+non urgente ora che nulla la segue.
 
 ---
 
@@ -91,6 +102,7 @@ Tre costano poche righe.
 | **Il censimento non ha un'asserzione sull'output CLI.** `TextFormatter` è `internal` e la CLI tiene gli internals chiusi apposta: **non aprirla con `InternalsVisibleTo`**, asserisci sullo stdout dentro un'acceptance che già gira | 2026-08-16 | XS | `Cli/Output/TextFormatter.cs:9` e `:31-35`; `CompareCommandTests.cs:287` documenta la scelta |
 | **Quattro test mutano `Application.Current.RequestedThemeVariant` senza ripristinarlo.** Non ha ancora morso perché nessun altro test legge un brush dipendente dal tema. La classe implementa già `IDisposable` | 2026-08-14 | XS | `ThemeCycleTests.cs:47-59, 74-86, 138-146, 151-163` contro `:121-134` |
 | **`SynonymReader` non fa un-escape di `]]`** — ma la conseguenza raccontata non esiste: i quattro segmenti sono campi morti e l'emittente usa `BaseObjectName` verbatim. **La chiusura più corta è cancellare i campi**, non gestire il `]]` | 2026-07-30 | XS | `Providers.LiveDb/Readers/SynonymReader.cs:52`; `SynonymScriptEmitter.cs:14` |
+| **Il parser delle risposte UDP del browser SQL è permissivo:** valida solo `buffer[0] == 0x05` e poi si fida della stringa. Scorporata dalla voce P0 sulle credenziali quando quella è stata chiusa: nulla parte più da sola verso un host suggerito, quindi resta igiene, non esposizione | 2026-07-30 | S | `Persistence/Sql/SqlServerDiscovery.cs:196-199` |
 | **Gli invarianti UI non sono asseriti in sé.** `Themes.axaml` è coperto da `AccentBandContrastTests` dal 2026-08-01, ma nulla fallisce se domani qualcuno rimette `Background=Transparent` su `.ghost` o toglie il `MinHeight` 32. Due buchi minori: manca uno stile CheckBox, e `SaveProjectDialog.axaml:31` usa `ghost` per Annulla | 2026-07-30 | S | `Styles/AppStyles.axaml:6-22` e `:91-105`; grep `Tokens.axaml` su `tests/` → zero |
 
 ---

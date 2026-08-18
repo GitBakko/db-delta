@@ -646,20 +646,31 @@ public sealed partial class MainWindowViewModel : ObservableObject
         string envColor = "#0054BD"; // default cobalt — env-aware colour comes in Wave 2C
         if (AppState.LastComparison is not null && AppState.LastComparisonRaw is not null)
         {
-            // Build a lookup from (Kind, Schema, Name) → DifferencePair so each
-            // row can carry its typed pair for the deploy pipeline.
-            // Key = (Kind, Schema, Name) — all strings come from the same comparison engine
-            // so ordinal equality is sufficient.
-            Dictionary<(string Kind, string Schema, string Name), DifferencePair> pairMap =
-                AppState.LastComparisonRaw.Differences.ToDictionary(
-                    p => (p.Identity.Kind, p.Identity.SchemaName, p.Identity.ObjectName));
-
-            foreach (DifferenceDto dto in AppState.LastComparison.Differences)
+            // The DTO list is a positional projection of the raw list — Mapper.ToDto
+            // is a single Select over Differences — so the pair for row i IS raw[i].
+            // This used to re-join the two by (Kind, Schema, Name) through a
+            // ToDictionary, which was both unnecessary and fatal: that triple is
+            // NOT unique. Permission.Identity leaves ClassDesc out while its
+            // DiffKey keeps it, so two permission rows can produce the same key,
+            // and the ArgumentException came out of a PropertyChanged handler
+            // with no try around it — the app died mid-comparison. Pairing by
+            // index cannot throw and cannot silently drop a row either.
+            IReadOnlyList<DifferencePair> pairs = AppState.LastComparisonRaw.Differences;
+            IReadOnlyList<DifferenceDto> dtos = AppState.LastComparison.Differences;
+            if (pairs.Count != dtos.Count)
             {
-                if (pairMap.TryGetValue((dto.Kind, dto.SchemaName, dto.ObjectName), out DifferencePair? pair)
-                    && pair is not null)
+                // Only reachable if someone publishes the two halves separately;
+                // PublishComparison is the one place that sets both, and its
+                // remarks already flag that the generated setters stay public.
+                AppState.LastError =
+                    "Risultati incoerenti: il confronto grezzo e la sua proiezione hanno "
+                    + $"{pairs.Count} e {dtos.Count} differenze. Rilancia il confronto.";
+            }
+            else
+            {
+                for (int i = 0; i < dtos.Count; i++)
                 {
-                    DifferenceRowViewModel row = new(pair, dto, envColor);
+                    DifferenceRowViewModel row = new(pairs[i], dtos[i], envColor);
                     row.PropertyChanged += (_, e) =>
                     {
                         if (e.PropertyName == nameof(DifferenceRowViewModel.IsSelected))
@@ -880,6 +891,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 + $"{ex.TypeDesc ?? "sconosciuto"} e DbDelta non sa ricrearlo. Allineare questa tabella "
                 + "lo eliminerebbe senza rimetterlo. Togli la tabella dalla selezione, oppure ricrea "
                 + "l'indice a mano dopo il rilascio.";
+            StatusText = "Nessuno script generato: vedi il messaggio in alto.";
+            return null;
+        }
+        catch (UnscriptablePermissionException ex)
+        {
+            AppState.LastError =
+                $"Script non generato: il permesso {ex.Action} per {ex.GranteeName} è di classe "
+                + $"{ex.ClassDesc} ma l'oggetto a cui si riferisce non ha un nome leggibile. "
+                + "Scriverlo lo concederebbe sull'intero database invece che su quell'oggetto. "
+                + "Rileggi con un login che veda l'oggetto, oppure escludi i permessi dal confronto.";
             StatusText = "Nessuno script generato: vedi il messaggio in alto.";
             return null;
         }
