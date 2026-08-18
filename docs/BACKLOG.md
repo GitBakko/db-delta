@@ -8,8 +8,8 @@ vedi «Manutenzione» in fondo.
 ## Stato — 2026-08-18
 
 - **v1.0.2 pubblicata** (2026-08-13), «Latest», MSI non firmata allegata.
-- **795 test verdi** nei sette progetti che girano senza Docker (Core 473,
-  Headless 165, Persistence.Unit 65, Golden 68, Property 12, Architecture 6,
+- **796 test verdi** nei sette progetti che girano senza Docker (Core 473,
+  Headless 166, Persistence.Unit 65, Golden 68, Property 12, Architecture 6,
   Shared 6). I tre DB-backed (LiveDb, Cli acceptance, Persistence integration)
   vogliono Docker e vanno **rossi**, non skipped, quando è spento: davanti a
   quel muro la prima domanda è `docker ps`. `dotnet format --verify-no-changes`
@@ -57,6 +57,34 @@ non urgente ora che nulla la segue.
 
 ---
 
+## Smoke dal vivo — 2026-08-18, `.243` e `.242`, sola lettura
+
+Prima sessione in cui qualcuno ha **guardato** l'app invece di dedurla.
+
+| Verifica | Esito |
+|---|---|
+| Confronto `PcrmV2Pl_test` → `PcrmV2Pl_Badii`, 841 oggetti | 786 identiche / 13 diverse / 24 solo prov. / 18 solo dest., **ripartizione identica all'A/B della 11b**: le ondate 1 e 2 non spostano un verdetto. GUI e CLI concordano |
+| **Exit code di `dbdelta script`** | **1** con 13 differenze pendenti. Il 2026-08-16 lo stesso comando sulla stessa coppia usciva **0**: la voce 5 è chiusa sui dati veri, non solo in container |
+| Churn dei vincoli auto-nominati nello script (2448 righe) | **0 nomi con hash**, **0 `DROP CONSTRAINT`**. Ma vedi la voce 12 in P1: su questa coppia i nomi coincidono, quindi è un controllo in negativo, non la prova della voce |
+| Percorso permessi (`--include-permissions`) | Un solo permesso: `GRANT CONNECT TO [pcrm_ro];` — database-scoped, senza `ON`, e il rifiuto dell'ondata 1 correttamente **non** scatta |
+| Banda ambra del censimento, in GUI e in CLI | Vista dal vivo: «Non esaminati: 52 proprietà estese» |
+| Dialogo di conferma (voce 3) | Visto: nomina l'oggetto che verrà eliminato, mostra lo script, redige le password nelle due stringhe di connessione, Annulla neutro e Esegui in cremisi |
+
+**Due difetti trovati guardando, che nessun test headless poteva vedere:**
+
+1. **Il pannello dello script si apriva in fondo a destra** — UIA lo misurava a
+   `HorizontalScrollPercent = 100`, `VerticalScrollPercent = 100` — su una
+   finestra larga 620 px e **non ridimensionabile**, dentro un box dentro un
+   box: il lettore incontrava la coda dello script con i primi caratteri di
+   ogni riga tagliati, e non poteva allargare. È l'unica superficie che esiste
+   per dare consenso informato prima di un'operazione irreversibile.
+   **Corretto**: finestra a 880 px e ridimensionabile, padding annidato tolto,
+   pannello 220 → 420 px, e l'offset azzerato dopo il layout. Riverificato
+   sull'app: `Vpercent = 0` e nessuno scorrimento orizzontale.
+2. **La `PasswordBox` espone il valore in chiaro via UIAutomation** — vedi P4.
+
+---
+
 ## P1 — Alte: risultato o script sbagliato
 
 Tre voci chiuse il 2026-08-18 dal commit che porta questa riga:
@@ -80,7 +108,7 @@ due senza test.
 | **Sotto un login a privilegio minimo ogni utente esce Different.** `UserReader` fa LEFT JOIN su `sys.server_principals`: la metadata visibility rende `LoginName` null e `UsersEqual` lo confronta senza trattarlo. Emette `CREATE USER … FOR LOGIN` per utenti già corretti | 2026-07-30 | S | `Providers.LiveDb/Readers/UserReader.cs:20-30`; `Core/Diff/ComparisonEngine.cs:156-159`; stesso JOIN in `LiveDbObjectBodyResolver.cs:112` |
 | **Il rebuild non porta i default nel `_tmp`:** una colonna NOT NULL solo-sorgente fa fallire l'INSERT di copia con Msg 515, ed è esattamente il caso che il preflight di backfill esclude di proposito. Nessuna perdita dati (la transazione annulla), ma fallisce a metà script davanti all'utente | 2026-07-30 | M | `Core/ScriptGen/TableScriptEmitter.cs:58` e `:651-696`; innesco stretto a `:619-632` (flip IDENTITY o cambio seed/increment) |
 | **Le FK auto-nominate non combaciano mai fra due server.** `ForeignKeysQuery` non legge `is_system_named` e `ConstraintPairing` esclude le FK. **Le strutture di `ScriptGenerator` chiavate sul nome sono CINQUE, non tre** come dicono le remarks e l'handoff: due sono lookup locali che un grep su `orchestratedFks\|fkDropKeys` non trova | 2026-07-30 | M | `Providers.LiveDb/Readers/ConstraintReader.cs:21,68,81` (non in `:35-58`); `Core/Diff/ConstraintPairing.cs:86-90`; `ScriptGenerator.cs:148, 156-158, 247-258, 268-273, 1237-1245` |
-| **Smoke live mai fatto sulla voce 12** (vincoli auto-nominati), dove il bug vive negli `object_id` veri e `.243`/`.242` portano DEFAULT inline. Coperta solo da Testcontainers. Da fare insieme a «guardare l'app girare» (P5): stessi due server, stessa sessione | 2026-07-31 (impegno) · 2026-08-17 (voce 12) | S | `docs/review/2026-08-16-handoff-post-scan.md:209-213`, `:408-410`. **Correzione:** l'ondata 2 non ha toccato `ScriptGenerator`, lì l'impegno non si applicava |
+| **La voce 12 NON è verificabile sulle istanze reali disponibili**, e non per la coppia sbagliata. Lo smoke del 2026-08-18 ha misurato i nomi auto-generati su tre confronti: `PcrmV2Pl_test` vs `PcrmV2Pl_Badii` (stesso server) e `PcrmV2Pl_test` (.243) vs `PcrmV2Pl` (.242) danno **24 PK auto-nominati su 24 con nome IDENTICO**, e 45 DEFAULT su 45 idem. Il motivo è strutturale: **un restore conserva gli `object_id`**, quindi ogni database che discende da un backup di un altro porta gli stessi hash, e l'appaiamento per nome — quello rotto — lì funzionerebbe comunque. La divergenza nasce solo deployando lo **script** dello schema due volte. Servono due DB usa-e-getta: stessa proposta già scartata per la 11b, quindi è una decisione del proprietario, non una svista | 2026-07-31 (impegno) · 2026-08-17 (voce 12) | S | Misurato: `sys.key_constraints`/`sys.default_constraints` con `is_system_named=1` sui tre database. Nessun altro DB su `.243` ha vincoli auto-nominati in numero utile (`PartnerCrmCashGlobo` 0, `PartnerCrmEconocom` 1, `TnTrace*` 0, `BetamedV2` 0) |
 
 ---
 
@@ -125,6 +153,7 @@ due senza test.
 | **Il censimento non ha un'asserzione sull'output CLI.** `TextFormatter` è `internal` e la CLI tiene gli internals chiusi apposta: **non aprirla con `InternalsVisibleTo`**, asserisci sullo stdout dentro un'acceptance che già gira | 2026-08-16 | XS | `Cli/Output/TextFormatter.cs:9` e `:31-35`; `CompareCommandTests.cs:287` documenta la scelta |
 | **Quattro test mutano `Application.Current.RequestedThemeVariant` senza ripristinarlo.** Non ha ancora morso perché nessun altro test legge un brush dipendente dal tema. La classe implementa già `IDisposable` | 2026-08-14 | XS | `ThemeCycleTests.cs:47-59, 74-86, 138-146, 151-163` contro `:121-134` |
 | **`SynonymReader` non fa un-escape di `]]`** — ma la conseguenza raccontata non esiste: i quattro segmenti sono campi morti e l'emittente usa `BaseObjectName` verbatim. **La chiusura più corta è cancellare i campi**, non gestire il `]]` | 2026-07-30 | XS | `Providers.LiveDb/Readers/SynonymReader.cs:52`; `SynonymScriptEmitter.cs:14` |
+| **La `PasswordBox` espone il valore in chiaro via UIAutomation.** Trovato pilotando la GUI il 2026-08-18: `ValuePattern.Current.Value` sul campo password ha restituito la password `sa` in chiaro, senza privilegi particolari. Qualunque processo nella sessione desktop può leggerla dall'albero UI. Rimedio: `AutomationProperties.IsOffscreenBehavior` non basta — serve che il controllo non pubblichi `ValuePattern`, o pubblichi il testo mascherato | 2026-08-18 | S | `Views/Controls/PasswordBox.axaml`; misurato su `ProjectSetupDialog`, campi indice 2 e 6 |
 | **Il parser delle risposte UDP del browser SQL è permissivo:** valida solo `buffer[0] == 0x05` e poi si fida della stringa. Scorporata dalla voce P0 sulle credenziali quando quella è stata chiusa: nulla parte più da sola verso un host suggerito, quindi resta igiene, non esposizione | 2026-07-30 | S | `Persistence/Sql/SqlServerDiscovery.cs:196-199` |
 | **Gli invarianti UI non sono asseriti in sé.** `Themes.axaml` è coperto da `AccentBandContrastTests` dal 2026-08-01, ma nulla fallisce se domani qualcuno rimette `Background=Transparent` su `.ghost` o toglie il `MinHeight` 32. Due buchi minori: manca uno stile CheckBox, e `SaveProjectDialog.axaml:31` usa `ghost` per Annulla | 2026-07-30 | S | `Styles/AppStyles.axaml:6-22` e `:91-105`; grep `Tokens.axaml` su `tests/` → zero |
 
@@ -134,7 +163,7 @@ due senza test.
 
 | Voce | Reg. | Sforzo | Stato reale |
 |---|---|---|---|
-| **Nessuno ha mai guardato l'app girare**: dialogo di conferma, banner di rifiuto e pulsante Annulla sono provati solo in headless. Cosa l'headless non copre: il secondo ingresso nel catch di annullamento, la lettura interrotta a metà che il driver riporta come `SqlException -2`. **Stessa sessione dello smoke della voce 12 (P1)** | 2026-08-16 | S | Due connessioni vere, dieci minuti |
+| **Resta da guardare girare: il banner di rifiuto e il pulsante Annulla.** Il dialogo di conferma e la banda ambra del censimento sono stati visti dal vivo il 2026-08-18 (vedi sotto). Gli altri due no: il rifiuto vuole un indice non rowstore, che `.243`/`.242` non hanno, e Annulla su quella coppia è irraggiungibile perché il confronto dura 2,6 s. Il secondo ingresso nel catch di annullamento — la lettura interrotta a metà, che il driver riporta come `SqlException -2` — lo può produrre solo un server lento o un catalogo enorme | 2026-08-16 | S | Serve una coppia grossa o lenta, non queste |
 | **I 300 s non sono mai stati misurati contro un server lento.** Via d'uscita già provata: l'utente può scrivere `Command Timeout=0` e la stringa torna intatta. Candidate a sforare: lettura colonne e lettura indici | 2026-08-17 | S | `ConnectionFactory.cs:27`; `ConnectionTimeoutTests.cs` non tocca alcun container |
 | **Code signing** — bloccato sul certificato, unico blocco vero. Lo step va **fra «Build MSI» e «Smoke install»**, altrimenti lo smoke esercita un artefatto diverso da quello pubblicato. Con `signtool` servono `/fd sha256` e un timestamp server | 2026-05-28 | M | Nessun passo di firma in `release.yml` |
 | **Annuncio pubblico** — il draft è completo ma **fermo a 1.0.1 mentre la release è 1.0.2**. Da fare dopo le docs (P2): oggi `docfx/articles/getting-started.md` manda i nuovi arrivati a compilare da sorgente invece di scaricare la MSI | 2026-05-28 | S | `docs/announcements/v1.0.1-draft.md`; `README.md:16-33` |

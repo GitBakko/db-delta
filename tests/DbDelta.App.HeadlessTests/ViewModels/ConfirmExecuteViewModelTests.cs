@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using DbDelta.App.ViewModels;
 using DbDelta.App.Views;
@@ -137,10 +138,19 @@ public class ConfirmExecuteViewModelTests
 
     /// <summary>
     /// The one thing headless CAN check about layout, and the risk the script
-    /// pane introduces: the window is SizeToContent="Height" and CanResize=False,
-    /// so an unbounded pane would grow it past the screen with no way back. Both
-    /// the script and the drop list sit in capped ScrollViewers.
+    /// pane introduces: the window is SizeToContent="Height", so an unbounded
+    /// pane would grow it past the screen. Both the script and the drop list sit
+    /// in capped ScrollViewers.
     /// </summary>
+    /// <remarks>
+    /// The bound moved from 260 to 440 on 2026-08-18, deliberately: the pane's
+    /// cap went 220 → 420 and the window became resizable, because seen live at
+    /// 620 wide and fixed, a line of DDL was clipped on both sides with no way
+    /// for the reader to widen it. What the net asserts is unchanged — a huge
+    /// script scrolls INSIDE a bounded pane instead of growing the window
+    /// without limit. If a future change needs this number raised again, check
+    /// that it is still a cap and not the removal of one.
+    /// </remarks>
     [AvaloniaFact]
     public void A_huge_script_does_not_grow_the_window_past_the_screen()
     {
@@ -164,7 +174,58 @@ public class ConfirmExecuteViewModelTests
         ScrollViewer scriptPane = dlg.GetVisualDescendants().OfType<ScrollViewer>()
             .Single(s => s.Name == "ScriptPane");
 
-        scriptPane.Bounds.Height.Should().BeLessThan(260,
-            "5000 script lines must scroll inside the pane, not grow a window that cannot be resized");
+        scriptPane.Bounds.Height.Should().BeLessThan(440,
+            "5000 script lines must scroll inside the pane, not grow the window past the screen");
+    }
+
+    /// <summary>
+    /// The script section opens at its FIRST line, not its last.
+    /// </summary>
+    /// <remarks>
+    /// Measured on the running app before it was fixed: UI Automation reported
+    /// the pane at HorizontalScrollPercent = 100 and VerticalScrollPercent = 100
+    /// the instant it expanded, so the reader met the tail of the script with
+    /// the first characters of every line clipped. The section exists to let
+    /// someone check what is about to run against a live database — landing at
+    /// the end of it defeats its only purpose. Headless cannot see the clipping,
+    /// but it can see the offset.
+    /// </remarks>
+    [AvaloniaFact]
+    public void The_script_section_opens_at_the_top_left()
+    {
+        string huge = string.Join('\n', Enumerable.Range(0, 5000).Select(i => $"-- riga molto lunga numero {i} con testo a sufficienza per scorrere"));
+        ConfirmExecuteDialog dlg = new()
+        {
+            DataContext = new ConfirmExecuteViewModel(
+                1, 1, ["dbo.T  (Table)"], 0, "src", "tgt", huge,
+                () => Task.FromResult(new SqlBatchResult(true, null, 1, 1))),
+        };
+        dlg.Show();
+
+        // The pane does not exist until the section is opened once — the
+        // Expander realises its content lazily.
+        Expander expander = dlg.GetVisualDescendants().OfType<Expander>().Single();
+        expander.IsExpanded = true;
+        dlg.UpdateLayout();
+        ScrollViewer scriptPane = dlg.GetVisualDescendants().OfType<ScrollViewer>()
+            .Single(s => s.Name == "ScriptPane");
+
+        // Drive it to the corner the live app opened at, then close and reopen.
+        // Asserting on the first expansion alone would pass without the handler,
+        // because headless happens to start at zero — it is the RETURN from a
+        // scrolled state that proves something resets it.
+        scriptPane.ScrollToEnd();
+        dlg.UpdateLayout();
+        scriptPane.Offset.Y.Should().BeGreaterThan(0, "the test must start from a scrolled pane to mean anything");
+
+        expander.IsExpanded = false;
+        dlg.UpdateLayout();
+        expander.IsExpanded = true;
+        dlg.UpdateLayout();
+        // The reset is posted at Loaded priority, so the queue has to run.
+        Dispatcher.UIThread.RunJobs();
+
+        scriptPane.Offset.Y.Should().Be(0, "the reader must land on the first statement, not the last");
+        scriptPane.Offset.X.Should().Be(0, "a horizontal offset clips the start of every line");
     }
 }

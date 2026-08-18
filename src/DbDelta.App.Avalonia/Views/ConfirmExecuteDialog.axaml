@@ -6,9 +6,9 @@
         x:DataType="vm:ConfirmExecuteViewModel"
         Title="Esecuzione allineamento"
         Icon="/Assets/app-icon.png"
-        Width="620" SizeToContent="Height"
+        Width="880" SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
-        CanResize="False"
+        CanResize="True"
         Background="{StaticResource BgBrush}">
 
   <StackPanel Margin="24" Spacing="14">
@@ -120,11 +120,18 @@
     <!-- The script itself, collapsed. It is already built and in hand — reading
          it used to cost a cancel, a second pass through "Genera script", a second
          answer to the backfill preflight, a file save and an external editor. -->
-    <Expander Header="{Binding ScriptToggleLabel}" IsExpanded="False">
+    <!-- Padding="0" on the Expander, and 8 rather than 12 inside the border.
+         The script used to sit in a box, in a box, each with its own padding,
+         on a 620-wide window that could not be resized — so a line of DDL was
+         clipped on BOTH sides and the reader could not do anything about it.
+         The surviving inset is the one that keeps the monospace text off the
+         border; everything else was space the script needed. -->
+    <Expander Header="{Binding ScriptToggleLabel}" IsExpanded="False" Padding="0"
+              Expanded="OnScriptExpanded">
       <Grid RowDefinitions="Auto,8,Auto">
         <Border Grid.Row="0" Classes="surface-raised" ClipToBounds="True" Padding="0">
-          <ScrollViewer x:Name="ScriptPane" MaxHeight="220" HorizontalScrollBarVisibility="Auto">
-            <SelectableTextBlock Text="{Binding Script}" Margin="12"
+          <ScrollViewer x:Name="ScriptPane" MaxHeight="420" HorizontalScrollBarVisibility="Auto">
+            <SelectableTextBlock Text="{Binding Script}" Margin="8"
                                  FontFamily="Cascadia Mono,Consolas,monospace" FontSize="11"
                                  Foreground="{StaticResource FgStrongBrush}" />
           </ScrollViewer>

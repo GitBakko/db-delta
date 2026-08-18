@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using DbDelta.App.ViewModels;
 
 namespace DbDelta.App.Views;
@@ -28,6 +29,28 @@ public partial class ConfirmExecuteDialog : Window
             e.Cancel = true; // the script owns a transaction — no mid-flight close
         }
     }
+
+    /// <summary>
+    /// Puts the script pane back at its first line when the section opens.
+    /// </summary>
+    /// <remarks>
+    /// Without this it opens at the BOTTOM-RIGHT — measured live, not guessed:
+    /// UI Automation reported the pane at <c>HorizontalScrollPercent = 100</c>
+    /// and <c>VerticalScrollPercent = 100</c> the moment it expanded, so the
+    /// reader met the last lines of the script with the first characters of
+    /// each one clipped. This section exists so someone can check what is about
+    /// to run against a live database; landing at the end of it defeats the one
+    /// job it has.
+    /// </remarks>
+    /// <remarks>
+    /// Posted at <see cref="DispatcherPriority.Loaded"/> rather than set inline.
+    /// A plain <c>ScrollToHome()</c> in this handler is undone: the expansion
+    /// realises the content and the layout pass that follows puts the offset
+    /// back — measured, the pane returned to Y = 59538 with the inline call in
+    /// place. The reset has to happen after that pass, not before it.
+    /// </remarks>
+    private void OnScriptExpanded(object? sender, RoutedEventArgs e) =>
+        Dispatcher.UIThread.Post(() => ScriptPane.Offset = default, DispatcherPriority.Loaded);
 
     private void OnAnnullaClick(object? sender, RoutedEventArgs e) => Close(null);
 
