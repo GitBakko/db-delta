@@ -22,13 +22,21 @@ public sealed class SqlExecutorTests : IAsyncLifetime
         // services every integration test project; the default unpinned
         // MsSqlBuilder() requires the CU-suffixed image to be pre-cached
         // and Assert.Skip cannot intercept DockerImageNotFoundException.
-        MsSqlContainer container = new MsSqlBuilder()
-            .WithImage("mcr.microsoft.com/mssql/server:2022-latest")
-            .WithPassword("Y0urStrong!Pass")
-            .Build();
-
+        MsSqlContainer? container = null;
         try
         {
+            // Build() is INSIDE the try, and that is the whole point. It calls
+            // AbstractBuilder.Validate(), which throws ArgumentException
+            // ("Docker is either not running or misconfigured", parameter
+            // DockerEndpointAuthConfig) when no endpoint is configured at all.
+            // Left outside, that escaped the catch below and failed the three
+            // tests on the Windows job instead of skipping them — and only when
+            // the runner happened to have no endpoint, so it read as a random
+            // red on a commit that had not touched this file.
+            container = new MsSqlBuilder()
+                .WithImage("mcr.microsoft.com/mssql/server:2022-latest")
+                .WithPassword("Y0urStrong!Pass")
+                .Build();
             await container.StartAsync();
             _container = container;
             _connectionString = container.GetConnectionString();
@@ -41,7 +49,10 @@ public sealed class SqlExecutorTests : IAsyncLifetime
             // container itself answer, and carry the real reason into the skip
             // so a green run still says why it did not assert anything.
             _skipReason = $"Testcontainers could not start MS SQL: {ex.Message}";
-            await container.DisposeAsync();
+            if (container is not null)
+            {
+                await container.DisposeAsync();
+            }
         }
     }
 
