@@ -106,17 +106,53 @@ public sealed class JsonRecentProjectsStore
         {
             byte[] bytes = await File.ReadAllBytesAsync(_filePath, ct).ConfigureAwait(false);
             Document? doc = JsonSerializer.Deserialize<Document>(bytes, s_json);
-            return doc is null || doc.SchemaVersion > CurrentSchemaVersion
-                ? new Document(CurrentSchemaVersion, [])
-                : doc;
+            if (doc is null)
+            {
+                return new Document(CurrentSchemaVersion, []);
+            }
+            if (doc.SchemaVersion > CurrentSchemaVersion)
+            {
+                // A downgrade — v2 wrote this, v1 is reading it. Keep the file
+                // instead of letting the next write flatten it, exactly as
+                // JsonConnectionStore does.
+                MoveAside("future-schema");
+                return new Document(CurrentSchemaVersion, []);
+            }
+            return doc;
         }
         catch (JsonException)
         {
+            // This branch ignored forWrite, so it undercut the guard the branch
+            // below applies: a truncated file was read as "no entries" even on
+            // the write path, and the next save replaced ten remembered project
+            // paths with one. Copy first, then degrade.
+            MoveAside("invalid-json");
             return new Document(CurrentSchemaVersion, []);
         }
         catch (Exception ex) when (!forWrite && ex is IOException or UnauthorizedAccessException)
         {
             return new Document(CurrentSchemaVersion, []);
+        }
+    }
+
+    /// <summary>
+    /// Renames the unreadable file out of the way instead of losing it. Same
+    /// shape and same suffix as <c>JsonConnectionStore</c>: a user who finds one
+    /// <c>.broken-*</c> file should recognise the other.
+    /// </summary>
+    private void MoveAside(string reason)
+    {
+        string aside = _filePath + ".broken-"
+            + DateTime.UtcNow.ToString("yyyyMMddHHmmssfff")
+            + "-" + reason;
+        try
+        {
+            File.Move(_filePath, aside, overwrite: false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Another instance may have moved it already, or the profile is
+            // read-only. Best-effort: never let this sink the caller.
         }
     }
 

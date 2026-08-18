@@ -246,6 +246,77 @@ public class LineDifferTests
         result.Should().AllSatisfy(r => r.Status.Should().Be(LineStatus.Unchanged));
     }
 
+    // -------------------------------------------------------------------------
+    // Common head and tail are trimmed before the DP table is allocated.
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// A body far larger than anything the other tests use, changed in one line.
+    /// </summary>
+    /// <remarks>
+    /// The table is <c>int[m+1, n+1]</c>, so before the trim two 30.000-line
+    /// bodies asked for roughly 3,6 GB in one allocation and threw
+    /// OutOfMemoryException — on a procedure a user can plausibly own, from a
+    /// double-click in the diff viewer. The largest input in this file was three
+    /// lines, which is why nothing here ever noticed.
+    /// </remarks>
+    [Fact]
+    public void A_huge_body_changed_in_one_line_is_diffed_without_a_giant_table()
+    {
+        string[] lines = [.. Enumerable.Range(0, 30_000).Select(i => $"    SELECT {i};")];
+        string source = string.Join('\n', lines);
+        lines[15_000] = "    SELECT 999999; -- cambiata";
+        string target = string.Join('\n', lines);
+
+        IReadOnlyList<LineDiff> result = LineDiffer.Compute(source, target);
+
+        result.Should().HaveCount(30_000);
+        result.Count(r => r.Status != LineStatus.Unchanged)
+            .Should().Be(1, "exactly one line moved");
+        result[15_000].Status.Should().Be(LineStatus.Modified);
+    }
+
+    /// <summary>
+    /// The trim must not change any verdict — it only decides what the DP table
+    /// has to cover.
+    /// </summary>
+    [Fact]
+    public void Trimming_the_head_and_tail_leaves_the_same_verdicts()
+    {
+        IReadOnlyList<LineDiff> result = LineDiffer.Compute(
+            "uguale-1\nuguale-2\nSOLO-SORGENTE\nuguale-3\nuguale-4",
+            "uguale-1\nuguale-2\nSOLO-TARGET\nuguale-3\nuguale-4");
+
+        result.Should().HaveCount(5);
+        result[0].Status.Should().Be(LineStatus.Unchanged);
+        result[1].Status.Should().Be(LineStatus.Unchanged);
+        result[2].Status.Should().Be(LineStatus.Modified);
+        result[3].Status.Should().Be(LineStatus.Unchanged);
+        result[4].Status.Should().Be(LineStatus.Unchanged);
+        result[2].SourceText.Should().Be("SOLO-SORGENTE");
+        result[2].TargetText.Should().Be("SOLO-TARGET");
+    }
+
+    /// <summary>Two bodies that share nothing still diff — the trim finds no head or tail.</summary>
+    [Fact]
+    public void Two_bodies_with_nothing_in_common_still_diff()
+    {
+        IReadOnlyList<LineDiff> result = LineDiffer.Compute("a\nb", "c\nd");
+
+        result.Should().HaveCount(2);
+        result.Should().AllSatisfy(r => r.Status.Should().Be(LineStatus.Modified));
+    }
+
+    /// <summary>Identical bodies are all head, and nothing is left for the table.</summary>
+    [Fact]
+    public void Identical_bodies_are_entirely_head()
+    {
+        IReadOnlyList<LineDiff> result = LineDiffer.Compute("a\nb\nc", "a\nb\nc");
+
+        result.Should().HaveCount(3);
+        result.Should().AllSatisfy(r => r.Status.Should().Be(LineStatus.Unchanged));
+    }
+
     [Fact]
     public void DiffSection_EndIndex_equals_start_plus_length_minus_one()
     {

@@ -8,13 +8,13 @@ vedi «Manutenzione» in fondo.
 ## Stato — 2026-08-18
 
 - **v1.0.2 pubblicata** (2026-08-13), «Latest», MSI non firmata allegata.
-- **803 test verdi** nei sette progetti che girano senza Docker (Core 473,
-  Headless 173, Persistence.Unit 65, Golden 68, Property 12, Architecture 6,
+- **810 test verdi** nei sette progetti che girano senza Docker (Core 477,
+  Headless 173, Persistence.Unit 68, Golden 68, Property 12, Architecture 6,
   Shared 6). I tre DB-backed (LiveDb, Cli acceptance, Persistence integration)
   vogliono Docker e vanno **rossi**, non skipped, quando è spento: davanti a
   quel muro la prima domanda è `docker ps`. `dotnet format --verify-no-changes`
   esce 0.
-- **47 voci aperte, verificate una per una sul codice del 2026-08-18**, non
+- **45 voci aperte, verificate una per una sul codice del 2026-08-18**, non
   ereditate dai documenti: 33 confermate, 3 parziali, 5 non verificabili senza
   il proprietario o un server vero, 14 riclassificate come scelte deliberate e
   spostate in fondo. **Le 4 critiche sono chiuse**, e 3 delle 7 alte — vedi P0
@@ -148,12 +148,11 @@ due senza test.
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
 | **Griglia, resta la metà (a) e (c).** La ricerca cieca è chiusa il 2026-08-18: il predicato confronta anche `StatusDisplayItalian`, quindi cercare «Diversi» trova le righe che la colonna chiama Diversi. Restano gli header che promettono un sort inesistente — o si aggiungono i cinque `SortMemberPath`, o si tolgono i `CanUserSort` perché smettano di prometterlo — e il `Refresh()` a ogni battuta | 2026-08-14 | S | `ResultsGridView.axaml:41,188,209,222`; `MainWindowViewModel.cs:630-637` |
-| **La MRU si sovrascrive senza copia di sicurezza.** Il `catch (JsonException)` torna un documento vuoto **senza guardare `forWrite`**, quindi scavalca anche la protezione del ramo successivo. Le dodici righe di `MoveAside` esistono già nel fratello | 2026-07-30 | XS | `Persistence/Json/JsonRecentProjectsStore.cs:105-121` |
 | **Resta la tastiera.** Annullare la modale di primo avvio non chiude più l'app dal 2026-08-18: si atterra sul guscio vuoto, con Nuovo e Carica in barra. Nessun dialogo risponde ancora a Invio/Esc — `IsDefault`/`IsCancel` li collegano senza codice, e nell'occasione due code-behind si cancellano | 2026-08-14 | S | grep `IsDefault\|IsCancel` su tutto il progetto → solo `ConfirmDialog.axaml.cs` |
 | **Annulla non ferma il confronto**, solo la lettura: `ComparisonEngine.Compare` non prende un token ed è chiamato sincronamente sul thread UI. Metterlo su `Task.Run` sblocca la finestra in poche righe; filare il token dentro `Compare` tocca anche i tre comandi CLI — **fai la prima e fermati** | 2026-08-17 | S | `ViewModels/AppStateViewModel.cs:355` e `:279-287`; `Core/Diff/ComparisonEngine.cs:12` |
 | **La Release non allega né hash né attestazione.** Due righe di `Get-FileHash -Algorithm SHA256` più `actions/attest-build-provenance`: costo zero, **non dipendono dal certificato** e vanno prima del code signing | 2026-07-30 | S | grep `sign\|sha256\|attest\|sbom` su `.github/workflows/` → nessun hit |
 | **Le docs mentono in cinque punti**, e il danno maggiore è verso di noi: il blocco di stato di questo file era fermo al 2026-06-04 (chiuso da questa riscrittura), il sito non nomina mai la MSI, il README linka le note Redgate come «Architecture», CONTRIBUTING descrive un progetto Blazor morto, `docfx/articles/cli.md` dichiara il falso sulle transazioni. Quasi tutto si chiude cancellando | 2026-08-14 | S | `docs/01_architecture.md`, `docs/04_api_endpoints.md`, `CONTRIBUTING.md`, `docfx/articles/cli.md`; `git log --since=2026-08-14` su quei file → vuoto |
-| **`LineDiffer` alloca `int[m+1,n+1]` grezzo** (~100 MB per 5.000 righe, OOM oltre ~23.000) mentre il test più grande ha 3 righe. **La metà economica è indipendente e vale da sola:** tagliare prefisso e suffisso comuni prima della DP fa crollare m e n nel caso reale di poche righe cambiate | 2026-08-14 | S | `Core/Diff/LineDiffer.cs:16` e `:81-98`; la metà virtualizzazione (`DiffViewerView.axaml:152-156, 193-195, 229-235`) aspetta il resolver |
+| **Resta la virtualizzazione dei pannelli diff.** Il taglio di prefisso e suffisso comuni prima della tabella LCS è chiuso il 2026-08-18: un corpo da 30.000 righe cambiato in una riga si confronta senza allocare nulla di grosso (prima: `int[m+1,n+1]`, ~3,6 GB in un colpo). I tre `ItemsPanel` non virtualizzanti restano, e aspettano la voce 10 | 2026-08-14 | S | `DiffViewerView.axaml:152-156, 193-195, 229-235` |
 
 ---
 

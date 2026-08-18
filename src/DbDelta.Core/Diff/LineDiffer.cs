@@ -12,14 +12,49 @@ public static class LineDiffer
         string[] src = SplitLines(sourceSql);
         string[] tgt = SplitLines(targetSql);
 
-        // Build LCS via O(N*M) DP — well within budget for SQL bodies.
-        int[,] lcs = BuildLcsTable(src, tgt);
+        // Identical head and tail come off before the DP table is allocated.
+        // Those lines cannot be anything but Unchanged, and they are most of a
+        // real diff: the usual case is a handful of lines changed inside a long
+        // module. The table is int[m+1, n+1] — 4 bytes a cell, so two 5.000-line
+        // bodies asked for ~100 MB and ~23.000 lines threw OutOfMemoryException,
+        // while the largest input any test had was three lines. Trimming turns
+        // that into a table over the lines that actually differ.
+        int head = 0;
+        while (head < src.Length && head < tgt.Length
+               && string.Equals(src[head], tgt[head], StringComparison.Ordinal))
+        {
+            head++;
+        }
+
+        int tail = 0;
+        while (tail < src.Length - head && tail < tgt.Length - head
+               && string.Equals(src[^(tail + 1)], tgt[^(tail + 1)], StringComparison.Ordinal))
+        {
+            tail++;
+        }
+
+        string[] srcMid = src[head..(src.Length - tail)];
+        string[] tgtMid = tgt[head..(tgt.Length - tail)];
 
         // Walk back through the LCS table to produce an edit script.
         // editScript[i] = (srcLine, tgtLine) for Unchanged; one null for
         // Added/Removed. We collect raw edit ops then pair up delete+insert runs.
-        var editOps = new List<(string? Src, string? Tgt)>();
-        CollectEdits(lcs, src, tgt, src.Length, tgt.Length, editOps);
+        // The trimmed head goes in first and the tail last, so the ops list is
+        // the same one the untrimmed code produced — CollectEdits reverses its
+        // own buffer before appending, never the list it is given.
+        var editOps = new List<(string? Src, string? Tgt)>(src.Length + tgt.Length);
+        for (int k = 0; k < head; k++)
+        {
+            editOps.Add((src[k], tgt[k]));
+        }
+
+        int[,] lcs = BuildLcsTable(srcMid, tgtMid);
+        CollectEdits(lcs, srcMid, tgtMid, srcMid.Length, tgtMid.Length, editOps);
+
+        for (int k = tail; k > 0; k--)
+        {
+            editOps.Add((src[^k], tgt[^k]));
+        }
 
         return BuildAlignedRows(editOps);
     }
