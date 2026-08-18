@@ -19,8 +19,15 @@ vedi «Manutenzione» in fondo.
   il proprietario o un server vero, 14 riclassificate come scelte deliberate e
   spostate in fondo. **Le 4 critiche sono chiuse**, e 3 delle 7 alte — vedi P0
   e P1.
-- **Due asserzioni di acceptance toccate in questa ondata girano solo in CI**
-  (vogliono Docker): l'exit code di `script` e la forma JSON di `compare`.
+- **CI verde su `56e2889`**, entrambi i job: **860 test** in tutto, cioè i 795
+  locali più i DB-backed (LiveDb 37, Cli acceptance 21, Persistence integration
+  7 su Linux, 4+3 skipped su Windows). Le due asserzioni di acceptance toccate
+  in questa ondata — l'exit code di `script` e la forma JSON di `compare` —
+  girano solo lì, e lì sono passate.
+- **La guardia dello skip Testcontainers deve avvolgere `Build()`**, non solo
+  `StartAsync()`: `Validate()` alza `ArgumentException` quando il runner non ha
+  proprio un endpoint Docker, e il job Windows andava rosso a intermittenza su
+  commit che non toccavano quei test. Corretto il 2026-08-18 (`56e2889`).
 - L'hash di `main` e lo stato di origin invecchiano il commit dopo: chiedili a
   `git status -sb` e `git log -1`, non a questo file.
 
