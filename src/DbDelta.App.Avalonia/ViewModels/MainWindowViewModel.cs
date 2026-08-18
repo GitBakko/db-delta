@@ -10,6 +10,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DbDelta.Core.Abstractions;
 using DbDelta.Core.Diff;
+using DbDelta.Core.Reports;
 using DbDelta.Core.ScriptGen;
 using DbDelta.Persistence.Json;
 using DbDelta.Persistence.Sql;
@@ -64,6 +65,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
             if (e.PropertyName == nameof(AppStateViewModel.LastComparison))
             {
                 RebuildRows();
+                // The report needs a comparison and nothing else, so it turns on
+                // here rather than with the selection the deploy buttons watch.
+                SaveReportCommand.NotifyCanExecuteChanged();
             }
             else if (e.PropertyName is nameof(AppStateViewModel.TargetConnectionString)
                                     or nameof(AppStateViewModel.ResultsAreStale))
@@ -858,6 +862,55 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     private bool CanDeploy() => Rows.Any(r => r.IsSelected) && !AppState.ResultsAreStale;
+
+    /// <summary>
+    /// Writes the HTML comparison report the CLI has always been able to write.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The generator was finished and tested and had exactly one production
+    /// caller — <c>dbdelta report</c> — so the only way to get the report from
+    /// the desktop app was to install the CLI and re-run the comparison against
+    /// both servers a second time. The input it needs is
+    /// <see cref="AppStateViewModel.LastComparisonRaw"/>, which the app is
+    /// already holding.
+    /// </para>
+    /// <para>
+    /// It covers the WHOLE comparison, not the ticked rows: the report is the
+    /// record of what the two databases looked like, while the selection is
+    /// what the user intends to deploy. That is also why it does not require a
+    /// selection, and why the tooltip says so.
+    /// </para>
+    /// </remarks>
+    [RelayCommand(CanExecute = nameof(CanSaveReport))]
+    public async Task SaveReportAsync(Window? owner)
+    {
+        if (owner is null) { return; }
+        if (AppState.LastComparisonRaw is null) { return; }
+
+        FilePickerSaveOptions opts = new()
+        {
+            Title = "Salva report di confronto",
+            SuggestedFileName = $"DbDelta-report-{DateTime.Now:yyyyMMdd-HHmm}.html",
+            FileTypeChoices = [new("Report HTML") { Patterns = ["*.html"] }],
+        };
+        IStorageFile? file = await owner.StorageProvider.SaveFilePickerAsync(opts).ConfigureAwait(true);
+        if (file is null) { return; }
+
+        string html = new HtmlReportGenerator().Generate(AppState.LastComparisonRaw);
+        await using Stream s = await file.OpenWriteAsync().ConfigureAwait(true);
+        await using StreamWriter w = new(s, Encoding.UTF8);
+        await w.WriteAsync(html).ConfigureAwait(true);
+
+        StatusText = $"Report salvato in {file.Path.LocalPath}.";
+    }
+
+    /// <summary>
+    /// A comparison is enough — unlike the deploy buttons this needs no
+    /// selection, and a stale result is still a truthful record of the run that
+    /// produced it.
+    /// </summary>
+    private bool CanSaveReport() => AppState.LastComparisonRaw is not null;
 
     /// <summary>
     /// The deploy script, or <c>null</c> after putting the generator's refusal

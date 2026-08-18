@@ -415,7 +415,7 @@
                 BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="0,0,0,1"
                 Padding="12,8">
-          <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
+          <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto">
             <TextBlock Grid.Column="0"
                        Text="{Binding SelectionSummary}"
                        FontSize="12"
@@ -463,7 +463,25 @@
               </Border>
             </StackPanel>
 
-            <Button Grid.Column="3" Classes="ghost-emerald"
+            <!-- Neutral, not emerald: saving the record of a comparison is a
+                 utility action, while Genera script is the read-only success
+                 path. It covers the whole comparison, so it needs no selection
+                 and stays enabled when nothing is ticked. -->
+            <Button Grid.Column="3" Classes="ghost"
+                    Command="{Binding SaveReportCommand}"
+                    CommandParameter="{Binding $parent[Window]}"
+                    ToolTip.Tip="Salva il report HTML dell'intero confronto (non solo delle righe selezionate)"
+                    Margin="0,0,8,0">
+              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                <Path Width="13" Height="13" Stretch="Uniform"
+                      Stroke="{Binding $parent[Button].Foreground}"
+                      StrokeThickness="1.7" StrokeLineCap="Round" StrokeJoin="Round"
+                      Fill="Transparent"
+                      Data="M 4,20 L 20,20 M 7,20 L 7,12 M 12,20 L 12,5 M 17,20 L 17,9" />
+                <TextBlock Text="Salva report" VerticalAlignment="Center" FontSize="12" />
+              </StackPanel>
+            </Button>
+            <Button Grid.Column="4" Classes="ghost-emerald"
                     Command="{Binding DeployCommand}"
                     CommandParameter="{Binding $parent[Window]}"
                     ToolTip.Tip="Genera script SQL di allineamento per le righe selezionate"
@@ -477,7 +495,7 @@
                 <TextBlock Text="Genera script" VerticalAlignment="Center" FontSize="12" />
               </StackPanel>
             </Button>
-            <Button Grid.Column="4" Classes="primary"
+            <Button Grid.Column="5" Classes="primary"
                     Command="{Binding ExecuteOnTargetCommand}"
                     CommandParameter="{Binding $parent[Window]}"
                     ToolTip.Tip="Esegui lo script di allineamento direttamente sulla destinazione">
