@@ -16,9 +16,9 @@ namespace DbDelta.App.HeadlessTests.Controls;
 /// </summary>
 public class LastModifiedCellTests
 {
-    private static LastModifiedCell Show(string text, bool isNewer)
+    private static LastModifiedCell Show(string text, bool isNewer, string? tip = null)
     {
-        LastModifiedCell cell = new() { Text = text, IsNewer = isNewer };
+        LastModifiedCell cell = new() { Text = text, IsNewer = isNewer, Tip = tip };
         Window window = new() { Content = cell };
         window.Show();
         return cell;
@@ -155,5 +155,28 @@ public class LastModifiedCellTests
 
         Part(cell, "PartArrow").IsVisible.Should().BeFalse();
         Part(cell, "PartValue").Text.Should().BeEmpty();
+    }
+
+    /// <summary>
+    /// The tooltip belongs to the marker, not to the cell.
+    /// </summary>
+    /// <remarks>
+    /// Both columns always pass the same NewerTooltip, so with the tip on the
+    /// root panel "Modifica più recente fra i due lati…" appeared over the
+    /// OLDER side, over identical rows, over one-sided rows and over the empty
+    /// cells of a Sequence or Synonym — explaining a marker that was not there.
+    /// Attached to the arrow it can only appear where the claim is true,
+    /// because the arrow already carries that condition.
+    /// </remarks>
+    [AvaloniaFact]
+    public void The_tooltip_hangs_off_the_marker_not_the_whole_cell()
+    {
+        LastModifiedCell cell = Show("12/08/2026 15:00", isNewer: true,
+            tip: "Modifica più recente fra i due lati, secondo l'orologio di ciascun server.");
+
+        ToolTip.GetTip(Part(cell, "PartArrow")).Should().NotBeNull(
+            "the side that carries the marker is the side the text describes");
+        ToolTip.GetTip(cell.FindControl<StackPanel>("PartRoot")!)
+            .Should().BeNull("on the root it covered the whole cell, marker or not");
     }
 }

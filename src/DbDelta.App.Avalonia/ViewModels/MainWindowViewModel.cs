@@ -613,6 +613,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
             || Contains(row.SchemaName, q)
             || Contains(row.ObjectName, q)
             || Contains(row.Status, q)
+            // The Italian label, not just the raw enum. The grid shows
+            // "Diverso" and groups by it, while the search compared only
+            // "Different" — so typing what was on screen found nothing.
+            || Contains(row.StatusDisplayItalian, q)
             || Contains(row.KindDisplayName, q);
     }
 

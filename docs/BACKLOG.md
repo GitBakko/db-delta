@@ -8,13 +8,13 @@ vedi «Manutenzione» in fondo.
 ## Stato — 2026-08-18
 
 - **v1.0.2 pubblicata** (2026-08-13), «Latest», MSI non firmata allegata.
-- **796 test verdi** nei sette progetti che girano senza Docker (Core 473,
-  Headless 166, Persistence.Unit 65, Golden 68, Property 12, Architecture 6,
+- **799 test verdi** nei sette progetti che girano senza Docker (Core 473,
+  Headless 169, Persistence.Unit 65, Golden 68, Property 12, Architecture 6,
   Shared 6). I tre DB-backed (LiveDb, Cli acceptance, Persistence integration)
   vogliono Docker e vanno **rossi**, non skipped, quando è spento: davanti a
   quel muro la prima domanda è `docker ps`. `dotnet format --verify-no-changes`
   esce 0.
-- **49 voci aperte, verificate una per una sul codice del 2026-08-18**, non
+- **48 voci aperte, verificate una per una sul codice del 2026-08-18**, non
   ereditate dai documenti: 33 confermate, 3 parziali, 5 non verificabili senza
   il proprietario o un server vero, 14 riclassificate come scelte deliberate e
   spostate in fondo. **Le 4 critiche sono chiuse**, e 3 delle 7 alte — vedi P0
@@ -140,11 +140,10 @@ due senza test.
 
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
-| **La ricerca è cieca alle parole che la griglia mostra.** `SearchPredicate` confronta lo `Status` grezzo, mai `StatusDisplayItalian`: cercare «Diverso» non trova nulla mentre la colonna dice «Diverso». Una riga. Nella stessa voce: header che promettono un sort inesistente, e `Refresh()` a ogni battuta | 2026-08-14 | S | `MainWindowViewModel.cs:601-620` e `:630-637`; `ResultsGridView.axaml:41,188,209,222` |
+| **Griglia, resta la metà (a) e (c).** La ricerca cieca è chiusa il 2026-08-18: il predicato confronta anche `StatusDisplayItalian`, quindi cercare «Diversi» trova le righe che la colonna chiama Diversi. Restano gli header che promettono un sort inesistente — o si aggiungono i cinque `SortMemberPath`, o si tolgono i `CanUserSort` perché smettano di prometterlo — e il `Refresh()` a ogni battuta | 2026-08-14 | S | `ResultsGridView.axaml:41,188,209,222`; `MainWindowViewModel.cs:630-637` |
 | **Il report HTML è irraggiungibile dalla GUI.** Unico chiamante di produzione è la CLI; l'app ha già in mano `LastComparisonRaw`. Nessun `using` nuovo, nessun riferimento nuovo | 2026-08-14 | S | `Cli/Commands/ReportCommand.cs:83`; zero occorrenze di `HtmlReportGenerator` in `App.Avalonia/`. Usa **«Salva»**, mai «Apri» |
-| **Il tooltip «modifica più recente» mente** dove la freccia non c'è: è sullo `StackPanel` radice e il `Tip` passato è sempre la costante. Sposta `ToolTip.Tip` sul `TextBlock PartArrow`, che ha già l'`IsVisible` giusto | 2026-08-14 | XS | `Views/Controls/LastModifiedCell.axaml:20-22` e `:24-31` |
 | **La MRU si sovrascrive senza copia di sicurezza.** Il `catch (JsonException)` torna un documento vuoto **senza guardare `forWrite`**, quindi scavalca anche la protezione del ramo successivo. Le dodici righe di `MoveAside` esistono già nel fratello | 2026-07-30 | XS | `Persistence/Json/JsonRecentProjectsStore.cs:105-121` |
-| **La modale di primo avvio chiude l'app se annullata** (`desktop.Shutdown()`), pur esistendo il pannello di benvenuto e il comando Nuovo. Togliere `Shutdown`, lasciare `return`: due righe. Seconda metà: nessun dialogo risponde a Invio/Esc — `IsDefault`/`IsCancel` li collegano senza codice, e due code-behind si cancellano nell'occasione | 2026-08-14 | S | `App.axaml.cs:69-74`; grep `IsDefault\|IsCancel` su tutto il progetto → solo `ConfirmDialog.axaml.cs` |
+| **Resta la tastiera.** Annullare la modale di primo avvio non chiude più l'app dal 2026-08-18: si atterra sul guscio vuoto, con Nuovo e Carica in barra. Nessun dialogo risponde ancora a Invio/Esc — `IsDefault`/`IsCancel` li collegano senza codice, e nell'occasione due code-behind si cancellano | 2026-08-14 | S | grep `IsDefault\|IsCancel` su tutto il progetto → solo `ConfirmDialog.axaml.cs` |
 | **Annulla non ferma il confronto**, solo la lettura: `ComparisonEngine.Compare` non prende un token ed è chiamato sincronamente sul thread UI. Metterlo su `Task.Run` sblocca la finestra in poche righe; filare il token dentro `Compare` tocca anche i tre comandi CLI — **fai la prima e fermati** | 2026-08-17 | S | `ViewModels/AppStateViewModel.cs:355` e `:279-287`; `Core/Diff/ComparisonEngine.cs:12` |
 | **La Release non allega né hash né attestazione.** Due righe di `Get-FileHash -Algorithm SHA256` più `actions/attest-build-provenance`: costo zero, **non dipendono dal certificato** e vanno prima del code signing | 2026-07-30 | S | grep `sign\|sha256\|attest\|sbom` su `.github/workflows/` → nessun hit |
 | **Le docs mentono in cinque punti**, e il danno maggiore è verso di noi: il blocco di stato di questo file era fermo al 2026-06-04 (chiuso da questa riscrittura), il sito non nomina mai la MSI, il README linka le note Redgate come «Architecture», CONTRIBUTING descrive un progetto Blazor morto, `docfx/articles/cli.md` dichiara il falso sulle transazioni. Quasi tutto si chiude cancellando | 2026-08-14 | S | `docs/01_architecture.md`, `docs/04_api_endpoints.md`, `CONTRIBUTING.md`, `docfx/articles/cli.md`; `git log --since=2026-08-14` su quei file → vuoto |

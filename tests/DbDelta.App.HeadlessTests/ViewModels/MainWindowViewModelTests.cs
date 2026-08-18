@@ -53,6 +53,43 @@ public class MainWindowViewModelTests
         vm.RowsView.Cast<DifferenceRowViewModel>().Single().ObjectName.Should().Be("Orders");
     }
 
+    /// <summary>
+    /// Typing what the grid shows finds it.
+    /// </summary>
+    /// <remarks>
+    /// The status column renders StatusDisplayItalian and the grid groups by
+    /// it, while the predicate compared only the raw enum — so searching
+    /// "Diversi" returned nothing on a screen full of rows labelled Diverso.
+    /// The Italian word is the one a user has in front of them; the English one
+    /// stays searchable because scripts and logs use it.
+    /// </remarks>
+    [AvaloniaFact]
+    public void Search_matches_the_status_word_the_grid_actually_shows()
+    {
+        MainWindowViewModel vm = BuildVm(
+            MakeDto("Orders", "Different"),
+            MakeDto("Customers", "Identical"));
+
+        vm.SearchText = "Diversi";
+
+        vm.RowsView.Cast<DifferenceRowViewModel>()
+            .Should().ContainSingle().Which.ObjectName.Should().Be("Orders");
+    }
+
+    /// <summary>The raw enum keeps working — it is what a log or a script says.</summary>
+    [AvaloniaFact]
+    public void Search_still_matches_the_raw_status()
+    {
+        MainWindowViewModel vm = BuildVm(
+            MakeDto("Orders", "Different"),
+            MakeDto("Customers", "Identical"));
+
+        vm.SearchText = "Different";
+
+        vm.RowsView.Cast<DifferenceRowViewModel>()
+            .Should().ContainSingle().Which.ObjectName.Should().Be("Orders");
+    }
+
     [AvaloniaFact]
     public void Rows_filter_clears_when_search_text_emptied()
     {

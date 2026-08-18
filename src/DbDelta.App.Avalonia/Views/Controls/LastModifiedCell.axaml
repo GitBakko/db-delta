@@ -17,17 +17,22 @@
     </Style>
   </UserControl.Styles>
 
-  <StackPanel Orientation="Horizontal" Spacing="4"
-              VerticalAlignment="Center" Margin="4,0"
-              ToolTip.Tip="{Binding Tip, ElementName=Self}">
+  <StackPanel x:Name="PartRoot" Orientation="Horizontal" Spacing="4"
+              VerticalAlignment="Center" Margin="4,0">
 
     <!-- Bigger than the timestamp next to it and on the success ramp: at the
-         digits' own size and in the generic accent it read as punctuation. -->
+         digits' own size and in the generic accent it read as punctuation.
+         The tooltip lives HERE, not on the panel: both columns always pass the
+         same NewerTooltip, so on the root it appeared over the older side, over
+         identical rows, over one-sided rows and over empty cells — explaining a
+         marker that was not there. The arrow already carries the only condition
+         under which the text is true. -->
     <TextBlock x:Name="PartArrow"
                Text="▲"
                FontSize="13"
                VerticalAlignment="Center"
                Foreground="{DynamicResource SuccessBrush}"
+               ToolTip.Tip="{Binding Tip, ElementName=Self}"
                IsVisible="{Binding IsNewer, ElementName=Self}" />
 
     <TextBlock x:Name="PartValue"

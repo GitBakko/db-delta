@@ -71,8 +71,11 @@ public partial class App : Application
 
                 if (result is null)
                 {
-                    // User cancelled — close the app gracefully.
-                    desktop.Shutdown();
+                    // Cancelled: land on the empty shell, do NOT end the app.
+                    // Shutting down here made Annulla on the first-run modal
+                    // quit DbDelta outright, which no other dialog does and
+                    // which the topbar contradicts — Nuovo and Carica are right
+                    // there, and the welcome panel is what they lead back to.
                     return;
                 }
 
