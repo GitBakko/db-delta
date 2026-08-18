@@ -33,6 +33,10 @@ public class ConnectionStringRedactorTests
     [Fact]
     public void Password_with_special_chars_is_redacted_to_semicolon()
     {
+        // Obviously fake, and deliberately so. This line used to carry a REAL sa
+        // password of a live instance, committed on 2026-05-21 and public ever
+        // since — in the test of the very class that exists to keep passwords out
+        // of logs. Keep sample secrets self-evidently invented.
         ConnectionStringRedactor.Redact("Server=x;Password=N0tAr3al!Pwd#Fake;Database=y")
             .Should().Be("Server=x;Password=***;Database=y");
     }
