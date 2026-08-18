@@ -26,60 +26,19 @@ Deciso dal proprietario, non riaprire senza una ragione nuova:
 
 ---
 
-# Stato di avanzamento
+# Stato di avanzamento — NON PIÙ QUI
 
-Aggiornato il 2026-08-17.
+**Questa sezione è stata rimossa il 2026-08-18.** Era una seconda lista di
+lavoro, che la regola del progetto vieta, ed era diventata falsa: dava per
+aperte voci già chiuse.
 
-| Voce | Stato | Commit |
-|---|---|---|
-| 1 — CI non fa da gate | **fatta** | `f91ee6e` |
-| 4 — Diff pane, SQL sotto il nome sbagliato | **fatta** | `d210b1a` |
-| 3 — Dialogo di conferma: script + cosa si elimina | **fatta** | `0cde9a9` |
-| 11a — Censimento + banner ambra | **fatta** | `6c2e2e9` |
-| 11b — `EmitRebuild` deve RIFIUTARE su indici non riemettibili | **fatta** | `04886b1` · `b250d4f` · `3c32b71` |
-| 12 — Vincoli auto-nominati appaiati per nome | **fatta** | `9b81ca0` · `142fcb7` |
-| 2 — Compare non annullabile, letture a 30 s | **fatta** | `8cfbc91` · `cf81ee9` |
-| 5, 6, 7, 8, 9, 10, 13, 14 | aperte | — |
+Lo stato di queste 14 voci vive **solo** in `docs/BACKLOG.md`. Questo file è la
+**diagnosi** del 2026-08-14 — perché una cosa era rotta e dove — non un
+cruscotto.
 
-**La 11 è chiusa in entrambe le metà.** Il reader porta ogni tipo di indice e
-`TableIndex.TypeDesc`; `IndexScriptEmitter.EmitCreate` /
-`EmitRebuildForCompression` e `TableScriptEmitter.EmitRebuild` alzano
-`UnscriptableIndexException` prima che esista una riga di script; la CLI esce 30
-e l'app mostra il banner. `DROP INDEX` resta permesso su ogni tipo — è valido, e
-rifiutarlo bloccherebbe una convergenza che il target sa completare.
-
-Non fatta, e deliberatamente: **l'emissione** di un columnstore. È il rifiuto
-che ferma la perdita; scrivere il `CREATE` è una voce a sé, e nessuno l'ha
-ancora chiesta.
-
-**La 12 è chiusa, meno una metà dichiarata.** `is_system_named` viaggia dalle tre
-query fino a `Constraint.IsSystemNamed`; `ConstraintPairing` appaia per **forma**
-ciò che il server ha nominato da sé e per nome tutto il resto; l'emittente crea i
-primi **senza** clausola `CONSTRAINT`, così è il target a coniare il proprio
-nome, e continua a droppare col nome vero del target.
-
-Non fatto, e per una ragione: **`IgnoreConstraintNames` resta scollegato**. È un
-flag dichiarato e morto, e la voce **9** deve prima decidere se quei flag si
-implementano o si cancellano — cablarne uno adesso significherebbe scegliere al
-posto suo. Il falso positivo che questa voce esisteva per uccidere non passa
-comunque più da lì: i vincoli auto-nominati non sono mai confrontati per nome.
-
-**La 2 è chiusa, in due metà indipendenti.** Le letture del catalogo hanno un
-`Command Timeout` di 300 s iniettato una volta sola in `ConnectionFactory` — la
-proprietà `SqlConnection.CommandTimeout` è di sola lettura, quindi la stringa di
-connessione è l'unica leva, ed è per questo che una riga copre tutti i comandi;
-chi il timeout se l'era già scritto se lo tiene, `0` (illimitato) compreso. E il
-compare si annulla: `CompareCancelCommand` generato dal toolkit, un **Annulla**
-neutro nell'overlay, e i due call site che chiamavano il metodo scavalcando il
-comando ora ci passano — altrimenti il pulsante sarebbe morto proprio su
-«Aggiorna».
-
-Due limiti dichiarati: `engine.Compare` è sincrono sul thread UI, quindi
-Annulla accorcia la lettura e non il confronto; e il pulsante non è mai stato
-visto dal vivo, solo in headless.
-
-La voce che resta a costo minore è la **6** (il report HTML che la GUI non sa
-invocare): ore, e si vede subito.
+**Gli SHA citati nel resto del file sono anteriori alla riscrittura della storia
+del 2026-08-18 e non risolvono più.** Cerca per messaggio:
+`git log --oneline --all --grep="…"`.
 
 ---
 

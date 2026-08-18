@@ -10,26 +10,33 @@ vedi «Manutenzione» in fondo.
 - **v1.0.2 pubblicata** (2026-08-13), «Latest», MSI non firmata allegata.
 - **810 test verdi** nei sette progetti che girano senza Docker (Core 477,
   Headless 173, Persistence.Unit 68, Golden 68, Property 12, Architecture 6,
-  Shared 6). I tre DB-backed (LiveDb, Cli acceptance, Persistence integration)
-  vogliono Docker e vanno **rossi**, non skipped, quando è spento: davanti a
-  quel muro la prima domanda è `docker ps`. `dotnet format --verify-no-changes`
-  esce 0.
-- **45 voci aperte, verificate una per una sul codice del 2026-08-18**, non
-  ereditate dai documenti: 33 confermate, 3 parziali, 5 non verificabili senza
-  il proprietario o un server vero, 14 riclassificate come scelte deliberate e
-  spostate in fondo. **Le 4 critiche sono chiuse**, e 3 delle 7 alte — vedi P0
-  e P1.
-- **CI verde su `56e2889`**, entrambi i job: **860 test** in tutto, cioè i 795
-  locali più i DB-backed (LiveDb 37, Cli acceptance 21, Persistence integration
-  7 su Linux, 4+3 skipped su Windows). Le due asserzioni di acceptance toccate
-  in questa ondata — l'exit code di `script` e la forma JSON di `compare` —
-  girano solo lì, e lì sono passate.
+  Shared 6). **Due** dei tre DB-backed vanno **rossi**, non skipped, con Docker
+  spento — LiveDb e Cli acceptance, che costruiscono il container in un
+  inizializzatore di campo senza rete. Davanti a quel muro la prima domanda è
+  `docker ps`. Persistence integration invece **skippa da sé** da `f8df44a`
+  (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
+  Windows. `dotnet format --verify-no-changes` esce 0.
+- **35 voci aperte** — P1 4 · P2 6 · P3 10 · P4 8 · P5 7 — più **11** in
+  «Deciso — NON riaprire». Tutte riverificate sul codice il 2026-08-18, non
+  ereditate dai documenti. **Le 4 critiche sono chiuse**, e 3 delle 7 alte:
+  vedi P0 e P1. Il conteggio va ricontato, non decrementato a mente: `awk` sulle
+  righe di tabella, o si scolla come si era già scollato.
+- **CI verde su `3c48735`** (run `32140004994`), entrambi i job. I DB-backed
+  aggiungono **65** test ai locali della riga sopra: LiveDb 37, Cli acceptance
+  21, Persistence integration 7 su Linux (4 passati + 3 skipped su Windows).
+  Il totale non si scrive: è «i locali + 65», così invecchia un numero solo.
+  L'exit code di `script` e la forma JSON di `compare` girano solo lì.
 - **La guardia dello skip Testcontainers deve avvolgere `Build()`**, non solo
   `StartAsync()`: `Validate()` alza `ArgumentException` quando il runner non ha
   proprio un endpoint Docker, e il job Windows andava rosso a intermittenza su
-  commit che non toccavano quei test. Corretto il 2026-08-18 (`56e2889`).
+  commit che non toccavano quei test. Corretto il 2026-08-18 (`f8df44a`).
 - L'hash di `main` e lo stato di origin invecchiano il commit dopo: chiedili a
   `git status -sb` e `git log -1`, non a questo file.
+
+**Gli SHA anteriori al 2026-08-18 non risolvono più.** La storia è stata
+riscritta quel giorno per togliere una credenziale, quindi ogni hash citato nei
+documenti in `docs/review/` e nei messaggi più vecchi restituisce
+`Not a valid object name`. Cerca per messaggio: `git log --oneline --all --grep="…"`.
 
 Le date sono di **registrazione**: quando la voce è stata scritta la prima
 volta, non quando è stata verificata. Sforzo: XS = poche righe, S = ore,
@@ -147,8 +154,8 @@ due senza test.
 
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
-| **Griglia, resta la metà (a) e (c).** La ricerca cieca è chiusa il 2026-08-18: il predicato confronta anche `StatusDisplayItalian`, quindi cercare «Diversi» trova le righe che la colonna chiama Diversi. Restano gli header che promettono un sort inesistente — o si aggiungono i cinque `SortMemberPath`, o si tolgono i `CanUserSort` perché smettano di prometterlo — e il `Refresh()` a ogni battuta | 2026-08-14 | S | `ResultsGridView.axaml:41,188,209,222`; `MainWindowViewModel.cs:630-637` |
-| **Resta la tastiera.** Annullare la modale di primo avvio non chiude più l'app dal 2026-08-18: si atterra sul guscio vuoto, con Nuovo e Carica in barra. Nessun dialogo risponde ancora a Invio/Esc — `IsDefault`/`IsCancel` li collegano senza codice, e nell'occasione due code-behind si cancellano | 2026-08-14 | S | grep `IsDefault\|IsCancel` su tutto il progetto → solo `ConfirmDialog.axaml.cs` |
+| **Griglia, resta la metà (a) e (c).** La ricerca cieca è chiusa il 2026-08-18: il predicato confronta anche `StatusDisplayItalian`, quindi cercare «Diversi» trova le righe che la colonna chiama Diversi. Restano gli header che promettono un sort inesistente — o si aggiungono i cinque `SortMemberPath`, o si tolgono i `CanUserSort` perché smettano di prometterlo — e il `Refresh()` a ogni battuta | 2026-08-14 | S | `ResultsGridView.axaml:188, 209, 222, 291, 306` (cinque `CanUserSort`, zero `SortMemberPath` in tutto il progetto); `MainWindowViewModel.cs:639-641` |
+| **Resta la tastiera.** Annullare la modale di primo avvio non chiude più l'app dal 2026-08-18: si atterra sul guscio vuoto, con Nuovo e Carica in barra. Nessun dialogo risponde ancora a Invio/Esc — `IsDefault`/`IsCancel` li collegano senza codice, e nell'occasione due code-behind si cancellano | 2026-08-14 | S | grep `IsDefault\|IsCancel` sul sorgente → **zero** occorrenze vere (i 4 match sono `IsCancellationRequested`); l'unico Esc è a mano in `ConfirmDialog.axaml.cs:17-20` |
 | **Annulla non ferma il confronto**, solo la lettura: `ComparisonEngine.Compare` non prende un token ed è chiamato sincronamente sul thread UI. Metterlo su `Task.Run` sblocca la finestra in poche righe; filare il token dentro `Compare` tocca anche i tre comandi CLI — **fai la prima e fermati** | 2026-08-17 | S | `ViewModels/AppStateViewModel.cs:355` e `:279-287`; `Core/Diff/ComparisonEngine.cs:12` |
 | **La Release non allega né hash né attestazione.** Due righe di `Get-FileHash -Algorithm SHA256` più `actions/attest-build-provenance`: costo zero, **non dipendono dal certificato** e vanno prima del code signing | 2026-07-30 | S | grep `sign\|sha256\|attest\|sbom` su `.github/workflows/` → nessun hit |
 | **Le docs mentono in cinque punti**, e il danno maggiore è verso di noi: il blocco di stato di questo file era fermo al 2026-06-04 (chiuso da questa riscrittura), il sito non nomina mai la MSI, il README linka le note Redgate come «Architecture», CONTRIBUTING descrive un progetto Blazor morto, `docfx/articles/cli.md` dichiara il falso sulle transazioni. Quasi tutto si chiude cancellando | 2026-08-14 | S | `docs/01_architecture.md`, `docs/04_api_endpoints.md`, `CONTRIBUTING.md`, `docfx/articles/cli.md`; `git log --since=2026-08-14` su quei file → vuoto |
@@ -163,12 +170,12 @@ due senza test.
 | **~1.500 righe morte**: 6 view irraggiungibili, connection manager senza binding, Serilog mai chiamato con tre `PackageReference`, 3 interfacce senza consumatori. **Dentro c'è una decisione del proprietario**: le connessioni si autosalvano a ogni compare riuscito e alimentano gli «Usati di recente», quindi finché il manager resta irraggiungibile quella lista cresce e nessuno può potarla — o si lega un pulsante, o si cancella tutto | 2026-08-14 | M | `Views/ConnectionPickerView.axaml`, `Views/ResultsTreeView.axaml`, `Cli/Logging/SerilogBootstrap.cs`, `Cli.csproj:13-15`; `OpenConnectionManagerAsync` referenziato solo da `MainWindowViewModel.cs:404` |
 | **`ComparisonOptions`: 20 flag dichiarati, 6 letti.** Più `ProjectOptions`, owner/table mappings che non raggiungono alcun motore, parser `.dbd` v1 legacy. **Assorbe `IgnoreConstraintNames`**, che è morto: deciderlo da solo significa scegliere al posto di questa voce per tutti e 14 | 2026-08-14 | M | `Core/Options/ComparisonOptions.cs:10-37`; grep `HasFlag` → 6 occorrenze in tutto; `DbDeltaProject.cs:19-34` |
 | **Tassonomia degli avvisi di deploy mai implementata** (`DeployRisk`, `--abort-on-warnings`). Due fette parziali sono atterrate e non la chiudono. **Il difetto più concreto oggi è documentale:** chi scrive una pipeline CI leggendo `docs/01_architecture.md` §9.4 usa uno switch che non esiste | 2026-07-30 | M | grep `AbortOnWarnings\|DeployRisk` → zero; `docs/01_architecture.md:225`, `:1152-1154`, `:1480-1481` |
-| **La griglia non è mai stata misurata a 10k oggetti**, e il motore emette una coppia per ogni oggetto, Identical inclusi. Da fare **dopo** la ricerca e il rebuild della griglia: misurare prima significa cronometrare un difetto già noto | 2026-07-30 | M | `MainWindowViewModel.cs:630-637`, `:601-620`; nessun test di scala |
+| **La griglia non è mai stata misurata a 10k oggetti**, e il motore emette una coppia per ogni oggetto, Identical inclusi. Da fare **dopo** la ricerca e il rebuild della griglia: misurare prima significa cronometrare un difetto già noto | 2026-07-30 | M | `MainWindowViewModel.cs:639-641`, `:601-620`; nessun test di scala |
 | **Il round-trip per kind copre 4 su 13** (Table, View, Function, Procedure), e uno dei tre test gira solo nella matrice notturna. Sei reader non sono mai passati da un apply vero. **Trappola:** i filtri `.Where` non si cancellano e basta, i commenti sopra `SeededDrift` spiegano perché esistono | 2026-07-30 | M | `DependencyRoundTripTests.cs:48`; `CompatMatrixTests.cs:104-107`; `CompressionRoundTripTests.cs:45-68` |
 | **L'invariante di convergenza copre 2 emitter su 14** (View, Procedure). L'esempio più fresco della regola non seguita è la voce 12: ha cambiato come `TableScriptEmitter` scrive i vincoli, ha aggiunto 17 test, e nessuno è «emetti, rileggi, deve essere Identical» | 2026-08-01 | M | `Core.UnitTests/Diff/DeployedModuleConvergesTests.cs:50` e `:67`; `git show --stat 142fcb7` |
 | **Gli indici su viste indicizzate sono invisibili**, non solo non scriptabili: due database che differiscono solo per quello escono Identical. Media e non alta **solo grazie al censimento**, che almeno lo dichiara. Non è cambiare un JOIN: vanno appesi a un `View`, che oggi non ha un contenitore di indici | 2026-07-30 | L | `Providers.LiveDb/Readers/IndexReader.cs:44-45`; `UnexaminedReader.cs:50-58` |
 | **`LiveDbObjectBodyResolver`, 697 righe**, apre due connessioni per clic e fino a 16 query. Lo switch non ha case per `TableType` né `Schema`: **quei due pannelli sono vuoti oggi, e costa un case in più** — falla anche se i giorni per la riscrittura non ci sono. Prerequisito della virtualizzazione del diff viewer | 2026-08-14 | L | `Providers.LiveDb/ObjectBody/LiveDbObjectBodyResolver.cs:33`, `:35-47`, `:214-257` |
-| **Undo dopo un commit riuscito**: nessun down script, nessun journal, nessun backup COPY_ONLY. Rinvio deliberato del proprietario (2026-08-01). Abbassata a media: il percorso distruttivo è tutto sotto consenso e dal commit `0cde9a9` il dialogo elenca per nome ciò che verrà droppato. Manca la rete di recupero **dopo**, che è debito strutturale, non perdita spontanea | 2026-07-30 | L | grep `COPY_ONLY\|DownScript\|DeployJournal` → zero; `docs/review/2026-07-30-undo-architecture.md` |
+| **Undo dopo un commit riuscito**: nessun down script, nessun journal, nessun backup COPY_ONLY. Rinvio deliberato del proprietario (2026-08-01). Abbassata a media: il percorso distruttivo è tutto sotto consenso e dal commit `c73583c` il dialogo elenca per nome ciò che verrà droppato. Manca la rete di recupero **dopo**, che è debito strutturale, non perdita spontanea | 2026-07-30 | L | grep `COPY_ONLY\|DownScript\|DeployJournal` → zero; `docs/review/2026-07-30-undo-architecture.md` |
 | **Parità Redgate ferma a 17 scenari** dal 2026-05-28: mancano DROP in topologia inversa con schemabound, indici filtrati/columnstore, CHECK cross-tabella, extended properties. Serve un server vivo e la GUI Redgate (la CLI è license-blocked, exit 35) | 2026-05-28 | L | `tests/Fixtures/Parity/01-source.sql` → 17 scenari; ultimo audit `docs/parity/redgate-2026-05-28.md` |
 
 ---
@@ -177,11 +184,12 @@ due senza test.
 
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
-| **«Apri» invece di «Carica» in quattro punti**, non due. Due sono messaggi d'errore su un progetto da caricare e vanno cambiati; **due sono tooltip di apertura pannello e browser, dove «Apri» è semanticamente giusto — chiedere al proprietario** se la regola li include | 2026-05-22 | XS | `MainWindowViewModel.cs:363`, `:783`; `MainWindow.axaml:564`, `:569` |
-| **Il censimento non ha un'asserzione sull'output CLI.** `TextFormatter` è `internal` e la CLI tiene gli internals chiusi apposta: **non aprirla con `InternalsVisibleTo`**, asserisci sullo stdout dentro un'acceptance che già gira | 2026-08-16 | XS | `Cli/Output/TextFormatter.cs:9` e `:31-35`; `CompareCommandTests.cs:287` documenta la scelta |
+| **«Apri» invece di «Carica» in quattro punti**, non due. Due sono messaggi d'errore su un progetto da caricare e vanno cambiati; **due sono tooltip di apertura pannello e browser, dove «Apri» è semanticamente giusto — chiedere al proprietario** se la regola li include | 2026-05-22 | XS | `ViewModels/MainWindowViewModel.cs:367`, `:802`; `Views/MainWindow.axaml:582`, `:587` |
+| **Il censimento non ha un'asserzione sull'output CLI.** `TextFormatter` è `internal` e la CLI tiene gli internals chiusi apposta: **non aprirla con `InternalsVisibleTo`**, asserisci sullo stdout dentro un'acceptance che già gira | 2026-08-16 | XS | `Cli/Output/TextFormatter.cs:9` e `:31-35`; `CompareCommandTests.cs:322-323` documenta la scelta |
 | **Quattro test mutano `Application.Current.RequestedThemeVariant` senza ripristinarlo.** Non ha ancora morso perché nessun altro test legge un brush dipendente dal tema. La classe implementa già `IDisposable` | 2026-08-14 | XS | `ThemeCycleTests.cs:47-59, 74-86, 138-146, 151-163` contro `:121-134` |
 | **`SynonymReader` non fa un-escape di `]]`** — ma la conseguenza raccontata non esiste: i quattro segmenti sono campi morti e l'emittente usa `BaseObjectName` verbatim. **La chiusura più corta è cancellare i campi**, non gestire il `]]` | 2026-07-30 | XS | `Providers.LiveDb/Readers/SynonymReader.cs:52`; `SynonymScriptEmitter.cs:14` |
 | **La `PasswordBox` espone il valore in chiaro via UIAutomation.** Trovato pilotando la GUI il 2026-08-18: `ValuePattern.Current.Value` sul campo password ha restituito la password `sa` in chiaro, senza privilegi particolari. Qualunque processo nella sessione desktop può leggerla dall'albero UI. Rimedio: `AutomationProperties.IsOffscreenBehavior` non basta — serve che il controllo non pubblichi `ValuePattern`, o pubblichi il testo mascherato | 2026-08-18 | S | `Views/Controls/PasswordBox.axaml`; misurato su `ProjectSetupDialog`, campi indice 2 e 6 |
+| **La regola DRY dell'app è violata dal codice che governa:** il markup icona+etichetta dei pulsanti (`<StackPanel Horizontal><Path/><TextBlock/>`) è inline **8 volte** in `Views/MainWindow.axaml`, e la regola dice «prima della seconda copia». O si estrae un `Views/Controls/IconButtonContent.axaml` con due proprietà (`Geometry`, `Text`), o si scrive l'eccezione come definitiva. Trovato dall'audit di allineamento del 2026-08-18, non da una lettura del codice | 2026-08-18 | S | `Views/MainWindow.axaml` righe 100, 123, 142, 203, 218, 475, 489, 502; regola in `src/DbDelta.App.Avalonia/CLAUDE.md` §3 |
 | **Il parser delle risposte UDP del browser SQL è permissivo:** valida solo `buffer[0] == 0x05` e poi si fida della stringa. Scorporata dalla voce P0 sulle credenziali quando quella è stata chiusa: nulla parte più da sola verso un host suggerito, quindi resta igiene, non esposizione | 2026-07-30 | S | `Persistence/Sql/SqlServerDiscovery.cs:196-199` |
 | **Gli invarianti UI non sono asseriti in sé.** `Themes.axaml` è coperto da `AccentBandContrastTests` dal 2026-08-01, ma nulla fallisce se domani qualcuno rimette `Background=Transparent` su `.ghost` o toglie il `MinHeight` 32. Due buchi minori: manca uno stile CheckBox, e `SaveProjectDialog.axaml:31` usa `ghost` per Annulla | 2026-07-30 | S | `Styles/AppStyles.axaml:6-22` e `:91-105`; grep `Tokens.axaml` su `tests/` → zero |
 
@@ -191,7 +199,7 @@ due senza test.
 
 | Voce | Reg. | Sforzo | Stato reale |
 |---|---|---|---|
-| **Resta da guardare girare: il banner di rifiuto e il pulsante Annulla.** Il dialogo di conferma e la banda ambra del censimento sono stati visti dal vivo il 2026-08-18 (vedi sotto). Gli altri due no: il rifiuto vuole un indice non rowstore, che `.243`/`.242` non hanno, e Annulla su quella coppia è irraggiungibile perché il confronto dura 2,6 s. Il secondo ingresso nel catch di annullamento — la lettura interrotta a metà, che il driver riporta come `SqlException -2` — lo può produrre solo un server lento o un catalogo enorme | 2026-08-16 | S | Serve una coppia grossa o lenta, non queste |
+| **Resta da vedere girare il pulsante Annulla.** Il dialogo di conferma e la banda ambra del censimento sono stati visti dal vivo il 2026-08-18. Annulla no: su `PcrmV2Pl_test` → `PcrmV2Pl_Badii` il confronto dura 2,6 s e il pulsante non è raggiungibile. Il secondo ingresso nel catch di annullamento — la lettura interrotta a metà, che il driver riporta come `SqlException -2` — lo può produrre solo un server lento o un catalogo enorme. **Il banner di rifiuto NON è qui**: sta in «Deciso — NON riaprire», perché la prova richiederebbe due DB seminati apposta e il proprietario l'ha scartata | 2026-08-16 | S | Serve una coppia grossa o lenta, non queste |
 | **I 300 s non sono mai stati misurati contro un server lento.** Via d'uscita già provata: l'utente può scrivere `Command Timeout=0` e la stringa torna intatta. Candidate a sforare: lettura colonne e lettura indici | 2026-08-17 | S | `ConnectionFactory.cs:27`; `ConnectionTimeoutTests.cs` non tocca alcun container |
 | **Code signing** — bloccato sul certificato, unico blocco vero. Lo step va **fra «Build MSI» e «Smoke install»**, altrimenti lo smoke esercita un artefatto diverso da quello pubblicato. Con `signtool` servono `/fd sha256` e un timestamp server | 2026-05-28 | M | Nessun passo di firma in `release.yml` |
 | **Annuncio pubblico** — il draft è completo ma **fermo a 1.0.1 mentre la release è 1.0.2**. Da fare dopo le docs (P2): oggi `docfx/articles/getting-started.md` manda i nuovi arrivati a compilare da sorgente invece di scaricare la MSI | 2026-05-28 | S | `docs/announcements/v1.0.1-draft.md`; `README.md:16-33` |
@@ -210,7 +218,7 @@ perché una sessione futura non le riscopra come nuove.
 | Voce | Reg. | Perché resta |
 |---|---|---|
 | Sovra-rilevazione di `BEGIN TRANSACTION` | 2026-07-30 | Doc-comment, test che l'asserisce come limite noto, e dal 2026-07-30 la provenienza viene prima del regex (`-- dbdelta:transaction=script`). Residuo solo sugli script **estranei** applicati con `apply` |
-| Nessun Annulla sull'esecuzione, cap 600 s | 2026-07-30 | Remarks di venti righe sulla costante + tabella «Accettato consapevolmente». `cf81ee9` ha reso annullabile il **compare**, non l'esecuzione. La CLI ha già `--command-timeout 0` |
+| Nessun Annulla sull'esecuzione, cap 600 s | 2026-07-30 | Remarks di venti righe sulla costante + tabella «Accettato consapevolmente». `f49b728` ha reso annullabile il **compare**, non l'esecuzione. La CLI ha già `--command-timeout 0` |
 | DROP di uno schema non spuntato → Msg 3729 | 2026-07-30 | `EmitSchemaDrops` è guidato dalla selezione e il doc-comment lo dichiara: fallimento rumoroso dal server, non danno silenzioso. Cambiarlo è una decisione di prodotto |
 | Freccia «più recente» fra orologi di server diversi | 2026-08-14 | Il remark XML documenta e accetta il limite, `HasComparableDates` esclude i casi senza vincitore. **Il disclaimer mal collocato lo chiude la voce tooltip in P2** |
 | Emissione di un columnstore | 2026-08-14 | Il rifiuto è cablato in tre emittenti, mappato su exit code CLI e mostrato come rifiuto nell'app: la perdita silenziosa è già fermata. L'emissione è funzione mancante dichiarata |

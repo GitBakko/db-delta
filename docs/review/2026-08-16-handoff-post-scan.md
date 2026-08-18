@@ -1,7 +1,11 @@
 # HANDOFF — dopo lo scan migliorie: dove siamo e da dove si riparte
 
+**Gli SHA citati qui sono anteriori alla riscrittura della storia del
+2026-08-18 e non risolvono più.** Cerca per messaggio di commit.
+
+
 **Da leggere per primo in una sessione nuova**, insieme a
-`2026-08-14-improvement-scan.md`, che è la roadmap operativa.
+`2026-08-14-improvement-scan.md`, che è la **diagnosi**, non lo stato: lo stato vive solo in `docs/BACKLOG.md`.
 `2026-08-08-handoff-to-v1.md` resta valido per la storia del rilascio (la
 trappola della `ProductVersion`, la verifica dell'upgrade, le tre reti da non
 rompere).
