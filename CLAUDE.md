@@ -11,6 +11,24 @@
 - Keep files under 500 lines
 - Validate input at system boundaries
 
+## Single source of truth — FUNDAMENTAL
+
+`docs/BACKLOG.md`, the session memory and this file **tell the same story**.
+Keeping them aligned is not housekeeping done later; it is part of the change.
+
+- **`docs/BACKLOG.md` is the ONLY task list.** Never start a second one.
+- **Close a backlog item in the SAME commit as the code that closes it.**
+- **Never depenna an item without evidence** — a `file:line` or a commit hash,
+  never a recollection. On 2026-08-18 a full re-verification found 14 of 58
+  entries describing a state the code no longer had.
+- **Handoffs in `docs/review/` are HISTORY, not current state** — why something
+  was done that way, which traps were paid. Never read them as a status board.
+- **Session memory points at the backlog and does not copy it.** It holds only
+  what the repo cannot say: owner decisions, environment traps, working cadence.
+- **Any status block ages in days.** A line naming a hash, a version or a test
+  count is re-checked against `git status -sb`, `git log -1`, `CHANGELOG.md`
+  before being believed — including the one in `docs/BACKLOG.md`.
+
 ## UI / UX Invariable Rules (DbDelta Avalonia app)
 
 Non-negotiable — see `src/DbDelta.App.Avalonia/CLAUDE.md`, loaded automatically
