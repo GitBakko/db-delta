@@ -57,6 +57,30 @@ non urgente ora che nulla la segue.
 
 ---
 
+## Credenziale reale nel repo — 2026-08-18, chiusa
+
+Trovata durante lo smoke: la password `sa` di `192.168.3.243` era un letterale
+in `ConnectionStringRedactorTests` — il test della classe che esiste per tenere
+le password fuori dai log — e nella copia della stessa riga nel piano M11-bis.
+Committata il 2026-05-21, pubblica da allora.
+
+- **Storia riscritta** il 2026-08-18 (`git filter-repo --replace-text`),
+  force-push di `main` e dei 13 tag. Clone da zero verificato: **0 occorrenze
+  su 404 commit**. Backup pre-riscrittura in
+  `D:\tmp\dbdelta-backup\pre-rewrite-20260818-141753.bundle`.
+- **Ogni clone esistente va riclonato**, non aggiornato con `pull`: tutti gli
+  SHA dal 2026-05-21 in poi sono cambiati. Le Release e le loro MSI sono
+  intatte, i tag ripuntano ai commit nuovi.
+- **La rotazione della password è stata rifiutata dal proprietario**
+  (2026-08-18). La riscrittura toglie il valore dalla storia, non annulla che
+  sia stato pubblico per tre mesi, e GitHub trattiene gli oggetti sciolti
+  finché non fa GC. Registrato perché sia una scelta, non una dimenticanza.
+- Secret scanning e push protection erano **già attivi** e non hanno preso
+  nulla: riconoscono formati di chiave di provider noti, non una password
+  qualsiasi dentro una stringa di connessione. Non contarci per questa classe.
+
+---
+
 ## Smoke dal vivo — 2026-08-18, `.243` e `.242`, sola lettura
 
 Prima sessione in cui qualcuno ha **guardato** l'app invece di dedurla.
