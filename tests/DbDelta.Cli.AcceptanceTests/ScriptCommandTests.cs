@@ -23,7 +23,11 @@ public class ScriptCommandTests(CliFixture fixture)
             "--target", ConnectionFor(tgtDb),
             "--out", sqlOut.Path], ct);
 
-        exit.Should().Be(ExpectedExitCodes.SuccessNoDifferences);
+        // 1, not 0. This assertion used to say SuccessNoDifferences while the
+        // script it checks below creates a table — the verb returned 0 whatever
+        // it found, so a pipeline gating on the exit code never saw pending
+        // work. compare and report have always distinguished the two.
+        exit.Should().Be(ExpectedExitCodes.SuccessDifferencesFound);
         File.Exists(sqlOut.Path).Should().BeTrue();
         string content = await File.ReadAllTextAsync(sqlOut.Path, ct);
         content.Should().Contain("CREATE TABLE [dbo].[Customer]");

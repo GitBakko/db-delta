@@ -76,8 +76,15 @@ internal static class ScriptCommand
                 opts &= ~ComparisonOptions.IgnorePermissions;
             }
 
+            // opts, not ComparisonOptions.Default. The two calls used to disagree:
+            // Generate got the real options while Compare got the default. It is
+            // harmless only for as long as ComparisonEngine keeps ignoring
+            // IgnorePermissions — the flag is read in exactly one place,
+            // ScriptGenerator, and nothing says so anywhere. The day the engine
+            // starts honouring it, --include-permissions would go quiet here and
+            // the reason would be two lines apart.
             ComparisonResult comparison = new ComparisonEngine()
-                .Compare(srcResult.Value!, tgtResult.Value!, ComparisonOptions.Default);
+                .Compare(srcResult.Value!, tgtResult.Value!, opts);
             string script = new ScriptGenerator().Generate(
                 comparison,
                 selection: null,
@@ -99,7 +106,18 @@ internal static class ScriptCommand
                 await File.WriteAllTextAsync(output, script, ct).ConfigureAwait(false);
             }
 
-            return ExitCodes.SuccessNoDifferences;
+            // Same rule as compare and report, and for the same reason: a
+            // pipeline that gates on the exit code has to be able to tell "the
+            // script is empty because the two are aligned" from "the script
+            // carries work". This verb used to return 0 either way, so a
+            // CI step that trusted it never saw a pending difference.
+            bool hasDifferences = comparison.Differences
+                .Any(d => d.Status is DifferenceStatus.Different
+                                   or DifferenceStatus.OnlyInA
+                                   or DifferenceStatus.OnlyInB);
+            return hasDifferences
+                ? ExitCodes.SuccessDifferencesFound
+                : ExitCodes.SuccessNoDifferences;
         });
 
         return command;

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Data.SqlClient;
 using Testcontainers.MsSql;
@@ -46,6 +47,41 @@ public class CompareCommandTests(CliFixture fixture)
         int exitCode = await RunCli(["compare", "--source", srcConn, "--target", tgtConn, "--format", "json"], ct);
 
         exitCode.Should().Be(ExpectedExitCodes.SuccessDifferencesFound);
+    }
+
+    /// <summary>
+    /// The field names <c>compare --format json</c> emits, pinned.
+    /// </summary>
+    /// <remarks>
+    /// This shape is NOT the one <c>report --json</c> writes: compare says
+    /// <c>schema</c> / <c>name</c> where report says <c>schemaName</c> /
+    /// <c>objectName</c>, and report carries the two modify dates as well. Two
+    /// contracts is one too many, and unifying them is a breaking change to a
+    /// released CLI — the owner's call, recorded in the backlog. Until then the
+    /// shape people actually script against is pinned here, because only
+    /// report's was covered and this one could have drifted unnoticed.
+    /// </remarks>
+    [Fact]
+    public async Task Compare_json_keeps_its_published_field_names()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        const string srcDb = "DbDeltaJsonShapeSrc";
+        const string tgtDb = "DbDeltaJsonShapeTgt";
+        await CreateDb(srcDb, ct);
+        await CreateDb(tgtDb, ct);
+        await CreateCustomerTable(srcDb, ct);
+
+        (int exitCode, string stdout) = await CliRunner.RunCapturing(
+            ["compare", "--source", ConnectionFor(srcDb), "--target", ConnectionFor(tgtDb),
+             "--format", "json"], ct);
+
+        exitCode.Should().Be(ExpectedExitCodes.SuccessDifferencesFound);
+        using var doc = JsonDocument.Parse(stdout);
+        JsonElement first = doc.RootElement.GetProperty("differences")[0];
+        first.GetProperty("kind").GetString().Should().NotBeNull();
+        first.GetProperty("schema").GetString().Should().NotBeNull();
+        first.GetProperty("name").GetString().Should().NotBeNull();
+        first.GetProperty("status").GetString().Should().NotBeNull();
     }
 
     [Fact]

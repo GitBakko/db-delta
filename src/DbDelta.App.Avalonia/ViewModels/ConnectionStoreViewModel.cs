@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using DbDelta.Core.Abstractions;
 using Microsoft.Data.SqlClient;
@@ -17,6 +16,13 @@ public sealed partial class ConnectionStoreViewModel(
     ICredentialStore credentials) : ObservableObject
 {
     private const string KeyPrefix = "dbdelta:connection:";
+
+    /// <summary>
+    /// What stands in for the password inside a stored template. Written by
+    /// <see cref="Templatise"/> and read back by <see cref="MaterialiseAsync"/>;
+    /// other call sites spell it out inline in their own literals.
+    /// </summary>
+    private const string PasswordPlaceholder = "{PASSWORD}";
 
     public ObservableCollection<ConnectionEntry> Entries { get; } = [];
 
@@ -63,7 +69,7 @@ public sealed partial class ConnectionStoreViewModel(
         }
 
         string password = builder.Password ?? "";
-        string template = ReplacePassword(rawConnectionString, "{PASSWORD}");
+        string template = Templatise(builder);
         var id = Guid.NewGuid();
         ConnectionEntry entry = new(
             Id: id,
@@ -90,7 +96,7 @@ public sealed partial class ConnectionStoreViewModel(
     public async Task<string?> MaterialiseAsync(ConnectionEntry entry, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        if (!entry.ConnectionStringTemplate.Contains("{PASSWORD}", StringComparison.Ordinal))
+        if (!entry.ConnectionStringTemplate.Contains(PasswordPlaceholder, StringComparison.Ordinal))
         {
             return entry.ConnectionStringTemplate;
         }
@@ -99,7 +105,27 @@ public sealed partial class ConnectionStoreViewModel(
             return null;
         }
         string? password = await credentials.GetSecretAsync(KeyPrefix + entry.Id.ToString("D"), ct).ConfigureAwait(true);
-        return password is null ? null : entry.ConnectionStringTemplate.Replace("{PASSWORD}", password, StringComparison.Ordinal);
+        if (password is null) { return null; }
+
+        // Put the secret back through the builder rather than pasting it into
+        // the text. A password containing ; or " needs quoting to survive as a
+        // value, and a plain Replace produces a string that parses as something
+        // else — or refuses to parse at all.
+        try
+        {
+            SqlConnectionStringBuilder materialised = new(entry.ConnectionStringTemplate)
+            {
+                Password = password,
+            };
+            return materialised.ConnectionString;
+        }
+        catch (ArgumentException)
+        {
+            // A template written by an older build could be malformed — the
+            // regex it came from left stray fragments behind. Fall back to the
+            // substitution that build used, so those entries keep working.
+            return entry.ConnectionStringTemplate.Replace(PasswordPlaceholder, password, StringComparison.Ordinal);
+        }
     }
 
     /// <summary>
@@ -171,9 +197,28 @@ public sealed partial class ConnectionStoreViewModel(
         OnPropertyChanged(nameof(FilteredEntries));
     }
 
-    private static string ReplacePassword(string original, string replacement) =>
-        Regex.Replace(
-            original,
-            @"(?i)(password|pwd)\s*=\s*[^;]+",
-            $"$1={replacement}");
+    /// <summary>
+    /// The connection string with its password swapped for
+    /// <see cref="PasswordPlaceholder"/>, ready to be written to disk.
+    /// </summary>
+    /// <remarks>
+    /// Built through <see cref="SqlConnectionStringBuilder"/>, not through a
+    /// regular expression. The regex this replaces matched
+    /// <c>(password|pwd)\s*=\s*[^;]+</c>, and a connection-string value may
+    /// legally contain a semicolon when it is quoted — <c>Password='a;b'</c>.
+    /// The match stopped at that semicolon, so <c>b'</c> stayed in the template
+    /// and a fragment of the real password was persisted in clear text, at every
+    /// successful comparison. The builder knows the quoting rules; nothing here
+    /// has to.
+    /// </remarks>
+    private static string Templatise(SqlConnectionStringBuilder builder)
+    {
+        // A copy, so the caller's builder keeps the real password it still needs
+        // to hand to the credential store.
+        SqlConnectionStringBuilder template = new(builder.ConnectionString)
+        {
+            Password = PasswordPlaceholder,
+        };
+        return template.ConnectionString;
+    }
 }

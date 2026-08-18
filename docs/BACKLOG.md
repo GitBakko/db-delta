@@ -8,16 +8,19 @@ vedi «Manutenzione» in fondo.
 ## Stato — 2026-08-18
 
 - **v1.0.2 pubblicata** (2026-08-13), «Latest», MSI non firmata allegata.
-- **790 test verdi** nei sette progetti che girano senza Docker (Core 473,
-  Headless 160, Persistence.Unit 65, Golden 68, Property 12, Architecture 6,
+- **795 test verdi** nei sette progetti che girano senza Docker (Core 473,
+  Headless 165, Persistence.Unit 65, Golden 68, Property 12, Architecture 6,
   Shared 6). I tre DB-backed (LiveDb, Cli acceptance, Persistence integration)
   vogliono Docker e vanno **rossi**, non skipped, quando è spento: davanti a
   quel muro la prima domanda è `docker ps`. `dotnet format --verify-no-changes`
   esce 0.
-- **51 voci aperte, verificate una per una sul codice del 2026-08-18**, non
+- **49 voci aperte, verificate una per una sul codice del 2026-08-18**, non
   ereditate dai documenti: 33 confermate, 3 parziali, 5 non verificabili senza
   il proprietario o un server vero, 14 riclassificate come scelte deliberate e
-  spostate in fondo. **Le 4 critiche sono chiuse** — vedi P0.
+  spostate in fondo. **Le 4 critiche sono chiuse**, e 3 delle 7 alte — vedi P0
+  e P1.
+- **Due asserzioni di acceptance toccate in questa ondata girano solo in CI**
+  (vogliono Docker): l'exit code di `script` e la forma JSON di `compare`.
 - L'hash di `main` e lo stato di origin invecchiano il commit dopo: chiedili a
   `git status -sb` e `git log -1`, non a questo file.
 
@@ -49,12 +52,25 @@ non urgente ora che nulla la segue.
 
 ## P1 — Alte: risultato o script sbagliato
 
+Tre voci chiuse il 2026-08-18 dal commit che porta questa riga:
+
+| Voce chiusa | Come | Prova |
+|---|---|---|
+| Terza copia della regex password rotta | Il template si costruisce col `SqlConnectionStringBuilder`, in **entrambe** le direzioni. Il regex si fermava al primo `;`, e un `;` dentro un valore quotato è legale: su `Password='a;b'` il frammento `b'` restava sul disco in chiaro | `PasswordTemplateTests` — 4 test. **Sonda di mutazione fatta:** rimesso il regex, ne cadono 2, e una è quella che asserisce l'assenza |
+| `dbdelta script` usciva 0 con differenze pendenti, e `--include-permissions` non arrivava a `Compare` | Stessa regola di `compare` e `report`. E `opts` passato a `Compare`: era innocuo **solo** perché `ComparisonEngine` non legge mai `IgnorePermissions` — lo legge un punto solo, `ScriptGenerator`, e non era scritto da nessuna parte | `ScriptCommandTests` — l'asserzione a `:26` diceva 0 su uno script che crea una tabella, ora dice 1; il test sui DB identici resta il controllo in negativo |
+| Quattro `async void` senza rete | La piattaforma lo copre: `Dispatcher.UIThread.UnhandledException` con `Handled = true`, un punto solo invece di quattro `try`. E `_ = SaveAsAsync()` ora è atteso, così il fallimento arriva lì invece di sparire | `UnhandledErrorBannerTests`. **Non coperto:** che il gancio sia davvero installato — l'headless costruisce il proprio `TestApp` e non esegue `OnFrameworkInitializationCompleted`. Va nello smoke dal vivo |
+
+**Non fatto, e dichiarato:** unificare i due contratti JSON. `compare` emette
+`{kind, schema, name, status}`, `report` emette `{kind, schemaName, objectName,
+status, lastModifiedSource, lastModifiedTarget}`. Collassarli **rompe** gli
+script di chi usa la CLI già rilasciata, quindi è una decisione del proprietario
+— vedi P5. Nel frattempo la forma di `compare` non è più senza rete:
+`Compare_json_keeps_its_published_field_names` la fissa, ed era l'unica delle
+due senza test.
+
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
-| **Terza copia della regex password rotta.** `ReplacePassword` usa un regex su `password|pwd` e il template finisce su disco a ogni autosave. Due righe sopra c'è già il `SqlConnectionStringBuilder` che risolve tutto | 2026-07-30 | XS | `App.Avalonia/ViewModels/ConnectionStoreViewModel.cs:174-178`, `:47-51`, `:64-66`, `:85-87` |
-| **`--include-permissions` è un no-op silenzioso e `dbdelta script` esce 0 con differenze pendenti.** `opts` viene costruito e poi `Compare` riceve `ComparisonOptions.Default`; l'unico return del percorso felice è `SuccessNoDifferences`. Terzo pezzo: due contratti JSON incompatibili | 2026-08-14 | S | `Cli/Commands/ScriptCommand.cs:72-76`, `:78-79`, `:102`. **Trappola:** `ScriptCommandTests.cs:26` asserisce l'exit code sbagliato e va aggiornato insieme |
 | **Sotto un login a privilegio minimo ogni utente esce Different.** `UserReader` fa LEFT JOIN su `sys.server_principals`: la metadata visibility rende `LoginName` null e `UsersEqual` lo confronta senza trattarlo. Emette `CREATE USER … FOR LOGIN` per utenti già corretti | 2026-07-30 | S | `Providers.LiveDb/Readers/UserReader.cs:20-30`; `Core/Diff/ComparisonEngine.cs:156-159`; stesso JOIN in `LiveDbObjectBodyResolver.cs:112` |
-| **Quattro `async void` / `AsyncRelayCommand` senza rete.** Nessun handler globale nel repo. Il sito peggiore è `_ = SaveAsAsync()`, che chiude il dialogo come se avesse salvato | 2026-07-30 | S | `MainWindowViewModel.cs:382-400`; `Views/ProjectSetupDialog.axaml.cs:71`, `:96-102`, `:105`; grep `UnhandledException` su tutto il repo → zero |
 | **Il rebuild non porta i default nel `_tmp`:** una colonna NOT NULL solo-sorgente fa fallire l'INSERT di copia con Msg 515, ed è esattamente il caso che il preflight di backfill esclude di proposito. Nessuna perdita dati (la transazione annulla), ma fallisce a metà script davanti all'utente | 2026-07-30 | M | `Core/ScriptGen/TableScriptEmitter.cs:58` e `:651-696`; innesco stretto a `:619-632` (flip IDENTITY o cambio seed/increment) |
 | **Le FK auto-nominate non combaciano mai fra due server.** `ForeignKeysQuery` non legge `is_system_named` e `ConstraintPairing` esclude le FK. **Le strutture di `ScriptGenerator` chiavate sul nome sono CINQUE, non tre** come dicono le remarks e l'handoff: due sono lookup locali che un grep su `orchestratedFks\|fkDropKeys` non trova | 2026-07-30 | M | `Providers.LiveDb/Readers/ConstraintReader.cs:21,68,81` (non in `:35-58`); `Core/Diff/ConstraintPairing.cs:86-90`; `ScriptGenerator.cs:148, 156-158, 247-258, 268-273, 1237-1245` |
 | **Smoke live mai fatto sulla voce 12** (vincoli auto-nominati), dove il bug vive negli `object_id` veri e `.243`/`.242` portano DEFAULT inline. Coperta solo da Testcontainers. Da fare insieme a «guardare l'app girare» (P5): stessi due server, stessa sessione | 2026-07-31 (impegno) · 2026-08-17 (voce 12) | S | `docs/review/2026-08-16-handoff-post-scan.md:209-213`, `:408-410`. **Correzione:** l'ondata 2 non ha toccato `ScriptGenerator`, lì l'impegno non si applicava |
@@ -115,6 +131,7 @@ non urgente ora che nulla la segue.
 | **I 300 s non sono mai stati misurati contro un server lento.** Via d'uscita già provata: l'utente può scrivere `Command Timeout=0` e la stringa torna intatta. Candidate a sforare: lettura colonne e lettura indici | 2026-08-17 | S | `ConnectionFactory.cs:27`; `ConnectionTimeoutTests.cs` non tocca alcun container |
 | **Code signing** — bloccato sul certificato, unico blocco vero. Lo step va **fra «Build MSI» e «Smoke install»**, altrimenti lo smoke esercita un artefatto diverso da quello pubblicato. Con `signtool` servono `/fd sha256` e un timestamp server | 2026-05-28 | M | Nessun passo di firma in `release.yml` |
 | **Annuncio pubblico** — il draft è completo ma **fermo a 1.0.1 mentre la release è 1.0.2**. Da fare dopo le docs (P2): oggi `docfx/articles/getting-started.md` manda i nuovi arrivati a compilare da sorgente invece di scaricare la MSI | 2026-05-28 | S | `docs/announcements/v1.0.1-draft.md`; `README.md:16-33` |
+| **Decisione: unificare i due contratti JSON della CLI?** `compare` dice `schema`/`name`, `report` dice `schemaName`/`objectName` e porta le due date. Collassarli su un solo generatore cancella ~30 righe e lascia un contratto solo — ma **rompe** chi già consuma `compare --format json` dalla CLI rilasciata. Alternativa: tenerli e documentare la differenza. Entrambe le forme sono ora fissate da un test | 2026-08-14 | S | `Cli/Output/JsonFormatter.cs` contro `Shared/Reports/JsonReportGenerator.cs` |
 | **Sezione D (parking-lot v2) ancora «BRAINSTORM PENDING»** dal 2026-05-28, nessuna sessione ha lasciato traccia. Copre: provider Scripts-Folder/Snapshot/Source-Control, migration script, kind Tier-3, estensioni SSMS/VS, OTel, auto-update, CLI Linux/macOS. **Tutte bloccate su questo brainstorming** | 2026-05-28 | M | Ultima spec in `docs/superpowers/specs/` → 2026-06-04 |
 | **Trimming mai attivato** e il motivo del rinvio regge: `XmlSerializer` è ancora costruito per riflessione, un trim spezzerebbe il salvataggio dei `.dbd`. **Assorbe la voce «MSI 94 MB»**: erano la stessa leva vista da causa e sintomo. Il runtime condiviso pretenderebbe .NET 10 preinstallato, che è il costo che la scelta evita | 2026-05-25 | M | `release.yml:39` e `:42` (`--self-contained true`); `Persistence/Xml/XmlProjectStore.cs:337` |
 

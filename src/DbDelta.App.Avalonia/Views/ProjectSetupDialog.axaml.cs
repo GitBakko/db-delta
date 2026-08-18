@@ -70,7 +70,14 @@ public partial class ProjectSetupDialog : Window
 
     // Round-9: a single "Salva" button drives the name-only save flow —
     // "Salva con nome" was redundant once paths became implicit.
-    private void OnSaveClick(object? sender, RoutedEventArgs e) => _ = SaveAsAsync();
+    //
+    // Awaited, not fire-and-forget. `_ = SaveAsAsync()` dropped the task, so a
+    // failed write — a locked file, a full disk — raised an exception nobody
+    // ever observed and the dialog carried on as if the project had been saved.
+    // Awaiting puts the failure on the dispatcher, where App's last-resort
+    // handler turns it into a message the user can act on.
+    private async void OnSaveClick(object? sender, RoutedEventArgs e) =>
+        await SaveAsAsync().ConfigureAwait(true);
 
     private async Task SaveAsAsync()
     {

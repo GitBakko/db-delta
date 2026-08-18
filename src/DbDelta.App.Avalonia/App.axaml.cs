@@ -22,6 +22,8 @@ public partial class App : Application
             ConnectionStoreViewModel connections = new(connectionStore, credentials);
             AppStateViewModel appState = new(connections);
 
+            InstallLastResortErrorHandler(appState);
+
             var recentProjects =
                 Persistence.Json.JsonRecentProjectsStore.CreateDefault();
 
@@ -129,5 +131,59 @@ public partial class App : Application
         // SQL auth error, which is the correct UX path to the credential-edit flow.
         return $"Server={server};Database={db};User Id={user};Password=;"
                + $"Encrypt={encrypt};TrustServerCertificate={trust}";
+    }
+
+    /// <summary>
+    /// Last resort for an exception that escapes an <c>async void</c> handler or
+    /// an <c>AsyncRelayCommand</c>: report it in the error banner instead of
+    /// letting it end the process.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The app had none, and four write paths rethrow into exactly that gap —
+    /// <c>SaveProjectAsync</c>, <c>OnLoadClick</c> and the two save routes of
+    /// the setup dialog. Their common failure is ordinary: a locked or
+    /// unwritable file under the user's profile. Without this the window
+    /// vanishes mid-edit, taking the unsaved project with it.
+    /// </para>
+    /// <para>
+    /// Marking it handled is deliberate. The alternative — terminating — cannot
+    /// be better than showing the message, because nothing here has touched a
+    /// database: these paths write project files, and a half-written file is
+    /// already guarded by the store's own temp-then-move. Deploy failures never
+    /// arrive here; they are caught where they happen and shown with their SQL
+    /// error.
+    /// </para>
+    /// <para>
+    /// <c>TaskScheduler.UnobservedTaskException</c> is deliberately NOT hooked.
+    /// It fires at garbage collection, so the message would reach the banner
+    /// minutes after the click that caused it, attached to whatever the user is
+    /// doing then. A fire-and-forget call that must not fail silently has to
+    /// await, and the ones that matter do.
+    /// </para>
+    /// </remarks>
+    private static void InstallLastResortErrorHandler(AppStateViewModel appState)
+    {
+        Avalonia.Threading.Dispatcher.UIThread.UnhandledException += (_, e) =>
+        {
+            ReportUnhandled(appState, e.Exception);
+            e.Handled = true;
+        };
+    }
+
+    /// <summary>
+    /// What the banner says when an exception reaches the handler. Split out so
+    /// it can be exercised without standing up the real application: the
+    /// headless tests build their own <c>TestApp</c>, so
+    /// <see cref="OnFrameworkInitializationCompleted"/> never runs there and the
+    /// subscription itself stays verified by inspection and by the live smoke.
+    /// </summary>
+    internal static void ReportUnhandled(AppStateViewModel appState, Exception exception)
+    {
+        ArgumentNullException.ThrowIfNull(appState);
+        ArgumentNullException.ThrowIfNull(exception);
+        appState.LastError =
+            $"Operazione non riuscita: {exception.Message}. "
+            + "Il progetto non è stato salvato; riprova o scegli un altro nome.";
     }
 }
