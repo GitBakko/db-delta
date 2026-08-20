@@ -8,15 +8,15 @@ vedi «Manutenzione» in fondo.
 ## Stato — 2026-08-20
 
 - **v1.0.2 pubblicata** (2026-08-13), «Latest», MSI non firmata allegata.
-- **842 test verdi** nei sette progetti che girano senza Docker (Core 500,
-  Headless 182, Persistence.Unit 68, Golden 68, Property 12, Architecture 6,
+- **844 test verdi** nei sette progetti che girano senza Docker (Core 500,
+  Headless 184, Persistence.Unit 68, Golden 68, Property 12, Architecture 6,
   Shared 6). **Due** dei tre DB-backed vanno **rossi**, non skipped, con Docker
   spento — LiveDb e Cli acceptance, che costruiscono il container in un
   inizializzatore di campo senza rete. Davanti a quel muro la prima domanda è
   `docker ps`. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **28 voci aperte** — P1 1 · P2 1 · P3 10 · P4 9 · P5 7 — più **11** in
+- **27 voci aperte** — P1 1 · P2 1 · P3 10 · P4 8 · P5 7 — più **11** in
   «Deciso — NON riaprire». Tutte riverificate sul codice il 2026-08-18, non
   ereditate dai documenti. **Le 4 critiche sono chiuse**, e 6 delle 7 alte:
   vedi P0 e P1. Il conteggio va ricontato, non decrementato a mente: `awk` sulle
@@ -119,7 +119,9 @@ per un conteggio che non torna fra due esecuzioni, chiedi a `sys.objects` cosa
    **Corretto**: finestra a 880 px e ridimensionabile, padding annidato tolto,
    pannello 220 → 420 px, e l'offset azzerato dopo il layout. Riverificato
    sull'app: `Vpercent = 0` e nessuno scorrimento orizzontale.
-2. **La `PasswordBox` espone il valore in chiaro via UIAutomation** — vedi P4.
+2. **La `PasswordBox` esponeva il valore in chiaro via UIAutomation** — chiusa
+   il 2026-08-20, vedi P4. Il difetto si riproduceva in headless: non serviva
+   la GUI, serviva chiedere al peer invece che al pixel.
 
 ---
 
@@ -177,7 +179,7 @@ Voci chiuse il 2026-08-20, ognuna dal commit che porta la sua riga:
 
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
-| **~1.500 righe morte**: 6 view irraggiungibili, connection manager senza binding, Serilog mai chiamato con tre `PackageReference`, 3 interfacce senza consumatori. **Dentro c'è una decisione del proprietario**: le connessioni si autosalvano a ogni compare riuscito e alimentano gli «Usati di recente», quindi finché il manager resta irraggiungibile quella lista cresce e nessuno può potarla — o si lega un pulsante, o si cancella tutto | 2026-08-14 | M | `Views/ConnectionPickerView.axaml`, `Views/ResultsTreeView.axaml`, `Cli/Logging/SerilogBootstrap.cs`, `Cli.csproj:13-15`; `OpenConnectionManagerAsync` referenziato solo da `MainWindowViewModel.cs:404` |
+| **~1.500 righe morte**: 6 view irraggiungibili, connection manager senza binding, Serilog mai chiamato con tre `PackageReference`, 3 interfacce senza consumatori. **Dentro c'è una decisione del proprietario**: le connessioni si autosalvano a ogni compare riuscito e alimentano gli «Usati di recente», quindi finché il manager resta irraggiungibile quella lista cresce e nessuno può potarla — o si lega un pulsante, o si cancella tutto. **Un motivo in più per cancellare:** `ConnectionPickerView` tiene la stringa di connessione intera — password compresa — in una `TextBox` normale, che l'albero UIA pubblica in chiaro. Oggi non è raggiungibile, quindi non è un'esposizione; il giorno che qualcuno la lega a un pulsante lo diventa | 2026-08-14 | M | `Views/ConnectionPickerView.axaml`, `Views/ResultsTreeView.axaml`, `Cli/Logging/SerilogBootstrap.cs`, `Cli.csproj:13-15`; `OpenConnectionManagerAsync` referenziato solo da `MainWindowViewModel.cs:404` |
 | **`ComparisonOptions`: 20 flag dichiarati, 6 letti.** Più `ProjectOptions`, owner/table mappings che non raggiungono alcun motore, parser `.dbd` v1 legacy. **Assorbe `IgnoreConstraintNames`**, che è morto: deciderlo da solo significa scegliere al posto di questa voce per tutti e 14 | 2026-08-14 | M | `Core/Options/ComparisonOptions.cs:10-37`; grep `HasFlag` → 6 occorrenze in tutto; `DbDeltaProject.cs:19-34` |
 | **Tassonomia degli avvisi di deploy mai implementata** (`DeployRisk`, `--abort-on-warnings`). Due fette parziali sono atterrate e non la chiudono. **Il difetto più concreto oggi è documentale:** chi scrive una pipeline CI leggendo `docs/01_architecture.md` §9.4 usa uno switch che non esiste | 2026-07-30 | M | grep `AbortOnWarnings\|DeployRisk` → zero; `docs/01_architecture.md:225`, `:1152-1154`, `:1480-1481` |
 | **La griglia non è mai stata misurata a 10k oggetti**, e il motore emette una coppia per ogni oggetto, Identical inclusi. Da fare **dopo** la ricerca e il rebuild della griglia: misurare prima significa cronometrare un difetto già noto. **Assorbe il `Refresh()` a ogni battuta**, che fino al 2026-08-20 stava nella voce P2 della griglia insieme al sort: un refresh per tasto è un predicato per riga, e il debounce esiste già in `ProjectEndpointPanelViewModel` — ma quel costo non è **mai stato misurato**, e la misura è questa voce. Il debounce va dopo il numero, non prima | 2026-07-30 | M | `MainWindowViewModel.cs:639-641`, `:601-620`; nessun test di scala |
@@ -192,13 +194,18 @@ Voci chiuse il 2026-08-20, ognuna dal commit che porta la sua riga:
 
 ## P4 — Igiene
 
+Una voce chiusa il 2026-08-20 dal commit che porta questa riga:
+
+| Voce chiusa | Come | Prova |
+|---|---|---|
+| La `PasswordBox` esponeva il valore in chiaro via UIAutomation | `PasswordChar` maschera i pixel; l'albero UIA è una **seconda superficie** sullo stesso controllo, e il peer standard pubblicava `Text` attraverso `IValueProvider`. Ora la casella è una `MaskedTextBox` col proprio peer, che pubblica i pallini — non `null`: togliere del tutto il pattern nasconderebbe la password e insieme il campo a uno screen reader | `PasswordBoxTests` — il difetto si riproduce **in headless**, senza pilotare la GUI: il peer restituiva `hunter2`. Due test, di cui uno è il controllo in negativo sull'accessibilità. **Sonda di mutazione fatta:** rimessa la `TextBox` normale, cadono entrambi |
+
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
 | **«Apri» invece di «Carica» in quattro punti**, non due. Due sono messaggi d'errore su un progetto da caricare e vanno cambiati; **due sono tooltip di apertura pannello e browser, dove «Apri» è semanticamente giusto — chiedere al proprietario** se la regola li include | 2026-05-22 | XS | `ViewModels/MainWindowViewModel.cs:367`, `:802`; `Views/MainWindow.axaml:582`, `:587` |
 | **Il censimento non ha un'asserzione sull'output CLI.** `TextFormatter` è `internal` e la CLI tiene gli internals chiusi apposta: **non aprirla con `InternalsVisibleTo`**, asserisci sullo stdout dentro un'acceptance che già gira | 2026-08-16 | XS | `Cli/Output/TextFormatter.cs:9` e `:31-35`; `CompareCommandTests.cs:322-323` documenta la scelta |
 | **Quattro test mutano `Application.Current.RequestedThemeVariant` senza ripristinarlo.** Non ha ancora morso perché nessun altro test legge un brush dipendente dal tema. La classe implementa già `IDisposable` | 2026-08-14 | XS | `ThemeCycleTests.cs:47-59, 74-86, 138-146, 151-163` contro `:121-134` |
 | **`SynonymReader` non fa un-escape di `]]`** — ma la conseguenza raccontata non esiste: i quattro segmenti sono campi morti e l'emittente usa `BaseObjectName` verbatim. **La chiusura più corta è cancellare i campi**, non gestire il `]]` | 2026-07-30 | XS | `Providers.LiveDb/Readers/SynonymReader.cs:52`; `SynonymScriptEmitter.cs:14` |
-| **La `PasswordBox` espone il valore in chiaro via UIAutomation.** Trovato pilotando la GUI il 2026-08-18: `ValuePattern.Current.Value` sul campo password ha restituito la password `sa` in chiaro, senza privilegi particolari. Qualunque processo nella sessione desktop può leggerla dall'albero UI. Rimedio: `AutomationProperties.IsOffscreenBehavior` non basta — serve che il controllo non pubblichi `ValuePattern`, o pubblichi il testo mascherato | 2026-08-18 | S | `Views/Controls/PasswordBox.axaml`; misurato su `ProjectSetupDialog`, campi indice 2 e 6 |
 | **La regola DRY dell'app è violata dal codice che governa:** il markup icona+etichetta dei pulsanti (`<StackPanel Horizontal><Path/><TextBlock/>`) è inline **8 volte** in `Views/MainWindow.axaml`, e la regola dice «prima della seconda copia». O si estrae un `Views/Controls/IconButtonContent.axaml` con due proprietà (`Geometry`, `Text`), o si scrive l'eccezione come definitiva. Trovato dall'audit di allineamento del 2026-08-18, non da una lettura del codice | 2026-08-18 | S | `Views/MainWindow.axaml` righe 100, 123, 142, 203, 218, 475, 489, 502; regola in `src/DbDelta.App.Avalonia/CLAUDE.md` §3 |
 | **Una FK auto-nominata e DISABILITATA continua a portare l'hash della sorgente.** `NOCHECK CONSTRAINT` vuole un nome e l'unico disponibile è quello che il server della sorgente ha coniato; emetterla senza nome e saltare la disabilitazione cambierebbe silenziosamente l'enforcement, che è peggio del churn. Quella forma quindi non converge: due server continueranno a vederla diversa a ogni confronto. Via d'uscita: un nome nostro, cioè una rinomina al deploy — non una clausola più furba | 2026-08-20 | S | `Core/ScriptGen/ForeignKeyScriptEmitter.cs` (`NameClause`, commento `ponytail:`); `SystemNamedForeignKeyTests.A_disabled_auto_named_foreign_key_keeps_its_name` lo fissa |
 | **Il parser delle risposte UDP del browser SQL è permissivo:** valida solo `buffer[0] == 0x05` e poi si fida della stringa. Scorporata dalla voce P0 sulle credenziali quando quella è stata chiusa: nulla parte più da sola verso un host suggerito, quindi resta igiene, non esposizione | 2026-07-30 | S | `Persistence/Sql/SqlServerDiscovery.cs:196-199` |
