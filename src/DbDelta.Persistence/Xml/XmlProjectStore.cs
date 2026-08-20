@@ -15,7 +15,7 @@ namespace DbDelta.Persistence.Xml;
 /// Reads / writes the canonical <c>.dbd</c> XML project file.
 /// Supports reading schema v1 (legacy) and writing / reading schema v2.
 /// </summary>
-public sealed class XmlProjectStore : IProjectStore
+public sealed class XmlProjectStore
 {
     /// <summary>XML namespace used for both schema versions.</summary>
     private const string Namespace = "https://schemas.dbdelta.org/project/v1";

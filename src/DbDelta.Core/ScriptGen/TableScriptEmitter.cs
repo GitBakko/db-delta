@@ -24,7 +24,6 @@ namespace DbDelta.Core.ScriptGen;
 public sealed class TableScriptEmitter(
     StringComparer? names = null,
     IReadOnlyDictionary<(string Schema, string Table, string Column), string>? backfillDefaults = null)
-    : IScriptEmitter
 {
     private readonly StringComparer _names = names ?? StringComparer.Ordinal;
 

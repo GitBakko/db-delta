@@ -25,7 +25,7 @@ namespace DbDelta.Core.ScriptGen;
 /// guessed owner would be worse than omitting it.
 /// </para>
 /// </remarks>
-public sealed class SchemaScriptEmitter : IScriptEmitter
+public sealed class SchemaScriptEmitter
 {
     /// <inheritdoc />
     public string Emit(DifferencePair pair)

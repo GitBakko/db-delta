@@ -7,9 +7,9 @@ using Microsoft.Data.SqlClient;
 namespace DbDelta.Providers.LiveDb;
 
 /// <summary>
-/// Live SQL Server <see cref="ISchemaSource"/>. Reads via direct sys.* catalog queries.
+/// Live SQL Server schema source. Reads via direct sys.* catalog queries.
 /// </summary>
-public sealed class LiveDbSource : ISchemaSource
+public sealed class LiveDbSource
 {
     private readonly string _connectionString;
 

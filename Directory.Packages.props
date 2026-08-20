@@ -6,9 +6,6 @@
   <ItemGroup Label="Core runtime">
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="6.0.1" />
     <PackageVersion Include="Microsoft.SqlServer.TransactSql.ScriptDom" Version="180.6.0" />
-    <PackageVersion Include="Serilog" Version="4.2.0" />
-    <PackageVersion Include="Serilog.Sinks.Console" Version="6.0.0" />
-    <PackageVersion Include="Serilog.Sinks.File" Version="6.0.0" />
     <PackageVersion Include="Polly" Version="8.5.0" />
   </ItemGroup>
   <ItemGroup Label="CLI">
