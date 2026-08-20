@@ -37,8 +37,10 @@ These are **non-negotiable** styling rules. Apply on every UI change.
    - `TextBox`
    - `AutoCompleteBox`
    - `ComboBox`
-   - `CheckBox` — **no shared style exists yet** (see P4 in `docs/BACKLOG.md`);
-     until it does, set the height by hand
+   - `CheckBox` — still has no style of its own, and does not need one: the
+     Fluent default already measures 32, which `UiInvariantTests` now asserts
+     alongside the other four. If that default ever moves, that test is what
+     says so
    - Declared exception: `Button.swap` is a 36x36 round icon
      (`Styles/AppStyles.axaml:122-124`)
    The shared height makes rows of mixed controls (Cerca + Raggruppa +
