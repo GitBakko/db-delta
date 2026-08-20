@@ -283,8 +283,11 @@ public sealed partial class AppStateViewModel : ObservableObject
     /// <c>CompareCommand</c> and none calls this method directly.
     /// A compare is read-only and holds no transaction — unlike the deploy
     /// path, which stays deliberately uncancellable. What the token does NOT
-    /// shorten is <c>engine.Compare</c> below: it is synchronous and runs on
-    /// the UI thread, so Annulla ends the reading, not the diffing.
+    /// shorten is <c>engine.Compare</c> below: it takes no token, so Annulla
+    /// ends the reading, not the diffing. It runs on the thread pool, which is
+    /// what keeps the window — and that same Annulla button — alive while it
+    /// works; the token is re-checked when it returns, so pressing Annulla
+    /// during the diff throws the result away instead of publishing it.
     /// </remarks>
     [RelayCommand(CanExecute = nameof(CanCompare), IncludeCancelCommand = true)]
     public async Task CompareAsync(CancellationToken ct)
@@ -352,7 +355,15 @@ public sealed partial class AppStateViewModel : ObservableObject
             }
 
             ComparisonEngine engine = new();
-            ComparisonResult result = engine.Compare(srcRes.Value!, tgtRes.Value!, ComparisonOptions.Default);
+            // CPU work over two whole catalogs. On the UI thread it froze the
+            // window for the length of the diff, Annulla included — the button
+            // the reads above had just finished making real. The token cannot
+            // shorten Compare itself, so it is re-checked on the way out: a
+            // cancelled run drops its result rather than publishing it.
+            ComparisonResult result = await Task.Run(
+                () => engine.Compare(srcRes.Value!, tgtRes.Value!, ComparisonOptions.Default),
+                ct).ConfigureAwait(true);
+            ct.ThrowIfCancellationRequested();
             PublishComparison(result, srcCs, tgtCs);
 
             // Keep the dependency edges: without them the deploy script the app

@@ -16,7 +16,7 @@ vedi «Manutenzione» in fondo.
   `docker ps`. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **33 voci aperte** — P1 3 · P2 5 · P3 10 · P4 8 · P5 7 — più **11** in
+- **32 voci aperte** — P1 3 · P2 4 · P3 10 · P4 8 · P5 7 — più **11** in
   «Deciso — NON riaprire». Tutte riverificate sul codice il 2026-08-18, non
   ereditate dai documenti. **Le 4 critiche sono chiuse**, e 4 delle 7 alte:
   vedi P0 e P1. Il conteggio va ricontato, non decrementato a mente: `awk` sulle
@@ -125,7 +125,7 @@ per un conteggio che non torna fra due esecuzioni, chiedi a `sys.objects` cosa
 
 ## P1 — Alte: risultato o script sbagliato
 
-Una voce chiusa il 2026-08-20 dal commit che porta questa riga:
+Voci chiuse il 2026-08-20, ognuna dal commit che porta la sua riga:
 
 | Voce chiusa | Come | Prova |
 |---|---|---|
@@ -163,11 +163,12 @@ Una voce chiusa il 2026-08-20 dal commit che porta questa riga:
 |---|---|---|
 | La Release non allegava né hash né attestazione | `Get-FileHash -Algorithm SHA256` scrive `…msi.sha256` nel formato che `sha256sum -c` legge (due spazi, nome nudo, LF — `Set-Content` avrebbe scritto CRLF), e `actions/attest-build-provenance@v4` firma lo stesso file. Il job prende `id-token: write` e `attestations: write`. Entrambi i passi stanno **dopo** lo smoke install, cioè dove andrà la firma: firmare riscrive il file | `.github/workflows/release.yml:12-18` (permessi), `:66-81` (hash + attestazione + entrambi i file allegati). Gira solo su un tag: non c'è CI che lo eserciti prima |
 
+| Il confronto girava sul thread UI | `engine.Compare` non prende un token e stava in linea: su un catalogo grosso la finestra si bloccava per tutta la durata del diff, **Annulla compreso**. Ora sta su `Task.Run` e il token è ricontrollato all'uscita, così un annullamento durante il diff butta il risultato invece di pubblicarlo. Filare il token DENTRO `Compare` resta fuori: la firma è condivisa con i tre comandi CLI | `ViewModels/AppStateViewModel.cs:355-364`. **Non coperto, e dichiarato:** nessun test headless osserva su quale thread gira il diff — servirebbe un server vivo o un seam che esiste solo per il test |
+
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
 | **Griglia, resta la metà (a) e (c).** La ricerca cieca è chiusa il 2026-08-18: il predicato confronta anche `StatusDisplayItalian`, quindi cercare «Diversi» trova le righe che la colonna chiama Diversi. Restano gli header che promettono un sort inesistente — o si aggiungono i cinque `SortMemberPath`, o si tolgono i `CanUserSort` perché smettano di prometterlo — e il `Refresh()` a ogni battuta | 2026-08-14 | S | `ResultsGridView.axaml:188, 209, 222, 291, 306` (cinque `CanUserSort`, zero `SortMemberPath` in tutto il progetto); `MainWindowViewModel.cs:639-641` |
 | **Resta la tastiera.** Annullare la modale di primo avvio non chiude più l'app dal 2026-08-18: si atterra sul guscio vuoto, con Nuovo e Carica in barra. Nessun dialogo risponde ancora a Invio/Esc — `IsDefault`/`IsCancel` li collegano senza codice, e nell'occasione due code-behind si cancellano | 2026-08-14 | S | grep `IsDefault\|IsCancel` sul sorgente → **zero** occorrenze vere (i 4 match sono `IsCancellationRequested`); l'unico Esc è a mano in `ConfirmDialog.axaml.cs:17-20` |
-| **Annulla non ferma il confronto**, solo la lettura: `ComparisonEngine.Compare` non prende un token ed è chiamato sincronamente sul thread UI. Metterlo su `Task.Run` sblocca la finestra in poche righe; filare il token dentro `Compare` tocca anche i tre comandi CLI — **fai la prima e fermati** | 2026-08-17 | S | `ViewModels/AppStateViewModel.cs:355` e `:279-287`; `Core/Diff/ComparisonEngine.cs:12` |
 | **Le docs mentono in cinque punti**, e il danno maggiore è verso di noi: il blocco di stato di questo file era fermo al 2026-06-04 (chiuso da questa riscrittura), il sito non nomina mai la MSI, il README linka le note Redgate come «Architecture», CONTRIBUTING descrive un progetto Blazor morto, `docfx/articles/cli.md` dichiara il falso sulle transazioni. Quasi tutto si chiude cancellando | 2026-08-14 | S | `docs/01_architecture.md`, `docs/04_api_endpoints.md`, `CONTRIBUTING.md`, `docfx/articles/cli.md`; `git log --since=2026-08-14` su quei file → vuoto |
 | **Resta la virtualizzazione dei pannelli diff.** Il taglio di prefisso e suffisso comuni prima della tabella LCS è chiuso il 2026-08-18: un corpo da 30.000 righe cambiato in una riga si confronta senza allocare nulla di grosso (prima: `int[m+1,n+1]`, ~3,6 GB in un colpo). I tre `ItemsPanel` non virtualizzanti restano, e aspettano la voce 10 | 2026-08-14 | S | `DiffViewerView.axaml:152-156, 193-195, 229-235` |
 
