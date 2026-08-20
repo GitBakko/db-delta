@@ -188,22 +188,57 @@ public static class SqlServerDiscovery
         }
     }
 
+    /// <summary>Longest server name SQL Server itself will report.</summary>
+    private const int MaxServerNameLength = 128;
+
+    /// <summary>Longest instance name SQL Server will accept.</summary>
+    private const int MaxInstanceNameLength = 16;
+
+    /// <summary>
+    /// Ceiling on how many instances one reply may contribute. A host runs
+    /// tens, not hundreds; a datagram has room for thousands.
+    /// </summary>
+    private const int MaxInstancesPerReply = 64;
+
     /// <summary>
     /// Parses a SQL Browser response packet. The payload starts with a 3-byte
     /// header (0x05 followed by little-endian 16-bit length), followed by an
     /// ASCII string with key/value pairs separated by ';' and ending with ";;"
     /// before the next instance block.
     /// </summary>
-    private static IEnumerable<string> ParseSqlBrowserResponse(byte[] buffer)
+    /// <remarks>
+    /// This is the one parser here reading bytes that are not ours: a UDP
+    /// datagram from whoever answered a broadcast first. What it returns lands
+    /// in a picker the user clicks, and from there in a connection string, so
+    /// "the packet said so" is not a reason to believe anything — the DECLARED
+    /// length is honoured rather than the datagram's, the names have to look
+    /// like names, and one reply cannot fill the list on its own.
+    /// </remarks>
+    internal static IEnumerable<string> ParseSqlBrowserResponse(byte[] buffer)
     {
-        if (buffer.Length < 3 || buffer[0] != 0x05)
+        if (buffer is null || buffer.Length < 3 || buffer[0] != 0x05)
         {
             yield break;
         }
-        string payload = Encoding.ASCII.GetString(buffer, 3, buffer.Length - 3);
+
+        // The header says how long the payload is. Reading to the end of the
+        // datagram instead parses whatever the sender chose to append.
+        int declared = buffer[1] | (buffer[2] << 8);
+        int length = Math.Min(declared, buffer.Length - 3);
+        if (length <= 0)
+        {
+            yield break;
+        }
+
+        string payload = Encoding.ASCII.GetString(buffer, 3, length);
+        int emitted = 0;
         // Split on ";;" to separate instance blocks
         foreach (string block in payload.Split(";;", StringSplitOptions.RemoveEmptyEntries))
         {
+            if (emitted >= MaxInstancesPerReply)
+            {
+                yield break;
+            }
             string[] tokens = block.Split(';');
             string? server = null;
             string? instance = null;
@@ -220,15 +255,32 @@ public static class SqlServerDiscovery
                     instance = value;
                 }
             }
-            if (string.IsNullOrWhiteSpace(server))
+            if (!IsPlausibleName(server, MaxServerNameLength))
             {
                 continue;
             }
-            yield return string.IsNullOrWhiteSpace(instance) || instance.Equals("MSSQLSERVER", StringComparison.OrdinalIgnoreCase)
-                ? server
-                : $"{server}\\{instance}";
+            bool defaultInstance = string.IsNullOrWhiteSpace(instance)
+                || instance.Equals("MSSQLSERVER", StringComparison.OrdinalIgnoreCase);
+            if (!defaultInstance && !IsPlausibleName(instance, MaxInstanceNameLength))
+            {
+                continue;
+            }
+            emitted++;
+            yield return defaultInstance ? server! : $"{server}\\{instance}";
         }
     }
+
+    /// <summary>
+    /// A host or instance name, as opposed to whatever else fits in a string.
+    /// The allow-list is what SQL Server itself permits: letters, digits, and
+    /// <c>. - _ $ #</c>. A space, a quote or a control character means the
+    /// sender is not a SQL Browser, and the value is on its way into a
+    /// connection string.
+    /// </summary>
+    private static bool IsPlausibleName(string? name, int maxLength) =>
+        !string.IsNullOrWhiteSpace(name)
+        && name.Length <= maxLength
+        && name.All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '-' or '_' or '$' or '#');
 
     public static async Task<IReadOnlyList<string>> ListDatabasesAsync(string connectionString, CancellationToken ct)
     {

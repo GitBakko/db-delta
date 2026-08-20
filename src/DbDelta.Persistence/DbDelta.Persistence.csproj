@@ -8,5 +8,9 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="DbDelta.Persistence.IntegrationTests" />
+    <!-- SqlServerDiscovery's UDP parser reads bytes off the network and needs a
+         unit test, not a container: the packets it has to survive are the ones
+         no real SQL Browser sends. -->
+    <InternalsVisibleTo Include="DbDelta.Persistence.UnitTests" />
   </ItemGroup>
 </Project>
