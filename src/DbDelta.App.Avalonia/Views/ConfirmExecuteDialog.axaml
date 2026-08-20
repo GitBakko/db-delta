@@ -180,11 +180,14 @@
 
     <!-- Action bar -->
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-      <Button Classes="ghost" Click="OnAnnullaClick"
+      <!-- Annulla and Chiudi are the same answer in the two phases of this
+           dialog and are mutually exclusive by IsVisible, so both carry
+           IsCancel: Escape has to work before the run and after it. -->
+      <Button Classes="ghost" IsCancel="True" Click="OnAnnullaClick"
               IsVisible="{Binding IsIdle}">
         <TextBlock Text="Annulla" />
       </Button>
-      <Button Classes="ghost" Click="OnChiudiClick"
+      <Button Classes="ghost" IsCancel="True" Click="OnChiudiClick"
               IsVisible="{Binding IsDone}">
         <TextBlock Text="Chiudi" />
       </Button>

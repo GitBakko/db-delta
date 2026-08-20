@@ -1,5 +1,4 @@
 using Avalonia.Controls;
-using Avalonia.Input;
 using Avalonia.Interactivity;
 
 namespace DbDelta.App.Views;
@@ -8,7 +7,9 @@ namespace DbDelta.App.Views;
 /// Minimal name-only save dialog. The user supplies a project name; the
 /// caller resolves the on-disk path via
 /// <see cref="Persistence.Json.ProjectsFolder.ResolvePath(string)"/>.
-/// Returns the typed name on OK, <see langword="null"/> on cancel.
+/// Returns the typed name on OK, <see langword="null"/> on cancel. Invio and
+/// Esc are IsDefault / IsCancel on the two buttons: they used to be a KeyDown
+/// handler on the text box, so they answered only while it had focus.
 /// </summary>
 public partial class SaveProjectDialog : Window
 {
@@ -20,7 +21,6 @@ public partial class SaveProjectDialog : Window
             TextBox box = this.FindControl<TextBox>("NameBox")!;
             box.Focus();
             box.SelectAll();
-            box.KeyDown += OnNameKeyDown;
         };
     }
 
@@ -38,18 +38,6 @@ public partial class SaveProjectDialog : Window
     {
         TextBlock hintText = this.FindControl<TextBlock>("HintText")!;
         hintText.Text = hint ?? string.Empty;
-    }
-
-    private void OnNameKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter)
-        {
-            OnOkClick(sender, new RoutedEventArgs());
-        }
-        else if (e.Key == Key.Escape)
-        {
-            OnCancelClick(sender, new RoutedEventArgs());
-        }
     }
 
     private void OnCancelClick(object? sender, RoutedEventArgs e) => Close(null);

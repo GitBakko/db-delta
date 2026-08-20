@@ -89,10 +89,10 @@
           <TextBlock Text="Sfoglia dal disco…" VerticalAlignment="Center" />
         </StackPanel>
       </Button>
-      <Button Classes="ghost" Click="OnCancelClick">
+      <Button Classes="ghost" IsCancel="True" Click="OnCancelClick">
         <TextBlock Text="Annulla" />
       </Button>
-      <Button x:Name="OkButton" Classes="primary" Click="OnOkClick">
+      <Button x:Name="OkButton" Classes="primary" IsDefault="True" Click="OnOkClick">
         <TextBlock Text="Carica" />
       </Button>
     </StackPanel>

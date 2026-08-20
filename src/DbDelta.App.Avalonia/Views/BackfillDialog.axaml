@@ -91,10 +91,10 @@
                  VerticalAlignment="Center" FontSize="11"
                  Foreground="{StaticResource DangerBrush}"
                  IsVisible="{Binding !CanConfirm}" />
-      <Button Classes="ghost" Click="OnAnnullaClick">
+      <Button Classes="ghost" IsCancel="True" Click="OnAnnullaClick">
         <TextBlock Text="Annulla" />
       </Button>
-      <Button Classes="primary" Click="OnApplicaClick"
+      <Button Classes="primary" IsDefault="True" Click="OnApplicaClick"
               IsEnabled="{Binding CanConfirm}">
         <TextBlock Text="Applica" />
       </Button>

@@ -1,5 +1,4 @@
 using Avalonia.Controls;
-using Avalonia.Input;
 using Avalonia.Interactivity;
 
 namespace DbDelta.App.Views;
@@ -7,17 +6,16 @@ namespace DbDelta.App.Views;
 /// <summary>
 /// Yes/no confirmation for an action that throws work away. Returns
 /// <see langword="true"/> when the user confirms, <see langword="false"/> on
-/// cancel, Escape, or closing the window.
+/// cancel, Escape, or closing the window. Escape is <c>IsCancel</c> on the
+/// cancel button itself — it used to be a KeyDown handler here, which is one
+/// more place for the two to disagree. Enter is deliberately NOT bound: the
+/// crimson button confirms something irreversible.
 /// </summary>
 public partial class ConfirmDialog : Window
 {
     public ConfirmDialog()
     {
         InitializeComponent();
-        KeyDown += (_, e) =>
-        {
-            if (e.Key == Key.Escape) { Close(false); }
-        };
     }
 
     /// <summary>

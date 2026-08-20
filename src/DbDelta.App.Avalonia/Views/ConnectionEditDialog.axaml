@@ -172,7 +172,7 @@
           <TextBlock Text="Elimina" VerticalAlignment="Center" />
         </StackPanel>
       </Button>
-      <Button Classes="ghost" Click="OnCancelClick">
+      <Button Classes="ghost" IsCancel="True" Click="OnCancelClick">
         <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
           <Path Width="14" Height="14" Stretch="Uniform"
                 Stroke="{Binding $parent[Button].Foreground}"
@@ -181,7 +181,7 @@
           <TextBlock Text="Annulla" VerticalAlignment="Center" />
         </StackPanel>
       </Button>
-      <Button Classes="primary"
+      <Button Classes="primary" IsDefault="True"
               IsEnabled="{Binding IsValid}"
               Click="OnSaveClick">
         <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">

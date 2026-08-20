@@ -86,7 +86,7 @@
 
     <!-- Close -->
     <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-      <Button Classes="ghost" Click="OnCloseClick">
+      <Button Classes="ghost" IsCancel="True" Click="OnCloseClick">
         <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
           <Path Width="14" Height="14" Stretch="Uniform"
                 Stroke="{Binding $parent[Button].Foreground}"

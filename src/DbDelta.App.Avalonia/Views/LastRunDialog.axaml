@@ -79,7 +79,7 @@
       <Button Classes="ghost" Click="OnCopyClick">
         <TextBlock Text="Copia tutto" />
       </Button>
-      <Button Classes="primary" Click="OnCloseClick">
+      <Button Classes="primary" IsDefault="True" IsCancel="True" Click="OnCloseClick">
         <TextBlock Text="Chiudi" />
       </Button>
     </StackPanel>

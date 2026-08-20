@@ -309,10 +309,10 @@
         <!-- Modal closure (right) -->
         <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="8"
                     HorizontalAlignment="Right">
-          <Button Classes="ghost" Click="OnCancelClick">
+          <Button Classes="ghost" IsCancel="True" Click="OnCancelClick">
             <TextBlock Text="Annulla" />
           </Button>
-          <Button Classes="primary" IsEnabled="{Binding IsValid}" Click="OnOkClick">
+          <Button Classes="primary" IsDefault="True" IsEnabled="{Binding IsValid}" Click="OnOkClick">
             <TextBlock Text="OK" />
           </Button>
         </StackPanel>

@@ -25,7 +25,7 @@
                 HorizontalAlignment="Right"
                 Spacing="8"
                 Margin="0,12,0,0">
-      <Button Classes="ghost" Click="OnCancelClick">
+      <Button Classes="ghost" IsCancel="True" Click="OnCancelClick">
         <TextBlock Text="Annulla" />
       </Button>
       <Button x:Name="ConfirmButton" Classes="solid-crimson" Click="OnConfirmClick">

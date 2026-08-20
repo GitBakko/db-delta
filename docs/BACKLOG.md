@@ -8,15 +8,15 @@ vedi «Manutenzione» in fondo.
 ## Stato — 2026-08-20
 
 - **v1.0.2 pubblicata** (2026-08-13), «Latest», MSI non firmata allegata.
-- **817 test verdi** nei sette progetti che girano senza Docker (Core 484,
-  Headless 173, Persistence.Unit 68, Golden 68, Property 12, Architecture 6,
+- **826 test verdi** nei sette progetti che girano senza Docker (Core 484,
+  Headless 182, Persistence.Unit 68, Golden 68, Property 12, Architecture 6,
   Shared 6). **Due** dei tre DB-backed vanno **rossi**, non skipped, con Docker
   spento — LiveDb e Cli acceptance, che costruiscono il container in un
   inizializzatore di campo senza rete. Davanti a quel muro la prima domanda è
   `docker ps`. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **31 voci aperte** — P1 3 · P2 3 · P3 10 · P4 8 · P5 7 — più **11** in
+- **30 voci aperte** — P1 3 · P2 2 · P3 10 · P4 8 · P5 7 — più **11** in
   «Deciso — NON riaprire». Tutte riverificate sul codice il 2026-08-18, non
   ereditate dai documenti. **Le 4 critiche sono chiuse**, e 4 delle 7 alte:
   vedi P0 e P1. Il conteggio va ricontato, non decrementato a mente: `awk` sulle
@@ -164,10 +164,10 @@ Voci chiuse il 2026-08-20, ognuna dal commit che porta la sua riga:
 | La Release non allegava né hash né attestazione | `Get-FileHash -Algorithm SHA256` scrive `…msi.sha256` nel formato che `sha256sum -c` legge (due spazi, nome nudo, LF — `Set-Content` avrebbe scritto CRLF), e `actions/attest-build-provenance@v4` firma lo stesso file. Il job prende `id-token: write` e `attestations: write`. Entrambi i passi stanno **dopo** lo smoke install, cioè dove andrà la firma: firmare riscrive il file | `.github/workflows/release.yml:12-18` (permessi), `:66-81` (hash + attestazione + entrambi i file allegati). Gira solo su un tag: non c'è CI che lo eserciti prima |
 | Il confronto girava sul thread UI | `engine.Compare` non prende un token e stava in linea: su un catalogo grosso la finestra si bloccava per tutta la durata del diff, **Annulla compreso**. Ora sta su `Task.Run` e il token è ricontrollato all'uscita, così un annullamento durante il diff butta il risultato invece di pubblicarlo. Filare il token DENTRO `Compare` resta fuori: la firma è condivisa con i tre comandi CLI | `ViewModels/AppStateViewModel.cs:355-364`. **Non coperto, e dichiarato:** nessun test headless osserva su quale thread gira il diff — servirebbe un server vivo o un seam che esiste solo per il test |
 | Cinque header promettevano un ordinamento che non esisteva | In una `DataGridTemplateColumn` `CanUserSort` da solo disegna la freccia e non ordina niente: manca `SortMemberPath`, che è l'unica cosa che dice **su cosa**. Aggiunto ai cinque. Le due colonne di data puntano al `DateTime`, **non** alla stringa `dd/MM/yyyy` che la cella stampa: come testo `31/12/2025` viene dopo `01/02/2026` | `ResultsGridSortTests` — 4 test headless: uno è l'invariante su OGNI colonna che offre un sort, quindi vale anche per le colonne future, e uno è il controllo in negativo sulla colonna checkbox. **Sonda di mutazione fatta:** puntando la data alla stringa stampata cade il test della data, e solo quello |
+| Nessun dialogo rispondeva a Invio/Esc | `IsCancel` su ogni pulsante di uscita (nove dialoghi) e `IsDefault` su quello che conferma, dove confermare non distrugge niente. **`ConfirmDialog` e `ConfirmExecuteDialog` restano senza `IsDefault` di proposito**: uscire da una conferma è gratis, entrarci la esegue. I due gestori scritti a mano sono cancellati — quello di `ConfirmDialog` intercettava Esc nel costruttore, quello di `SaveProjectDialog` rispondeva solo mentre la casella di testo aveva il fuoco | `DialogKeyboardTests` — 5 test headless: l'invariante su TUTTI e nove i dialoghi, due controlli in negativo (nessun doppio default, niente default sulle due conferme distruttive) e due funzionali. **Due sonde di mutazione:** togliendo `IsCancel` cade l'Esc, togliendo `IsDefault` cade l'Invio — ed è quest'ultima a provare che a rispondere è l'attributo e non un resto del gestore cancellato |
 
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
-| **Resta la tastiera.** Annullare la modale di primo avvio non chiude più l'app dal 2026-08-18: si atterra sul guscio vuoto, con Nuovo e Carica in barra. Nessun dialogo risponde ancora a Invio/Esc — `IsDefault`/`IsCancel` li collegano senza codice, e nell'occasione due code-behind si cancellano | 2026-08-14 | S | grep `IsDefault\|IsCancel` sul sorgente → **zero** occorrenze vere (i 4 match sono `IsCancellationRequested`); l'unico Esc è a mano in `ConfirmDialog.axaml.cs:17-20` |
 | **Le docs mentono in cinque punti**, e il danno maggiore è verso di noi: il blocco di stato di questo file era fermo al 2026-06-04 (chiuso da questa riscrittura), il sito non nomina mai la MSI, il README linka le note Redgate come «Architecture», CONTRIBUTING descrive un progetto Blazor morto, `docfx/articles/cli.md` dichiara il falso sulle transazioni. Quasi tutto si chiude cancellando | 2026-08-14 | S | `docs/01_architecture.md`, `docs/04_api_endpoints.md`, `CONTRIBUTING.md`, `docfx/articles/cli.md`; `git log --since=2026-08-14` su quei file → vuoto |
 | **Resta la virtualizzazione dei pannelli diff.** Il taglio di prefisso e suffisso comuni prima della tabella LCS è chiuso il 2026-08-18: un corpo da 30.000 righe cambiato in una riga si confronta senza allocare nulla di grosso (prima: `int[m+1,n+1]`, ~3,6 GB in un colpo). I tre `ItemsPanel` non virtualizzanti restano, e aspettano la voce 10 | 2026-08-14 | S | `DiffViewerView.axaml:152-156, 193-195, 229-235` |
 
