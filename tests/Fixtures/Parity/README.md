@@ -1,10 +1,19 @@
 # Parity fixture — DbDelta ↔ Redgate SQL Compare
 
 End-to-end calibration: same source / target schema diffed by **DbDelta**
-and **Redgate SQL Compare**. The 17-scenario fixture is small enough to
+and **Redgate SQL Compare**. The 21-scenario fixture is small enough to
 diff outputs line-by-line yet broad enough to surface real divergences
 across the kinds DbDelta has shipped (M0 – M13), including the #24
-cross-kind dependency-ordering edges (scenarios 13–17).
+cross-kind dependency-ordering edges (scenarios 13–17) and, since
+2026-08-20, the four shapes the audit had never reached (18–21) plus one
+refusal kept in its own pair of databases (22).
+
+**DbDelta's half is verified before you open Redgate.**
+`ParityFixtureTests` applies this fixture to two containerised databases,
+generates the script, checks each new scenario's expected shape, applies
+it and requires the target to come back Identical. It found a real defect
+the first time it ran — see scenario 20 — so the audit starts from a side
+that is known to work rather than from one being debugged.
 
 ## Scenarios
 
@@ -27,6 +36,11 @@ cross-kind dependency-ordering edges (scenarios 13–17).
 | 15 | View → fn | `fnTaxRate` + `vTaxedItems` source-only — #24 CREATE order |
 | 16 | Schemabound TVF → table | `Region` + `tvfRegionLookup` source-only — #24 CREATE order |
 | 17 | Multi-hop | `Warehouse` → `fnStockValue` → `vStockReport` source-only — #24 transitive |
+| 18 | DROP, reverse topology | `LegacyStock` → `fnLegacyTotal` (SCHEMABINDING) → `vLegacyReport`, all target-only: the function must be dropped before the table or Msg 3729 |
+| 19 | Index | filtered predicate (`WHERE IsActive = 1`) on source, unfiltered on target |
+| 20 | CHECK over another table | `CK_CustomerOrder_WithinLimit` calls `fnCreditLimit`, which reads `CreditLimit`. **Found a real bug:** the constraint's dependency on the function was dropped by the reader, the table was created first and the deploy died on Msg 4121 |
+| 21 | Extended properties | source-only `MS_Description`. DbDelta does NOT script these — it declares them in the census. The scenario measures that gap on purpose |
+| 22 | Columnstore index | **In `03-refusals.sql`, its own database pair.** DbDelta reads the difference and REFUSES to script it (exit 30). A refusal stops the whole run, so it cannot live in the main fixture |
 
 Users / Roles / Permissions are deliberately out of scope for the v1
 parity run — they require server-level logins that complicate fixture

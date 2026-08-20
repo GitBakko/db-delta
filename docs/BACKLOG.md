@@ -22,7 +22,7 @@ vedi «Manutenzione» in fondo.
   vedi P0 e P1. Il conteggio va ricontato, non decrementato a mente: `awk` sulle
   righe di tabella, o si scolla come si era già scollato.
 - **CI verde su `3c48735`** (run `32140004994`), entrambi i job. I DB-backed
-  aggiungono **72** test ai locali della riga sopra: LiveDb 43, Cli acceptance
+  aggiungono **74** test ai locali della riga sopra: LiveDb 45, Cli acceptance
   22, Persistence integration 7 su Linux (4 passati + 3 skipped su Windows).
   Il totale non si scrive: è «i locali + 65», così invecchia un numero solo.
   L'exit code di `script` e la forma JSON di `compare` girano solo lì.
@@ -193,7 +193,7 @@ Una voce chiusa il 2026-08-20 dal commit che porta questa riga:
 
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
-| **Parità Redgate ferma a 17 scenari** dal 2026-05-28: mancano DROP in topologia inversa con schemabound, indici filtrati/columnstore, CHECK cross-tabella, extended properties. Serve un server vivo e la GUI Redgate (la CLI è license-blocked, exit 35) | 2026-05-28 | L | `tests/Fixtures/Parity/01-source.sql` → 17 scenari; ultimo audit `docs/parity/redgate-2026-05-28.md` |
+| **Parità Redgate: la mia metà è pronta, manca la tua.** La fixture porta ora **21 scenari** più uno di rifiuto in un paio di database a sé (columnstore, che fermerebbe l'intera generazione). I quattro nuovi sono quelli che l'audit non aveva mai raggiunto: DROP in topologia inversa con schemabound, indice filtrato, CHECK che legge un'altra tabella attraverso una funzione, extended properties. **`ParityFixtureTests` verifica la metà DbDelta in container prima che tu apra Redgate** — applica, ricontrolla e pretende Identical. **Ha trovato un difetto vero al primo giro: vedi lo scenario 20, corretto nello stesso commit.** Quello che serve da te: lanciare Redgate sulla stessa coppia e passarmi i suoi script; io faccio il diff e apro una voce per ogni divergenza | 2026-05-28 | L | `tests/Fixtures/Parity/README.md` (come si esegue), `01-source.sql`/`02-target.sql`/`03-refusals.sql`; ultimo audit `docs/parity/redgate-2026-05-28.md` |
 
 ---
 

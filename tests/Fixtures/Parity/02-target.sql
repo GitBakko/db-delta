@@ -1,5 +1,5 @@
 -- DbDelta ↔ Redgate parity fixture — TARGET schema
--- Apply on DbDeltaParity_Target. Pair with 01-source.sql (17 scenarios).
+-- Apply on DbDeltaParity_Target. Pair with 01-source.sql (21 scenarios).
 
 USE [DbDeltaParity_Target];
 GO
@@ -111,3 +111,44 @@ GO
 --   15  dbo.fnTaxRate    →  dbo.vTaxedItems (view → function)
 --   16  dbo.Region       →  dbo.tvfRegionLookup (schemabound TVF → table)
 --   17  dbo.Warehouse    →  dbo.fnStockValue  →  dbo.vStockReport (multi-hop)
+
+-- =========================================================================
+-- Scenario 18 — DROP in reverse topology, with SCHEMABINDING (target-only)
+-- The source defines none of these three. The deploy must drop them in
+-- REVERSE dependency order — view, then function, then table. Dropping
+-- the table first fails with Msg 3729 because the schemabound function
+-- still binds to it.
+-- =========================================================================
+CREATE TABLE dbo.LegacyStock
+(
+    Id       int            IDENTITY(1, 1) NOT NULL,
+    Quantity decimal(18, 2) NOT NULL,
+    CONSTRAINT PK_LegacyStock PRIMARY KEY CLUSTERED (Id)
+);
+GO
+EXEC ('CREATE FUNCTION dbo.fnLegacyTotal (@id int) RETURNS decimal(18, 2) WITH SCHEMABINDING AS BEGIN RETURN (SELECT TOP (1) Quantity FROM dbo.LegacyStock WHERE Id = @id); END');
+GO
+EXEC ('CREATE VIEW dbo.vLegacyReport AS SELECT 1 AS StockId, dbo.fnLegacyTotal(1) AS Total;');
+GO
+
+-- =========================================================================
+-- Scenario 19 — Index.FilteredPredicate (target index has NO filter)
+-- =========================================================================
+CREATE TABLE dbo.Subscriber
+(
+    Id       int          IDENTITY(1, 1) NOT NULL,
+    Email    nvarchar(200) NOT NULL,
+    IsActive bit          NOT NULL,
+    CONSTRAINT PK_Subscriber PRIMARY KEY CLUSTERED (Id)
+);
+GO
+CREATE NONCLUSTERED INDEX IX_Subscriber_Email ON dbo.Subscriber (Email);
+GO
+
+-- Scenario 20 — Check constraint over another table: source-only, so the
+-- target defines neither dbo.CreditLimit, dbo.fnCreditLimit nor
+-- dbo.CustomerOrder.
+
+-- Scenario 21 — Extended properties: source-only. The target holds no
+-- dbo.Documented at all, so the table itself is a normal CREATE and the
+-- property is the part DbDelta declares rather than writes.

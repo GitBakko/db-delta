@@ -10,27 +10,55 @@ namespace DbDelta.Providers.LiveDb.Readers;
 /// <see cref="EdgeKind.ModuleReference"/> — the resolver only distinguishes
 /// foreign-key edges (which this reader does not produce), so no finer
 /// classification is needed here. Module bodies (views, functions, procedures,
-/// triggers) surface as expected; computed-column/check/default expressions
-/// that reference a function or sequence happen to surface here too, because
-/// SQL Server records them in sys.sql_expression_dependencies with the owning
-/// table as the referencing object. Unresolved references (cross-db, dynamic
-/// SQL, NULL referenced_id) yield no edge — the affected node then falls back
-/// to its stable kind/alphabetical slot in the resolver.
+/// triggers) surface as expected, and so do computed columns — a computed
+/// column is not an object, so SQL Server records the TABLE as the referencing
+/// entity. Unresolved references (cross-db, dynamic SQL, NULL referenced_id)
+/// yield no edge — the affected node then falls back to its stable
+/// kind/alphabetical slot in the resolver.
 /// </summary>
+/// <remarks>
+/// A CHECK or DEFAULT constraint is a different matter, and this comment used
+/// to claim otherwise. Those ARE objects, so the referencing entity is the
+/// constraint itself, of type <c>C</c> or <c>D</c> — kinds DbDelta does not
+/// model, so the edge was dropped and the dependency vanished. A CHECK calling
+/// a scalar function then produced a script that created the table BEFORE the
+/// function, and the deploy died on Msg 4121: "Cannot find either column dbo or
+/// the user-defined function or aggregate". Found on 2026-08-20 by parity
+/// scenario 20, which exists for exactly this shape.
+/// <para>
+/// Such a row is attributed to the constraint's PARENT TABLE, which is the
+/// object DbDelta orders. A TRIGGER also carries a parent_object_id and is
+/// deliberately NOT remapped: it is modelled in its own right and its
+/// dependencies belong to it.
+/// </para>
+/// </remarks>
 internal sealed class DependencyReader
 {
     private const string Sql = """
         SELECT
-            referencing_schema = OBJECT_SCHEMA_NAME(d.referencing_id),
-            referencing_name   = OBJECT_NAME(d.referencing_id),
-            referencing_type   = ro.type,
-            referenced_schema  = ISNULL(d.referenced_schema_name, OBJECT_SCHEMA_NAME(d.referenced_id)),
-            referenced_name    = ISNULL(d.referenced_entity_name, OBJECT_NAME(d.referenced_id)),
+            referencing_schema = OBJECT_SCHEMA_NAME(x.OwnerId),
+            referencing_name   = OBJECT_NAME(x.OwnerId),
+            referencing_type   = oo.type,
+            referenced_schema  = ISNULL(x.referenced_schema_name, OBJECT_SCHEMA_NAME(x.referenced_id)),
+            referenced_name    = ISNULL(x.referenced_entity_name, OBJECT_NAME(x.referenced_id)),
             referenced_type    = eo.type
-        FROM sys.sql_expression_dependencies AS d
-        INNER JOIN sys.objects AS ro ON ro.object_id = d.referencing_id AND ro.is_ms_shipped = 0
-        LEFT  JOIN sys.objects AS eo ON eo.object_id = d.referenced_id
-        WHERE d.referenced_id IS NOT NULL;
+        FROM (
+            SELECT
+                d.referenced_id,
+                d.referenced_schema_name,
+                d.referenced_entity_name,
+                -- A CHECK or DEFAULT constraint is an object of its own, and
+                -- not one DbDelta models: attribute its references to the table
+                -- that carries it, which is the node the resolver orders. A
+                -- trigger also has a parent and keeps its own edges.
+                OwnerId = CASE WHEN ro.type IN ('C', 'D') THEN ro.parent_object_id
+                               ELSE d.referencing_id END
+            FROM sys.sql_expression_dependencies AS d
+            INNER JOIN sys.objects AS ro ON ro.object_id = d.referencing_id AND ro.is_ms_shipped = 0
+            WHERE d.referenced_id IS NOT NULL
+        ) AS x
+        INNER JOIN sys.objects AS oo ON oo.object_id = x.OwnerId
+        LEFT  JOIN sys.objects AS eo ON eo.object_id = x.referenced_id;
         """;
 
     public async Task<IReadOnlyList<DependencyEdge>> ReadAsync(

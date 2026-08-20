@@ -1,6 +1,6 @@
 -- DbDelta ↔ Redgate parity fixture — SOURCE schema
 -- Apply on DbDeltaParity_Source. Pair with 02-target.sql to produce
--- 17 deliberate, well-named divergences for line-by-line parity diff.
+-- 21 deliberate, well-named divergences for line-by-line parity diff.
 
 USE [DbDeltaParity_Source];
 GO
@@ -224,4 +224,78 @@ GO
 EXEC ('CREATE FUNCTION dbo.fnStockValue (@id int) RETURNS decimal(18, 2) WITH SCHEMABINDING AS BEGIN RETURN (SELECT TOP (1) Capacity FROM dbo.Warehouse WHERE Id = @id); END');
 GO
 EXEC ('CREATE VIEW dbo.vStockReport AS SELECT 1 AS WarehouseId, dbo.fnStockValue(1) AS Value;');
+GO
+
+-- =========================================================================
+-- Scenario 18 — DROP in reverse topology, with SCHEMABINDING
+-- All three objects are TARGET-ONLY, so the deploy has to REMOVE them —
+-- and a schemabound chain cannot be dropped in creation order. Correct
+-- order is the reverse: vLegacyReport → fnLegacyTotal → LegacyStock.
+-- Drop the table first and SQL Server refuses (Msg 3729: the function
+-- binds to it). The source therefore defines NONE of them.
+-- =========================================================================
+
+-- =========================================================================
+-- Scenario 19 — Index.FilteredPredicate
+-- Source filters on [IsActive] = 1; target has the same index unfiltered.
+-- Expected diff: DROP INDEX + CREATE INDEX … WHERE ([IsActive]=(1)).
+-- =========================================================================
+CREATE TABLE dbo.Subscriber
+(
+    Id       int          IDENTITY(1, 1) NOT NULL,
+    Email    nvarchar(200) NOT NULL,
+    IsActive bit          NOT NULL,
+    CONSTRAINT PK_Subscriber PRIMARY KEY CLUSTERED (Id)
+);
+GO
+CREATE NONCLUSTERED INDEX IX_Subscriber_Email
+    ON dbo.Subscriber (Email)
+    WHERE (IsActive = 1);
+GO
+
+-- =========================================================================
+-- Scenario 20 — Check constraint reading ANOTHER table
+-- A CHECK cannot query a second table directly, so it goes through a
+-- scalar UDF — the shape that makes a CHECK a cross-object dependency.
+-- Source-only, so both the function and the constraint must be created,
+-- and the function has to come first.
+-- =========================================================================
+CREATE TABLE dbo.CreditLimit
+(
+    CustomerId int            NOT NULL,
+    MaxAmount  decimal(18, 2) NOT NULL,
+    CONSTRAINT PK_CreditLimit PRIMARY KEY CLUSTERED (CustomerId)
+);
+GO
+EXEC ('CREATE FUNCTION dbo.fnCreditLimit (@customerId int) RETURNS decimal(18, 2) AS BEGIN RETURN (SELECT TOP (1) MaxAmount FROM dbo.CreditLimit WHERE CustomerId = @customerId); END');
+GO
+CREATE TABLE dbo.CustomerOrder
+(
+    Id         int            IDENTITY(1, 1) NOT NULL,
+    CustomerId int            NOT NULL,
+    Amount     decimal(18, 2) NOT NULL,
+    CONSTRAINT PK_CustomerOrder PRIMARY KEY CLUSTERED (Id),
+    CONSTRAINT CK_CustomerOrder_WithinLimit
+        CHECK (Amount <= dbo.fnCreditLimit(CustomerId))
+);
+GO
+
+-- =========================================================================
+-- Scenario 21 — Extended properties
+-- DbDelta does NOT model these: it declares them instead, in the
+-- unexamined census (EXTENDED_PROPERTY). Redgate scripts them. The
+-- scenario exists to measure that gap deliberately rather than discover
+-- it, and its expected DbDelta outcome is "no statement, one caveat".
+-- =========================================================================
+CREATE TABLE dbo.Documented
+(
+    Id   int           IDENTITY(1, 1) NOT NULL,
+    Note nvarchar(100) NULL,
+    CONSTRAINT PK_Documented PRIMARY KEY CLUSTERED (Id)
+);
+GO
+EXEC sys.sp_addextendedproperty
+    @name = N'MS_Description', @value = N'Una tabella che si descrive da sola',
+    @level0type = N'SCHEMA', @level0name = N'dbo',
+    @level1type = N'TABLE',  @level1name = N'Documented';
 GO
