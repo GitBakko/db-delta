@@ -56,12 +56,15 @@ These are **non-negotiable** styling rules. Apply on every UI change.
      base view-model.
    - When tempted to copy-paste a snippet "just this once" — STOP, create
      the abstraction first, then use it from both call sites.
-   **Known open violation, tracked not ignored:** the icon+label content of the
-   topbar and action-bar buttons (`<StackPanel Horizontal><Path/><TextBlock/>`)
-   is inline in 8 places in `Views/MainWindow.axaml` — the eighth was added on
-   2026-08-18 with «Salva report». Each `Path` carries a different `Data`, so
-   extraction is not free. It is a P4 item in `docs/BACKLOG.md`; until it is
-   decided, do not add a ninth without saying so there.
+   **Closed 2026-08-20:** the icon+label content of the topbar and action-bar
+   buttons was inline in 8 places in `Views/MainWindow.axaml`. Seven of them are
+   now `Views/Controls/IconButtonContent.axaml` (`Geometry`, `Text`, plus
+   `IconSize` and `StrokeThickness`, because the three families were drawn at
+   16/14/13 px on purpose and collapsing them would have been a design change
+   hiding in a refactor). **The eighth stays inline and is the declared
+   exception:** «Allinea destinazione» draws a FILLED play triangle with no
+   stroke and a SemiBold label in `PrimaryFgBrush` — three knobs no other call
+   site would ever use. Use the control for the ninth.
 
    Violation example we've already paid for: the in-button "busy" markup
    (spinner + label) was copy-pasted into 4 buttons; one was missed in a

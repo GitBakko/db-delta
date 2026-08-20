@@ -97,16 +97,7 @@
                   ToolTip.Tip="Crea un nuovo progetto DbDelta"
                   Padding="6"
                   VerticalContentAlignment="Center">
-            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-              <Border Width="16" Height="16" VerticalAlignment="Center" Margin="0,1,0,0">
-                <Path Stretch="Uniform"
-                      Stroke="{Binding $parent[Button].Foreground}"
-                      StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
-                      Fill="Transparent"
-                      Data="M 6,3 L 14,3 L 19,8 L 19,21 L 6,21 Z M 14,3 L 14,8 L 19,8 M 12,12 L 12,18 M 9,15 L 15,15" />
-              </Border>
-              <TextBlock Text="Nuovo" VerticalAlignment="Center" FontSize="12" />
-            </StackPanel>
+            <c:IconButtonContent Geometry="M 6,3 L 14,3 L 19,8 L 19,21 L 6,21 Z M 14,3 L 14,8 L 19,8 M 12,12 L 12,18 M 9,15 L 15,15" Text="Nuovo" />
           </Button>
 
           <!-- Carica progetto — folder icon wrapped in a fixed 16-px container
@@ -120,16 +111,7 @@
                   ToolTip.Tip="Carica un progetto DbDelta esistente"
                   Padding="6"
                   VerticalContentAlignment="Center">
-            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-              <Border Width="16" Height="16" VerticalAlignment="Center" Margin="0,1,0,0">
-                <Path Stretch="Uniform"
-                      Stroke="{Binding $parent[Button].Foreground}"
-                      StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
-                      Fill="Transparent"
-                      Data="M 2,6 L 9,6 L 11,8 L 22,8 L 22,18 L 2,18 Z" />
-              </Border>
-              <TextBlock Text="Carica" VerticalAlignment="Center" FontSize="12" />
-            </StackPanel>
+            <c:IconButtonContent Geometry="M 2,6 L 9,6 L 11,8 L 22,8 L 22,18 L 2,18 Z" Text="Carica" />
           </Button>
 
           <!-- Salva progetto — same icon-container alignment fix -->
@@ -139,16 +121,7 @@
                   ToolTip.Tip="Salva il progetto corrente"
                   Padding="6"
                   VerticalContentAlignment="Center">
-            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-              <Border Width="16" Height="16" VerticalAlignment="Center" Margin="0,1,0,0">
-                <Path Stretch="Uniform"
-                      Stroke="{Binding $parent[Button].Foreground}"
-                      StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
-                      Fill="Transparent"
-                      Data="M 5,5 L 17,5 L 19,7 L 19,19 L 5,19 Z M 7,5 L 7,11 L 15,11 L 15,5 M 9,15 L 15,15" />
-              </Border>
-              <TextBlock Text="Salva" VerticalAlignment="Center" FontSize="12" />
-            </StackPanel>
+            <c:IconButtonContent Geometry="M 5,5 L 17,5 L 19,7 L 19,19 L 5,19 Z M 7,5 L 7,11 L 15,11 L 15,5 M 9,15 L 15,15" Text="Salva" />
           </Button>
 
         </StackPanel>
@@ -200,14 +173,8 @@
                   CommandParameter="{Binding $parent[Window]}"
                   ToolTip.Tip="Modifica il progetto corrente"
                   Padding="6">
-            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-              <Path Width="14" Height="14" Stretch="Uniform"
-                    Stroke="{Binding $parent[Button].Foreground}"
-                    StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
-                    Fill="Transparent"
-                    Data="M 15,5 L 19,9 L 9,19 L 5,19 L 5,15 Z M 13,7 L 17,11" />
-              <TextBlock Text="Modifica" VerticalAlignment="Center" FontSize="12" />
-            </StackPanel>
+            <c:IconButtonContent Geometry="M 15,5 L 19,9 L 9,19 L 5,19 L 5,15 Z M 13,7 L 17,11" Text="Modifica"
+                                   IconSize="14" StrokeThickness="1.6" />
           </Button>
 
           <!-- Refresh -->
@@ -215,14 +182,8 @@
                   Command="{Binding RefreshCommand}"
                   ToolTip.Tip="Riesegui il confronto"
                   Padding="6">
-            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-              <Path Width="14" Height="14" Stretch="Uniform"
-                    Stroke="{Binding $parent[Button].Foreground}"
-                    StrokeThickness="1.6" StrokeLineCap="Round" StrokeJoin="Round"
-                    Fill="Transparent"
-                    Data="M 20,12 A 8,8 0 1 1 18,7 M 18,4 L 18,8 L 14,8" />
-              <TextBlock Text="Aggiorna" VerticalAlignment="Center" FontSize="12" />
-            </StackPanel>
+            <c:IconButtonContent Geometry="M 20,12 A 8,8 0 1 1 18,7 M 18,4 L 18,8 L 14,8" Text="Aggiorna"
+                                   IconSize="14" StrokeThickness="1.6" />
           </Button>
 
         </StackPanel>
@@ -472,28 +433,16 @@
                     CommandParameter="{Binding $parent[Window]}"
                     ToolTip.Tip="Salva il report HTML dell'intero confronto (non solo delle righe selezionate)"
                     Margin="0,0,8,0">
-              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                <Path Width="13" Height="13" Stretch="Uniform"
-                      Stroke="{Binding $parent[Button].Foreground}"
-                      StrokeThickness="1.7" StrokeLineCap="Round" StrokeJoin="Round"
-                      Fill="Transparent"
-                      Data="M 4,20 L 20,20 M 7,20 L 7,12 M 12,20 L 12,5 M 17,20 L 17,9" />
-                <TextBlock Text="Salva report" VerticalAlignment="Center" FontSize="12" />
-              </StackPanel>
+              <c:IconButtonContent Geometry="M 4,20 L 20,20 M 7,20 L 7,12 M 12,20 L 12,5 M 17,20 L 17,9" Text="Salva report"
+                                   IconSize="13" StrokeThickness="1.7" />
             </Button>
             <Button Grid.Column="4" Classes="ghost-emerald"
                     Command="{Binding DeployCommand}"
                     CommandParameter="{Binding $parent[Window]}"
                     ToolTip.Tip="Genera script SQL di allineamento per le righe selezionate"
                     Margin="0,0,8,0">
-              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                <Path Width="13" Height="13" Stretch="Uniform"
-                      Stroke="{Binding $parent[Button].Foreground}"
-                      StrokeThickness="1.7" StrokeLineCap="Round" StrokeJoin="Round"
-                      Fill="Transparent"
-                      Data="M 6,3 L 14,3 L 19,8 L 19,21 L 6,21 Z M 14,3 L 14,8 L 19,8 M 9,14 L 16,14 M 9,17 L 16,17" />
-                <TextBlock Text="Genera script" VerticalAlignment="Center" FontSize="12" />
-              </StackPanel>
+              <c:IconButtonContent Geometry="M 6,3 L 14,3 L 19,8 L 19,21 L 6,21 Z M 14,3 L 14,8 L 19,8 M 9,14 L 16,14 M 9,17 L 16,17" Text="Genera script"
+                                   IconSize="13" StrokeThickness="1.7" />
             </Button>
             <Button Grid.Column="5" Classes="primary"
                     Command="{Binding ExecuteOnTargetCommand}"

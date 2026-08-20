@@ -1,0 +1,33 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:DbDelta.App.Views.Controls"
+             x:Class="DbDelta.App.Views.Controls.IconButtonContent"
+             x:DataType="c:IconButtonContent"
+             x:Name="Self">
+
+  <!-- The icon+label content of a text button, in one place. It was inline in
+       eight buttons in MainWindow.axaml, which is the DRY rule (CLAUDE.md #3)
+       broken by the file that states it.
+
+       The icon sits in a fixed-size Border rather than being sized on the Path
+       itself: with Stretch="Uniform" the Path's own size follows its geometry,
+       so two icons drawn on different bounds ended up different widths and the
+       labels beside them did not line up. The 1-px nudge is optical, not
+       geometric — text x-height sits above the layout-box centre, so an icon
+       centred by layout reads as sitting low. -->
+  <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+    <Border Width="{Binding IconSize, ElementName=Self}"
+            Height="{Binding IconSize, ElementName=Self}"
+            VerticalAlignment="Center" Margin="0,1,0,0">
+      <Path Stretch="Uniform"
+            Data="{Binding Geometry, ElementName=Self}"
+            Stroke="{Binding $parent[Button].Foreground}"
+            StrokeThickness="{Binding StrokeThickness, ElementName=Self}"
+            StrokeLineCap="Round" StrokeJoin="Round"
+            Fill="Transparent" />
+    </Border>
+    <TextBlock Text="{Binding Text, ElementName=Self}"
+               VerticalAlignment="Center" FontSize="12" />
+  </StackPanel>
+
+</UserControl>
