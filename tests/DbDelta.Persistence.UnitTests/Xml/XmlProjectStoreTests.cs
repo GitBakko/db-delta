@@ -106,25 +106,6 @@ public class XmlProjectStoreTests : IDisposable
 
         ProjectEndpoint endpointTgt = new(connRefTgt, authTgt);
 
-        List<OwnerMappingEntry> owners =
-        [
-            new OwnerMappingEntry("dbo", "dbo"),
-            new OwnerMappingEntry("sales", "sales"),
-        ];
-
-        List<TableMappingEntry> tables =
-        [
-            new TableMappingEntry("dbo", "Orders", "dbo", "Orders"),
-            new TableMappingEntry("sales", "Customer", "sales", "Customer"),
-        ];
-
-        ProjectOptions opts = new(
-            IgnoreFillFactor: true,
-            IgnoreCollation: false,
-            IgnoreWhitespace: true,
-            IgnoreCommentBlocks: false,
-            TreatExtendedPropertiesAsObjects: true);
-
         Dictionary<ObjectSelectionKey, bool> selections = new()
         {
             [new ObjectSelectionKey("Table", "dbo", "Orders")] = true,
@@ -138,9 +119,6 @@ public class XmlProjectStoreTests : IDisposable
             LastModifiedUtc: modified,
             Source: endpoint,
             Target: endpointTgt,
-            OwnerMappings: owners,
-            TableMappings: tables,
-            ProjectOptions: opts,
             Selections: selections);
 
         await store.SaveAsync(_file, project, CancellationToken.None);
@@ -167,9 +145,6 @@ public class XmlProjectStoreTests : IDisposable
         back.Target!.Authentication.Mode.Should().Be(AuthenticationMode.WindowsIntegrated);
         back.Target.Authentication.Encrypt.Should().BeTrue();
 
-        back.OwnerMappings.Should().BeEquivalentTo(project.OwnerMappings);
-        back.TableMappings.Should().BeEquivalentTo(project.TableMappings);
-        back.ProjectOptions.Should().Be(project.ProjectOptions);
         back.Selections.Should().BeEquivalentTo(project.Selections);
     }
 
@@ -202,9 +177,6 @@ public class XmlProjectStoreTests : IDisposable
         project.Source.Should().BeNull();
         project.Target.Should().BeNull();
         project.Selections.Should().BeEmpty();
-        project.OwnerMappings.Should().BeEmpty();
-        project.TableMappings.Should().BeEmpty();
-        project.ProjectOptions.Should().Be(ProjectOptions.Default);
     }
 
     [Fact]
@@ -229,6 +201,50 @@ public class XmlProjectStoreTests : IDisposable
         text.Should().Contain("<Selections");
         text.Should().Contain("type=\"Table\"");
         text.Should().Contain("name=\"Orders\"");
+    }
+
+    /// <summary>
+    /// A <c>.dbd</c> written before 2026-08-20 still loads. It carries
+    /// <c>&lt;OwnerMappings&gt;</c>, <c>&lt;TableMappings&gt;</c> and
+    /// <c>&lt;Options&gt;</c>, which nothing reads any more — they were saved
+    /// and read back and consulted by no engine, and were deleted rather than
+    /// implemented.
+    /// </summary>
+    /// <remarks>
+    /// This is the whole compatibility contract of that deletion: an old file
+    /// opens, and stops carrying those elements the next time it is saved. If
+    /// the reader ever starts refusing what it does not recognise, this fails
+    /// and it is right.
+    /// </remarks>
+    [Fact]
+    public async Task A_project_saved_before_the_dead_options_were_removed_still_loads()
+    {
+        string xml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <DbDeltaProject xmlns="https://schemas.dbdelta.org/project/v1" schema="2">
+              <Name>Vecchio progetto</Name>
+              <CreatedUtc>2026-05-01T00:00:00Z</CreatedUtc>
+              <LastModifiedUtc>2026-05-01T00:00:00Z</LastModifiedUtc>
+              <OwnerMappings>
+                <Map source="dbo" target="sales" />
+              </OwnerMappings>
+              <TableMappings>
+                <Map sourceSchema="dbo" sourceName="Orders" targetSchema="sales" targetName="Ordini" />
+              </TableMappings>
+              <Options ignoreFillFactor="true" ignoreCollation="true" ignoreWhitespace="true"
+                       ignoreCommentBlocks="false" treatExtendedPropertiesAsObjects="true" />
+              <Selections>
+                <Entry type="Table" schema="dbo" name="Orders" selected="true" />
+              </Selections>
+            </DbDeltaProject>
+            """;
+        await File.WriteAllTextAsync(_file, xml, CancellationToken.None);
+
+        DbDeltaProject project = await new XmlProjectStore().LoadAsync(_file, CancellationToken.None);
+
+        project.Name.Should().Be("Vecchio progetto");
+        project.Selections.Should().ContainSingle()
+               .Which.Key.Should().Be(new ObjectSelectionKey("Table", "dbo", "Orders"));
     }
 
     [Fact]

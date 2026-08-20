@@ -287,7 +287,8 @@
     </Border>
 
     <!-- ── Band 3: Error banner ─────────────────────────────────────────────
-         AppState.LastError was previously bound ONLY in ConnectionPickerView,
+         AppState.LastError was once bound ONLY in a picker view that no
+         longer exists,
          which is never instantiated — so every failed compare / project load
          set the message and nobody ever saw it. The grid kept showing the
          PREVIOUS run's counts, which the user then read as current. Auto row:

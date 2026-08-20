@@ -92,41 +92,10 @@ public sealed class XmlProjectStore
         root.Add(BuildEndpointElement(ns, "Source", p.Source));
         root.Add(BuildEndpointElement(ns, "Target", p.Target));
 
-        XElement ownerMappings = new(ns + "OwnerMappings");
-        foreach (OwnerMappingEntry om in p.OwnerMappings)
-        {
-            ownerMappings.Add(new XElement(
-                ns + "Map",
-                new XAttribute("source", om.SourceOwner),
-                new XAttribute("target", om.TargetOwner)));
-        }
-
-        root.Add(ownerMappings);
-
-        XElement tableMappings = new(ns + "TableMappings");
-        foreach (TableMappingEntry tm in p.TableMappings)
-        {
-            tableMappings.Add(new XElement(
-                ns + "Map",
-                new XAttribute("sourceSchema", tm.SourceSchema),
-                new XAttribute("sourceName", tm.SourceName),
-                new XAttribute("targetSchema", tm.TargetSchema),
-                new XAttribute("targetName", tm.TargetName)));
-        }
-
-        root.Add(tableMappings);
-
-        ProjectOptions opts = p.ProjectOptions;
-        root.Add(new XElement(
-            ns + "Options",
-            new XAttribute("ignoreFillFactor", BoolToString(opts.IgnoreFillFactor)),
-            new XAttribute("ignoreCollation", BoolToString(opts.IgnoreCollation)),
-            new XAttribute("ignoreWhitespace", BoolToString(opts.IgnoreWhitespace)),
-            new XAttribute("ignoreCommentBlocks", BoolToString(opts.IgnoreCommentBlocks)),
-            new XAttribute(
-                "treatExtendedPropertiesAsObjects",
-                BoolToString(opts.TreatExtendedPropertiesAsObjects))));
-
+        // No <OwnerMappings>, <TableMappings> or <Options> any more: they were
+        // written and read back and consulted by nothing. A file that still
+        // carries them loads fine — the reader ignores what it does not know —
+        // and stops carrying them the next time it is saved.
         XElement selections = new(ns + "Selections");
         foreach (KeyValuePair<ObjectSelectionKey, bool> kv in p.Selections)
         {
@@ -209,37 +178,8 @@ public sealed class XmlProjectStore
         ProjectEndpoint? source = ParseEndpoint(root.Element(ns + "Source"), ns);
         ProjectEndpoint? target = ParseEndpoint(root.Element(ns + "Target"), ns);
 
-        List<OwnerMappingEntry> ownerMappings = [];
-        foreach (XElement map in root.Element(ns + "OwnerMappings")?.Elements(ns + "Map") ?? [])
-        {
-            ownerMappings.Add(new OwnerMappingEntry(
-                (string?)map.Attribute("source") ?? string.Empty,
-                (string?)map.Attribute("target") ?? string.Empty));
-        }
-
-        List<TableMappingEntry> tableMappings = [];
-        foreach (XElement map in root.Element(ns + "TableMappings")?.Elements(ns + "Map") ?? [])
-        {
-            tableMappings.Add(new TableMappingEntry(
-                (string?)map.Attribute("sourceSchema") ?? string.Empty,
-                (string?)map.Attribute("sourceName") ?? string.Empty,
-                (string?)map.Attribute("targetSchema") ?? string.Empty,
-                (string?)map.Attribute("targetName") ?? string.Empty));
-        }
-
-        ProjectOptions opts = ProjectOptions.Default;
-        XElement? optsEl = root.Element(ns + "Options");
-        if (optsEl is not null)
-        {
-            opts = new ProjectOptions(
-                IgnoreFillFactor: ParseBool(optsEl.Attribute("ignoreFillFactor")),
-                IgnoreCollation: ParseBool(optsEl.Attribute("ignoreCollation")),
-                IgnoreWhitespace: ParseBool(optsEl.Attribute("ignoreWhitespace")),
-                IgnoreCommentBlocks: ParseBool(optsEl.Attribute("ignoreCommentBlocks")),
-                TreatExtendedPropertiesAsObjects: ParseBool(
-                    optsEl.Attribute("treatExtendedPropertiesAsObjects")));
-        }
-
+        // <OwnerMappings>, <TableMappings> and <Options> are not read: nothing
+        // consulted them. An older file carrying them still loads, minus those.
         Dictionary<ObjectSelectionKey, bool> selections = [];
         foreach (XElement entry in root.Element(ns + "Selections")?.Elements(ns + "Entry") ?? [])
         {
@@ -283,9 +223,6 @@ public sealed class XmlProjectStore
             LastModifiedUtc: modified,
             Source: source,
             Target: target,
-            OwnerMappings: ownerMappings,
-            TableMappings: tableMappings,
-            ProjectOptions: opts,
             Selections: selections,
             SourceConnectionId: srcId,
             TargetConnectionId: tgtId,
@@ -349,9 +286,6 @@ public sealed class XmlProjectStore
             LastModifiedUtc: DateTime.UtcNow,
             Source: null,
             Target: null,
-            OwnerMappings: [],
-            TableMappings: [],
-            ProjectOptions: ProjectOptions.Default,
             Selections: new Dictionary<ObjectSelectionKey, bool>(),
             SourceConnectionId: doc.SourceConnectionId,
             TargetConnectionId: doc.TargetConnectionId,

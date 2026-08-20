@@ -60,15 +60,7 @@ public class ProjectSetupViewModelTests
             CreatedUtc: new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
             LastModifiedUtc: new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
             Source: new ProjectEndpoint(srcConn, auth),
-            Target: new ProjectEndpoint(tgtConn, auth),
-            OwnerMappings: [new OwnerMappingEntry("dbo", "dbo")],
-            TableMappings: [],
-            ProjectOptions: new ProjectOptions(
-                IgnoreFillFactor: true,
-                IgnoreCollation: true,
-                IgnoreWhitespace: true,
-                IgnoreCommentBlocks: false,
-                TreatExtendedPropertiesAsObjects: false));
+            Target: new ProjectEndpoint(tgtConn, auth));
     }
 
     // ── Test 1: IsValid_false_when_either_endpoint_missing_database ───────────
@@ -148,21 +140,12 @@ public class ProjectSetupViewModelTests
         vm.Target.RememberCredentials.Should().BeTrue();
     }
 
-    // ── Test 4: Build_produces_DbDeltaProject_with_both_endpoints_and_options ─
+    // ── Test 4: Build_produces_DbDeltaProject_with_both_endpoints ────────────
 
     [AvaloniaFact]
-    public void Build_produces_DbDeltaProject_with_both_endpoints_and_options()
+    public void Build_produces_DbDeltaProject_with_both_endpoints()
     {
-        ProjectSetupViewModel vm = new()
-        {
-            ProjectName = "My project",
-            Options = new ProjectOptions(
-                IgnoreFillFactor: true,
-                IgnoreCollation: false,
-                IgnoreWhitespace: true,
-                IgnoreCommentBlocks: false,
-                TreatExtendedPropertiesAsObjects: false),
-        };
+        ProjectSetupViewModel vm = new() { ProjectName = "My project" };
 
         FillEndpoint(vm.Source, "srv-src", "dbSrc");
         FillEndpoint(vm.Target, "srv-tgt", "dbTgt");
@@ -176,8 +159,6 @@ public class ProjectSetupViewModelTests
         project.Source.Connection.DatabaseName.Should().Be("dbSrc");
         project.Target!.Connection.ServerName.Should().Be("srv-tgt");
         project.Target.Connection.DatabaseName.Should().Be("dbTgt");
-        project.ProjectOptions.IgnoreFillFactor.Should().BeTrue();
-        project.ProjectOptions.IgnoreWhitespace.Should().BeTrue();
     }
 
     // ── Test 5: FromProject_round_trips_through_Build ─────────────────────────
@@ -199,9 +180,6 @@ public class ProjectSetupViewModelTests
         rebuilt.Source.Authentication.Mode.Should().Be(original.Source.Authentication.Mode);
         rebuilt.Source.Authentication.TrustServerCertificate.Should()
                .Be(original.Source.Authentication.TrustServerCertificate);
-        rebuilt.ProjectOptions.IgnoreFillFactor.Should().Be(original.ProjectOptions.IgnoreFillFactor);
-        rebuilt.ProjectOptions.IgnoreCollation.Should().Be(original.ProjectOptions.IgnoreCollation);
-        rebuilt.OwnerMappings.Should().HaveCount(original.OwnerMappings.Count);
     }
 
     // ── Test 6: DisplayBandName_returns_placeholder_when_server_empty ─────────

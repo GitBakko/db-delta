@@ -1,5 +1,4 @@
 using System.Collections.Frozen;
-using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DbDelta.Core.Abstractions;
@@ -183,15 +182,6 @@ public sealed partial class ProjectSetupViewModel : ObservableObject
 
     [ObservableProperty] private string _projectName = "Nuovo progetto";
 
-    [ObservableProperty]
-    private ProjectOptions _options = new(false, false, true, false, false);
-
-    [ObservableProperty]
-    private ObservableCollection<OwnerMappingEntry> _ownerMappings = [];
-
-    [ObservableProperty]
-    private ObservableCollection<TableMappingEntry> _tableMappings = [];
-
     partial void OnProjectNameChanged(string value) => OnPropertyChanged(nameof(IsValid));
 
     // ── Validity ──────────────────────────────────────────────────────────────
@@ -243,9 +233,6 @@ public sealed partial class ProjectSetupViewModel : ObservableObject
             LastModifiedUtc: DateTime.UtcNow,
             Source: Source.ToEndpoint(),
             Target: Target.ToEndpoint(),
-            OwnerMappings: [.. OwnerMappings],
-            TableMappings: [.. TableMappings],
-            ProjectOptions: Options,
             Selections: FrozenDictionary<ObjectSelectionKey, bool>.Empty);
 
     /// <summary>
@@ -256,20 +243,6 @@ public sealed partial class ProjectSetupViewModel : ObservableObject
     {
         ArgumentNullException.ThrowIfNull(project);
         ProjectName = project.Name;
-        Options = project.ProjectOptions;
-
-        OwnerMappings.Clear();
-        foreach (OwnerMappingEntry entry in project.OwnerMappings)
-        {
-            OwnerMappings.Add(entry);
-        }
-
-        TableMappings.Clear();
-        foreach (TableMappingEntry entry in project.TableMappings)
-        {
-            TableMappings.Add(entry);
-        }
-
         Source.LoadFromEndpoint(project.Source);
         Target.LoadFromEndpoint(project.Target);
     }
@@ -289,19 +262,6 @@ public sealed partial class ProjectSetupViewModel : ObservableObject
         }
 
         vm.ProjectName = p.Name;
-        vm.Options = p.ProjectOptions;
-
-        vm.OwnerMappings.Clear();
-        foreach (OwnerMappingEntry entry in p.OwnerMappings)
-        {
-            vm.OwnerMappings.Add(entry);
-        }
-
-        vm.TableMappings.Clear();
-        foreach (TableMappingEntry entry in p.TableMappings)
-        {
-            vm.TableMappings.Add(entry);
-        }
 
         // Repopulate endpoint panels from the saved endpoints.
         var src =
