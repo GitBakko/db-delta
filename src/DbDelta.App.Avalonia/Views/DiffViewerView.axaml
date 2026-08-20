@@ -94,8 +94,12 @@
              Background="{StaticResource BgMutedBrush}"
              ClipToBounds="True">
         <!-- Source-side marks (green, left half) -->
+        <!-- Bound to the rows that HAVE a mark, not to every row: a Canvas
+             cannot virtualise, so binding all of them put one Rectangle per
+             line on the strip. Measured at 30.000 lines: over a minute of
+             layout for two strips of marks nobody could see. -->
         <ItemsControl x:Name="SourceMarks"
-                      ItemsSource="{Binding Rows}"
+                      ItemsSource="{Binding SourceMarkRows}"
                       ClipToBounds="True">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
@@ -107,13 +111,13 @@
               <Rectangle Width="8" Height="2"
                          Fill="#35AF6D"
                          RadiusX="1" RadiusY="1"
-                         IsVisible="{Binding Status, Converter={x:Static v:Converters.IsSourceIndicator}}" />
+ />
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
         <!-- Target-side marks (red, right half) -->
         <ItemsControl x:Name="TargetMarks"
-                      ItemsSource="{Binding Rows}"
+                      ItemsSource="{Binding TargetMarkRows}"
                       ClipToBounds="True">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
@@ -125,7 +129,7 @@
               <Rectangle Width="8" Height="2"
                          Fill="#DD2F44"
                          RadiusX="1" RadiusY="1"
-                         IsVisible="{Binding Status, Converter={x:Static v:Converters.IsTargetIndicator}}" />
+ />
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
@@ -151,7 +155,7 @@
         <ItemsControl ItemsSource="{Binding Rows}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
-              <StackPanel Orientation="Vertical" />
+              <VirtualizingStackPanel Orientation="Vertical" />
             </ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
@@ -192,7 +196,7 @@
           <ItemsControl ItemsSource="{Binding Rows}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
-                <StackPanel Orientation="Vertical" />
+                <VirtualizingStackPanel Orientation="Vertical" />
               </ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
@@ -229,7 +233,7 @@
         <ItemsControl ItemsSource="{Binding Rows}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
-              <StackPanel Orientation="Vertical" />
+              <VirtualizingStackPanel Orientation="Vertical" />
             </ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>

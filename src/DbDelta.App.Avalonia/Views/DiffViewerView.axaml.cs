@@ -227,20 +227,26 @@ public partial class DiffViewerView : UserControl
 
         if (_sourceMarks is not null)
         {
-            PositionMarksColumn(_sourceMarks, vm.Rows.Count, scale, leftPx: 1);
+            PositionMarksColumn(_sourceMarks, vm.SourceMarkRows, scale, leftPx: 1);
         }
         if (_targetMarks is not null)
         {
-            PositionMarksColumn(_targetMarks, vm.Rows.Count, scale, leftPx: 11);
+            PositionMarksColumn(_targetMarks, vm.TargetMarkRows, scale, leftPx: 11);
         }
     }
 
-    private static void PositionMarksColumn(ItemsControl marks, int rowCount, double scale, double leftPx)
+    /// <summary>
+    /// Places one mark per CHANGED row. The strip is bound to the changed rows
+    /// only, so a container's position in the list is not its line number —
+    /// <see cref="LineDiff.Index"/> is, and that is what the Y is scaled from.
+    /// </summary>
+    private static void PositionMarksColumn(
+        ItemsControl marks, IReadOnlyList<LineDiff> markRows, double scale, double leftPx)
     {
-        for (int i = 0; i < rowCount; i++)
+        for (int i = 0; i < markRows.Count; i++)
         {
             if (marks.ContainerFromIndex(i) is not Control container) { continue; }
-            double top = i * LineHeight * scale;
+            double top = markRows[i].Index * LineHeight * scale;
             Canvas.SetTop(container, top);
             Canvas.SetLeft(container, leftPx);
         }

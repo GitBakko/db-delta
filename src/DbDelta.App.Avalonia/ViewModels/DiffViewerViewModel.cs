@@ -43,8 +43,30 @@ public sealed partial class DiffViewerViewModel(IObjectBodyResolver? resolver = 
     /// <summary>True when there is at least one diff row to display.</summary>
     public bool HasContent => Rows.Count > 0;
 
-    partial void OnRowsChanged(IReadOnlyList<LineDiff> value) =>
+    /// <summary>
+    /// The rows the minimap draws a mark for on the SOURCE side — removals and
+    /// modifications — and nothing else.
+    /// </summary>
+    /// <remarks>
+    /// The minimap used to bind to every row and hide the unchanged ones with a
+    /// converter, which meant one Rectangle per row on a Canvas that cannot
+    /// virtualise: 30.000 lines produced 60.000 visuals across the two strips,
+    /// and laying them out took over a minute. A mark exists only where there
+    /// is something to mark, so that is what the strip is given.
+    /// </remarks>
+    public IReadOnlyList<LineDiff> SourceMarkRows { get; private set; } = [];
+
+    /// <summary>The same for the TARGET side — additions and modifications.</summary>
+    public IReadOnlyList<LineDiff> TargetMarkRows { get; private set; } = [];
+
+    partial void OnRowsChanged(IReadOnlyList<LineDiff> value)
+    {
+        SourceMarkRows = [.. value.Where(r => r.Status is LineStatus.Removed or LineStatus.Modified)];
+        TargetMarkRows = [.. value.Where(r => r.Status is LineStatus.Added or LineStatus.Modified)];
         OnPropertyChanged(nameof(HasContent));
+        OnPropertyChanged(nameof(SourceMarkRows));
+        OnPropertyChanged(nameof(TargetMarkRows));
+    }
 
     /// <summary>
     /// Loads the diff for the given row: clears previous state, resolves both
