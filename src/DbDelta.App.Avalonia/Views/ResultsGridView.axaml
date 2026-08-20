@@ -185,7 +185,8 @@
         <DataGrid.Columns>
 
           <!-- Col 1: Status pill + Kind label -->
-          <DataGridTemplateColumn Header="Tipo entità" Width="100" CanUserSort="True">
+          <DataGridTemplateColumn Header="Tipo entità" Width="100" CanUserSort="True"
+                                  SortMemberPath="KindDisplayName">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:DifferenceRowViewModel">
                 <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="4,0">
@@ -205,8 +206,11 @@
           </DataGridTemplateColumn>
 
           <!-- Col 2: Last modified source. The arrow marks whichever side
-               changed last, so the user can see which way to align. -->
-          <DataGridTemplateColumn Header="Ultima modifica (orig)" Width="140" CanUserSort="True">
+               changed last, so the user can see which way to align.
+               SortMemberPath is the DateTime, not the dd/MM/yyyy string the
+               cell prints: as text, 31/12/2025 sorts after 01/02/2026. -->
+          <DataGridTemplateColumn Header="Ultima modifica (orig)" Width="140" CanUserSort="True"
+                                  SortMemberPath="LastModifiedSource">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:DifferenceRowViewModel">
                 <c:LastModifiedCell Text="{Binding LastModifiedSourceDisplay}"
@@ -219,7 +223,8 @@
           <!-- Col 3: Source object name. Hidden when the row exists only on
                the target — leaves the cell empty to make the missing side
                visually obvious. -->
-          <DataGridTemplateColumn Header="Nome (orig)" Width="*" CanUserSort="True">
+          <DataGridTemplateColumn Header="Nome (orig)" Width="*" CanUserSort="True"
+                                  SortMemberPath="QualifiedName">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:DifferenceRowViewModel">
                 <TextBlock Text="{Binding QualifiedName}"
@@ -288,7 +293,8 @@
 
           <!-- Col 5: Target object name. Hidden when the row exists only on
                the source — leaves the cell empty to surface the missing side. -->
-          <DataGridTemplateColumn Header="Nome (dest)" Width="*" CanUserSort="True">
+          <DataGridTemplateColumn Header="Nome (dest)" Width="*" CanUserSort="True"
+                                  SortMemberPath="QualifiedName">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:DifferenceRowViewModel">
                 <TextBlock Text="{Binding QualifiedName}"
@@ -303,7 +309,8 @@
           </DataGridTemplateColumn>
 
           <!-- Col 6: Last modified target — same shared cell as col 2. -->
-          <DataGridTemplateColumn Header="Ultima modifica (dest)" Width="140" CanUserSort="True">
+          <DataGridTemplateColumn Header="Ultima modifica (dest)" Width="140" CanUserSort="True"
+                                  SortMemberPath="LastModifiedTarget">
             <DataGridTemplateColumn.CellTemplate>
               <DataTemplate x:DataType="vm:DifferenceRowViewModel">
                 <c:LastModifiedCell Text="{Binding LastModifiedTargetDisplay}"
