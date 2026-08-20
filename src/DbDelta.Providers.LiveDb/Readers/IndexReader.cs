@@ -42,7 +42,10 @@ internal sealed class IndexReader
              ORDER BY p.partition_number) AS DataCompression,
             i.type_desc          AS IndexTypeDesc
         FROM sys.indexes AS i
-        INNER JOIN sys.tables AS t ON t.object_id = i.object_id
+        -- sys.objects, not sys.tables: an index on a VIEW is what makes the
+        -- view a stored result set, and joining tables only made two databases
+        -- differing by one compare Identical.
+        INNER JOIN sys.objects AS t ON t.object_id = i.object_id AND t.type IN ('U', 'V')
         INNER JOIN sys.index_columns AS ic ON ic.object_id = i.object_id
                                            AND ic.index_id = i.index_id
         INNER JOIN sys.columns AS c ON c.object_id = ic.object_id

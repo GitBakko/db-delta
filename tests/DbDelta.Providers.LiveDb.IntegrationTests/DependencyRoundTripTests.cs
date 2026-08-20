@@ -94,6 +94,10 @@ public class DependencyRoundTripTests(LiveDbFixture fixture)
                 """, ct);
             await Exec(c, "IF OBJECT_ID('IX_Articolo_Codice') IS NULL CREATE UNIQUE INDEX IX_Articolo_Codice ON app.Articolo (Codice);", ct);
             await Exec(c, "CREATE OR ALTER VIEW app.vArticolo AS SELECT Id, Codice FROM app.Articolo;", ct);
+            // An INDEXED view: the index is what makes it a stored result set,
+            // and it was invisible to the comparison until 2026-08-20.
+            await Exec(c, "CREATE OR ALTER VIEW app.vTotali WITH SCHEMABINDING AS SELECT Codice, COUNT_BIG(*) AS N FROM app.Articolo GROUP BY Codice;", ct);
+            await Exec(c, "IF INDEXPROPERTY(OBJECT_ID('app.vTotali'), 'IX_vTotali', 'IndexID') IS NULL CREATE UNIQUE CLUSTERED INDEX IX_vTotali ON app.vTotali (Codice);", ct);
             await Exec(c, "CREATE OR ALTER FUNCTION app.fnQta(@id int) RETURNS int AS BEGIN RETURN (SELECT Qta FROM app.Articolo WHERE Id = @id) END", ct);
             await Exec(c, "CREATE OR ALTER PROCEDURE app.spArticolo AS BEGIN SET NOCOUNT ON; SELECT Id FROM app.Articolo; END", ct);
             await Exec(c, "CREATE OR ALTER TRIGGER app.trgArticolo ON app.Articolo AFTER INSERT AS BEGIN SET NOCOUNT ON; END", ct);

@@ -185,6 +185,57 @@ public class IndexReaderTests(LiveDbFixture fixture)
     /// back with <c>key_ordinal = 0</c> — and a query that compiles can still
     /// return the wrong rows.
     /// </summary>
+    /// <summary>
+    /// An index on a VIEW reaches the model. It used to reach nothing: the
+    /// reader joined sys.tables, so two databases differing only by an indexed
+    /// view compared Identical.
+    /// </summary>
+    /// <remarks>
+    /// This has to be asserted on the READER. A round-trip cannot catch it: if
+    /// neither side is read, both sides have no indexes and the comparison is
+    /// Identical for the wrong reason — which is precisely how the blind spot
+    /// survived being declared in the census.
+    /// </remarks>
+    [Fact]
+    public async Task An_index_on_a_view_reaches_the_model()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        await using (SqlConnection bootstrap = new(fixture.ConnectionString))
+        {
+            await bootstrap.OpenAsync(ct);
+            await ExecAsync(bootstrap, "IF DB_ID('DbDeltaIxView') IS NULL CREATE DATABASE DbDeltaIxView;", ct);
+        }
+
+        string dbConn = new SqlConnectionStringBuilder(fixture.ConnectionString)
+        {
+            InitialCatalog = "DbDeltaIxView"
+        }.ConnectionString;
+
+        await using (SqlConnection c = new(dbConn))
+        {
+            await c.OpenAsync(ct);
+            await ExecAsync(c, "IF OBJECT_ID('dbo.Ordine','U') IS NULL CREATE TABLE dbo.Ordine (Id int NOT NULL, Stato int NOT NULL);", ct);
+            await ExecAsync(c, "CREATE OR ALTER VIEW dbo.vOrdini AS SELECT Id FROM dbo.Ordine;", ct);
+            await ExecAsync(c, "CREATE OR ALTER VIEW dbo.vOrdiniPerStato WITH SCHEMABINDING AS SELECT Stato, COUNT_BIG(*) AS N FROM dbo.Ordine GROUP BY Stato;", ct);
+            await ExecAsync(c, "IF INDEXPROPERTY(OBJECT_ID('dbo.vOrdiniPerStato'), 'IX_vOrdiniPerStato', 'IndexID') IS NULL CREATE UNIQUE CLUSTERED INDEX IX_vOrdiniPerStato ON dbo.vOrdiniPerStato (Stato);", ct);
+        }
+
+        Result<Database> result = await new LiveDbSource(dbConn).LoadAsync(ct);
+        result.IsSuccess.Should().BeTrue(result.Error?.Message);
+
+        View view = result.Value!.Views.Single(v => v.Name == "vOrdiniPerStato");
+        TableIndex index = view.Indexes.Should().ContainSingle().Subject;
+        index.Name.Should().Be("IX_vOrdiniPerStato");
+        index.IsUnique.Should().BeTrue();
+        index.IsClustered.Should().BeTrue();
+        index.KeyColumns.Select(k => k.Name).Should().Equal("Stato");
+
+        // The negative control: an ordinary view has none, and gaining the
+        // ability to see them must not invent any.
+        result.Value!.Views.Where(v => v.Name != "vOrdiniPerStato")
+            .Should().OnlyContain(v => v.Indexes.Count == 0);
+    }
+
     [Fact]
     public async Task Non_rowstore_indexes_are_read_and_carry_their_type()
     {

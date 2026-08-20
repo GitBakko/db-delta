@@ -77,9 +77,23 @@ public sealed class LiveDbSource
                 tables.Add(t with { Constraints = cons, Indexes = idx });
             }
 
+            // A table and a view cannot share a name, so one map serves both.
+            IReadOnlyList<View> ReattachViewIndexes(IReadOnlyList<View> bare)
+            {
+                return
+                [
+                    .. bare.Select(v =>
+                        objectIdByName.TryGetValue((v.Schema, v.Name), out int vid)
+                        && indexesByObject.TryGetValue(vid, out List<TableIndex>? vl)
+                            ? v with { Indexes = vl }
+                            : v)
+                ];
+            }
+
             // M3: views + stored procedures
             ModuleReader moduleReader = new();
-            IReadOnlyList<View> views = await moduleReader.ReadViewsAsync(connection, cancellationToken);
+            IReadOnlyList<View> views = ReattachViewIndexes(
+                await moduleReader.ReadViewsAsync(connection, cancellationToken));
             IReadOnlyList<StoredProcedure> procs = await moduleReader.ReadProceduresAsync(connection, cancellationToken);
             IReadOnlyList<Function> functions = await moduleReader.ReadFunctionsAsync(connection, cancellationToken);
             IReadOnlyList<Trigger> triggers = await moduleReader.ReadTriggersAsync(connection, cancellationToken);
@@ -255,9 +269,9 @@ public sealed class LiveDbSource
     {
         const string sql = """
             SELECT s.name AS SchemaName, t.name AS TableName, t.object_id
-            FROM sys.tables AS t
+            FROM sys.objects AS t
             INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
-            WHERE t.is_ms_shipped = 0;
+            WHERE t.is_ms_shipped = 0 AND t.type IN ('U', 'V');
             """;
         Dictionary<(string Schema, string Name), int> map = [];
         await using SqlCommand cmd = new(sql, connection);

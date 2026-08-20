@@ -52,10 +52,10 @@ internal sealed class UnexaminedReader
                       FROM sys.indexes AS i
                       INNER JOIN sys.objects AS o ON o.object_id = i.object_id
                       WHERE o.is_ms_shipped = 0 AND i.type NOT IN (0, 1, 2)
-            UNION ALL SELECT 'INDEX_ON_VIEW', COUNT(*)
-                      FROM sys.indexes AS i
-                      INNER JOIN sys.views AS v ON v.object_id = i.object_id
-                      WHERE i.type IN (1, 2)
+            -- INDEX_ON_VIEW is gone from this census as of 2026-08-20: those
+            -- indexes are read, compared and emitted like any other. A census
+            -- that keeps declaring a blind spot after it closes is as wrong as
+            -- one that never declared it.
 
             -- Read as tables, but these attributes of them are not compared.
             UNION ALL SELECT 'TEMPORAL_TABLE', COUNT(*) FROM sys.tables WHERE temporal_type <> 0

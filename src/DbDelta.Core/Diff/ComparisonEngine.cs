@@ -409,12 +409,12 @@ public sealed class ComparisonEngine
         {
             aByIdentity.TryGetValue(id, out TModule? sideA);
             bByIdentity.TryGetValue(id, out TModule? sideB);
-            DifferenceStatus status = ClassifyModule(sideA, sideB);
+            DifferenceStatus status = ClassifyModule(sideA, sideB, ids.Names);
             yield return new DifferencePair(id, status, sideA, sideB);
         }
     }
 
-    private static DifferenceStatus ClassifyModule(Module? a, Module? b)
+    private static DifferenceStatus ClassifyModule(Module? a, Module? b, StringComparer names)
     {
         // After CompareModules' union-of-keys iteration at least one side is non-null;
         // the both-null case is unreachable in practice but treated as Identical for safety.
@@ -453,9 +453,18 @@ public sealed class ComparisonEngine
         // catalog identity, not by the name baked into the definition text).
         string? na = BodyNormalizer.Normalize(ModuleHeader.CanonicalizeObjectName(a.Body, a.Schema, a.Name));
         string? nb = BodyNormalizer.Normalize(ModuleHeader.CanonicalizeObjectName(b.Body, b.Schema, b.Name));
-        return string.Equals(na, nb, StringComparison.Ordinal)
-            ? DifferenceStatus.Identical
-            : DifferenceStatus.Different;
+        if (!string.Equals(na, nb, StringComparison.Ordinal))
+        {
+            return DifferenceStatus.Different;
+        }
+
+        // An index on a view is what makes it a stored result set rather than a
+        // query, so two views with the same body and different indexes are two
+        // different objects. Only views carry any: for every other module the
+        // list is empty on both sides and this costs a type test.
+        return a is View va && b is View vb && !IndexesEqual(va.Indexes, vb.Indexes, names)
+            ? DifferenceStatus.Different
+            : DifferenceStatus.Identical;
     }
 
     private static DifferenceStatus ClassifyTable(
@@ -730,7 +739,7 @@ public sealed class ComparisonEngine
     private static DifferenceStatus ClassifyTrigger(Trigger? a, Trigger? b, StringComparer names)
     {
         // Reuse the module-body classification first.
-        DifferenceStatus body = ClassifyModule(a, b);
+        DifferenceStatus body = ClassifyModule(a, b, names);
         if (body != DifferenceStatus.Identical)
         {
             return body;

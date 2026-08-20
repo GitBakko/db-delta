@@ -496,6 +496,21 @@ public sealed class ScriptGenerator
             if (!string.IsNullOrWhiteSpace(body)) { writer.WriteBatch(PhaseLabel(pair), body); }
         }
 
+        // Indexes on VIEWS, in a batch of their own. Not appended to the view's
+        // DDL: CREATE VIEW has to be the first statement of its batch, so a
+        // CREATE INDEX after it in the same one is "Incorrect syntax near the
+        // keyword 'CREATE'" — the server reads it as part of the view.
+        foreach (ObjectIdentity id in createOrder.Where(i => i.Kind == "View"))
+        {
+            DifferencePair pair = pairById[id];
+            if (pair.Status == DifferenceStatus.OnlyInB) { continue; }
+            string viewIndexes = EmitViewIndexDelta(pair, result.NameComparer);
+            if (!string.IsNullOrWhiteSpace(viewIndexes))
+            {
+                writer.WriteBatch($"Indexes on {Sql.Q(id.SchemaName, id.ObjectName)}", viewIndexes);
+            }
+        }
+
         // Indexes
         //    - New table (OnlyInA): emit CREATE INDEX for every index.
         //    - Existing table (Different): diff against the target side and
@@ -871,6 +886,42 @@ public sealed class ScriptGenerator
     {
         string ddl = _viewEmitter.Emit(pair);
         return string.IsNullOrWhiteSpace(ddl) ? null : ddl;
+    }
+
+    /// <summary>
+    /// The CREATE / DROP INDEX statements an indexed view needs, after its own
+    /// DDL. An index on a view is what makes it a stored result set rather than
+    /// a query, so it travels with the view or the view arrives as something
+    /// else entirely.
+    /// </summary>
+    /// <remarks>
+    /// A view the script DROPs gets nothing: <c>DROP VIEW</c> takes its indexes
+    /// with it, and a DROP INDEX against an object about to disappear is an
+    /// error at worst and noise at best. Same order as the table delta — drops
+    /// before creates, so a reshaped index frees its name before it is written
+    /// again.
+    /// </remarks>
+    private string EmitViewIndexDelta(DifferencePair pair, StringComparer names)
+    {
+        if (pair.SideA is not View src) { return string.Empty; }
+
+        IReadOnlyList<TableIndex> before = pair.SideB is View tgt ? tgt.Indexes : [];
+        StringBuilder sb = new();
+        foreach (TableIndex t in before)
+        {
+            TableIndex? s = src.Indexes.FirstOrDefault(i => names.Equals(i.Name, t.Name));
+            if (s is null || !IndexShapeEqual(t, s, names))
+            {
+                sb.AppendLine(_indexEmitter.EmitDrop(src.Schema, src.Name, t));
+            }
+        }
+        foreach (TableIndex s in src.Indexes)
+        {
+            TableIndex? t = before.FirstOrDefault(i => names.Equals(i.Name, s.Name));
+            if (t is not null && IndexShapeEqual(s, t, names)) { continue; }
+            sb.AppendLine(_indexEmitter.EmitCreate(src.Schema, src.Name, s));
+        }
+        return sb.ToString();
     }
 
     private string? BuildOneFunction(DifferencePair pair)
