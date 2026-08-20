@@ -9,7 +9,7 @@
 - ALWAYS read a file before editing it
 - NEVER commit secrets, credentials, or .env files
 - Keep NEW files under 500 lines. Six existing ones are already over
-  (ScriptGenerator 1262, MainWindowViewModel 1160, TableScriptEmitter 894,
+  (ScriptGenerator 1262, MainWindowViewModel 1160, TableScriptEmitter 953,
   ComparisonEngine 749, LiveDbObjectBodyResolver 710,
   ProjectEndpointPanelViewModel 689) — do not grow them without opening an
   item in `docs/BACKLOG.md`

@@ -49,13 +49,19 @@ public sealed class TableScriptEmitter(
     /// script runs is what lets a human supply the value instead of finding out
     /// halfway through a deploy.
     /// </remarks>
+    /// <remarks>
+    /// A full rebuild used to return nothing here, on the reading that Msg 4901
+    /// is an ALTER … ADD error and a rebuild does not ALTER anything. It copies
+    /// the rows instead, and the same column with nothing to put in it fails
+    /// the copy with Msg 515 — the one case where nobody else can supply the
+    /// value, silently skipped.
+    /// </remarks>
     public static IReadOnlyList<string> ColumnsNeedingABackfillDefault(
         Table newT, Table oldT, StringComparer names)
     {
         ArgumentNullException.ThrowIfNull(newT);
         ArgumentNullException.ThrowIfNull(oldT);
         ArgumentNullException.ThrowIfNull(names);
-        if (RequiresFullRebuild(newT, oldT, names)) { return []; }
 
         HashSet<string> existing = new(oldT.Columns.Select(c => c.Name), names);
         Dictionary<string, DefaultConstraint> namedDefaults = NamedDefaultsByColumn(newT, names);
@@ -271,7 +277,7 @@ public sealed class TableScriptEmitter(
         // the data we are trying to migrate.
         if (RequiresFullRebuild(newT, oldT, names))
         {
-            return EmitRebuild(newT, oldT, names);
+            return EmitRebuild(newT, oldT, names, backfillDefaults);
         }
 
         StringBuilder sb = new();
@@ -648,7 +654,11 @@ public sealed class TableScriptEmitter(
     /// re-create pass lives in another file and another class, and a rebuild
     /// that quietly stopped calling it would take the loss back with it.
     /// </remarks>
-    private static string EmitRebuild(Table newT, Table oldT, StringComparer names)
+    private static string EmitRebuild(
+        Table newT,
+        Table oldT,
+        StringComparer names,
+        IReadOnlyDictionary<(string Schema, string Table, string Column), string>? backfillDefaults = null)
     {
         foreach (TableIndex ix in newT.Indexes)
         {
@@ -660,13 +670,31 @@ public sealed class TableScriptEmitter(
         string qualifiedTmp = $"{Sql.Q(newT.Schema, tmpName)}";
 
         HashSet<string> oldColNames = new(oldT.Columns.Select(c => c.Name), names);
-        List<string> commonInsertable =
-        [
-            .. newT.Columns
-                .Where(c => oldColNames.Contains(c.Name) && c.ComputedExpression is null)
-                .OrderBy(c => c.Ordinal)
-                .Select(c => $"{Sql.Q(c.Name)}")
-        ];
+        Dictionary<string, DefaultConstraint> namedDefaultsOnNew = NamedDefaultsByColumn(newT, names);
+
+        // A shared column travels as itself. A column only the SOURCE has is
+        // not in the SELECT at all, so _tmp has to produce the value on its
+        // own — and for a NOT NULL column it cannot always: see
+        // <see cref="SeedForCopiedRows"/> for which ones need carrying and why.
+        List<string> insertColumns = [];
+        List<string> selectTerms = [];
+        foreach (Column c in newT.Columns
+            .Where(c => c.ComputedExpression is null)
+            .OrderBy(c => c.Ordinal))
+        {
+            if (oldColNames.Contains(c.Name))
+            {
+                insertColumns.Add(Sql.Q(c.Name));
+                selectTerms.Add(Sql.Q(c.Name));
+                continue;
+            }
+            if (SeedForCopiedRows(newT, c, namedDefaultsOnNew, backfillDefaults) is not string seed)
+            {
+                continue;
+            }
+            insertColumns.Add(Sql.Q(c.Name));
+            selectTerms.Add(seed);
+        }
 
         StringBuilder sb = new();
 
@@ -700,12 +728,11 @@ public sealed class TableScriptEmitter(
             sb.Append("SET IDENTITY_INSERT ").Append(qualifiedTmp).AppendLine(" ON;");
         }
 
-        if (commonInsertable.Count > 0)
+        if (insertColumns.Count > 0)
         {
-            string colList = string.Join(", ", commonInsertable);
             sb.Append("INSERT INTO ").Append(qualifiedTmp)
-              .Append(" (").Append(colList).Append(") SELECT ")
-              .Append(colList).Append(" FROM ").Append(qualifiedOld).AppendLine(";");
+              .Append(" (").Append(string.Join(", ", insertColumns)).Append(") SELECT ")
+              .Append(string.Join(", ", selectTerms)).Append(" FROM ").Append(qualifiedOld).AppendLine(";");
         }
 
         if (newHasIdentity)
@@ -728,6 +755,38 @@ public sealed class TableScriptEmitter(
               .Append(body).AppendLine(";");
         }
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// What the copy has to write into a column only the source has, or
+    /// <see langword="null"/> when the <c>_tmp</c> table produces it by itself.
+    /// </summary>
+    /// <remarks>
+    /// It produces it by itself for a nullable column (NULL is a value), for an
+    /// identity column (the server assigns one), and for an INLINE default,
+    /// which <c>EmitCreate</c> writes onto the <c>_tmp</c> column. It does NOT
+    /// for a NAMED default: those are deliberately kept off <c>_tmp</c>, since
+    /// the name still belongs to the table being replaced until the DROP — so
+    /// the expression rides in on the SELECT instead. When the source declares
+    /// no default at all, the value can only come from the operator, which is
+    /// what <see cref="ColumnsNeedingABackfillDefault"/> collects.
+    /// </remarks>
+    private static string? SeedForCopiedRows(
+        Table newT,
+        Column column,
+        IReadOnlyDictionary<string, DefaultConstraint> namedDefaults,
+        IReadOnlyDictionary<(string Schema, string Table, string Column), string>? backfillDefaults)
+    {
+        if (column.IsNullable || column.IsIdentity || !string.IsNullOrEmpty(column.DefaultExpression))
+        {
+            return null;
+        }
+
+        string? supplied = null;
+        backfillDefaults?.TryGetValue((newT.Schema, newT.Name, column.Name), out supplied);
+        return namedDefaults.TryGetValue(column.Name, out DefaultConstraint? named)
+            ? named.Expression
+            : supplied;
     }
 
     private static bool IsNamedNonFkConstraint(Constraint c) => c switch
