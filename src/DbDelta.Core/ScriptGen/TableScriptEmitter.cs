@@ -944,9 +944,17 @@ public sealed class TableScriptEmitter(
     /// Compare, which always emits the explicit collation on character columns.
     /// Non-string columns (null collation) are skipped silently.
     /// </summary>
+    /// <remarks>
+    /// One exception, and it is not cosmetic: a column of a user-defined ALIAS
+    /// type may not carry the clause. SQL Server answers "COLLATE clause cannot
+    /// be used on user-defined data types" and the deploy stops there — the
+    /// collation belongs to the type, not to the column using it. sys.columns
+    /// reports one for such a column all the same, which is why nothing but a
+    /// real apply found this.
+    /// </remarks>
     private static void AppendCollation(StringBuilder sb, Column c)
     {
-        if (string.IsNullOrEmpty(c.Collation)) { return; }
+        if (string.IsNullOrEmpty(c.Collation) || c.IsUserDefinedType) { return; }
         sb.Append(" COLLATE ").Append(c.Collation);
     }
 }

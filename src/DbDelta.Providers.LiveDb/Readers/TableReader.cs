@@ -45,8 +45,12 @@ internal sealed class TableReader
             cc.definition          AS ComputedExpression,
             ISNULL(cc.is_persisted, 0)         AS IsPersistedComputed,
             c.column_id            AS Ordinal,
-            c.collation_name       AS CollationName
+            c.collation_name       AS CollationName,
+            -- Not cosmetic: a column of an ALIAS type may not carry a COLLATE
+            -- clause, and sys.columns reports a collation for it all the same.
+            ty.is_user_defined     AS IsUserDefinedType
         FROM sys.columns AS c
+        INNER JOIN sys.types AS ty ON ty.user_type_id = c.user_type_id
         INNER JOIN sys.tables AS t ON t.object_id = c.object_id
         LEFT JOIN sys.identity_columns AS ic ON ic.object_id = c.object_id
                                              AND ic.column_id = c.column_id
@@ -100,6 +104,7 @@ internal sealed class TableReader
                 bool isPersistedComputed = !columnsReader.IsDBNull(12) && columnsReader.GetBoolean(12);
                 int ordinal = columnsReader.GetInt32(13);
                 string? collation = columnsReader.IsDBNull(14) ? null : columnsReader.GetString(14);
+                bool isUdt = columnsReader.GetBoolean(15);
 
                 if (!tableShells.ContainsKey(objectId))
                 {
@@ -122,7 +127,10 @@ internal sealed class TableReader
                     identityIncrement: identityIncrement,
                     computedExpression: computedExpr,
                     isPersistedComputed: isPersistedComputed,
-                    collation: collation));
+                    collation: collation)
+                {
+                    IsUserDefinedType = isUdt,
+                });
             }
         }
 

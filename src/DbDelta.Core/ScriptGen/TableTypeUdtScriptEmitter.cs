@@ -40,11 +40,13 @@ public sealed class TableTypeUdtScriptEmitter
     /// <summary>
     /// Appends <c>COLLATE &lt;name&gt;</c> to <paramref name="sb"/> whenever the
     /// column carries a collation (string type). Mirrors the always-explicit
-    /// rule in <see cref="TableScriptEmitter"/>.
+    /// rule in <see cref="TableScriptEmitter"/> — including its one exception,
+    /// a column of a user-defined alias type, which SQL Server refuses to let
+    /// carry the clause at all.
     /// </summary>
     private static void AppendCollation(StringBuilder sb, Column c)
     {
-        if (string.IsNullOrEmpty(c.Collation)) { return; }
+        if (string.IsNullOrEmpty(c.Collation) || c.IsUserDefinedType) { return; }
         sb.Append(" COLLATE ").Append(c.Collation);
     }
 }

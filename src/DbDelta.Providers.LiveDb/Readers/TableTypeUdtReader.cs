@@ -35,8 +35,10 @@ internal sealed class TableTypeUdtReader
             c.scale                              AS Scale,
             c.is_nullable                        AS IsNullable,
             c.column_id                          AS Ordinal,
-            c.collation_name                     AS CollationName
+            c.collation_name                     AS CollationName,
+            ty.is_user_defined                   AS IsUserDefinedType
         FROM sys.columns AS c
+        INNER JOIN sys.types AS ty ON ty.user_type_id = c.user_type_id
         INNER JOIN sys.table_types AS tt ON tt.type_table_object_id = c.object_id
         WHERE tt.is_user_defined = 1
         ORDER BY c.object_id, c.column_id;
@@ -74,7 +76,10 @@ internal sealed class TableTypeUdtReader
                     dataType: FormatDataType(r.GetString(2), r.GetInt16(3), r.GetByte(4), r.GetByte(5)),
                     isNullable: r.GetBoolean(6),
                     ordinal: r.GetInt32(7),
-                    collation: r.IsDBNull(8) ? null : r.GetString(8)));
+                    collation: r.IsDBNull(8) ? null : r.GetString(8))
+                {
+                    IsUserDefinedType = r.GetBoolean(9),
+                });
             }
         }
 

@@ -27,6 +27,21 @@ public sealed record Column
     /// </summary>
     public string? Collation { get; init; }
 
+    /// <summary>
+    /// The column is typed with a user-defined ALIAS type
+    /// (<c>sys.types.is_user_defined = 1</c>), not a built-in one.
+    /// </summary>
+    /// <remarks>
+    /// It matters for exactly one thing, and it is not cosmetic: a column of an
+    /// alias type may not carry a <c>COLLATE</c> clause. SQL Server refuses the
+    /// statement — "COLLATE clause cannot be used on user-defined data types" —
+    /// and the deploy stops there. <c>sys.columns</c> reports a collation for
+    /// such a column exactly as it does for an <c>nvarchar</c> one, so nothing
+    /// else in the row says so. An <c>init</c> property, so every existing
+    /// construction still compiles and still means "a built-in type".
+    /// </remarks>
+    public bool IsUserDefinedType { get; init; }
+
     public Column(
         string name,
         string dataType,
