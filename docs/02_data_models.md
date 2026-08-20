@@ -1,5 +1,14 @@
 # 02 — Data Models
 
+> **These are research notes about REDGATE SQL Compare, not documentation of
+> DbDelta.** They were written before this project had code, by
+> reverse-engineering a tool we wanted to match, and they name switches, paths
+> and binaries that are Redgate's: `sqlcompare.exe`, `--abort-on-warnings`,
+> `RedGate.SQLCompare.Engine.dll`. **Do not build a pipeline from anything
+> here.** What DbDelta actually does is at
+> <https://gitbakko.github.io/db-delta/>; what is still open is
+> `docs/BACKLOG.md`.
+
 **SQL Compare Clone — Authoritative Data Model Specification**
 Version: 1.0 | Date: 2026-05-20 | Status: Draft
 

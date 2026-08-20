@@ -1,5 +1,14 @@
 # 04 — API Endpoints: CLI and Programmatic Surface
 
+> **These are research notes about REDGATE SQL Compare, not documentation of
+> DbDelta.** They were written before this project had code, by
+> reverse-engineering a tool we wanted to match, and they name switches, paths
+> and binaries that are Redgate's: `sqlcompare.exe`, `--abort-on-warnings`,
+> `RedGate.SQLCompare.Engine.dll`. **Do not build a pipeline from anything
+> here.** What DbDelta actually does is at
+> <https://gitbakko.github.io/db-delta/>; what is still open is
+> `docs/BACKLOG.md`.
+
 SQL Compare exposes no HTTP REST API. "API" in this document means the three programmatic
 surfaces through which callers control comparison and deployment:
 

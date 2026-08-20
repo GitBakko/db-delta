@@ -1,5 +1,14 @@
 # SQL Compare Clone — Internal Architecture Reference
 
+> **These are research notes about REDGATE SQL Compare, not documentation of
+> DbDelta.** They were written before this project had code, by
+> reverse-engineering a tool we wanted to match, and they name switches, paths
+> and binaries that are Redgate's: `sqlcompare.exe`, `--abort-on-warnings`,
+> `RedGate.SQLCompare.Engine.dll`. **Do not build a pipeline from anything
+> here.** What DbDelta actually does is at
+> <https://gitbakko.github.io/db-delta/>; what is still open is
+> `docs/BACKLOG.md`.
+
 > **Purpose**: This document describes the internal architecture of Redgate SQL Compare as reverse-engineered from public documentation, the SQL Comparison SDK, forum disclosures, and first-principles reasoning about how a SQL Server schema-comparison-and-sync tool must be built. Every architectural claim is annotated with its source or the constraint that forces it. This is the primary design reference for building a faithful clone.
 
 ---

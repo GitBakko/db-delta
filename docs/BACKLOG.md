@@ -8,15 +8,15 @@ vedi «Manutenzione» in fondo.
 ## Stato — 2026-08-20
 
 - **v1.0.2 pubblicata** (2026-08-13), «Latest», MSI non firmata allegata.
-- **873 test verdi** nei sette progetti che girano senza Docker (Core 500,
-  Headless 201, Persistence.Unit 80, Golden 68, Property 12, Architecture 6,
+- **876 test verdi** nei sette progetti che girano senza Docker (Core 500,
+  Headless 204, Persistence.Unit 80, Golden 68, Property 12, Architecture 6,
   Shared 6). **Due** dei tre DB-backed vanno **rossi**, non skipped, con Docker
   spento — LiveDb e Cli acceptance, che costruiscono il container in un
   inizializzatore di campo senza rete. Davanti a quel muro la prima domanda è
   `docker ps`. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **21 voci aperte** — P1 1 · P2 1 · P3 10 · P4 2 · P5 7 — più **11** in
+- **20 voci aperte** — P1 1 · P2 1 · P3 9 · P4 2 · P5 7 — più **12** in
   «Deciso — NON riaprire». Tutte riverificate sul codice il 2026-08-18, non
   ereditate dai documenti. **Le 4 critiche sono chiuse**, e 6 delle 7 alte:
   vedi P0 e P1. Il conteggio va ricontato, non decrementato a mente: `awk` sulle
@@ -177,12 +177,17 @@ Voci chiuse il 2026-08-20, ognuna dal commit che porta la sua riga:
 
 ## P3 — Debito strutturale
 
+Una voce chiusa il 2026-08-20 dal commit che porta questa riga:
+
+| Voce chiusa | Come | Prova |
+|---|---|---|
+| La griglia non era mai stata misurata a 10k oggetti | Misurata. **Costruzione e prima enumerazione di 10.000 righe: 134 ms. Sei battute nella casella di ricerca: 156 ms, cioè 26 ms per battuta. Raggruppamento: sotto il millisecondo.** I limiti asseriti sono larghi di proposito (10 s): quello che devono prendere è un cambio di **ordine di grandezza**, non un runner di CI occupato | `ResultsGridScaleTests` — 3 test che stampano i numeri misurati nell'output. **Il `Refresh()` a ogni battuta è deciso, non rinviato:** 26 ms su 10.000 righe stanno sotto la soglia di percezione e ben dentro l'intervallo fra due tasti — il debounce non serve, e sta ora in «Deciso — NON riaprire» |
+
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
 | **~1.500 righe morte**: 6 view irraggiungibili, connection manager senza binding, Serilog mai chiamato con tre `PackageReference`, 3 interfacce senza consumatori. **Dentro c'è una decisione del proprietario**: le connessioni si autosalvano a ogni compare riuscito e alimentano gli «Usati di recente», quindi finché il manager resta irraggiungibile quella lista cresce e nessuno può potarla — o si lega un pulsante, o si cancella tutto. **Un motivo in più per cancellare:** `ConnectionPickerView` tiene la stringa di connessione intera — password compresa — in una `TextBox` normale, che l'albero UIA pubblica in chiaro. Oggi non è raggiungibile, quindi non è un'esposizione; il giorno che qualcuno la lega a un pulsante lo diventa | 2026-08-14 | M | `Views/ConnectionPickerView.axaml`, `Views/ResultsTreeView.axaml`, `Cli/Logging/SerilogBootstrap.cs`, `Cli.csproj:13-15`; `OpenConnectionManagerAsync` referenziato solo da `MainWindowViewModel.cs:404` |
 | **`ComparisonOptions`: 20 flag dichiarati, 6 letti.** Più `ProjectOptions`, owner/table mappings che non raggiungono alcun motore, parser `.dbd` v1 legacy. **Assorbe `IgnoreConstraintNames`**, che è morto: deciderlo da solo significa scegliere al posto di questa voce per tutti e 14 | 2026-08-14 | M | `Core/Options/ComparisonOptions.cs:10-37`; grep `HasFlag` → 6 occorrenze in tutto; `DbDeltaProject.cs:19-34` |
-| **Tassonomia degli avvisi di deploy mai implementata** (`DeployRisk`, `--abort-on-warnings`). Due fette parziali sono atterrate e non la chiudono. **Il difetto più concreto oggi è documentale:** chi scrive una pipeline CI leggendo `docs/01_architecture.md` §9.4 usa uno switch che non esiste | 2026-07-30 | M | grep `AbortOnWarnings\|DeployRisk` → zero; `docs/01_architecture.md:225`, `:1152-1154`, `:1480-1481` |
-| **La griglia non è mai stata misurata a 10k oggetti**, e il motore emette una coppia per ogni oggetto, Identical inclusi. Da fare **dopo** la ricerca e il rebuild della griglia: misurare prima significa cronometrare un difetto già noto. **Assorbe il `Refresh()` a ogni battuta**, che fino al 2026-08-20 stava nella voce P2 della griglia insieme al sort: un refresh per tasto è un predicato per riga, e il debounce esiste già in `ProjectEndpointPanelViewModel` — ma quel costo non è **mai stato misurato**, e la misura è questa voce. Il debounce va dopo il numero, non prima | 2026-07-30 | M | `MainWindowViewModel.cs:639-641`, `:601-620`; nessun test di scala |
+| **Tassonomia degli avvisi di deploy mai implementata** (`DeployRisk`, `--abort-on-warnings`). Due fette parziali sono atterrate e non la chiudono. **La metà documentale è chiusa il 2026-08-20:** i quattro `docs/0*.md` portano ora in testa un riquadro che dice cosa descrivono — Redgate, non DbDelta — e il README non li linka più come documentazione nostra. Chi legge §9.4 lo sa prima di arrivare allo switch. Quello che resta è una **funzione mai chiesta da nessuno**, non un difetto | 2026-07-30 | M | grep `AbortOnWarnings\|DeployRisk` → zero; il riquadro in `docs/01_architecture.md:3-11` |
 | **Il round-trip per kind copre 4 su 13** (Table, View, Function, Procedure), e uno dei tre test gira solo nella matrice notturna. Sei reader non sono mai passati da un apply vero. **Trappola:** i filtri `.Where` non si cancellano e basta, i commenti sopra `SeededDrift` spiegano perché esistono | 2026-07-30 | M | `DependencyRoundTripTests.cs:48`; `CompatMatrixTests.cs:104-107`; `CompressionRoundTripTests.cs:45-68` |
 | **L'invariante di convergenza copre 2 emitter su 14** (View, Procedure). L'esempio più fresco della regola non seguita è la voce 12: ha cambiato come `TableScriptEmitter` scrive i vincoli, ha aggiunto 17 test, e nessuno è «emetti, rileggi, deve essere Identical» | 2026-08-01 | M | `Core.UnitTests/Diff/DeployedModuleConvergesTests.cs:50` e `:67`; `git show --stat 142fcb7` |
 | **Gli indici su viste indicizzate sono invisibili**, non solo non scriptabili: due database che differiscono solo per quello escono Identical. Media e non alta **solo grazie al censimento**, che almeno lo dichiara. Non è cambiare un JOIN: vanno appesi a un `View`, che oggi non ha un contenitore di indici | 2026-07-30 | L | `Providers.LiveDb/Readers/IndexReader.cs:44-45`; `UnexaminedReader.cs:50-58` |
@@ -235,6 +240,7 @@ perché una sessione futura non le riscopra come nuove.
 
 | Voce | Reg. | Perché resta |
 |---|---|---|
+| Debounce sulla ricerca della griglia | 2026-08-20 | **Misurato invece che immaginato**: 26 ms per battuta su 10.000 righe (`ResultsGridScaleTests`), sotto la soglia di percezione e dentro l'intervallo fra due tasti di chi scrive. Il pattern esiste già in `ProjectEndpointPanelViewModel` e si copierebbe in quindici righe, ma toglierebbe un costo che non si sente e aggiungerebbe un test dipendente dal tempo. Riaprire solo se la misura cambia |
 | Sovra-rilevazione di `BEGIN TRANSACTION` | 2026-07-30 | Doc-comment, test che l'asserisce come limite noto, e dal 2026-07-30 la provenienza viene prima del regex (`-- dbdelta:transaction=script`). Residuo solo sugli script **estranei** applicati con `apply` |
 | Nessun Annulla sull'esecuzione, cap 600 s | 2026-07-30 | Remarks di venti righe sulla costante + tabella «Accettato consapevolmente». `f49b728` ha reso annullabile il **compare**, non l'esecuzione. La CLI ha già `--command-timeout 0` |
 | DROP di uno schema non spuntato → Msg 3729 | 2026-07-30 | `EmitSchemaDrops` è guidato dalla selezione e il doc-comment lo dichiara: fallimento rumoroso dal server, non danno silenzioso. Cambiarlo è una decisione di prodotto |
