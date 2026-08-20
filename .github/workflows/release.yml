@@ -11,6 +11,10 @@ on:
 
 permissions:
   contents: write
+  # attest-build-provenance signs with a short-lived OIDC token and writes the
+  # attestation back to this repository. Both are per-job, not inherited.
+  id-token: write
+  attestations: write
 
 jobs:
   build-msi:
@@ -63,9 +67,31 @@ jobs:
           if (Test-Path $app) { throw "app still present after uninstall: $app" }
           Write-Host "Smoke install/uninstall OK"
 
+      - name: SHA256 of the MSI
+        id: hash
+        shell: pwsh
+        run: |
+          # After the smoke install, and after the signing step when there is
+          # one: signing rewrites the file, so a hash taken before it would
+          # describe bytes nobody can download.
+          $msi = "installer/bin/Release/DbDelta-${{ steps.ver.outputs.version }}-win-x64.msi"
+          $h = (Get-FileHash -Algorithm SHA256 $msi).Hash.ToLowerInvariant()
+          # "<hash><2 spaces><bare name>" and an LF: the format `sha256sum -c`
+          # reads. Set-Content would write CRLF and coreutils would not match.
+          [IO.File]::WriteAllText("$msi.sha256", "$h  $(Split-Path $msi -Leaf)`n")
+          "sha256=$h" >> $env:GITHUB_OUTPUT
+          Write-Host "SHA256 $h"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: installer/bin/Release/DbDelta-${{ steps.ver.outputs.version }}-win-x64.msi
+
       - name: Attach MSI to GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          files: installer/bin/Release/DbDelta-${{ steps.ver.outputs.version }}-win-x64.msi
+          files: |
+            installer/bin/Release/DbDelta-${{ steps.ver.outputs.version }}-win-x64.msi
+            installer/bin/Release/DbDelta-${{ steps.ver.outputs.version }}-win-x64.msi.sha256
           fail_on_unmatched_files: true
           prerelease: ${{ contains(github.ref_name, '-') }}
