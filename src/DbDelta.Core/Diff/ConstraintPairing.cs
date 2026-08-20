@@ -33,11 +33,14 @@ namespace DbDelta.Core.Diff;
 /// "the same constraint, changed".
 /// </para>
 /// <para>
-/// Foreign keys are excluded and always pair by name. Their emission side is
-/// keyed on the name in three separate structures in
-/// <c>ScriptGenerator</c> (the orchestrated re-add set, the drop dedupe set and
-/// the FK delta), and pairing them differently HERE alone would leave the
-/// engine and the emitter disagreeing about the same key.
+/// Foreign keys were excluded from this rule until 2026-08-20, on the ground
+/// that their emission side is keyed on the name in three separate structures
+/// in <c>ScriptGenerator</c>. The real count was FIVE — the two FK deltas, the
+/// orchestrated re-add set, and the two lookups that find the OTHER side's
+/// foreign key by this side's name, which no grep for the set names finds. All
+/// five route through <see cref="Match"/> now, because pairing them differently
+/// here alone is exactly what would leave the engine and the emitter
+/// disagreeing about the same key.
 /// </para>
 /// </remarks>
 internal static class ConstraintPairing
@@ -80,13 +83,12 @@ internal static class ConstraintPairing
 
     /// <summary>
     /// True when SQL Server named <paramref name="c"/> itself and its name is
-    /// therefore not a pairing key. Foreign keys are excluded — see the class
-    /// remarks.
+    /// therefore not a pairing key.
     /// </summary>
     public static bool PairsByShape(Constraint c)
     {
         ArgumentNullException.ThrowIfNull(c);
-        return c is not ForeignKey && c.IsSystemNamed;
+        return c.IsSystemNamed;
     }
 
     private static bool ShapeEqual(Constraint a, Constraint b, StringComparer names) => (a, b) switch
@@ -97,6 +99,14 @@ internal static class ConstraintPairing
             BodyNormalizer.ExpressionsEqual(ca.Expression, cb.Expression),
         // A column holds at most one DEFAULT, so the column IS the identity.
         (DefaultConstraint da, DefaultConstraint db) => names.Equals(da.ColumnName, db.ColumnName),
+        // What the key constrains and what it points at. ON DELETE, ON UPDATE
+        // and the disabled flag stay out: those make it the same foreign key,
+        // CHANGED, which is the distinction the callers need to keep.
+        (ForeignKey fa, ForeignKey fb) =>
+            fa.Columns.SequenceEqual(fb.Columns, names)
+            && names.Equals(fa.ReferencedSchema, fb.ReferencedSchema)
+            && names.Equals(fa.ReferencedTable, fb.ReferencedTable)
+            && fa.ReferencedColumns.SequenceEqual(fb.ReferencedColumns, names),
         _ => false,
     };
 }

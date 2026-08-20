@@ -101,6 +101,15 @@ public class ConstraintReaderTests(LiveDbFixture fixture)
                         Codice nvarchar(10) NOT NULL UNIQUE
                     );
                 END
+                IF OBJECT_ID('dbo.Righe') IS NULL
+                BEGIN
+                    -- An inline REFERENCES: SQL Server names this one too, from
+                    -- its own object_id, exactly like the four above.
+                    CREATE TABLE dbo.Righe (
+                        Id       int NOT NULL PRIMARY KEY,
+                        OrdineId int NOT NULL REFERENCES dbo.Ordini (Id)
+                    );
+                END
                 """, ct);
         }
 
@@ -118,6 +127,11 @@ public class ConstraintReaderTests(LiveDbFixture fixture)
         ordini.Constraints.OfType<UniqueConstraint>().Single().Name.Should().StartWith("UQ__Ordini__");
         ordini.Constraints.OfType<CheckConstraint>().Single().Name.Should().StartWith("CK__Ordini__");
         ordini.Constraints.OfType<DefaultConstraint>().Single().Name.Should().StartWith("DF__Ordini__");
+
+        Table righe = result.Value!.Tables.Single(t => t.Name == "Righe");
+        ForeignKey fk = righe.Constraints.OfType<ForeignKey>().Single();
+        fk.IsSystemNamed.Should().BeTrue("an inline REFERENCES leaves the naming to the server");
+        fk.Name.Should().StartWith("FK__Righe__");
     }
 
     [Fact]

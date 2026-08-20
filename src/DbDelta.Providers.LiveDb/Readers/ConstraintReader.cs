@@ -44,7 +44,8 @@ internal sealed class ConstraintReader
             fk.delete_referential_action AS OnDelete,
             fk.update_referential_action AS OnUpdate,
             fk.is_disabled         AS IsDisabled,
-            fk.is_not_for_replication AS IsNotForReplication
+            fk.is_not_for_replication AS IsNotForReplication,
+            fk.is_system_named     AS IsSystemNamed
         FROM sys.foreign_keys AS fk
         INNER JOIN sys.foreign_key_columns AS fkc ON fkc.constraint_object_id = fk.object_id
         INNER JOIN sys.tables AS tp ON tp.object_id = fk.parent_object_id
@@ -176,6 +177,7 @@ internal sealed class ConstraintReader
         ReferentialAction onUpdate = ReferentialAction.NoAction;
         bool isDisabled = false;
         bool isNfr = false;
+        bool isSystemNamed = false;
         List<string> localCols = [];
         List<string> refCols = [];
 
@@ -194,12 +196,13 @@ internal sealed class ConstraintReader
             byte onUpd = reader.GetByte(8);
             bool disabled = reader.GetBoolean(9);
             bool nfr = reader.GetBoolean(10);
+            bool systemNamed = reader.GetBoolean(11);
 
             if (currentName is not null && (currentName != name || currentObjectId != objectId))
             {
                 FlushForeignKey(byObject, currentObjectId!.Value, currentName,
                     localCols, refSchema!, refTable!, refCols,
-                    onDelete, onUpdate, isDisabled, isNfr);
+                    onDelete, onUpdate, isDisabled, isNfr, isSystemNamed);
                 localCols = [];
                 refCols = [];
             }
@@ -212,6 +215,7 @@ internal sealed class ConstraintReader
             onUpdate = MapAction(onUpd);
             isDisabled = disabled;
             isNfr = nfr;
+            isSystemNamed = systemNamed;
             localCols.Add(localCol);
             refCols.Add(rc);
         }
@@ -220,7 +224,7 @@ internal sealed class ConstraintReader
         {
             FlushForeignKey(byObject, currentObjectId!.Value, currentName,
                 localCols, refSchema!, refTable!, refCols,
-                onDelete, onUpdate, isDisabled, isNfr);
+                onDelete, onUpdate, isDisabled, isNfr, isSystemNamed);
         }
     }
 
@@ -235,7 +239,8 @@ internal sealed class ConstraintReader
         ReferentialAction onDelete,
         ReferentialAction onUpdate,
         bool isDisabled,
-        bool isNotForReplication)
+        bool isNotForReplication,
+        bool isSystemNamed)
     {
         ForeignKey fk = new(
             Name: name,
@@ -246,7 +251,8 @@ internal sealed class ConstraintReader
             OnDelete: onDelete,
             OnUpdate: onUpdate,
             IsDisabled: isDisabled,
-            IsNotForReplication: isNotForReplication);
+            IsNotForReplication: isNotForReplication)
+        { IsSystemNamed = isSystemNamed };
         Append(byObject, objectId, fk);
     }
 

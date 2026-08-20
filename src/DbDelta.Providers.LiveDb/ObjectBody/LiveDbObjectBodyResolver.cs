@@ -441,7 +441,7 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
             SELECT fk.name, cp.name AS LocalCol, sr.name AS RefSchema, tr.name AS RefTable,
                    cr.name AS RefCol, fkc.constraint_column_id,
                    fk.delete_referential_action, fk.update_referential_action,
-                   fk.is_disabled, fk.is_not_for_replication
+                   fk.is_disabled, fk.is_not_for_replication, fk.is_system_named
             FROM sys.foreign_keys AS fk
             INNER JOIN sys.foreign_key_columns AS fkc ON fkc.constraint_object_id = fk.object_id
             INNER JOIN sys.tables AS tr ON tr.object_id = fk.referenced_object_id
@@ -458,7 +458,7 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
         string? refSchema = null, refTable = null;
         ReferentialAction onDelete = ReferentialAction.NoAction;
         ReferentialAction onUpdate = ReferentialAction.NoAction;
-        bool isDisabled = false, isNfr = false;
+        bool isDisabled = false, isNfr = false, isSystemNamed = false;
         List<string> localCols = [], refCols = [];
 
         await using SqlCommand cmd = new(sql, connection);
@@ -476,10 +476,11 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
             byte onUpd = r.GetByte(7);
             bool disabled = r.GetBoolean(8);
             bool nfr = r.GetBoolean(9);
+            bool systemNamed = r.GetBoolean(10);
 
             if (currentName is not null && currentName != name)
             {
-                AppendForeignKey(byObject, objectId, currentName, localCols, refSchema!, refTable!, refCols, onDelete, onUpdate, isDisabled, isNfr);
+                AppendForeignKey(byObject, objectId, currentName, localCols, refSchema!, refTable!, refCols, onDelete, onUpdate, isDisabled, isNfr, isSystemNamed);
                 localCols = [];
                 refCols = [];
             }
@@ -491,13 +492,14 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
             onUpdate = MapAction(onUpd);
             isDisabled = disabled;
             isNfr = nfr;
+            isSystemNamed = systemNamed;
             localCols.Add(localCol);
             refCols.Add(rc);
         }
 
         if (currentName is not null)
         {
-            AppendForeignKey(byObject, objectId, currentName, localCols, refSchema!, refTable!, refCols, onDelete, onUpdate, isDisabled, isNfr);
+            AppendForeignKey(byObject, objectId, currentName, localCols, refSchema!, refTable!, refCols, onDelete, onUpdate, isDisabled, isNfr, isSystemNamed);
         }
     }
 
@@ -512,7 +514,8 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
         ReferentialAction onDelete,
         ReferentialAction onUpdate,
         bool isDisabled,
-        bool isNfr)
+        bool isNfr,
+        bool isSystemNamed)
     {
         ForeignKey fk = new(
             Name: name,
@@ -523,7 +526,8 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
             OnDelete: onDelete,
             OnUpdate: onUpdate,
             IsDisabled: isDisabled,
-            IsNotForReplication: isNfr);
+            IsNotForReplication: isNfr)
+        { IsSystemNamed = isSystemNamed };
         Append(byObject, objectId, fk);
     }
 

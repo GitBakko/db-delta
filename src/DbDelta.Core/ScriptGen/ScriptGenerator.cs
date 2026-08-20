@@ -151,11 +151,20 @@ public sealed class ScriptGenerator
         // it carries the shape the final schema wants. An FK the source no
         // longer has is claimed but never re-added, which is the point — the
         // claim is what stops some other pass from putting it back.
-        void OrchestrateFkReAdd(Table sourceHolder, string fkName)
+        void OrchestrateFkReAdd(Table sourceHolder, ForeignKey fk)
         {
-            if (!orchestratedFks.Add((sourceHolder.Schema, sourceHolder.Name, fkName))) { return; }
-            ForeignKey? sourceFk = sourceHolder.Constraints.OfType<ForeignKey>()
-                .FirstOrDefault(f => result.NameComparer.Equals(f.Name, fkName));
+            // Found by PAIRING, not by name: for a key SQL Server named itself
+            // the two sides carry different hashes, and looking the source's up
+            // under the target's name finds nothing — the claim would then be
+            // keyed on a name the skip check never asks about, and the key
+            // would be added twice.
+            ForeignKey? sourceFk = MatchFk(fk, sourceHolder, result.NameComparer);
+            // The key set is read with the SOURCE's name (see EmitFkAdds), so
+            // that is what has to go in when there is one.
+            if (!orchestratedFks.Add((sourceHolder.Schema, sourceHolder.Name, (sourceFk ?? fk).Name)))
+            {
+                return;
+            }
             if (sourceFk is not null)
             {
                 orchestratedFkAdds.Add((sourceHolder.Schema, sourceHolder.Name, sourceFk));
@@ -186,7 +195,7 @@ public sealed class ScriptGenerator
             if (holderPair.SideA is Table sourceHolder
                 && selectedTables.Contains((targetHolder.Schema, targetHolder.Name)))
             {
-                OrchestrateFkReAdd(sourceHolder, targetFk.Name);
+                OrchestrateFkReAdd(sourceHolder, targetFk);
                 return;
             }
             ClaimTargetSideFkReAdd(targetHolder, targetFk);
@@ -237,7 +246,7 @@ public sealed class ScriptGenerator
                 {
                     if (rebuildTargets.Contains((fk.ReferencedSchema, fk.ReferencedTable)))
                     {
-                        OrchestrateFkReAdd(holder, fk.Name);
+                        OrchestrateFkReAdd(holder, fk);
                     }
                 }
             }
@@ -265,12 +274,10 @@ public sealed class ScriptGenerator
             x.Identity.Kind == "Table" && x.Status == DifferenceStatus.Different))
         {
             if (p.SideA is not Table sideA || p.SideB is not Table sideB) { continue; }
-            var srcFks = sideA.Constraints.OfType<ForeignKey>()
-                .ToDictionary(f => f.Name, result.NameComparer);
             foreach (ForeignKey t in sideB.Constraints.OfType<ForeignKey>())
             {
-                bool stillThere = srcFks.TryGetValue(t.Name, out ForeignKey? s);
-                if (!stillThere || !ForeignKeyShapeEqual(t, s!, result.NameComparer))
+                ForeignKey? s = MatchFk(t, sideA, result.NameComparer);
+                if (s is null || !ForeignKeyShapeEqual(t, s, result.NameComparer))
                 {
                     AddFkDrop(sideA.Schema, sideA.Name, t);
                 }
@@ -1234,21 +1241,25 @@ public sealed class ScriptGenerator
         StringComparer names)
     {
         StringBuilder sb = new();
-        var srcFks =
-            src.Constraints.OfType<ForeignKey>().ToDictionary(fk => fk.Name, names);
-        var tgtFks =
-            tgt.Constraints.OfType<ForeignKey>().ToDictionary(fk => fk.Name, names);
-
-        foreach (ForeignKey s in srcFks.Values)
+        foreach (ForeignKey s in src.Constraints.OfType<ForeignKey>())
         {
             if (skipKeys.Contains((src.Schema, src.Name, s.Name))) { continue; }
-            bool existsOnTarget = tgtFks.TryGetValue(s.Name, out ForeignKey? t);
-            bool shapeChanged = existsOnTarget && !ForeignKeyShapeEqual(s, t!, names);
-            if (existsOnTarget && !shapeChanged) { continue; }
+            ForeignKey? t = MatchFk(s, tgt, names);
+            if (t is not null && ForeignKeyShapeEqual(s, t, names)) { continue; }
             sb.AppendLine(_fkEmitter.EmitAdd(src.Schema, src.Name, s));
         }
         return sb.ToString();
     }
+
+    /// <summary>
+    /// The foreign key on <paramref name="other"/> that IS
+    /// <paramref name="fk"/>, or <see langword="null"/> when that side has
+    /// none. The single answer all five name-keyed structures ask, so they
+    /// cannot drift apart: a key SQL Server named itself pairs on what it
+    /// constrains, never on its hash. See <c>ConstraintPairing</c>.
+    /// </summary>
+    private static ForeignKey? MatchFk(ForeignKey fk, Table other, StringComparer names) =>
+        ConstraintPairing.Match(fk, [.. other.Constraints.OfType<ForeignKey>()], names) as ForeignKey;
 
     private static bool ForeignKeyShapeEqual(ForeignKey a, ForeignKey b, StringComparer names) =>
         a.Columns.SequenceEqual(b.Columns, names)
