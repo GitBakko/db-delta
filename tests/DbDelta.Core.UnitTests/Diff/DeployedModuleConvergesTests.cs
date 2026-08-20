@@ -29,6 +29,12 @@ public class DeployedModuleConvergesTests
     private static Database Db(params StoredProcedure[] p) =>
         new("Db", Schemas: [new Schema("dbo")], Tables: [], Views: [], Procedures: p);
 
+    private static Database Db(params Function[] f) =>
+        new("Db", Schemas: [new Schema("dbo")], Tables: [], Views: [], Procedures: []) { Functions = f };
+
+    private static Database Db(params Trigger[] t) =>
+        new("Db", Schemas: [new Schema("dbo")], Tables: [], Views: [], Procedures: []) { Triggers = t };
+
     /// <summary>
     /// The tails a real catalog actually holds. The newline ones are the bug:
     /// SQL Server stores the definition VERBATIM, and a developer's file
@@ -75,6 +81,43 @@ public class DeployedModuleConvergesTests
 
         new ComparisonEngine().Compare(Db(source), Db(target), ComparisonOptions.None)
             .Differences.Single(p => p.Identity.Kind == "Procedure")
+            .Status.Should().Be(DifferenceStatus.Identical, $"deployed:\n{deployed}");
+    }
+
+    [Theory]
+    [MemberData(nameof(Tails))]
+    public void A_deployed_function_compares_identical_on_the_next_run(string tail)
+    {
+        Function source = new(
+            "dbo", "FnTotale",
+            $"CREATE FUNCTION [dbo].[FnTotale]() RETURNS TABLE AS RETURN {tail}",
+            IsEncrypted: false, FunctionKind.InlineTableValued);
+
+        string deployed = new FunctionScriptEmitter().Emit(
+            new DifferencePair(source.Identity, DifferenceStatus.OnlyInA, source, null));
+        Function target = source with { Body = deployed };
+
+        new ComparisonEngine().Compare(Db(source), Db(target), ComparisonOptions.None)
+            .Differences.Single(p => p.Identity.Kind == "Function")
+            .Status.Should().Be(DifferenceStatus.Identical, $"deployed:\n{deployed}");
+    }
+
+    [Theory]
+    [MemberData(nameof(Tails))]
+    public void A_deployed_trigger_compares_identical_on_the_next_run(string tail)
+    {
+        Trigger source = new(
+            "dbo", "TrgArticoli",
+            $"CREATE TRIGGER [dbo].[TrgArticoli] ON [dbo].[Articoli] AFTER INSERT AS BEGIN {tail} END",
+            IsEncrypted: false, ParentSchema: "dbo", ParentTable: "Articoli",
+            IsDisabled: false, IsNotForReplication: false);
+
+        string deployed = new TriggerScriptEmitter().Emit(
+            new DifferencePair(source.Identity, DifferenceStatus.OnlyInA, source, null));
+        Trigger target = source with { Body = deployed };
+
+        new ComparisonEngine().Compare(Db(source), Db(target), ComparisonOptions.None)
+            .Differences.Single(p => p.Identity.Kind == "Trigger")
             .Status.Should().Be(DifferenceStatus.Identical, $"deployed:\n{deployed}");
     }
 
