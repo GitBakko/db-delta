@@ -364,7 +364,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (window is null) { return; }
         if (AppState.CurrentProject is null)
         {
-            AppState.LastError = "Nessun progetto attivo da salvare. Apri o crea un progetto prima.";
+            AppState.LastError = "Nessun progetto attivo da salvare. Carica o crea un progetto prima.";
             return;
         }
 
@@ -799,7 +799,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(AppState.SourceConnectionString)
             || string.IsNullOrWhiteSpace(AppState.TargetConnectionString))
         {
-            AppState.LastError = "Apri o crea un progetto prima di poter aggiornare il confronto.";
+            AppState.LastError = "Carica o crea un progetto prima di poter aggiornare il confronto.";
             return;
         }
         if (AppState.IsBusy) { return; }

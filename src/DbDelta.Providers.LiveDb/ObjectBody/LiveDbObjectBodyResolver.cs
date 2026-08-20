@@ -97,9 +97,7 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
         object? raw = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
         if (raw is null or DBNull) { return null; }
 
-        Synonym syn = new(
-            Schema: schema, Name: name, BaseObjectName: (string)raw,
-            TargetServer: null, TargetDatabase: null, TargetSchema: null, TargetObject: null);
+        Synonym syn = new(Schema: schema, Name: name, BaseObjectName: (string)raw);
         return new SynonymScriptEmitter().EmitCreate(syn);
     }
 

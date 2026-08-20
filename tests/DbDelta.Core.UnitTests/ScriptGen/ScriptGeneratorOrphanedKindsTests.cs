@@ -102,7 +102,7 @@ public class ScriptGeneratorOrphanedKindsTests
     [Fact]
     public void OnlyInA_Synonym_emits_CREATE_SYNONYM()
     {
-        Synonym syn = new("dbo", "OrdersAlias", "[OtherDb].[dbo].[Orders]", null, "OtherDb", "dbo", "Orders");
+        Synonym syn = new("dbo", "OrdersAlias", "[OtherDb].[dbo].[Orders]");
         ComparisonResult result = new([Pair(syn.Identity, DifferenceStatus.OnlyInA, syn, null)]);
 
         string sql = Sut.Generate(result);
@@ -113,7 +113,7 @@ public class ScriptGeneratorOrphanedKindsTests
     [Fact]
     public void OnlyInB_Synonym_emits_DROP_SYNONYM()
     {
-        Synonym syn = new("dbo", "OrdersAlias", "[OtherDb].[dbo].[Orders]", null, "OtherDb", "dbo", "Orders");
+        Synonym syn = new("dbo", "OrdersAlias", "[OtherDb].[dbo].[Orders]");
         ComparisonResult result = new([Pair(syn.Identity, DifferenceStatus.OnlyInB, null, syn)]);
 
         string sql = Sut.Generate(result);
@@ -124,8 +124,8 @@ public class ScriptGeneratorOrphanedKindsTests
     [Fact]
     public void Different_Synonym_emits_DROP_then_CREATE()
     {
-        Synonym src = new("dbo", "OrdersAlias", "[NewDb].[dbo].[Orders]", null, "NewDb", "dbo", "Orders");
-        Synonym tgt = new("dbo", "OrdersAlias", "[OldDb].[dbo].[Orders]", null, "OldDb", "dbo", "Orders");
+        Synonym src = new("dbo", "OrdersAlias", "[NewDb].[dbo].[Orders]");
+        Synonym tgt = new("dbo", "OrdersAlias", "[OldDb].[dbo].[Orders]");
         ComparisonResult result = new([Pair(src.Identity, DifferenceStatus.Different, src, tgt)]);
 
         string sql = Sut.Generate(result);
@@ -305,7 +305,7 @@ public class ScriptGeneratorOrphanedKindsTests
     [Fact]
     public void Synonyms_appear_between_triggers_and_FKs()
     {
-        Synonym syn = new("dbo", "OrdersAlias", "[Other].[dbo].[Orders]", null, "Other", "dbo", "Orders");
+        Synonym syn = new("dbo", "OrdersAlias", "[Other].[dbo].[Orders]");
         Table table = new("dbo", "Orders", [new Column("Id", "int", isNullable: false, ordinal: 1)]);
         ComparisonResult result = new(
         [

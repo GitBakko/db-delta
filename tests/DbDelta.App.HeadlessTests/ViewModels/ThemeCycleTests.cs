@@ -23,6 +23,15 @@ public class ThemeCycleTests : IDisposable
     private readonly string _dir;
     private readonly string _file;
 
+    /// <summary>
+    /// The application's theme as this test found it. Every test in here cycles
+    /// the theme, and cycling applies the variant to the RUNNING application —
+    /// a process-wide setting the whole assembly shares. Restoring it costs two
+    /// lines; not restoring it costs whatever the next test that reads a
+    /// theme-dependent brush happens to see, which depends on execution order.
+    /// </summary>
+    private readonly ThemeVariant? _appVariant = Application.Current?.RequestedThemeVariant;
+
     public ThemeCycleTests()
     {
         _dir = Path.Combine(Path.GetTempPath(), $"dbdelta-theme-{Guid.NewGuid():N}");
@@ -33,6 +42,7 @@ public class ThemeCycleTests : IDisposable
     public void Dispose()
     {
         try { Directory.Delete(_dir, recursive: true); } catch { /* best effort */ }
+        if (Application.Current is Application app) { app.RequestedThemeVariant = _appVariant; }
         GC.SuppressFinalize(this);
     }
 
@@ -118,20 +128,14 @@ public class ThemeCycleTests : IDisposable
     [AvaloniaFact]
     public async Task Cycling_applies_the_variant_to_the_running_application()
     {
-        Application app = Application.Current!;
-        ThemeVariant? previous = app.RequestedThemeVariant;
-        try
-        {
-            MainWindowViewModel vm = BuildVm(AppTheme.Light);
+        // This one used to restore the variant by hand, in a try/finally, and
+        // was the only one that did — while every other test here cycles the
+        // theme too. Dispose does it for all of them now.
+        MainWindowViewModel vm = BuildVm(AppTheme.Light);
 
-            await vm.CycleThemeCommand.ExecuteAsync(null);
+        await vm.CycleThemeCommand.ExecuteAsync(null);
 
-            app.RequestedThemeVariant.Should().Be(ThemeVariant.Dark);
-        }
-        finally
-        {
-            app.RequestedThemeVariant = previous;
-        }
+        Application.Current!.RequestedThemeVariant.Should().Be(ThemeVariant.Dark);
     }
 
     [AvaloniaFact]

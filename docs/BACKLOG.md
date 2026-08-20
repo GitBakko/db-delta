@@ -8,15 +8,15 @@ vedi «Manutenzione» in fondo.
 ## Stato — 2026-08-20
 
 - **v1.0.2 pubblicata** (2026-08-13), «Latest», MSI non firmata allegata.
-- **844 test verdi** nei sette progetti che girano senza Docker (Core 500,
-  Headless 184, Persistence.Unit 68, Golden 68, Property 12, Architecture 6,
+- **845 test verdi** nei sette progetti che girano senza Docker (Core 500,
+  Headless 185, Persistence.Unit 68, Golden 68, Property 12, Architecture 6,
   Shared 6). **Due** dei tre DB-backed vanno **rossi**, non skipped, con Docker
   spento — LiveDb e Cli acceptance, che costruiscono il container in un
   inizializzatore di campo senza rete. Davanti a quel muro la prima domanda è
   `docker ps`. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **27 voci aperte** — P1 1 · P2 1 · P3 10 · P4 8 · P5 7 — più **11** in
+- **25 voci aperte** — P1 1 · P2 1 · P3 10 · P4 6 · P5 7 — più **11** in
   «Deciso — NON riaprire». Tutte riverificate sul codice il 2026-08-18, non
   ereditate dai documenti. **Le 4 critiche sono chiuse**, e 6 delle 7 alte:
   vedi P0 e P1. Il conteggio va ricontato, non decrementato a mente: `awk` sulle
@@ -199,13 +199,13 @@ Una voce chiusa il 2026-08-20 dal commit che porta questa riga:
 | Voce chiusa | Come | Prova |
 |---|---|---|
 | La `PasswordBox` esponeva il valore in chiaro via UIAutomation | `PasswordChar` maschera i pixel; l'albero UIA è una **seconda superficie** sullo stesso controllo, e il peer standard pubblicava `Text` attraverso `IValueProvider`. Ora la casella è una `MaskedTextBox` col proprio peer, che pubblica i pallini — non `null`: togliere del tutto il pattern nasconderebbe la password e insieme il campo a uno screen reader | `PasswordBoxTests` — il difetto si riproduce **in headless**, senza pilotare la GUI: il peer restituiva `hunter2`. Due test, di cui uno è il controllo in negativo sull'accessibilità. **Sonda di mutazione fatta:** rimessa la `TextBox` normale, cadono entrambi |
+| I quattro segmenti di `Synonym` erano campi morti | Cancellati, insieme al parser che li riempiva. Nessuno li leggeva: l'emittente scrive `BaseObjectName` verbatim e il confronto legge quella stessa stringa. Il difetto registrato — il parser non faceva un-escape di `]]` — era un difetto di codice morto, e la chiusura più corta era toglierlo | `Synonym.cs` porta ora tre membri. `M5KindsTests`, `ScriptGeneratorOrphanedKindsTests` e i golden restano verdi senza toccare un'asserzione: la prova che nessuno leggeva quei campi |
+| Quattro test lasciavano il tema dell'applicazione come l'avevano trovato | `Application.RequestedThemeVariant` è un'impostazione di processo e ciclare il tema la scrive; un solo test la ripristinava, a mano, in un `try/finally`. Ora la cattura il costruttore e la rimette il `Dispose` che la classe già aveva, per tutti | `ThemeCycleTests`. **Non c'è un test che lo guardi**, e sarebbe finto: il difetto è invisibile finché nessun altro test legge un brush dipendente dal tema — è il motivo per cui non aveva ancora morso |
 
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
-| **«Apri» invece di «Carica» in quattro punti**, non due. Due sono messaggi d'errore su un progetto da caricare e vanno cambiati; **due sono tooltip di apertura pannello e browser, dove «Apri» è semanticamente giusto — chiedere al proprietario** se la regola li include | 2026-05-22 | XS | `ViewModels/MainWindowViewModel.cs:367`, `:802`; `Views/MainWindow.axaml:582`, `:587` |
+| **Restano due «Apri», ed è una decisione del proprietario.** I due messaggi d'errore sono stati corretti il 2026-08-20 e sono asseriti da `MainWindowViewModelTests.The_project_errors_say_Carica_and_never_Apri` (sonda di mutazione fatta). Gli altri due sono tooltip che aprono un pannello e un browser: la regola in memoria parla di azioni di **caricamento file**, quindi non li copre di suo. Se la regola è più larga di così, lo dice il proprietario | 2026-05-22 | XS | `Views/MainWindow.axaml:582` («Apri i messaggi del server»), `:587` («Apri la version history nel browser») |
 | **Il censimento non ha un'asserzione sull'output CLI.** `TextFormatter` è `internal` e la CLI tiene gli internals chiusi apposta: **non aprirla con `InternalsVisibleTo`**, asserisci sullo stdout dentro un'acceptance che già gira | 2026-08-16 | XS | `Cli/Output/TextFormatter.cs:9` e `:31-35`; `CompareCommandTests.cs:322-323` documenta la scelta |
-| **Quattro test mutano `Application.Current.RequestedThemeVariant` senza ripristinarlo.** Non ha ancora morso perché nessun altro test legge un brush dipendente dal tema. La classe implementa già `IDisposable` | 2026-08-14 | XS | `ThemeCycleTests.cs:47-59, 74-86, 138-146, 151-163` contro `:121-134` |
-| **`SynonymReader` non fa un-escape di `]]`** — ma la conseguenza raccontata non esiste: i quattro segmenti sono campi morti e l'emittente usa `BaseObjectName` verbatim. **La chiusura più corta è cancellare i campi**, non gestire il `]]` | 2026-07-30 | XS | `Providers.LiveDb/Readers/SynonymReader.cs:52`; `SynonymScriptEmitter.cs:14` |
 | **La regola DRY dell'app è violata dal codice che governa:** il markup icona+etichetta dei pulsanti (`<StackPanel Horizontal><Path/><TextBlock/>`) è inline **8 volte** in `Views/MainWindow.axaml`, e la regola dice «prima della seconda copia». O si estrae un `Views/Controls/IconButtonContent.axaml` con due proprietà (`Geometry`, `Text`), o si scrive l'eccezione come definitiva. Trovato dall'audit di allineamento del 2026-08-18, non da una lettura del codice | 2026-08-18 | S | `Views/MainWindow.axaml` righe 100, 123, 142, 203, 218, 475, 489, 502; regola in `src/DbDelta.App.Avalonia/CLAUDE.md` §3 |
 | **Una FK auto-nominata e DISABILITATA continua a portare l'hash della sorgente.** `NOCHECK CONSTRAINT` vuole un nome e l'unico disponibile è quello che il server della sorgente ha coniato; emetterla senza nome e saltare la disabilitazione cambierebbe silenziosamente l'enforcement, che è peggio del churn. Quella forma quindi non converge: due server continueranno a vederla diversa a ogni confronto. Via d'uscita: un nome nostro, cioè una rinomina al deploy — non una clausola più furba | 2026-08-20 | S | `Core/ScriptGen/ForeignKeyScriptEmitter.cs` (`NameClause`, commento `ponytail:`); `SystemNamedForeignKeyTests.A_disabled_auto_named_foreign_key_keeps_its_name` lo fissa |
 | **Il parser delle risposte UDP del browser SQL è permissivo:** valida solo `buffer[0] == 0x05` e poi si fida della stringa. Scorporata dalla voce P0 sulle credenziali quando quella è stata chiusa: nulla parte più da sola verso un host suggerito, quindi resta igiene, non esposizione | 2026-07-30 | S | `Persistence/Sql/SqlServerDiscovery.cs:196-199` |

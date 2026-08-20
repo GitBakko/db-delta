@@ -88,8 +88,7 @@ public class M5KindsTests
     [Fact]
     public void Synonym_create_emits_for_clause()
     {
-        Synonym syn = new("dbo", "Cust", "[other_db].[dbo].[Customer]",
-            null, "other_db", "dbo", "Customer");
+        Synonym syn = new("dbo", "Cust", "[other_db].[dbo].[Customer]");
 
         string sql = new SynonymScriptEmitter().EmitCreate(syn);
         sql.Should().Be("CREATE SYNONYM [dbo].[Cust] FOR [other_db].[dbo].[Customer];");
@@ -98,7 +97,7 @@ public class M5KindsTests
     [Fact]
     public void Synonym_diff_changed_target_flags_different()
     {
-        Synonym a = new("dbo", "Cust", "[a].[dbo].[Customer]", null, "a", "dbo", "Customer");
+        Synonym a = new("dbo", "Cust", "[a].[dbo].[Customer]");
         Synonym b = a with { BaseObjectName = "[b].[dbo].[Customer]" };
         Database dA = new("d", [], [], [], [], [], []) { Synonyms = [a] };
         Database dB = new("d", [], [], [], [], [], []) { Synonyms = [b] };

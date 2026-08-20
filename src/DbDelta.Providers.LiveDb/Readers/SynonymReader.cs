@@ -6,8 +6,8 @@ namespace DbDelta.Providers.LiveDb.Readers;
 /// <summary>
 /// Reads SYNONYM objects from sys.synonyms. SQL Server stores the synonym
 /// target as a single string (<c>base_object_name</c>) of the form
-/// <c>[srv].[db].[schema].[obj]</c>; we keep the raw string for emission
-/// and split it best-effort into segments for the diff viewer.
+/// <c>[srv].[db].[schema].[obj]</c>, which we keep verbatim: it is what the
+/// emitter writes and what the comparison reads.
 /// </summary>
 internal sealed class SynonymReader
 {
@@ -28,43 +28,8 @@ internal sealed class SynonymReader
             string schemaName = r.GetString(0);
             string synName = r.GetString(1);
             string baseRaw = r.GetString(2);
-            (string? srv, string? db, string? sch, string? obj) = SplitBaseObjectName(baseRaw);
-            result.Add(new Synonym(schemaName, synName, baseRaw, srv, db, sch, obj));
+            result.Add(new Synonym(schemaName, synName, baseRaw));
         }
         return result;
-    }
-
-    /// <summary>
-    /// Splits SQL Server's <c>base_object_name</c> form into up to four
-    /// bracketed segments. Missing leading segments are returned as null —
-    /// e.g. <c>[dbo].[Orders]</c> yields (null, null, "dbo", "Orders");
-    /// <c>[other_db].[dbo].[Orders]</c> yields (null, "other_db", "dbo", "Orders").
-    /// </summary>
-    private static (string? Server, string? Database, string? Schema, string? Object) SplitBaseObjectName(string raw)
-    {
-        if (string.IsNullOrWhiteSpace(raw)) { return (null, null, null, null); }
-        List<string> parts = [];
-        int i = 0;
-        while (i < raw.Length)
-        {
-            if (raw[i] == '[')
-            {
-                int end = raw.IndexOf(']', i + 1);
-                if (end < 0) { break; }
-                parts.Add(raw[(i + 1)..end]);
-                i = end + 1;
-                if (i < raw.Length && raw[i] == '.') { i++; }
-            }
-            else { i++; }
-        }
-
-        return parts.Count switch
-        {
-            0 => (null, null, null, null),
-            1 => (null, null, null, parts[0]),
-            2 => (null, null, parts[0], parts[1]),
-            3 => (null, parts[0], parts[1], parts[2]),
-            _ => (parts[0], parts[1], parts[2], parts[3]),
-        };
     }
 }

@@ -1,3 +1,4 @@
+using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using DbDelta.App.ViewModels;
 using DbDelta.Core.Diff;
@@ -416,5 +417,24 @@ public class MainWindowViewModelTests
 
         vm.SelectedCount.Should().Be(1);
         vm.Rows.Single(r => r.ObjectName == "Unchanged").IsSelected.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// "Carica", never "Apri", for anything that loads a project — the rule the
+    /// owner called inviolable. Two error messages were the last places in the
+    /// source still saying otherwise. The two tooltips that open a panel and a
+    /// browser are NOT load actions and are left alone; see docs/BACKLOG.md.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task The_project_errors_say_Carica_and_never_Apri()
+    {
+        MainWindowViewModel vm = new(new AppStateViewModel());
+
+        await vm.SaveProjectCommand.ExecuteAsync(new Window());
+        vm.AppState.LastError.Should().Contain("Carica").And.NotContain("Apri");
+
+        vm.AppState.LastError = null;
+        await vm.RefreshCommand.ExecuteAsync(null);
+        vm.AppState.LastError.Should().Contain("Carica").And.NotContain("Apri");
     }
 }
