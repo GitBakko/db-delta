@@ -37,18 +37,24 @@ CI re-runs the same set on `windows-latest` and additionally runs the integratio
 
 - `DbDelta.Core` has zero I/O dependencies. Enforced by `DbDelta.Architecture.Tests/LayeringTests.cs`.
 - Providers implement ports from `DbDelta.Core.Abstractions`.
-- Latest stable NuGet versions only — Renovate-bot opens PRs weekly.
+- Latest stable NuGet versions only, pinned centrally in `Directory.Packages.props`.
+  `NuGetAudit` plus `TreatWarningsAsErrors` means a new advisory turns into
+  `NU1903` and breaks the restore with nobody having committed anything — the
+  fix is a `PackageVersion` pin, checked against a real container.
 
 ## Commit Style
 
 Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`, `build:`, `test:`, `refactor:`.
 
-### Design System Sync Rule
+### The task list
 
-The App copies the design system from `docs/design-system/project/assets/` into `src/DbDelta.App/wwwroot/assets/`. When the design system changes:
+`docs/BACKLOG.md` is the only one. An item is closed **in the same commit as
+the code that closes it**, and never on a recollection — a `file:line` or a
+commit hash. Handoffs in `docs/review/` and plans in `docs/superpowers/plans/`
+are history, not a status board.
 
-1. Edit files under `docs/design-system/project/`.
-2. Re-run the copy command (see Task T1.11a in plan M0/M1).
-3. Commit both the docs change and the asset copy in a single commit so the App build stays in sync.
+### UI rules
 
-Do NOT hand-edit `src/DbDelta.App/wwwroot/assets/*` — they are generated. Edits will be overwritten on the next sync.
+`src/DbDelta.App.Avalonia/CLAUDE.md` holds the non-negotiable ones (control
+heights, the accent bands, "Carica" and never "Apri"). They are asserted by
+headless tests under `tests/DbDelta.App.HeadlessTests/`.

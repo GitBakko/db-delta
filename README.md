@@ -25,6 +25,10 @@ Notes:
 - The MSI is **unsigned**, so Windows SmartScreen will warn on first run —
   choose *More info → Run anyway*. Code signing is planned but not yet in
   place; it will land in a later release without changing anything else.
+- Every release also carries a `.sha256` file next to the MSI and a signed
+  **build-provenance attestation**. To check what you downloaded:
+  `Get-FileHash -Algorithm SHA256 DbDelta-<version>-win-x64.msi` against the
+  `.sha256`, or `gh attestation verify DbDelta-<version>-win-x64.msi --repo GitBakko/db-delta`.
 - **Coming from an earlier version?** Install the current MSI straight over it.
   The one exception is the release candidates: they all carry the numeric
   ProductVersion `1.0.0`, which is why the first final release was `1.0.1` and
@@ -105,7 +109,7 @@ Architecture rules are enforced by `NetArchTest.Rules` tests under `tests/DbDelt
 dotnet test
 ```
 
-Over 400 tests across eleven projects: unit, architecture, headless UI, script-gen golden, FsCheck property, persistence (unit + integration), live-db integration, CLI acceptance, and a nightly SQL Server 2017/2019/2022 compat matrix. Integration tests use `Testcontainers.MsSql` (Docker required); the compat matrix self-skips unless `DBDELTA_COMPAT=1`.
+Over 900 tests across eleven projects: unit, architecture, headless UI, script-gen golden, FsCheck property, persistence (unit + integration), live-db integration, CLI acceptance, and a nightly SQL Server 2017/2019/2022 compat matrix. Integration tests use `Testcontainers.MsSql` (Docker required); the compat matrix self-skips unless `DBDELTA_COMPAT=1`.
 
 ## Documentation
 
@@ -113,12 +117,19 @@ Over 400 tests across eleven projects: unit, architecture, headless UI, script-g
 - [Version history](https://gitbakko.github.io/db-delta/articles/version-history.html) ([CHANGELOG](CHANGELOG.md) in the repo)
 - [Design Spec](docs/superpowers/specs/2026-05-20-sql-compare-clone-design.md) — locked v1 contract
 - [Avalonia pivot addendum](docs/superpowers/specs/2026-05-25-avalonia-ui-pivot-addendum.md) — why the GUI moved from Blazor Hybrid to Avalonia
-- [Architecture](docs/01_architecture.md) · [Data Models](docs/02_data_models.md) · [Core Modules](docs/03_core_modules.md) · [CLI / API](docs/04_api_endpoints.md)
 - [Redgate parity audits](docs/parity/)
+
+**Research notes, not DbDelta's own documentation.** `docs/01_architecture.md`,
+`docs/02_data_models.md`, `docs/03_core_modules.md` and
+`docs/04_api_endpoints.md` describe **Redgate SQL Compare**, reverse-engineered
+before this project had any code. They are the reasoning behind the design, and
+they name switches, paths and binaries that are Redgate's and have no DbDelta
+equivalent — `sqlcompare.exe`, `--abort-on-warnings`. Read them as background;
+for what DbDelta actually does, the documentation site above is the only source.
 
 ## Contributing
 
-We use the Superpowers workflow: brainstorm → spec → plan → execute. Implementation plans live in `docs/superpowers/plans/`. See [CONTRIBUTING.md](CONTRIBUTING.md) (coming soon).
+We use the Superpowers workflow: brainstorm → spec → plan → execute. Implementation plans live in `docs/superpowers/plans/` and are **history**: they record how something was built, never what is left to do. The open list is [docs/BACKLOG.md](docs/BACKLOG.md). See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
