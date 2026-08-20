@@ -40,6 +40,13 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
             "Sequence" => await ResolveSequenceBodyAsync(connection, schemaName, objectName, ct).ConfigureAwait(false),
             "Synonym" => await ResolveSynonymBodyAsync(connection, schemaName, objectName, ct).ConfigureAwait(false),
             "UserDefinedType" => await ResolveUserDefinedTypeBodyAsync(connection, schemaName, objectName, ct).ConfigureAwait(false),
+
+            // A schema is modelled by its name alone, and the identity carries
+            // it in SchemaName with an empty ObjectName — so the pane shows the
+            // one statement that creates it instead of nothing at all.
+            "TableType" => await ResolveTableTypeBodyAsync(connection, schemaName, objectName, ct).ConfigureAwait(false),
+            "Schema" => SchemaScriptEmitter.EmitCreate(
+                new Schema(string.IsNullOrEmpty(schemaName) ? objectName : schemaName)),
             "User" => await ResolveUserBodyAsync(connection, objectName, ct).ConfigureAwait(false),
             "Role" => await ResolveRoleBodyAsync(connection, objectName, ct).ConfigureAwait(false),
             "Permission" => Task.FromResult<string?>(null).Result, // permissions render as identity-only rows
@@ -99,6 +106,51 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
 
         Synonym syn = new(Schema: schema, Name: name, BaseObjectName: (string)raw);
         return new SynonymScriptEmitter().EmitCreate(syn);
+    }
+
+    /// <summary>
+    /// A table type's <c>CREATE TYPE … AS TABLE</c>, columns included.
+    /// </summary>
+    /// <remarks>
+    /// The switch had no case for this kind, so selecting a table type in the
+    /// grid opened an empty pane — the same shape of bug as round-16's, where a
+    /// row the grid calls Different shows nothing to compare.
+    /// </remarks>
+    private static async Task<string?> ResolveTableTypeBodyAsync(
+        SqlConnection connection, string schema, string name, CancellationToken ct)
+    {
+        const string sql = """
+            SELECT c.name, TYPE_NAME(c.user_type_id), c.max_length, c.precision, c.scale,
+                   c.is_nullable, c.column_id, c.collation_name, ty.is_user_defined
+            FROM sys.table_types AS tt
+            INNER JOIN sys.schemas AS s ON s.schema_id = tt.schema_id
+            INNER JOIN sys.columns AS c ON c.object_id = tt.type_table_object_id
+            INNER JOIN sys.types AS ty ON ty.user_type_id = c.user_type_id
+            WHERE tt.is_user_defined = 1 AND s.name = @schema AND tt.name = @name
+            ORDER BY c.column_id;
+            """;
+        await using SqlCommand cmd = new(sql, connection);
+        cmd.Parameters.AddWithValue("@schema", schema);
+        cmd.Parameters.AddWithValue("@name", name);
+        await using SqlDataReader r = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+
+        List<Column> columns = [];
+        while (await r.ReadAsync(ct).ConfigureAwait(false))
+        {
+            columns.Add(new Column(
+                name: r.GetString(0),
+                dataType: FormatDataType(r.GetString(1), r.GetInt16(2), r.GetByte(3), r.GetByte(4)),
+                isNullable: r.GetBoolean(5),
+                ordinal: r.GetInt32(6),
+                collation: r.IsDBNull(7) ? null : r.GetString(7))
+            {
+                IsUserDefinedType = r.GetBoolean(8),
+            });
+        }
+
+        return columns.Count == 0
+            ? null
+            : new TableTypeUdtScriptEmitter().EmitCreate(new TableTypeUdt(schema, name, columns));
     }
 
     private static async Task<string?> ResolveUserBodyAsync(

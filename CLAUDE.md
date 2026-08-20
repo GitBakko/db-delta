@@ -10,7 +10,7 @@
 - NEVER commit secrets, credentials, or .env files
 - Keep NEW files under 500 lines. Six existing ones are already over
   (ScriptGenerator 1273, MainWindowViewModel 1160, TableScriptEmitter 953,
-  ComparisonEngine 749, LiveDbObjectBodyResolver 714,
+  ComparisonEngine 749, LiveDbObjectBodyResolver 764,
   ProjectEndpointPanelViewModel 689) — do not grow them without opening an
   item in `docs/BACKLOG.md`
 - Validate input at system boundaries
