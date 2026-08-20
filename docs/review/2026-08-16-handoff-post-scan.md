@@ -1,5 +1,13 @@
 # HANDOFF — dopo lo scan migliorie: dove siamo e da dove si riparte
 
+> **STORIA, non stato — rileggere il 2026-08-20.** Le tre voci di «Da dove si
+> riparte» sono tutte chiuse: il report HTML (`91cafb2`), l'exit code di
+> `dbdelta script` e lo smoke dal vivo del 2026-08-18. Questo file resta per
+> *perché* le cose sono state fatte così e quali trappole sono state pagate.
+> **Lo stato aperto sta solo in `docs/BACKLOG.md`**, riscritto e riverificato
+> voce per voce il 2026-08-18: l'ultima riga di questo documento diceva di non
+> fidarsene, ed è la sola riga che era vera il 16 e non lo è più.
+
 **Gli SHA citati qui sono anteriori alla riscrittura della storia del
 2026-08-18 e non risolvono più.** Cerca per messaggio di commit.
 
@@ -439,5 +447,9 @@ Alle tre di `2026-08-08-handoff-to-v1.md` — `DeployedModuleConvergesTests`,
   upgrade verificato, le prime tre reti.
 - `docs/review/2026-07-31-handoff-post-wave.md` — i 33 moduli, il confronto con
   Redgate, i due bug del primo smoke.
-- `docs/BACKLOG.md` — **è indietro di tre release**, lo dice la voce 14 dello
-  scan. Non fidarti del suo blocco di stato.
+- `docs/BACKLOG.md` — **la sola lista di lavoro aperta**. Quando questa riga fu
+  scritta era indietro di tre release (voce 14 dello scan) e diceva di non
+  fidarsi del suo blocco di stato; il 2026-08-18 il file è stato riscritto e
+  riverificato voce per voce, e la voce 14 è chiusa. Il blocco di stato invecchia
+  comunque in giorni: ricontrollalo con `git status -sb` e `git log -1`, come
+  chiede la sua stessa sezione «Manutenzione».

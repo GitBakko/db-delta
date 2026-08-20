@@ -961,6 +961,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
             StatusText = "Nessuno script generato: vedi il messaggio in alto.";
             return null;
         }
+        catch (UnscriptableUserException ex)
+        {
+            AppState.LastError =
+                $"Script non generato: l'utente {ex.UserName} è associato a un login di cui questa "
+                + "connessione non può leggere il nome. Scriverlo lo creerebbe WITHOUT LOGIN, cioè "
+                + "senza nessuno che possa autenticarsi. Rileggi quell'estremità con un login che veda "
+                + "sys.server_principals, oppure togli l'utente dalla selezione.";
+            StatusText = "Nessuno script generato: vedi il messaggio in alto.";
+            return null;
+        }
     }
 
     /// <summary>

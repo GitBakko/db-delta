@@ -18,6 +18,7 @@ public sealed class UserScriptEmitter
     public string EmitCreate(DatabaseUser user)
     {
         ArgumentNullException.ThrowIfNull(user);
+        UnscriptableUserException.ThrowIfLoginNameIsHidden(user);
         StringBuilder sb = new();
         sb.Append("CREATE USER ").Append(Sql.Q(user.Name));
         switch (user.TypeCode)

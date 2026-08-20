@@ -155,7 +155,7 @@ public sealed class ComparisonEngine
 
     private static bool UsersEqual(DatabaseUser a, DatabaseUser b) =>
         string.Equals(a.TypeCode, b.TypeCode, StringComparison.Ordinal)
-        && string.Equals(a.LoginName, b.LoginName, StringComparison.OrdinalIgnoreCase)
+        && a.LoginMatches(b)
         && string.Equals(a.DefaultSchema, b.DefaultSchema, StringComparison.OrdinalIgnoreCase);
 
     private static IEnumerable<DifferencePair> CompareRoles(

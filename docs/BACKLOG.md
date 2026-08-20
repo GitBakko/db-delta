@@ -5,10 +5,10 @@
 contenuto. Chi chiude una voce la depenna QUI, nello stesso commit del codice —
 vedi «Manutenzione» in fondo.
 
-## Stato — 2026-08-18
+## Stato — 2026-08-20
 
 - **v1.0.2 pubblicata** (2026-08-13), «Latest», MSI non firmata allegata.
-- **810 test verdi** nei sette progetti che girano senza Docker (Core 477,
+- **817 test verdi** nei sette progetti che girano senza Docker (Core 484,
   Headless 173, Persistence.Unit 68, Golden 68, Property 12, Architecture 6,
   Shared 6). **Due** dei tre DB-backed vanno **rossi**, non skipped, con Docker
   spento — LiveDb e Cli acceptance, che costruiscono il container in un
@@ -16,13 +16,13 @@ vedi «Manutenzione» in fondo.
   `docker ps`. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **35 voci aperte** — P1 4 · P2 6 · P3 10 · P4 8 · P5 7 — più **11** in
+- **34 voci aperte** — P1 3 · P2 6 · P3 10 · P4 8 · P5 7 — più **11** in
   «Deciso — NON riaprire». Tutte riverificate sul codice il 2026-08-18, non
-  ereditate dai documenti. **Le 4 critiche sono chiuse**, e 3 delle 7 alte:
+  ereditate dai documenti. **Le 4 critiche sono chiuse**, e 4 delle 7 alte:
   vedi P0 e P1. Il conteggio va ricontato, non decrementato a mente: `awk` sulle
   righe di tabella, o si scolla come si era già scollato.
 - **CI verde su `3c48735`** (run `32140004994`), entrambi i job. I DB-backed
-  aggiungono **65** test ai locali della riga sopra: LiveDb 37, Cli acceptance
+  aggiungono **66** test ai locali della riga sopra: LiveDb 38, Cli acceptance
   21, Persistence integration 7 su Linux (4 passati + 3 skipped su Windows).
   Il totale non si scrive: è «i locali + 65», così invecchia un numero solo.
   L'exit code di `script` e la forma JSON di `compare` girano solo lì.
@@ -125,7 +125,13 @@ per un conteggio che non torna fra due esecuzioni, chiedi a `sys.objects` cosa
 
 ## P1 — Alte: risultato o script sbagliato
 
-Tre voci chiuse il 2026-08-18 dal commit che porta questa riga:
+Una voce chiusa il 2026-08-20 dal commit che porta questa riga:
+
+| Voce chiusa | Come | Prova |
+|---|---|---|
+| Sotto un login a privilegio minimo ogni utente usciva Different | Il NULL di `sys.server_principals` non è più letto come «nessun login»: `authentication_type` (1 INSTANCE / 3 WINDOWS) dice che il login esiste comunque, e il reader lo porta su `DatabaseUser.LoginNameIsHidden`. Un nome che non si può leggere si appaia su «è mappato a un login», mai sul NULL. **Le strutture che confrontano due utenti sono DUE** — `ComparisonEngine.UsersEqual` e `ScriptGenerator.DefaultSchemaIsOnlyDifference` — e passano entrambe da `DatabaseUser.LoginMatches`, così non possono scollarsi. L'emittente **rifiuta** (`UnscriptableUserException`, CLI exit 30, banner nell'app) invece di scrivere `WITHOUT LOGIN` per un utente che un login ce l'ha; il corpo del diff viewer rende un commento e non lancia | `HiddenLoginNameTests` — 7 test, di cui 2 controlli in negativo (`Two_visible_login_names_that_differ_still_flag_the_user_different`, `A_user_genuinely_without_a_login_still_emits_WITHOUT_LOGIN`). `CatalogVisibilityTests.A_login_name_hidden_from_the_reader_does_not_make_the_user_different` (live) lo prova sul meccanismo vero. **Tre sonde di mutazione, tutte cadute**, una per struttura |
+
+Tre voci chiuse il 2026-08-18:
 
 | Voce chiusa | Come | Prova |
 |---|---|---|
@@ -143,7 +149,6 @@ due senza test.
 
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
-| **Sotto un login a privilegio minimo ogni utente esce Different.** `UserReader` fa LEFT JOIN su `sys.server_principals`: la metadata visibility rende `LoginName` null e `UsersEqual` lo confronta senza trattarlo. Emette `CREATE USER … FOR LOGIN` per utenti già corretti | 2026-07-30 | S | `Providers.LiveDb/Readers/UserReader.cs:20-30`; `Core/Diff/ComparisonEngine.cs:156-159`; stesso JOIN in `LiveDbObjectBodyResolver.cs:112` |
 | **Il rebuild non porta i default nel `_tmp`:** una colonna NOT NULL solo-sorgente fa fallire l'INSERT di copia con Msg 515, ed è esattamente il caso che il preflight di backfill esclude di proposito. Nessuna perdita dati (la transazione annulla), ma fallisce a metà script davanti all'utente | 2026-07-30 | M | `Core/ScriptGen/TableScriptEmitter.cs:58` e `:651-696`; innesco stretto a `:619-632` (flip IDENTITY o cambio seed/increment) |
 | **Le FK auto-nominate non combaciano mai fra due server.** `ForeignKeysQuery` non legge `is_system_named` e `ConstraintPairing` esclude le FK. **Le strutture di `ScriptGenerator` chiavate sul nome sono CINQUE, non tre** come dicono le remarks e l'handoff: due sono lookup locali che un grep su `orchestratedFks\|fkDropKeys` non trova | 2026-07-30 | M | `Providers.LiveDb/Readers/ConstraintReader.cs:21,68,81` (non in `:35-58`); `Core/Diff/ConstraintPairing.cs:86-90`; `ScriptGenerator.cs:148, 156-158, 247-258, 268-273, 1237-1245` |
 | **La voce 12 NON è verificabile sulle istanze reali disponibili**, e non per la coppia sbagliata. Lo smoke del 2026-08-18 ha misurato i nomi auto-generati su tre confronti: `PcrmV2Pl_test` vs `PcrmV2Pl_Badii` (stesso server) e `PcrmV2Pl_test` (.243) vs `PcrmV2Pl` (.242) danno **24 PK auto-nominati su 24 con nome IDENTICO**, e 45 DEFAULT su 45 idem. Il motivo è strutturale: **un restore conserva gli `object_id`**, quindi ogni database che discende da un backup di un altro porta gli stessi hash, e l'appaiamento per nome — quello rotto — lì funzionerebbe comunque. La divergenza nasce solo deployando lo **script** dello schema due volte. Servono due DB usa-e-getta: stessa proposta già scartata per la 11b, quindi è una decisione del proprietario, non una svista | 2026-07-31 (impegno) · 2026-08-17 (voce 12) | S | Misurato: `sys.key_constraints`/`sys.default_constraints` con `is_system_named=1` sui tre database. Nessun altro DB su `.243` ha vincoli auto-nominati in numero utile (`PartnerCrmCashGlobo` 0, `PartnerCrmEconocom` 1, `TnTrace*` 0, `BetamedV2` 0) |
@@ -174,7 +179,7 @@ due senza test.
 | **Il round-trip per kind copre 4 su 13** (Table, View, Function, Procedure), e uno dei tre test gira solo nella matrice notturna. Sei reader non sono mai passati da un apply vero. **Trappola:** i filtri `.Where` non si cancellano e basta, i commenti sopra `SeededDrift` spiegano perché esistono | 2026-07-30 | M | `DependencyRoundTripTests.cs:48`; `CompatMatrixTests.cs:104-107`; `CompressionRoundTripTests.cs:45-68` |
 | **L'invariante di convergenza copre 2 emitter su 14** (View, Procedure). L'esempio più fresco della regola non seguita è la voce 12: ha cambiato come `TableScriptEmitter` scrive i vincoli, ha aggiunto 17 test, e nessuno è «emetti, rileggi, deve essere Identical» | 2026-08-01 | M | `Core.UnitTests/Diff/DeployedModuleConvergesTests.cs:50` e `:67`; `git show --stat 142fcb7` |
 | **Gli indici su viste indicizzate sono invisibili**, non solo non scriptabili: due database che differiscono solo per quello escono Identical. Media e non alta **solo grazie al censimento**, che almeno lo dichiara. Non è cambiare un JOIN: vanno appesi a un `View`, che oggi non ha un contenitore di indici | 2026-07-30 | L | `Providers.LiveDb/Readers/IndexReader.cs:44-45`; `UnexaminedReader.cs:50-58` |
-| **`LiveDbObjectBodyResolver`, 697 righe**, apre due connessioni per clic e fino a 16 query. Lo switch non ha case per `TableType` né `Schema`: **quei due pannelli sono vuoti oggi, e costa un case in più** — falla anche se i giorni per la riscrittura non ci sono. Prerequisito della virtualizzazione del diff viewer | 2026-08-14 | L | `Providers.LiveDb/ObjectBody/LiveDbObjectBodyResolver.cs:33`, `:35-47`, `:214-257` |
+| **`LiveDbObjectBodyResolver`, 710 righe**, apre due connessioni per clic e fino a 16 query. Lo switch non ha case per `TableType` né `Schema`: **quei due pannelli sono vuoti oggi, e costa un case in più** — falla anche se i giorni per la riscrittura non ci sono. Prerequisito della virtualizzazione del diff viewer | 2026-08-14 | L | `Providers.LiveDb/ObjectBody/LiveDbObjectBodyResolver.cs:33`, `:35-47`, `:227-271` |
 | **Undo dopo un commit riuscito**: nessun down script, nessun journal, nessun backup COPY_ONLY. Rinvio deliberato del proprietario (2026-08-01). Abbassata a media: il percorso distruttivo è tutto sotto consenso e dal commit `c73583c` il dialogo elenca per nome ciò che verrà droppato. Manca la rete di recupero **dopo**, che è debito strutturale, non perdita spontanea | 2026-07-30 | L | grep `COPY_ONLY\|DownScript\|DeployJournal` → zero; `docs/review/2026-07-30-undo-architecture.md` |
 | **Parità Redgate ferma a 17 scenari** dal 2026-05-28: mancano DROP in topologia inversa con schemabound, indici filtrati/columnstore, CHECK cross-tabella, extended properties. Serve un server vivo e la GUI Redgate (la CLI è license-blocked, exit 35) | 2026-05-28 | L | `tests/Fixtures/Parity/01-source.sql` → 17 scenari; ultimo audit `docs/parity/redgate-2026-05-28.md` |
 

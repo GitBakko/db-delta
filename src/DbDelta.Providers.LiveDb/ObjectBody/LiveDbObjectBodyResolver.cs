@@ -107,7 +107,9 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
         SqlConnection connection, string name, CancellationToken ct)
     {
         const string sql = """
-            SELECT p.type, sp.name AS LoginName, p.default_schema_name
+            SELECT p.type, sp.name AS LoginName, p.default_schema_name,
+                   CAST(CASE WHEN sp.name IS NULL AND p.authentication_type IN (1, 3)
+                             THEN 1 ELSE 0 END AS bit) AS LoginNameIsHidden
             FROM sys.database_principals AS p
             LEFT JOIN sys.server_principals AS sp ON sp.sid = p.sid
             WHERE p.name = @name;
@@ -120,8 +122,19 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
             Name: name,
             TypeCode: r.GetString(0).Trim(),
             LoginName: r.IsDBNull(1) ? null : r.GetString(1),
-            DefaultSchema: r.IsDBNull(2) ? "dbo" : r.GetString(2));
-        return new UserScriptEmitter().EmitCreate(user);
+            DefaultSchema: r.IsDBNull(2) ? "dbo" : r.GetString(2))
+        {
+            LoginNameIsHidden = r.GetBoolean(3),
+        };
+
+        // This body is read, not run: the diff viewer renders it. EmitCreate
+        // refuses a hidden login name rather than writing WITHOUT LOGIN, and a
+        // throw here would empty the pane for a row the grid can perfectly well
+        // show — the same failure as an unscriptable index, one kind over.
+        return user.LoginNameIsHidden
+            ? $"-- USER {Sql.Q(user.Name)} is mapped to a login this connection cannot name "
+              + $"(DEFAULT_SCHEMA = {Sql.Q(user.DefaultSchema)}) — read, not scriptable by DbDelta"
+            : new UserScriptEmitter().EmitCreate(user);
     }
 
     private static async Task<string?> ResolveRoleBodyAsync(

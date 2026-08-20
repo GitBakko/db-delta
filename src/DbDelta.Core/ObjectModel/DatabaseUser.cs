@@ -20,5 +20,41 @@ public sealed record DatabaseUser(
     string? LoginName,
     string DefaultSchema)
 {
+    /// <summary>
+    /// The principal is mapped to a server login whose name the reading
+    /// connection is not allowed to see. <c>UserReader</c> LEFT JOINs
+    /// <c>sys.server_principals</c>, which metadata visibility filters down to
+    /// the logins the caller owns, so a least-privilege account reads NULL for
+    /// every other one. That NULL is indistinguishable from a user created
+    /// WITHOUT LOGIN unless something carries the difference: this flag does.
+    /// It is an <c>init</c> property rather than a positional member so every
+    /// existing construction still compiles and still means "read in full".
+    /// </summary>
+    public bool LoginNameIsHidden { get; init; }
+
+    /// <summary>
+    /// Same login as <paramref name="other"/>, as far as either side was able
+    /// to read one. A name hidden from one reader is matched on "is it mapped
+    /// to a login at all", never on the NULL it came back as — comparing the
+    /// NULL makes every user Different under a least-privilege account, and the
+    /// script that follows drops and re-creates principals that were correct.
+    /// </summary>
+    /// <remarks>
+    /// Both structures that compare two users route here so they cannot drift
+    /// apart: <c>ComparisonEngine.UsersEqual</c> decides the status,
+    /// <c>ScriptGenerator.DefaultSchemaIsOnlyDifference</c> decides whether an
+    /// ALTER covers it or the pair needs DROP + CREATE.
+    /// </remarks>
+    public bool LoginMatches(DatabaseUser other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        return LoginNameIsHidden || other.LoginNameIsHidden
+            ? IsMappedToALogin == other.IsMappedToALogin
+            : string.Equals(LoginName, other.LoginName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>A hidden name is still a name: the mapping exists either way.</summary>
+    private bool IsMappedToALogin => LoginNameIsHidden || LoginName is not null;
+
     public ObjectIdentity Identity => new(SchemaName: string.Empty, ObjectName: Name, Kind: "User");
 }

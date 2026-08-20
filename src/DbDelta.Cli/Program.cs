@@ -59,6 +59,17 @@ catch (UnscriptablePermissionException ex)
         + "to leave permissions out of this run."));
     return ExitCodes.ScriptGenerationFailure;
 }
+catch (UnscriptableUserException ex)
+{
+    // Same refusal, same code, third securable: emitting this row would have
+    // created the user WITHOUT LOGIN instead of mapped to the login it has.
+    CliErrorMapper.WriteError(new Error(
+        ErrorCode.DataPreservationImpossible,
+        ex.Message,
+        $"Re-read that endpoint with a login that can see sys.server_principals, or exclude "
+        + $"the user {ex.UserName} from this run."));
+    return ExitCodes.ScriptGenerationFailure;
+}
 catch (Exception ex)
 {
     CliErrorMapper.WriteError(new Error(

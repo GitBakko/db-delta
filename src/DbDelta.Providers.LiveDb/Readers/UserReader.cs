@@ -12,6 +12,15 @@ namespace DbDelta.Providers.LiveDb.Readers;
 ///   <item>Asymmetric-key / certificate-based users (<c>type IN ('K','C')</c>)
 ///       — out of scope for v1 (require key/cert deployment first)</item>
 /// </list>
+/// <para>
+/// The LEFT JOIN onto <c>sys.server_principals</c> reads NULL twice over: for a
+/// user created WITHOUT LOGIN, and for a login the connection is not allowed to
+/// see — that view is filtered by metadata visibility, so a least-privilege
+/// account gets NULL for every login it does not own.
+/// <c>authentication_type</c> is not filtered and separates the two:
+/// 1 (INSTANCE) and 3 (WINDOWS) mean a server login exists, whatever we can
+/// read of its name. See <see cref="DatabaseUser.LoginNameIsHidden"/>.
+/// </para>
 /// </summary>
 internal sealed class UserReader
 {
@@ -20,7 +29,9 @@ internal sealed class UserReader
             p.name             AS PrincipalName,
             p.type             AS TypeCode,
             sp.name             AS LoginName,
-            p.default_schema_name AS DefaultSchema
+            p.default_schema_name AS DefaultSchema,
+            CAST(CASE WHEN sp.name IS NULL AND p.authentication_type IN (1, 3)
+                      THEN 1 ELSE 0 END AS bit) AS LoginNameIsHidden
         FROM sys.database_principals AS p
         LEFT JOIN sys.server_principals AS sp ON sp.sid = p.sid
         WHERE p.type IN ('S','U','G','E','X')
@@ -40,7 +51,10 @@ internal sealed class UserReader
             string type = r.GetString(1).Trim();
             string? login = r.IsDBNull(2) ? null : r.GetString(2);
             string defaultSchema = r.IsDBNull(3) ? "dbo" : r.GetString(3);
-            result.Add(new DatabaseUser(name, type, login, defaultSchema));
+            result.Add(new DatabaseUser(name, type, login, defaultSchema)
+            {
+                LoginNameIsHidden = r.GetBoolean(4),
+            });
         }
         return result;
     }

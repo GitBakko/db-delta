@@ -1,5 +1,7 @@
 using DbDelta.Core.Abstractions;
+using DbDelta.Core.Diff;
 using DbDelta.Core.ObjectModel;
+using DbDelta.Core.Options;
 using FluentAssertions;
 using Microsoft.Data.SqlClient;
 using Xunit;
@@ -89,6 +91,79 @@ public class CatalogVisibilityTests(LiveDbFixture fixture)
 
         result.IsSuccess.Should().BeTrue(result.Error?.Message);
         result.Value!.Tables.Select(t => t.Name).Should().BeEquivalentTo(["Visible", "Hidden"]);
+    }
+
+    /// <summary>
+    /// The reader half of the hidden-login rule, against a server that really
+    /// applies metadata visibility. <c>sys.server_principals</c> shows a
+    /// least-privilege login its own row and nothing else, so every OTHER user
+    /// in the database comes back with a NULL login name. Read that NULL as
+    /// "no login" and the same database compares Different against itself,
+    /// user by user, and the script drops and re-creates principals that were
+    /// already correct.
+    /// </summary>
+    [Fact]
+    public async Task A_login_name_hidden_from_the_reader_does_not_make_the_user_different()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        const string login = "dbdelta_probe_logins";
+        const string otherLogin = "dbdelta_other_login";
+        const string otherUser = "dbdelta_other_user";
+        string dbConn = await SetUpProbeDatabaseAsync(
+            "VisibilityLogins",
+            login,
+            Grants.ViewDefinition | Grants.SelectOnDependencies,
+            ct);
+        string ownerConn = WithCatalog(fixture.ConnectionString, "VisibilityLogins");
+
+        await using (SqlConnection master = new(fixture.ConnectionString))
+        {
+            await master.OpenAsync(ct);
+            await Exec(master, $"IF SUSER_ID('{otherLogin}') IS NULL CREATE LOGIN {otherLogin} WITH PASSWORD = '{Password}';", ct);
+        }
+        await using (SqlConnection db = new(ownerConn))
+        {
+            await db.OpenAsync(ct);
+            await Exec(db, $"IF DATABASE_PRINCIPAL_ID('{otherUser}') IS NULL CREATE USER {otherUser} FOR LOGIN {otherLogin};", ct);
+        }
+
+        // The mechanism this rule exists for: SQL Server itself blanks the name.
+        // Without this the test would pass just as well on a server that showed
+        // the probe every login, and would prove nothing about the rule.
+        (await ReadLoginNameAsync(dbConn, otherUser, ct)).Should().BeNull(
+            "sys.server_principals is filtered by metadata visibility, so the probe sees only its own login");
+        (await ReadLoginNameAsync(ownerConn, otherUser, ct)).Should().Be(otherLogin);
+
+        Result<Database> asOwner = await new LiveDbSource(ownerConn, "source").LoadAsync(ct);
+        Result<Database> asProbe = await new LiveDbSource(dbConn, "target").LoadAsync(ct);
+
+        asOwner.IsSuccess.Should().BeTrue(asOwner.Error?.Message);
+        asProbe.IsSuccess.Should().BeTrue(asProbe.Error?.Message);
+        asProbe.Value!.Users.Single(u => u.Name == otherUser).LoginNameIsHidden.Should().BeTrue(
+            "authentication_type still says the user is mapped to an instance login");
+
+        ComparisonResult r = new ComparisonEngine().Compare(
+            asOwner.Value!, asProbe.Value!, ComparisonOptions.Default);
+
+        r.Differences.Where(p => p.Identity.Kind == "User")
+            .Should().OnlyContain(p => p.Status == DifferenceStatus.Identical)
+            .And.Contain(p => p.Identity.ObjectName == otherUser);
+    }
+
+    private static async Task<string?> ReadLoginNameAsync(
+        string connectionString, string user, CancellationToken ct)
+    {
+        await using SqlConnection c = new(connectionString);
+        await c.OpenAsync(ct);
+        await using SqlCommand cmd = new(
+            """
+            SELECT sp.name
+            FROM sys.database_principals AS p
+            LEFT JOIN sys.server_principals AS sp ON sp.sid = p.sid
+            WHERE p.name = @name;
+            """, c);
+        cmd.Parameters.AddWithValue("@name", user);
+        return await cmd.ExecuteScalarAsync(ct) as string;
     }
 
     /// <summary>
