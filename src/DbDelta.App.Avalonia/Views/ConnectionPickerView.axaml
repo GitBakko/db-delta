@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:DbDelta.App.ViewModels"
              xmlns:core="using:DbDelta.Core.Abstractions"
+             xmlns:c="using:DbDelta.App.Views.Controls"
              x:Class="DbDelta.App.Views.ConnectionPickerView"
              x:DataType="vm:AppStateViewModel">
 
@@ -32,7 +33,12 @@
               </DataTemplate>
             </ComboBox.ItemTemplate>
           </ComboBox>
-          <TextBox Text="{Binding ConnectionString, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+          <!-- MaskedTextBox, not TextBox: this field holds a whole connection
+               string, Password included, and a plain TextBox publishes its text
+               through UI Automation to any process in the session. No
+               PasswordChar, so the pixels are unchanged and only the automation
+               value is masked. -->
+          <c:MaskedTextBox Text="{Binding ConnectionString, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                    FontFamily="Cascadia Mono,Consolas,monospace" FontSize="12"
                    Classes="connection-input"
                    PlaceholderText="Server=.;Database=Dev;User Id=sa;Password=…;TrustServerCertificate=True" />
@@ -85,7 +91,12 @@
               </DataTemplate>
             </ComboBox.ItemTemplate>
           </ComboBox>
-          <TextBox Text="{Binding ConnectionString, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+          <!-- MaskedTextBox, not TextBox: this field holds a whole connection
+               string, Password included, and a plain TextBox publishes its text
+               through UI Automation to any process in the session. No
+               PasswordChar, so the pixels are unchanged and only the automation
+               value is masked. -->
+          <c:MaskedTextBox Text="{Binding ConnectionString, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                    FontFamily="Cascadia Mono,Consolas,monospace" FontSize="12"
                    Classes="connection-input"
                    PlaceholderText="Server=.;Database=Prod;User Id=sa;Password=…;TrustServerCertificate=True" />

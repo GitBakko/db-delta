@@ -124,6 +124,18 @@
             <c:IconButtonContent Geometry="M 5,5 L 17,5 L 19,7 L 19,19 L 5,19 Z M 7,5 L 7,11 L 15,11 L 15,5 M 9,15 L 15,15" Text="Salva" />
           </Button>
 
+          <!-- Connessioni — the only way in. Every successful compare autosaves
+               its two connection strings and they feed "Usati di recente";
+               without this button that list grows and nobody can prune it. -->
+          <Button Classes="ghost"
+                  Command="{Binding OpenConnectionManagerCommand}"
+                  CommandParameter="{Binding $parent[Window]}"
+                  ToolTip.Tip="Gestisci le connessioni salvate"
+                  Padding="6"
+                  VerticalContentAlignment="Center">
+            <c:IconButtonContent Geometry="M 4,7 A 8,3 0 1 0 20,7 A 8,3 0 1 0 4,7 M 4,7 L 4,17 A 8,3 0 0 0 20,17 L 20,7 M 4,12 A 8,3 0 0 0 20,12" Text="Connessioni" />
+          </Button>
+
         </StackPanel>
 
         <!-- 3: divider -->

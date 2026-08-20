@@ -74,6 +74,27 @@ public class IconButtonContentTests
             .Which.Text.Should().Be("Carica");
     }
 
+    /// <summary>
+    /// The connection manager had no way in. Connections autosave on every
+    /// successful compare and feed the recent list, so while the dialog was
+    /// unreachable that list grew and nobody could prune it.
+    /// </summary>
+    [AvaloniaFact]
+    public void The_connection_manager_has_a_button_that_opens_it()
+    {
+        MainWindow window = Shell();
+        var vm = (MainWindowViewModel)window.DataContext!;
+
+        Button button = window.GetVisualDescendants()
+            .OfType<Button>()
+            .Should().ContainSingle(b => b.Command == vm.OpenConnectionManagerCommand)
+            .Subject;
+
+        button.IsVisible.Should().BeTrue();
+        button.GetVisualDescendants().OfType<IconButtonContent>()
+            .Should().ContainSingle().Which.Text.Should().Be("Connessioni");
+    }
+
     [AvaloniaFact]
     public void The_three_button_families_keep_the_weights_they_were_drawn_at()
     {
