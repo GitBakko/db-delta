@@ -16,13 +16,13 @@ vedi «Manutenzione» in fondo.
   `docker ps`. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **14 voci aperte** — P1 1 · P2 0 · P3 5 · P4 1 · P5 7 — più **14** in
+- **12 voci aperte** — P1 0 · P2 0 · P3 5 · P4 0 · P5 7 — più **15** in
   «Deciso — NON riaprire». Tutte riverificate sul codice il 2026-08-18, non
   ereditate dai documenti. **Le 4 critiche sono chiuse**, e 6 delle 7 alte:
   vedi P0 e P1. Il conteggio va ricontato, non decrementato a mente: `awk` sulle
   righe di tabella, o si scolla come si era già scollato.
 - **CI verde su `3c48735`** (run `32140004994`), entrambi i job. I DB-backed
-  aggiungono **70** test ai locali della riga sopra: LiveDb 41, Cli acceptance
+  aggiungono **72** test ai locali della riga sopra: LiveDb 43, Cli acceptance
   22, Persistence integration 7 su Linux (4 passati + 3 skipped su Windows).
   Il totale non si scrive: è «i locali + 65», così invecchia un numero solo.
   L'exit code di `script` e la forma JSON di `compare` girano solo lì.
@@ -134,6 +134,7 @@ Voci chiuse il 2026-08-20, ognuna dal commit che porta la sua riga:
 | Sotto un login a privilegio minimo ogni utente usciva Different | Il NULL di `sys.server_principals` non è più letto come «nessun login»: `authentication_type` (1 INSTANCE / 3 WINDOWS) dice che il login esiste comunque, e il reader lo porta su `DatabaseUser.LoginNameIsHidden`. Un nome che non si può leggere si appaia su «è mappato a un login», mai sul NULL. **Le strutture che confrontano due utenti sono DUE** — `ComparisonEngine.UsersEqual` e `ScriptGenerator.DefaultSchemaIsOnlyDifference` — e passano entrambe da `DatabaseUser.LoginMatches`, così non possono scollarsi. L'emittente **rifiuta** (`UnscriptableUserException`, CLI exit 30, banner nell'app) invece di scrivere `WITHOUT LOGIN` per un utente che un login ce l'ha; il corpo del diff viewer rende un commento e non lancia | `HiddenLoginNameTests` — 7 test, di cui 2 controlli in negativo (`Two_visible_login_names_that_differ_still_flag_the_user_different`, `A_user_genuinely_without_a_login_still_emits_WITHOUT_LOGIN`). `CatalogVisibilityTests.A_login_name_hidden_from_the_reader_does_not_make_the_user_different` (live) lo prova sul meccanismo vero. **Tre sonde di mutazione, tutte cadute**, una per struttura |
 | Il rebuild non portava i default nel `_tmp` | Due buchi, una causa. I DEFAULT **nominati** restano di proposito fuori dal `_tmp` (il nome appartiene ancora alla tabella che verrà sostituita), quindi la loro espressione ora viaggia nella `SELECT` della copia. E `ColumnsNeedingABackfillDefault` non taglia più corto sui rebuild: era l'unico caso in cui nessun altro può fornire il valore, e il preflight lo saltava. Un default **inline** non si tocca: `EmitCreate` lo scrive già sulla colonna del `_tmp`, e nominarlo nella INSERT lo ripeterebbe soltanto | `RebuildBackfillTests` — 6 test, di cui 3 controlli in negativo (default inline, colonna nullable, rebuild senza colonne nuove). **Tre sonde di mutazione, tutte cadute**, una per buco più una sulla chiave del backfill. **Non cambia nulla per la CLI:** `BackfillPreflight` è usato solo dall'app (`MainWindowViewModel.cs:1149`), quindi una colonna NOT NULL senza alcun default resta un Msg 515 lì — come prima, e ora dichiarato |
 | Le FK auto-nominate non combaciavano mai fra due server | `ForeignKeysQuery` legge `is_system_named` (entrambi i lettori: quello del confronto e quello del diff viewer) e `ConstraintPairing` non esclude più le FK: si appaiano su **cosa vincolano e cosa puntano**, mai sull'hash. `ON DELETE`, `ON UPDATE` e il flag disabled restano fuori dalla chiave — quelle sono «la stessa FK, cambiata». **Le strutture chiavate sul nome erano CINQUE, non tre**: i due delta FK, il set di re-add orchestrato e i due lookup che cercano la FK dell'altro lato col nome di questo. Passano tutte da `ScriptGenerator.MatchFk`, un metodo solo | `SystemNamedForeignKeyTests` — 10 test, di cui 3 controlli in negativo. **Tre sonde di mutazione, tre test distinti caduti**, una per struttura; la terza ha richiesto di stringere il test finché non ha visto la differenza. Provato dal vivo in `ConstraintReaderTests`: un `REFERENCES` inline torna `IsSystemNamed = true` con nome `FK__Righe__…` |
+| La voce 12 non era verificabile sulle istanze reali | Verificata su **due DB usa-e-getta** creati dal test (Testcontainers), non sulle istanze vere: là non si può, e ora si sa perché con più precisione di prima. **Un restore conserva gli `object_id`** — quello si sapeva. Ma nemmeno due DB *creati* separatamente bastano: costruiti dalle stesse istruzioni nello stesso ordine su un server fresco, SQL Server assegna **gli stessi `object_id`**, e CHECK, DEFAULT e FK — il cui suffisso viene dalla colonna o tabella padre — tornano con l'hash **identico**. Solo PK e UNIQUE divergevano, il loro suffisso portando l'id dell'indice. Serve una **storia di allocazione diversa**: il test la forza creando e cancellando qualche oggetto scratch prima dello schema, che è ciò che un database vissuto ha e uno appena creato no | `AutoNamedConstraintConvergenceTests` — 2 test. Il primo asserisce **il meccanismo** (i cinque nomi auto-generati non si intersecano) prima di asserire il verdetto, altrimenti passerebbe su due DB che vanno d'accordo. **Sonda di mutazione:** rimesso l'appaiamento per nome, `dbo.Righe` torna Different e cadono entrambi |
 
 Tre voci chiuse il 2026-08-18:
 
@@ -153,7 +154,6 @@ due senza test.
 
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
-| **La voce 12 NON è verificabile sulle istanze reali disponibili**, e non per la coppia sbagliata. Lo smoke del 2026-08-18 ha misurato i nomi auto-generati su tre confronti: `PcrmV2Pl_test` vs `PcrmV2Pl_Badii` (stesso server) e `PcrmV2Pl_test` (.243) vs `PcrmV2Pl` (.242) danno **24 PK auto-nominati su 24 con nome IDENTICO**, e 45 DEFAULT su 45 idem. Il motivo è strutturale: **un restore conserva gli `object_id`**, quindi ogni database che discende da un backup di un altro porta gli stessi hash, e l'appaiamento per nome — quello rotto — lì funzionerebbe comunque. La divergenza nasce solo deployando lo **script** dello schema due volte. Servono due DB usa-e-getta: stessa proposta già scartata per la 11b, quindi è una decisione del proprietario, non una svista | 2026-07-31 (impegno) · 2026-08-17 (voce 12) | S | Misurato: `sys.key_constraints`/`sys.default_constraints` con `is_system_named=1` sui tre database. Nessun altro DB su `.243` ha vincoli auto-nominati in numero utile (`PartnerCrmCashGlobo` 0, `PartnerCrmEconocom` 1, `TnTrace*` 0, `BetamedV2` 0) |
 
 ---
 
@@ -215,7 +215,6 @@ Una voce chiusa il 2026-08-20 dal commit che porta questa riga:
 
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
-| **Una FK auto-nominata e DISABILITATA continua a portare l'hash della sorgente.** `NOCHECK CONSTRAINT` vuole un nome e l'unico disponibile è quello che il server della sorgente ha coniato; emetterla senza nome e saltare la disabilitazione cambierebbe silenziosamente l'enforcement, che è peggio del churn. Quella forma quindi non converge: due server continueranno a vederla diversa a ogni confronto. Via d'uscita: un nome nostro, cioè una rinomina al deploy — non una clausola più furba | 2026-08-20 | S | `Core/ScriptGen/ForeignKeyScriptEmitter.cs` (`NameClause`, commento `ponytail:`); `SystemNamedForeignKeyTests.A_disabled_auto_named_foreign_key_keeps_its_name` lo fissa |
 
 ---
 
@@ -254,6 +253,7 @@ perché una sessione futura non le riscopra come nuove.
 | `ponytail:` scansione lineare in `ConstraintPairing` | 2026-08-17 | Debito tracciato col soffitto e la via d'uscita già scritti nel commento |
 | Tassonomia degli avvisi di deploy (`DeployRisk`, `--abort-on-warnings`) | 2026-07-30 | **Archiviata dal proprietario il 2026-08-20.** Nessuno l'ha mai chiesta, e le due fette parziali già atterrate coprono i casi concreti: il rifiuto columnstore e il dialogo che nomina ciò che verrà eliminato. La metà documentale — chi leggeva §9.4 e usava uno switch inesistente — è chiusa: quei documenti dichiarano ora in testa che descrivono Redgate |
 | Due «Apri» nei tooltip | 2026-05-22 | **Deciso dal proprietario il 2026-08-20: restano «Apri».** Aprono un pannello di messaggi e una pagina nel browser — non sono azioni di caricamento file, che è ciò che la regola governa. I due messaggi d'errore che erano violazioni vere sono corretti e asseriti da `MainWindowViewModelTests.The_project_errors_say_Carica_and_never_Apri` |
+| FK auto-nominata **e disabilitata**: churn accettato | 2026-08-20 | **Accettata dal proprietario il 2026-08-20.** `NOCHECK CONSTRAINT` vuole un nome e l'unico disponibile è quello coniato dal server della sorgente; emetterla senza nome e saltare la disabilitazione cambierebbe l'enforcement in silenzio, che è peggio del churn. Quella forma sola continua a non convergere. Via d'uscita se un giorno servisse: un nome nostro, cioè una rinomina al deploy — `ForeignKeyScriptEmitter.NameClause`, commento `ponytail:` |
 | Kind Tier-3 assenti | 2026-05-28 | Fuori scope v1, e dal 2026-08-14 il silenzio non è più silenzioso: `UnexaminedCensus` li dichiara |
 
 **Le 17 proposte scartate con motivo** stanno in
