@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using Microsoft.Data.SqlClient;
 
 namespace DbDelta.Cli.AcceptanceTests;
@@ -55,6 +56,12 @@ internal static class CliRunner
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true,
+            // Read what the CLI writes. Without this the parent decodes with the
+            // console's code page and every accented Italian word comes back as
+            // replacement characters — a green assertion on ASCII and a broken
+            // one on anything else.
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8,
         };
         psi.ArgumentList.Add(cliDll);
         foreach (string a in args)

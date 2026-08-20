@@ -204,6 +204,54 @@ public class CompareCommandTests(CliFixture fixture)
 
     private static Task<int> RunCli(string[] args, CancellationToken ct) => CliRunner.Run(args, ct);
 
+    /// <summary>
+    /// The census reaches the CLI's own text output, asserted across the
+    /// process boundary.
+    /// </summary>
+    /// <remarks>
+    /// <c>TextFormatter</c> is internal and the CLI keeps its internals closed
+    /// on purpose, so this does not open it with InternalsVisibleTo: it runs the
+    /// binary and reads stdout, which is the surface a user actually sees. An
+    /// empty diff with no caveat reads as "the two databases match"; it means
+    /// "no difference among the thirteen kinds DbDelta compares", and the last
+    /// line on screen is the only thing that says so.
+    /// </remarks>
+    [Fact]
+    public async Task The_text_output_declares_what_the_comparison_did_not_examine()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        const string srcDb = "DbDeltaCensusSrc";
+        const string tgtDb = "DbDeltaCensusTgt";
+        await CreateDb(srcDb, ct);
+        await CreateDb(tgtDb, ct);
+        await CreateCustomerTable(srcDb, ct);
+        await AddExtendedProperty(srcDb, ct);
+
+        (int exit, string stdout) = await CliRunner.RunCapturing(["compare",
+            "--source", ConnectionFor(srcDb),
+            "--target", ConnectionFor(tgtDb),
+            "--format", "text"], ct);
+
+        exit.Should().Be(ExpectedExitCodes.SuccessDifferencesFound);
+        stdout.Should().Contain("Non esaminati").And.Contain("proprietà estese");
+    }
+
+    private async Task AddExtendedProperty(string db, CancellationToken ct)
+    {
+        await using SqlConnection c = new(ConnectionFor(db));
+        await c.OpenAsync(ct);
+        await using SqlCommand cmd = new(
+            """
+            IF NOT EXISTS (SELECT 1 FROM sys.extended_properties WHERE name = N'MS_Description')
+                EXEC sys.sp_addextendedproperty
+                    @name = N'MS_Description', @value = N'a column nobody compares',
+                    @level0type = N'SCHEMA', @level0name = N'dbo',
+                    @level1type = N'TABLE',  @level1name = N'Customer';
+            """, c);
+        await cmd.ExecuteNonQueryAsync(ct);
+    }
+
+
     [Fact]
     public async Task Returns_exit_code_1_when_source_has_an_extra_view()
     {

@@ -1,8 +1,26 @@
 using System.CommandLine;
+using System.Text;
 using DbDelta.Cli;
 using DbDelta.Cli.Commands;
 using DbDelta.Core.Abstractions;
 using DbDelta.Core.ScriptGen;
+
+// Every user-facing line this tool prints is Italian, and half of them carry an
+// accent or a guillemet. Left to the console's code page they come out as
+// whatever that page can represent — and redirected to a file or a pipe, as
+// bytes no UTF-8 reader can decode: `dbdelta compare > out.txt` produced a file
+// with a replacement character in place of every à. UTF-8 makes the bytes the
+// same everywhere, which is the only way an acceptance test can assert on them.
+// Guarded because a host with no console at all throws here, and that is not a
+// reason to fail the run.
+try
+{
+    Console.OutputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+}
+catch (IOException)
+{
+    // No console attached — nothing to configure, nothing to report.
+}
 
 RootCommand root = new("DbDelta — open-source SQL Server schema compare and deployment tool")
 {
