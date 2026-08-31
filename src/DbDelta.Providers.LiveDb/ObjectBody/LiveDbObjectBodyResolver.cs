@@ -116,41 +116,29 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
     /// grid opened an empty pane — the same shape of bug as round-16's, where a
     /// row the grid calls Different shows nothing to compare.
     /// </remarks>
+    /// <remarks>
+    /// Reads through <see cref="Readers.TableTypeUdtReader"/> rather than a
+    /// query of its own. The second query it used to carry saw columns only, so
+    /// the day the comparison learned to see a table type's keys this pane
+    /// would have shown two bodies a reader cannot tell apart for a row the
+    /// grid calls Different — the same bug as the missing case above, one level
+    /// down. One reader means the pane cannot drift from the verdict again.
+    /// </remarks>
     private static async Task<string?> ResolveTableTypeBodyAsync(
         SqlConnection connection, string schema, string name, CancellationToken ct)
     {
-        const string sql = """
-            SELECT c.name, TYPE_NAME(c.user_type_id), c.max_length, c.precision, c.scale,
-                   c.is_nullable, c.column_id, c.collation_name, ty.is_user_defined
-            FROM sys.table_types AS tt
-            INNER JOIN sys.schemas AS s ON s.schema_id = tt.schema_id
-            INNER JOIN sys.columns AS c ON c.object_id = tt.type_table_object_id
-            INNER JOIN sys.types AS ty ON ty.user_type_id = c.user_type_id
-            WHERE tt.is_user_defined = 1 AND s.name = @schema AND tt.name = @name
-            ORDER BY c.column_id;
-            """;
-        await using SqlCommand cmd = new(sql, connection);
-        cmd.Parameters.AddWithValue("@schema", schema);
-        cmd.Parameters.AddWithValue("@name", name);
-        await using SqlDataReader r = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        // Filtered on the SERVER, so the database's own collation decides which
+        // type this is — a case-sensitive database can hold both dbo.T and
+        // dbo.t, and picking between them in memory would answer with whichever
+        // came first. It also means one type is read, not the whole catalog.
+        IReadOnlyList<TableTypeUdt> match =
+            await new Readers.TableTypeUdtReader().ReadAsync(connection, ct, schema, name).ConfigureAwait(false);
 
-        List<Column> columns = [];
-        while (await r.ReadAsync(ct).ConfigureAwait(false))
-        {
-            columns.Add(new Column(
-                name: r.GetString(0),
-                dataType: FormatDataType(r.GetString(1), r.GetInt16(2), r.GetByte(3), r.GetByte(4)),
-                isNullable: r.GetBoolean(5),
-                ordinal: r.GetInt32(6),
-                collation: r.IsDBNull(7) ? null : r.GetString(7))
-            {
-                IsUserDefinedType = r.GetBoolean(8),
-            });
-        }
+        TableTypeUdt? udt = match.Count == 1 ? match[0] : null;
 
-        return columns.Count == 0
+        return udt is null || udt.Columns.Count == 0
             ? null
-            : new TableTypeUdtScriptEmitter().EmitCreate(new TableTypeUdt(schema, name, columns));
+            : new TableTypeUdtScriptEmitter().EmitCreate(udt);
     }
 
     private static async Task<string?> ResolveUserBodyAsync(

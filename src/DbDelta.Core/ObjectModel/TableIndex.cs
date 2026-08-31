@@ -1,9 +1,14 @@
 namespace DbDelta.Core.ObjectModel;
 
 /// <summary>
-/// A non-PK / non-UQ index on a table. PK and UQ indexes are modeled as
-/// <see cref="PrimaryKey"/> / <see cref="UniqueConstraint"/> on the parent
-/// <see cref="Table"/> — they are NOT duplicated here.
+/// An index. On a <see cref="Table"/> this is the non-PK / non-UQ kind only:
+/// there PK and UQ are modeled as <see cref="PrimaryKey"/> /
+/// <see cref="UniqueConstraint"/> and are NOT duplicated here.
+///
+/// A <see cref="TableTypeUdt"/> is the exception, and carries all three as
+/// TableIndex — see <see cref="IsPrimaryKey"/>. Its keys accept a per-column
+/// sort direction, which <see cref="PrimaryKey"/> does not model, and losing
+/// that direction flattens the index on the next rebuild without a word.
 ///
 /// Named <c>TableIndex</c> rather than <c>Index</c> to avoid clashing with
 /// <see cref="Index"/> (the BCL range-indexer type).
@@ -51,6 +56,28 @@ public sealed record TableIndex(
     /// asks this first and refuses rather than guessing. A false here is what
     /// stops a table rebuild from dropping an index nothing would put back.
     /// </remarks>
+    /// <summary>
+    /// The index backs a <c>PRIMARY KEY</c>. Only a <see cref="TableTypeUdt"/>
+    /// sets it; on a <see cref="Table"/> the PK is a <see cref="PrimaryKey"/>
+    /// and this stays false. An <c>init</c> property so every existing
+    /// positional construction still compiles and still means "a plain index".
+    /// </summary>
+    public bool IsPrimaryKey { get; init; }
+
+    /// <summary>
+    /// The index backs a <c>UNIQUE</c> constraint rather than being a bare
+    /// unique index. Same scope and same reasoning as <see cref="IsPrimaryKey"/>.
+    /// </summary>
+    public bool IsUniqueConstraint { get; init; }
+
+    /// <summary>
+    /// True when the index carries no name of the user's own — a table type's
+    /// PK and UNIQUE are minted by the server from an <c>object_id</c>, because
+    /// <c>CREATE TYPE … AS TABLE</c> rejects a <c>CONSTRAINT</c> clause. Such a
+    /// name is never a pairing key and never written back.
+    /// </summary>
+    public bool IsSystemNamed => IsPrimaryKey || IsUniqueConstraint;
+
     public bool IsRowstore =>
         TypeDesc is null
         || TypeDesc.Equals("CLUSTERED", StringComparison.OrdinalIgnoreCase)

@@ -349,29 +349,12 @@ public sealed class ComparisonEngine
                 (null, null) => DifferenceStatus.Identical,
                 (null, _) => DifferenceStatus.OnlyInB,
                 (_, null) => DifferenceStatus.OnlyInA,
-                _ => TableTypeUdtsEqual(sideA, sideB, ids.Names)
+                _ => TableTypeComparison.Equal(sideA, sideB, ids.Names)
                     ? DifferenceStatus.Identical
                     : DifferenceStatus.Different,
             };
             yield return new DifferencePair(id, status, sideA, sideB);
         }
-    }
-
-    private static bool TableTypeUdtsEqual(TableTypeUdt a, TableTypeUdt b, StringComparer names)
-    {
-        if (a.Columns.Count != b.Columns.Count) { return false; }
-        var bByName = b.Columns.ToDictionary(c => c.Name, names);
-        foreach (Column ac in a.Columns)
-        {
-            if (!bByName.TryGetValue(ac.Name, out Column? bc)) { return false; }
-            if (!string.Equals(ac.DataType, bc.DataType, StringComparison.OrdinalIgnoreCase)) { return false; }
-            if (ac.IsNullable != bc.IsNullable) { return false; }
-            if (ac.Ordinal != bc.Ordinal) { return false; }
-            // M13-PARITY.5 #32 — UDTT column collation participates in equality
-            // for the same reason it does on plain tables.
-            if (!string.Equals(ac.Collation, bc.Collation, StringComparison.OrdinalIgnoreCase)) { return false; }
-        }
-        return true;
     }
 
     private static IEnumerable<DifferencePair> CompareTables(
