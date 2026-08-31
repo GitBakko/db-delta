@@ -16,7 +16,8 @@ public sealed class SequenceScriptEmitter
     {
         ArgumentNullException.ThrowIfNull(seq);
         StringBuilder sb = new();
-        sb.Append("CREATE SEQUENCE ").Append(Sql.Q(seq.Schema, seq.Name)).Append(" AS ").Append(seq.DataType);
+        sb.Append("CREATE SEQUENCE ").Append(Sql.Q(seq.Schema, seq.Name)).Append(" AS ")
+          .Append(SqlTypeFormatter.FormatSequenceBaseType(seq.DataType, seq.TypeSchema));
         sb.Append(" START WITH ").Append(seq.StartValue.ToString(CultureInfo.InvariantCulture));
         sb.Append(" INCREMENT BY ").Append(seq.Increment.ToString(CultureInfo.InvariantCulture));
         if (seq.MinValue.HasValue)
@@ -71,7 +72,7 @@ public sealed class SequenceScriptEmitter
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(target);
 
-        if (!string.Equals(source.DataType, target.DataType, StringComparison.OrdinalIgnoreCase))
+        if (!source.TypeMatches(target, StringComparer.OrdinalIgnoreCase))
         {
             return null;
         }

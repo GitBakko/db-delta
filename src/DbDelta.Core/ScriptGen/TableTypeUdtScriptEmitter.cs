@@ -85,7 +85,7 @@ public sealed class TableTypeUdtScriptEmitter
             return sb.Append("AS ").Append(c.ComputedExpression).ToString();
         }
 
-        sb.Append(SqlTypeFormatter.FormatColumnType(c.DataType));
+        sb.Append(SqlTypeFormatter.FormatColumnType(c.DataType, c.TypeSchema));
         if (c.IsIdentity)
         {
             sb.Append(c.IdentitySeed is long seed && c.IdentityIncrement is long inc

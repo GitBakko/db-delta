@@ -48,7 +48,11 @@ internal sealed class TableReader
             c.collation_name       AS CollationName,
             -- Not cosmetic: a column of an ALIAS type may not carry a COLLATE
             -- clause, and sys.columns reports a collation for it all the same.
-            ty.is_user_defined     AS IsUserDefinedType
+            ty.is_user_defined     AS IsUserDefinedType,
+            -- The schema is recoverable ONLY from this join: TYPE_NAME() returns the
+            -- bare name whatever the type's schema, measured. Null for a built-in
+            -- type, so the emitters can tell "dbo" from "not a user type".
+            CASE WHEN ty.is_user_defined = 1 THEN SCHEMA_NAME(ty.schema_id) END AS TypeSchema
         FROM sys.columns AS c
         INNER JOIN sys.types AS ty ON ty.user_type_id = c.user_type_id
         INNER JOIN sys.tables AS t ON t.object_id = c.object_id
@@ -105,6 +109,7 @@ internal sealed class TableReader
                 int ordinal = columnsReader.GetInt32(13);
                 string? collation = columnsReader.IsDBNull(14) ? null : columnsReader.GetString(14);
                 bool isUdt = columnsReader.GetBoolean(15);
+                string? typeSchema = columnsReader.IsDBNull(16) ? null : columnsReader.GetString(16);
 
                 if (!tableShells.ContainsKey(objectId))
                 {
@@ -118,7 +123,7 @@ internal sealed class TableReader
                 }
                 list.Add(new Column(
                     name: columnName,
-                    dataType: FormatDataType(typeName, maxLength, precision, scale),
+                    dataType: CatalogDataType.Format(typeName, maxLength, precision, scale),
                     isNullable: isNullable,
                     ordinal: ordinal,
                     defaultExpression: defaultExpr,
@@ -130,6 +135,7 @@ internal sealed class TableReader
                     collation: collation)
                 {
                     IsUserDefinedType = isUdt,
+                    TypeSchema = typeSchema,
                 });
             }
         }
@@ -150,19 +156,4 @@ internal sealed class TableReader
         return tables;
     }
 
-    private static string FormatDataType(string typeName, short maxLength, byte precision, byte scale)
-    {
-        return typeName switch
-        {
-            "nvarchar" or "nchar" => maxLength == -1
-                ? $"{typeName}(max)"
-                : $"{typeName}({maxLength / 2})",
-            "varchar" or "char" or "varbinary" or "binary" => maxLength == -1
-                ? $"{typeName}(max)"
-                : $"{typeName}({maxLength})",
-            "decimal" or "numeric" => $"{typeName}({precision},{scale})",
-            "datetime2" or "time" or "datetimeoffset" => $"{typeName}({scale})",
-            _ => typeName,
-        };
-    }
 }

@@ -1,6 +1,7 @@
 using DbDelta.Core.Abstractions;
 using DbDelta.Core.ObjectModel;
 using DbDelta.Core.ScriptGen;
+using DbDelta.Providers.LiveDb.Readers;
 using Microsoft.Data.SqlClient;
 
 namespace DbDelta.Providers.LiveDb.ObjectBody;
@@ -63,9 +64,13 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
             SELECT seq.name, TYPE_NAME(seq.user_type_id),
                    CAST(seq.start_value AS bigint), CAST(seq.increment AS bigint),
                    CAST(seq.minimum_value AS bigint), CAST(seq.maximum_value AS bigint),
-                   seq.is_cycling, seq.is_cached, seq.cache_size
+                   seq.is_cycling, seq.is_cached, seq.cache_size,
+                   CASE WHEN ty.is_user_defined = 1 THEN SCHEMA_NAME(ty.schema_id) END
             FROM sys.sequences AS seq
             INNER JOIN sys.schemas AS s ON s.schema_id = seq.schema_id
+            -- LEFT, never INNER: see SequenceReader for why, and for why it
+            -- is defence in depth rather than a live fix.
+            LEFT JOIN sys.types AS ty ON ty.user_type_id = seq.user_type_id
             WHERE s.name = @schema AND seq.name = @name;
             """;
 
@@ -85,7 +90,10 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
             MaxValue: r.IsDBNull(5) ? null : r.GetInt64(5),
             IsCycling: r.GetBoolean(6),
             IsCached: r.GetBoolean(7),
-            CacheSize: r.IsDBNull(8) ? null : r.GetInt32(8));
+            CacheSize: r.IsDBNull(8) ? null : r.GetInt32(8))
+        {
+            TypeSchema = r.IsDBNull(9) ? null : r.GetString(9),
+        };
         return new SequenceScriptEmitter().EmitCreate(seq);
     }
 
@@ -117,7 +125,7 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
     /// row the grid calls Different shows nothing to compare.
     /// </remarks>
     /// <remarks>
-    /// Reads through <see cref="Readers.TableTypeUdtReader"/> rather than a
+    /// Reads through <see cref="TableTypeUdtReader"/> rather than a
     /// query of its own. The second query it used to carry saw columns only, so
     /// the day the comparison learned to see a table type's keys this pane
     /// would have shown two bodies a reader cannot tell apart for a row the
@@ -132,7 +140,7 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
         // dbo.t, and picking between them in memory would answer with whichever
         // came first. It also means one type is read, not the whole catalog.
         IReadOnlyList<TableTypeUdt> match =
-            await new Readers.TableTypeUdtReader().ReadAsync(connection, ct, schema, name).ConfigureAwait(false);
+            await new TableTypeUdtReader().ReadAsync(connection, ct, schema, name).ConfigureAwait(false);
 
         TableTypeUdt? udt = match.Count == 1 ? match[0] : null;
 
@@ -349,8 +357,18 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
                 dc.definition                              AS DefaultExpression,
                 cc.definition                              AS ComputedExpression,
                 ISNULL(cc.is_persisted, 0)                 AS IsPersistedComputed,
-                c.column_id                                AS Ordinal
+                c.column_id                                AS Ordinal,
+                -- This query had NO sys.types join: the pane could not tell an
+                -- alias type from a built-in, so it would have rendered the bare
+                -- name for a row the grid calls Different — two identical panes.
+                ISNULL(ty.is_user_defined, 0)              AS IsUserDefinedType,
+                CASE WHEN ty.is_user_defined = 1 THEN SCHEMA_NAME(ty.schema_id) END AS TypeSchema
             FROM sys.columns AS c
+            -- LEFT, never INNER: this query had no join at all before, so an
+            -- INNER one could only ever REMOVE rows it used to return —
+            -- rendering a table body with columns silently missing. Same
+            -- reasoning as SequenceReader.
+            LEFT JOIN sys.types AS ty ON ty.user_type_id = c.user_type_id
             LEFT JOIN sys.identity_columns AS ic ON ic.object_id = c.object_id
                                                  AND ic.column_id = c.column_id
             LEFT JOIN sys.default_constraints AS dc ON dc.parent_object_id = c.object_id
@@ -380,9 +398,11 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
             string? computedExpr = r.IsDBNull(10) ? null : r.GetString(10);
             bool isPersistedComputed = !r.IsDBNull(11) && r.GetBoolean(11);
             int ordinal = r.GetInt32(12);
+            bool isUdt = !r.IsDBNull(13) && r.GetBoolean(13);
+            string? typeSchema = r.IsDBNull(14) ? null : r.GetString(14);
             columns.Add(new Column(
                 name: columnName,
-                dataType: FormatDataType(typeName, maxLength, precision, scale),
+                dataType: CatalogDataType.Format(typeName, maxLength, precision, scale),
                 isNullable: isNullable,
                 ordinal: ordinal,
                 defaultExpression: defaultExpr,
@@ -390,7 +410,11 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
                 identitySeed: identitySeed,
                 identityIncrement: identityIncrement,
                 computedExpression: computedExpr,
-                isPersistedComputed: isPersistedComputed));
+                isPersistedComputed: isPersistedComputed)
+            {
+                IsUserDefinedType = isUdt,
+                TypeSchema = typeSchema,
+            });
         }
 
         return new Table(schemaName, objectName, columns);
@@ -760,13 +784,4 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
         _ => ReferentialAction.NoAction,
     };
 
-    private static string FormatDataType(string typeName, short maxLength, byte precision, byte scale) =>
-        typeName switch
-        {
-            "nvarchar" or "nchar" => maxLength == -1 ? $"{typeName}(max)" : $"{typeName}({maxLength / 2})",
-            "varchar" or "char" or "varbinary" or "binary" => maxLength == -1 ? $"{typeName}(max)" : $"{typeName}({maxLength})",
-            "decimal" or "numeric" => $"{typeName}({precision},{scale})",
-            "datetime2" or "time" or "datetimeoffset" => $"{typeName}({scale})",
-            _ => typeName,
-        };
 }

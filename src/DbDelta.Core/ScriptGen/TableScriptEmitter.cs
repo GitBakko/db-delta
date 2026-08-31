@@ -359,7 +359,7 @@ public sealed class TableScriptEmitter(
             }
             sb.Append("ALTER TABLE ").Append(qualifiedName)
               .Append(" ALTER COLUMN ").Append(Sql.Q(newCol.Name)).Append(' ')
-              .Append(SqlTypeFormatter.FormatColumnType(newCol.DataType));
+              .Append(SqlTypeFormatter.FormatColumnType(newCol.DataType, newCol.TypeSchema));
             AppendCollation(sb, newCol);
             sb.Append(newCol.IsNullable ? " NULL" : " NOT NULL")
               .AppendLine(";");
@@ -531,7 +531,10 @@ public sealed class TableScriptEmitter(
     /// section 3 emitted nothing but a no-op ALTER COLUMN.
     /// </remarks>
     private static bool ColumnRequiresAlterColumn(Column oldCol, Column newCol) =>
-        !string.Equals(oldCol.DataType, newCol.DataType, StringComparison.OrdinalIgnoreCase)
+        // OrdinalIgnoreCase and not the target collation: an emitter has no
+        // database to ask. It is what this line already did before the type
+        // schema joined the comparison.
+        !oldCol.TypeMatches(newCol, StringComparer.OrdinalIgnoreCase)
         || oldCol.IsNullable != newCol.IsNullable
         || !string.Equals(oldCol.Collation, newCol.Collation, StringComparison.OrdinalIgnoreCase)
         || !BodyNormalizer.ExpressionsEqual(oldCol.ComputedExpression, newCol.ComputedExpression)
@@ -805,7 +808,7 @@ public sealed class TableScriptEmitter(
     /// </summary>
     private static bool ColumnShapeEqual(Column a, Column b)
     {
-        if (!string.Equals(a.DataType, b.DataType, StringComparison.OrdinalIgnoreCase)) { return false; }
+        if (!a.TypeMatches(b, StringComparer.OrdinalIgnoreCase)) { return false; }
         if (a.IsNullable != b.IsNullable) { return false; }
         if (a.IsIdentity != b.IsIdentity) { return false; }
         if (a.IsIdentity && b.IsIdentity)
@@ -910,7 +913,7 @@ public sealed class TableScriptEmitter(
             return sb.ToString();
         }
 
-        sb.Append(SqlTypeFormatter.FormatColumnType(c.DataType));
+        sb.Append(SqlTypeFormatter.FormatColumnType(c.DataType, c.TypeSchema));
         if (c.IsIdentity)
         {
             if (c.IdentitySeed is long seed && c.IdentityIncrement is long inc)

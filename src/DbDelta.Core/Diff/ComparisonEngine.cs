@@ -255,14 +255,14 @@ public sealed class ComparisonEngine
                 (null, null) => DifferenceStatus.Identical,
                 (null, _) => DifferenceStatus.OnlyInB,
                 (_, null) => DifferenceStatus.OnlyInA,
-                _ => SequencesEqual(sideA, sideB) ? DifferenceStatus.Identical : DifferenceStatus.Different,
+                _ => SequencesEqual(sideA, sideB, ids.Names) ? DifferenceStatus.Identical : DifferenceStatus.Different,
             };
             yield return new DifferencePair(id, status, sideA, sideB);
         }
     }
 
-    private static bool SequencesEqual(Sequence a, Sequence b) =>
-        string.Equals(a.DataType, b.DataType, StringComparison.OrdinalIgnoreCase)
+    private static bool SequencesEqual(Sequence a, Sequence b, StringComparer names) =>
+        a.TypeMatches(b, names)
         && a.StartValue == b.StartValue
         && a.Increment == b.Increment
         && a.MinValue == b.MinValue
@@ -505,7 +505,7 @@ public sealed class ComparisonEngine
                 return false;
             }
 
-            if (col.DataType != other.DataType)
+            if (!col.TypeMatches(other, names))
             {
                 return false;
             }

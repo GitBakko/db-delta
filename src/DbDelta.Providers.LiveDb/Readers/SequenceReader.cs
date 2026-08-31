@@ -22,9 +22,22 @@ internal sealed class SequenceReader
             CAST(seq.maximum_value AS bigint)   AS MaxValue,
             seq.is_cycling                 AS IsCycling,
             seq.is_cached                  AS IsCached,
-            seq.cache_size                 AS CacheSize
+            seq.cache_size                 AS CacheSize,
+            -- A sequence over an ALIAS type is legal and TYPE_NAME hands back the
+            -- bare name, same as for a column. Null for a built-in base type.
+            CASE WHEN ty.is_user_defined = 1 THEN SCHEMA_NAME(ty.schema_id) END AS TypeSchema
         FROM sys.sequences AS seq
         INNER JOIN sys.schemas AS s ON s.schema_id = seq.schema_id
+        -- LEFT, never INNER, and it is defence in depth rather than a live
+        -- fix: sys.* is filtered by metadata visibility, so an INNER join to
+        -- sys.types would DROP the sequence for a principal that cannot see
+        -- its type — and a dropped row reads as OnlyInB on the other side,
+        -- which the script turns into DROP SEQUENCE. Unreachable today
+        -- because LiveDbSource refuses to read at all without VIEW DEFINITION
+        -- at DATABASE scope, which lifts the filter for sys.types too. LEFT
+        -- costs nothing and keeps this reader from being the thing that loses
+        -- an object if that guard is ever relaxed.
+        LEFT JOIN sys.types AS ty ON ty.user_type_id = seq.user_type_id
         ORDER BY s.name, seq.name;
         """;
 
@@ -45,7 +58,10 @@ internal sealed class SequenceReader
                 MaxValue: r.IsDBNull(6) ? null : r.GetInt64(6),
                 IsCycling: r.GetBoolean(7),
                 IsCached: r.GetBoolean(8),
-                CacheSize: r.IsDBNull(9) ? null : r.GetInt32(9)));
+                CacheSize: r.IsDBNull(9) ? null : r.GetInt32(9))
+            {
+                TypeSchema = r.IsDBNull(10) ? null : r.GetString(10),
+            });
         }
         return result;
     }

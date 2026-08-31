@@ -28,7 +28,7 @@ internal static class TableTypeComparison
         foreach (Column ac in a.Columns)
         {
             if (!bByName.TryGetValue(ac.Name, out Column? bc)) { return false; }
-            if (!string.Equals(ac.DataType, bc.DataType, StringComparison.OrdinalIgnoreCase)) { return false; }
+            if (!ac.TypeMatches(bc, names)) { return false; }
             if (ac.IsNullable != bc.IsNullable) { return false; }
             if (ac.Ordinal != bc.Ordinal) { return false; }
             // M13-PARITY.5 #32 — UDTT column collation participates in equality

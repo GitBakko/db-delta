@@ -56,7 +56,11 @@ internal sealed class TableTypeUdtReader
             CAST(idc.seed_value AS bigint)       AS IdentitySeed,
             CAST(idc.increment_value AS bigint)  AS IdentityIncrement,
             dc.definition                        AS DefaultExpression,
-            cmp.definition                       AS ComputedExpression
+            cmp.definition                       AS ComputedExpression,
+            -- The schema is recoverable ONLY from this join: TYPE_NAME() returns the
+            -- bare name whatever the type's schema, measured. Null for a built-in
+            -- type, so the emitters can tell "dbo" from "not a user type".
+            CASE WHEN ty.is_user_defined = 1 THEN SCHEMA_NAME(ty.schema_id) END AS TypeSchema
         FROM sys.columns AS c
         INNER JOIN sys.types AS ty ON ty.user_type_id = c.user_type_id
         INNER JOIN sys.table_types AS tt ON tt.type_table_object_id = c.object_id
@@ -195,7 +199,7 @@ internal sealed class TableTypeUdtReader
 
             list.Add(new Column(
                 name: r.GetString(1),
-                dataType: FormatDataType(r.GetString(2), r.GetInt16(3), r.GetByte(4), r.GetByte(5)),
+                dataType: CatalogDataType.Format(r.GetString(2), r.GetInt16(3), r.GetByte(4), r.GetByte(5)),
                 isNullable: r.GetBoolean(6),
                 ordinal: r.GetInt32(7),
                 defaultExpression: r.IsDBNull(13) ? null : r.GetString(13),
@@ -206,6 +210,7 @@ internal sealed class TableTypeUdtReader
                 collation: r.IsDBNull(8) ? null : r.GetString(8))
             {
                 IsUserDefinedType = r.GetBoolean(9),
+                TypeSchema = r.IsDBNull(15) ? null : r.GetString(15),
             });
         }
         return columns;
@@ -321,17 +326,4 @@ internal sealed class TableTypeUdtReader
         List<IndexColumn> KeyColumns,
         List<string> IncludedColumns);
 
-    private static string FormatDataType(string typeName, short maxLength, byte precision, byte scale)
-    {
-        return typeName switch
-        {
-            "nvarchar" or "nchar" => maxLength == -1 ? $"{typeName}(max)" : $"{typeName}({maxLength / 2})",
-            "varchar" or "char" or "varbinary" or "binary" => maxLength == -1
-                ? $"{typeName}(max)"
-                : $"{typeName}({maxLength})",
-            "decimal" or "numeric" => $"{typeName}({precision},{scale})",
-            "datetime2" or "time" or "datetimeoffset" => $"{typeName}({scale})",
-            _ => typeName,
-        };
-    }
 }
