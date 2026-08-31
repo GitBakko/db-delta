@@ -78,10 +78,10 @@ public class AliasTypeSchemaReaderTests(LiveDbFixture fixture)
     }
 
     /// <summary>
-    /// The negative controls, and they are what keeps the change from moving a
-    /// single existing script: an alias type in <c>dbo</c> reports its schema
-    /// too — the emitter, not the reader, decides that <c>dbo</c> stays bare —
-    /// and a built-in type reports none at all.
+    /// The negative controls: an alias type in <c>dbo</c> reports its schema
+    /// like any other, and a BUILT-IN type reports none at all. The second is
+    /// the one that matters — it is what keeps <c>SCHEMA_NAME</c> from handing
+    /// back <c>sys</c> and every column coming out <c>[sys].[nvarchar]</c>.
     /// </summary>
     [Fact]
     public async Task A_dbo_alias_type_reports_dbo_and_a_built_in_type_reports_nothing()
@@ -106,11 +106,13 @@ public class AliasTypeSchemaReaderTests(LiveDbFixture fixture)
         t.Columns.Single(c => c.Name == "Id").TypeSchema.Should().BeNull();
         t.Columns.Single(c => c.Name == "Nome").TypeSchema.Should().BeNull();
 
-        // …and the script for a dbo alias type is byte-for-byte what it always
-        // was. This is the assertion that says "no existing deploy changes".
+        // A dbo alias type is qualified like any other, and the built-in
+        // beside it is not: the two halves of the policy in one script.
         string sql = new TableScriptEmitter().Emit(
             new DifferencePair(t.Identity, DifferenceStatus.OnlyInA, t, null));
-        sql.Should().Contain("[Codice] [CodiceDbo] NOT NULL").And.NotContain("[dbo].[CodiceDbo]");
+        sql.Should().Contain("[Codice] [dbo].[CodiceDbo] NOT NULL")
+           .And.Contain("[Nome] [nvarchar] (50)")
+           .And.NotContain("[sys]");
     }
 
     /// <summary>

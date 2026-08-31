@@ -30,54 +30,50 @@ namespace DbDelta.Core.ScriptGen;
 internal static class SqlTypeFormatter
 {
     /// <summary>
-    /// The schema an unqualified alias type name is allowed to stay
-    /// unqualified for. This is the ONE place the qualification policy lives.
-    /// </summary>
-    private const string ImplicitTypeSchema = "dbo";
-
-    /// <summary>
-    /// Whether an alias type living in <paramref name="typeSchema"/> has to be
-    /// written schema-qualified. Today: everything except <c>dbo</c>.
+    /// Whether an alias type has to be written schema-qualified. It always
+    /// does. Built-in types never are — <paramref name="typeSchema"/> is null
+    /// for them, and for any column not read from a catalog.
     /// </summary>
     /// <remarks>
     /// <para>
     /// Measured on <c>mssql/server:2022-latest</c>, on real logins whose
     /// DEFAULT_SCHEMA differed, not under <c>EXECUTE AS</c>: SQL Server
     /// resolves an unqualified type name for a table or table-type column
-    /// against the CALLER'S DEFAULT SCHEMA FIRST, then <c>dbo</c>. So a type
-    /// in <c>dbo</c> always resolves for everyone — which is why the bare name
-    /// is kept for it, and why no existing script changes a byte — while a
-    /// type in any other schema is invisible to a <c>dbo</c>-default caller
-    /// and dies with Msg 2715 ("Cannot find data type"). That is the defect
-    /// this predicate closes.
+    /// against the CALLER'S DEFAULT SCHEMA FIRST, then <c>dbo</c>. Two things
+    /// follow, and the second is why <c>dbo</c> is qualified like everything
+    /// else.
     /// </para>
     /// <para>
-    /// KNOWN AND ACCEPTED, measured on the same server: because the caller's
-    /// default schema wins over <c>dbo</c>, a bare <c>dbo</c> type name binds
-    /// to a DIFFERENT type when the target holds a same-named one in the
-    /// deploying principal's default schema. Byte-identical DDL produced
-    /// <c>user_type_id</c> 258 (<c>dbo.MioTipo</c>) run by a dbo-default login
-    /// and 257 (<c>app.MioTipo</c>) run by an app-default one. That is silent,
-    /// not loud. Closing it means qualifying <c>dbo</c> too, and the whole
-    /// change is this constant: set <see cref="ImplicitTypeSchema"/> to
-    /// <c>null</c> and every alias type comes out qualified. Left as it is
-    /// because it makes the emitted script diverge from every one issued so
-    /// far — a product decision, recorded in docs/BACKLOG.md rather than taken
-    /// here.
+    /// A type outside <c>dbo</c> is invisible to a <c>dbo</c>-default caller
+    /// and the statement dies with Msg 2715, "Cannot find data type". That is
+    /// the loud half.
     /// </para>
     /// <para>
-    /// Note this governs COLUMNS only. A procedure or function parameter
-    /// resolves against the schema of the MODULE being created, not the
-    /// caller's — a second rule in the same server, also measured — and DbDelta
-    /// never models those types anyway: they ride inside
-    /// <c>sys.sql_modules.definition</c> as opaque text and are re-emitted
-    /// verbatim, which binds identically on the target precisely because the
-    /// module's own schema travels with them.
+    /// The quiet half: because the caller's own schema wins over <c>dbo</c>, a
+    /// BARE <c>dbo</c> type name binds to a DIFFERENT type whenever the target
+    /// holds a same-named one in the deploying principal's default schema.
+    /// Byte-identical DDL produced <c>user_type_id</c> 258 (<c>dbo.MioTipo</c>)
+    /// run by a dbo-default login and 257 (<c>app.MioTipo</c>) run by an
+    /// app-default one — same script, two different databases, no error either
+    /// time. Qualifying removes the dependence on who runs the script: a type
+    /// that lives elsewhere on the target now fails loudly instead of binding
+    /// quietly to the wrong one.
+    /// </para>
+    /// <para>
+    /// The cost is that an alias-typed column reads <c>[dbo].[MioTipo]</c>
+    /// where every script issued before said <c>[MioTipo]</c>. Cosmetic, and
+    /// confined to alias-typed columns; built-in types are untouched.
+    /// </para>
+    /// <para>
+    /// This governs COLUMNS. A procedure or function parameter resolves against
+    /// the schema of the MODULE being created — a second rule in the same
+    /// server, also measured — and DbDelta never models those types: they ride
+    /// inside <c>sys.sql_modules.definition</c> as opaque text and are
+    /// re-emitted verbatim, which binds identically on the target precisely
+    /// because the module's own schema travels with them.
     /// </para>
     /// </remarks>
-    private static bool NeedsSchemaQualification(string? typeSchema) =>
-        typeSchema is not null
-        && !string.Equals(typeSchema, ImplicitTypeSchema, StringComparison.OrdinalIgnoreCase);
+    private static bool NeedsSchemaQualification(string? typeSchema) => typeSchema is not null;
 
     /// <summary>
     /// The base type of a <c>CREATE SEQUENCE</c>. Returns
@@ -99,7 +95,7 @@ internal static class SqlTypeFormatter
     /// moves no existing script that was valid to begin with.
     /// </remarks>
     public static string FormatSequenceBaseType(string dataType, string? typeSchema) =>
-        typeSchema is null ? dataType : FormatColumnType(dataType, typeSchema);
+        NeedsSchemaQualification(typeSchema) ? FormatColumnType(dataType, typeSchema) : dataType;
 
     /// <param name="dataType">
     /// The bare catalog type name with its optional length — never

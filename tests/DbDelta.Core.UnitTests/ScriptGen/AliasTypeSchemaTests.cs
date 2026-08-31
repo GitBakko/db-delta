@@ -141,13 +141,16 @@ public class AliasTypeSchemaTests
     // ── negative controls ────────────────────────────────────────────────
 
     [Fact]
-    public void An_alias_type_in_dbo_keeps_its_bare_name()
+    public void An_alias_type_in_dbo_is_qualified_too()
     {
-        // The reason no golden file and no existing assertion moves: an
-        // unqualified name resolves against dbo for every caller, measured.
+        // A bare dbo name DOES resolve for every caller — that half was
+        // measured and is true. It resolves to the WRONG TYPE when the target
+        // holds a same-named one in the deploying principal's default schema,
+        // because the caller's schema wins over dbo: user_type_id 258 or 257
+        // from byte-identical DDL, depending on who runs it. Qualifying trades
+        // a silent mis-binding for a loud Msg 2715.
         Create(Tbl(Alias("Codice", "CodiceArticolo", "dbo")))
-            .Should().Contain("[Codice] [CodiceArticolo] NOT NULL")
-            .And.NotContain("[dbo].[CodiceArticolo]");
+            .Should().Contain("[Codice] [dbo].[CodiceArticolo] NOT NULL");
     }
 
     [Fact]
@@ -242,7 +245,7 @@ public class AliasTypeSchemaTests
         // shape. Only BUILT-IN base types stay bare.
         Sequence s = new("dbo", "S1", "Ordine Riga", 1, 1, null, null, false, true, null) { TypeSchema = "dbo" };
 
-        new SequenceScriptEmitter().EmitCreate(s).Should().Contain("AS [Ordine Riga]");
+        new SequenceScriptEmitter().EmitCreate(s).Should().Contain("AS [dbo].[Ordine Riga]");
     }
 
     [Fact]
