@@ -43,8 +43,27 @@ public class ParityFixtureTests(LiveDbFixture fixture)
         Database target = (await new LiveDbSource(tgt, "target").LoadAsync(ct)).Value!;
 
         ComparisonResult diff = new ComparisonEngine().Compare(source, target, ComparisonOptions.Default);
+        // dropDependencies is the TARGET's edges, and leaving it out is not a
+        // detail: without it ResolveDropOrder falls back to reversing the CREATE
+        // order, which is kind rank, not topology. This test exists to measure
+        // drop ordering (scenario 18), so omitting the one input that decides it
+        // measured the fallback and called it the resolver. Both shipping call
+        // sites pass it — ScriptCommand.cs:93 and DeployScriptBuilder.cs:105.
         string script = new ScriptGenerator().Generate(
-            diff, selection: null, options: ComparisonOptions.Default, dependencies: source.Dependencies);
+            diff,
+            selection: null,
+            options: ComparisonOptions.Default,
+            dependencies: source.Dependencies,
+            dropDependencies: target.Dependencies);
+
+        // The audit's other half is a file on disk: point DBDELTA_PARITY_DUMP at
+        // a path and this run leaves DbDelta's script next to Redgate's, which
+        // is the only way the two get diffed without a licensed GUI on this box.
+        if (Environment.GetEnvironmentVariable("DBDELTA_PARITY_DUMP") is { Length: > 0 } dump)
+        {
+            await File.WriteAllTextAsync(dump, script, ct);
+        }
+
         // ── 18: the SCHEMABINDING edge is the one the server enforces. The
         //    function binds to the table, so it has to be dropped first or
         //    the DROP TABLE is Msg 3729. The view merely CALLS the function

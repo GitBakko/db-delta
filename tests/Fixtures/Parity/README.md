@@ -70,6 +70,24 @@ those once the fixture for v0.14 includes them.
 
    `scripts/parity/` is git-ignored so the captured output stays local.
 
+   **Or, with no live credentials and no licensed GUI:** point
+   `DBDELTA_PARITY_DUMP` at a path and run `ParityFixtureTests` — it
+   builds the same two databases in a container, generates the script
+   with the same inputs `dbdelta script` uses, and writes it there.
+
+   ```bash
+   DBDELTA_PARITY_DUMP=scripts/parity/dbdelta-<date>.sql \
+     dotnet test tests/DbDelta.Providers.LiveDb.IntegrationTests \
+     --filter "FullyQualifiedName~ParityFixtureTests"
+   ```
+
+   Mind the collation: a container's server default is
+   `SQL_Latin1_General_CP1_CI_AS` and a typical live host's is
+   `Latin1_General_CI_AS`. The fixture declares no `COLLATE` anywhere, so
+   if the two halves come from different servers every collation *name*
+   will differ and none of it is a divergence. What to check is that the
+   `COLLATE` clause sits on the same set of columns in both scripts.
+
 5. **Generate the Redgate migration script.** Open Redgate SQL Compare,
    add both DBs as sources, click **Compare Now**, then **Deployment
    Script** → save as `scripts/parity/redgate-2026-05-25.sql`. Use the
@@ -80,10 +98,11 @@ those once the fixture for v0.14 includes them.
    - Keep `Ignore permissions / users / role memberships` ON
      (matches DbDelta's default `ComparisonOptions.IgnorePermissions`).
 
-6. **Paste both outputs back.** Open `docs/parity/redgate-2026-05-25.md`
-   and paste the two scripts into the **Captured outputs** section.
-   Then ping Claude — the agent diffs the two by scenario and fills the
-   verdict table (match / cosmetic / bug).
+6. **Ask for the diff.** Leave both scripts in `scripts/parity/` and say
+   so — the agent diffs them scenario by scenario and writes a new
+   `docs/parity/redgate-<date>.md` with the verdict table. The artifacts
+   themselves stay untracked, so the audit document has to carry the
+   evidence it relies on. Latest run: `docs/parity/redgate-2026-08-31.md`.
 
 ## Cleanup
 

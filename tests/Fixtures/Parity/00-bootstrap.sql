@@ -1,7 +1,8 @@
 -- DbDelta ↔ Redgate SQL Compare parity fixture — bootstrap
 -- Run once against a SQL Server instance (LocalDB / 2022 / Azure SQL).
 -- Creates two empty databases, then 01-source.sql and 02-target.sql
--- populate them with 17 deliberate divergences (one per scenario).
+-- populate them with 21 deliberate divergences (one per scenario).
+-- Scenario 22 is a refusal and lives in 03-refusals.sql, its own DB pair.
 
 USE [master];
 GO

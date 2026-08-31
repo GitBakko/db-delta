@@ -5,7 +5,7 @@
 contenuto. Chi chiude una voce la depenna QUI, nello stesso commit del codice —
 vedi «Manutenzione» in fondo.
 
-## Stato — 2026-08-20
+## Stato — 2026-08-31
 
 - **v1.0.2 pubblicata** (2026-08-13), «Latest», MSI non firmata allegata.
 - **909 test verdi** nei sette progetti che girano senza Docker (Core 530,
@@ -16,11 +16,20 @@ vedi «Manutenzione» in fondo.
   `docker ps`. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **8 voci aperte** — P1 0 · P2 0 · P3 1 · P4 0 · P5 7 — più **19** in
-  «Deciso — NON riaprire». Tutte riverificate sul codice il 2026-08-18, non
-  ereditate dai documenti. **Le 4 critiche sono chiuse**, e 6 delle 7 alte:
-  vedi P0 e P1. Il conteggio va ricontato, non decrementato a mente: `awk` sulle
-  righe di tabella, o si scolla come si era già scollato.
+- **13 voci aperte** — P1 3 · P2 1 · P3 1 · P4 1 · P5 7 — più **19** in
+  «Deciso — NON riaprire». **Le 4 critiche restano chiuse.** Le sei nuove del
+  2026-08-31 escono tutte dall'audit di parità Redgate e **nessuna è un
+  fallimento di parità**: sono forme che la fixture non raggiunge, trovate
+  guardando il nostro lato da vicino. Le altre sette sono del proprietario e
+  riverificate sul codice il 2026-08-18, non ereditate dai documenti. Il
+  conteggio va ricontato, non decrementato a mente: `awk` sulle righe di
+  tabella, o si scolla come si era già scollato.
+- **La parità Redgate è stata eseguita il 2026-08-31 e chiusa**: 21 scenari,
+  **zero difetti di parità**, un solo buco dichiarato (extended properties).
+  L'unico difetto vero era nostro e nell'attrezzatura — `ParityFixtureTests`
+  non passava `dropDependencies`, quindi lo scenario 18 misurava il fallback
+  invece del risolutore. Tutto in `docs/parity/redgate-2026-08-31.md`; per
+  rigenerare l'artefatto DbDelta serve `DBDELTA_PARITY_DUMP=<percorso>`.
 - **CI verde su `3c48735`** (run `32140004994`), entrambi i job. I DB-backed
   aggiungono **74** test ai locali della riga sopra: LiveDb 45, Cli acceptance
   22, Persistence integration 7 su Linux (4 passati + 3 skipped su Windows).
@@ -154,6 +163,9 @@ due senza test.
 
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
+| **Il tipo tabella perde PK / UNIQUE / CHECK al rebuild, e la perdita non è dichiarata.** `TableTypeUdt` modella solo `Columns` (`TableTypeUdt.cs:12-15`), e lo scenario 11 della fixture di parità — una colonna aggiunta — costringe DROP + CREATE: una chiave sul tipo se ne va e non torna. Il ri-confronto poi dice **Identical**, quindi nessuno se ne accorge e nessuna seconda esecuzione ripara. **Non è nemmeno un buco dichiarato**: il filtro di `UnexaminedReader` esclude `'C'`, `'PK'`, `'UQ'` prima ancora di arrivare a `is_ms_shipped`, e `UnexaminedCensus.Labels` non ha una chiave per questo. Un TVP con una primary key è il caso comune, non l'esotico | 2026-08-31 | M | `docs/parity/redgate-2026-08-31.md` R1; `src/DbDelta.Core/ObjectModel/TableTypeUdt.cs:12-15`, `src/DbDelta.Core/ScriptGen/TableTypeUdtScriptEmitter.cs:13-32` |
+| **Nessun arco di dipendenza esiste per il legame a un tipo, quindi `DROP TYPE` esce nudo.** `EdgeKind` ha sette membri e nessuno è questo, e `sys.sql_expression_dependencies` **non registra alcuna riga** per una colonna legata a un tipo alias o per un parametro legato a un table type: l'arco non potrebbe esistere nemmeno se l'enum avesse il membro. Il `DROP TYPE` viene quindi piazzato per solo rango di kind, davanti a tutto, e una colonna o un parametro TVP legato dà Msg 3732. Riprodotto su una coppia usa-e-getta con i due tipi della fixture stessa. Rumoroso, non silenzioso — ma un tipo alias legato a una colonna è la ragione normale per dichiararne uno | 2026-08-31 | M | `docs/parity/redgate-2026-08-31.md` R2; `src/DbDelta.Core/Dependency/EdgeKind.cs`, `src/DbDelta.Core/Dependency/DependencyReader.cs:37-62` |
+| **Il rebuild per identity non ha alcuna strada per un modulo schemabound legato alla tabella ricostruita.** Il rebuild rimette FK entranti, FK uscenti, indici e trigger; un grep su `schemabind`/`3729`/`3732` in `src/` torna sei occorrenze e **sono tutte e sei prosa**. L'unica guardia di rifiuto di `EmitRebuild` è quella sull'indice non-rowstore. Una vista schemabound sulla tabella ricostruita dà Msg 3729 sulla `DROP TABLE`, che sotto `XACT_ABORT` aborta il batch: l'intero deploy torna indietro e il target resta divergente — un fallimento a runtime, non un limite dichiarato. La fixture separa le due forme per costruzione (la 12 ricostruisce `Order`; la 16 e la 17 mettono `SCHEMABINDING` su tabelle che sono CREATE puri); su uno schema vero coesistono di continuo | 2026-08-31 | M | `docs/parity/redgate-2026-08-31.md` R3; `src/DbDelta.Core/ScriptGen/TableScriptEmitter.cs` (`EmitRebuild`) |
 
 ---
 
@@ -172,10 +184,17 @@ Voci chiuse il 2026-08-20, ognuna dal commit che porta la sua riga:
 
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
+| **Il CHECK in linea trasforma uno schema legale in un errore interno.** DbDelta scrive `CONSTRAINT … CHECK` dentro `CREATE TABLE`, il che forza la tabella **dopo** la funzione: l'arco CHECK→funzione e l'arco funzione→tabella devono quindi formare un DAG. `CHECK (dbo.fnRowCount() < 100)` dove `fnRowCount` legge la stessa tabella è legale su un server vivo ed è esattamente quel ciclo. `DependencyResolver` alza `DependencyCycleException`; il percorso **DROP** la cattura (`ScriptGenerator.cs:742`), quello **CREATE** a `:331-332` no, e l'unico gestore che resta nella CLI è quello generico (`Program.cs:91`) → exit **99** con «open an issue», invece del rifiuto dichiarato exit 30 che DbDelta usa già per tre altre forme non scrivibili. Redgate, che il CHECK lo mette in coda con un `ALTER TABLE`, è immune per costruzione. **Sforzo contenuto**: una `catch` e un tipo di eccezione sul modello dei tre esistenti | 2026-08-31 | S | `docs/parity/redgate-2026-08-31.md` R4; `src/DbDelta.Core/ScriptGen/ScriptGenerator.cs:331-332` contro `:742`; `src/DbDelta.Cli/Program.cs:56-91` |
 
 ---
 
 ## P3 — Debito strutturale
+
+Una voce chiusa il 2026-08-31 dal commit che porta questa riga:
+
+| Voce chiusa | Come | Prova |
+|---|---|---|
+| **Parità Redgate: mancava la tua metà** | Fatta. Il proprietario ha eseguito la fixture in SSMS e prodotto lo script Redgate; il diff è stato fatto scenario per scenario e ogni divergenza rivendicata è stata **ri-derivata da una passata indipendente** che ha rifiutato la prima sulla fiducia. **Zero difetti di parità su 21 scenari** — tutti match, cosmetici accettati, o l'unico buco dichiarato (extended properties); un diff meccanico degli insiemi di istruzioni non trova **alcun oggetto** su cui uno strumento agisca e l'altro no. Ma la corsa ha trovato un difetto **nostro, nell'attrezzatura**: `ParityFixtureTests` non passava `dropDependencies`, quindi lo scenario 18 — quello il cui unico scopo è l'ordine di DROP — misurava il fallback `createOrder.Reverse()`, cioè il rango di kind invertito, e non la topologia che CLI (`ScriptCommand.cs:93`) e GUI (`DeployScriptBuilder.cs:105`) danno davvero al generatore. L'ordine di fallback era legale **solo** perché `vLegacyReport` chiama `fnLegacyTotal` senza esserne schema-bound: con `SCHEMABINDING` sulla vista lo stesso fallback droppa la funzione per prima e muore su Msg 3729. Corretto qui: l'ordine di DROP ora coincide con Redgate (`view → function → table`), e il percorso vero di `ScriptCommand` ha finalmente copertura end-to-end. **Cinque rischi aperti come voci a sé** (P1×3, P2, P3) più una di igiene: sono forme che la fixture non raggiunge, non fallimenti di parità | `docs/parity/redgate-2026-08-31.md` — matrice completa dei 21 scenari, le riproduzioni su container e i claim **refutati** rieseguendoli. `ParityFixtureTests` 2/2 verdi con `dropDependencies: target.Dependencies`; `DBDELTA_PARITY_DUMP` rigenera l'artefatto |
 
 Una voce chiusa il 2026-08-20 dal commit che porta questa riga:
 
@@ -193,7 +212,7 @@ Una voce chiusa il 2026-08-20 dal commit che porta questa riga:
 
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
-| **Parità Redgate: la mia metà è pronta, manca la tua.** La fixture porta ora **21 scenari** più uno di rifiuto in un paio di database a sé (columnstore, che fermerebbe l'intera generazione). I quattro nuovi sono quelli che l'audit non aveva mai raggiunto: DROP in topologia inversa con schemabound, indice filtrato, CHECK che legge un'altra tabella attraverso una funzione, extended properties. **`ParityFixtureTests` verifica la metà DbDelta in container prima che tu apra Redgate** — applica, ricontrolla e pretende Identical. **Ha trovato un difetto vero al primo giro: vedi lo scenario 20, corretto nello stesso commit.** Quello che serve da te: lanciare Redgate sulla stessa coppia e passarmi i suoi script; io faccio il diff e apro una voce per ogni divergenza | 2026-05-28 | L | `tests/Fixtures/Parity/README.md` (come si esegue), `01-source.sql`/`02-target.sql`/`03-refusals.sql`; ultimo audit `docs/parity/redgate-2026-05-28.md` |
+| **Il gate d'errore di batch legge solo l'`@@ERROR` dell'ultima istruzione.** `SET XACT_ABORT ON` non rende abortivo ogni errore. Misurato su `mssql/server:2022-latest` 16.0.4265.3, dentro `BEGIN TRANSACTION` con `XACT_ABORT ON`: una `DROP TABLE dbo.NoSuchTable` a metà batch (Msg 3701, Level 11) ha lasciato proseguire il batch **e committare**; `EXEC sp_rename 'dbo.NoSuchObject', …` (Msg 15225, alzato da `RAISERROR` dentro una procedura di sistema) idem, e anche l'istruzione precedente è sopravvissuta. Entrambe le classi sono raggiungibili nello script di parità, sulle due `DROP TABLE` e le due `sp_rename` del rebuild. **Rischio e non difetto** perché lì il sopravvissuto è seguito subito da un `ALTER TABLE … ADD CONSTRAINT` contro la tabella che il rename fallito ha lasciato mancante — Msg 4902, che *è* abortivo, quindi torna indietro tutto. È anche il motivo per cui Redgate avvolge `sp_addextendedproperty` in TRY/CATCH e nient'altro: stessa classe non abortiva | 2026-08-31 | M | `docs/parity/redgate-2026-08-31.md` R5 (le due riproduzioni) |
 
 ---
 
@@ -213,6 +232,7 @@ Una voce chiusa il 2026-08-20 dal commit che porta questa riga:
 
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
+| **Le `DROP` di DbDelta non seguono una politica sola**: `IF EXISTS` su vista e funzione, nuda su tabella, tipi, indice e sinonimo. Lo script non è quindi né uniformemente fail-fast né ri-eseguibile — una seconda esecuzione supera le prime due e muore sulla `DROP TABLE` (Msg 3701). Scegliere una politica: o tutte guardate (ri-eseguibile) o tutte nude (fail-fast se il target non è quello che il confronto ha letto) | 2026-08-31 | XS | `docs/parity/redgate-2026-08-31.md`, sezione «Cosmetics» |
 
 ---
 

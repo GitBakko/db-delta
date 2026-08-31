@@ -505,7 +505,7 @@ source: `TableScriptEmitter.cs:295-310` e `:399-420`.
 
 `ComparisonOptions.IgnoreConstraintNames` è dichiarato a
 `Options/ComparisonOptions.cs:15` e letto da nessuno.
-`tests/Fixtures/Parity/README.md:99-102` documenta già il falso positivo
+`tests/Fixtures/Parity/README.md:132-139` documenta già il falso positivo
 («Redgate ignores by default, DbDelta currently compares by name»): **è una
 feature non implementata, non una delle quattro divergenze cosmetiche
 decise**, nessuna delle quali menziona il naming dei vincoli.
