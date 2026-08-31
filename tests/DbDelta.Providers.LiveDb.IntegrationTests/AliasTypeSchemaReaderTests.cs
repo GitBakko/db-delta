@@ -146,15 +146,13 @@ public class AliasTypeSchemaReaderTests(LiveDbFixture fixture)
             await c.OpenAsync(ct);
             await ExecAsync(c, "IF SCHEMA_ID('app') IS NULL EXEC('CREATE SCHEMA app');", ct);
             await ExecAsync(c, "IF TYPE_ID('app.CodiceArticolo') IS NULL CREATE TYPE app.CodiceArticolo FROM nvarchar(20) NOT NULL;", ct);
-            // Both alias types are pre-created so this test measures ONE thing.
-            // A sequence over an alias type the target lacks fails with Msg 243
-            // regardless of qualification: DependencyResolver.KindRank puts
-            // Sequence at 0 and UserDefinedType at 1, so the CREATE SEQUENCE is
-            // emitted before the type it is declared over, and no edge exists to
-            // reorder them — sys.sql_expression_dependencies records none for a
-            // binding to a type. Separate defect, open in docs/BACKLOG.md; it
-            // cannot be closed by swapping the two ranks, because the DROP order
-            // is that same rank reversed and today it is correct.
+            // Both alias types are pre-created so this test measures ONE thing:
+            // qualification, not ordering. The ordering of a sequence against
+            // its alias type was a defect of its own — the rank had them
+            // backwards in both directions, Msg 243 on CREATE and Msg 3732 on
+            // DROP — and it is closed and covered separately by
+            // DependencyRoundTripTests
+            // .A_sequence_over_an_alias_type_is_ordered_against_it_in_both_directions.
             await ExecAsync(c, "IF TYPE_ID('app.MioIntTipo') IS NULL CREATE TYPE app.MioIntTipo FROM bigint NOT NULL;", ct);
 
             // The mechanism, asserted before the verdict: this connection's

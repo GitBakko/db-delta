@@ -127,6 +127,86 @@ public class DependencyRoundTripTests(LiveDbFixture fixture)
             .Should().BeEmpty("a difference that survives its own script is one no operator can remove");
     }
 
+    /// <summary>
+    /// A sequence declared over an alias type, both ways: created after its
+    /// type and dropped before it. Both orders were wrong at once, and the
+    /// second one had been asserted correct from reasoning rather than
+    /// measurement.
+    /// </summary>
+    /// <remarks>
+    /// The refusals are asserted FIRST, against the same server, because
+    /// without them this test passes just as well against a generator that got
+    /// lucky: it would be proving the target accepts a script rather than that
+    /// the order is what makes it acceptable. CREATE is Msg 243 and DROP is
+    /// Msg 3732 — two different numbers for one missing ordering, which is part
+    /// of why they were never recognised as the same defect.
+    /// </remarks>
+    [Fact]
+    public async Task A_sequence_over_an_alias_type_is_ordered_against_it_in_both_directions()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        await Create(fixture.ConnectionString, "SeqTypeSrc", ct);
+        await Create(fixture.ConnectionString, "SeqTypeTgt", ct);
+        string src = Cat(fixture.ConnectionString, "SeqTypeSrc");
+        string tgt = Cat(fixture.ConnectionString, "SeqTypeTgt");
+
+        await using (SqlConnection c = new(src))
+        {
+            await c.OpenAsync(ct);
+            await Exec(c, "IF SCHEMA_ID('app') IS NULL EXEC('CREATE SCHEMA app');", ct);
+            await Exec(c, "IF TYPE_ID('app.AliasInt') IS NULL CREATE TYPE app.AliasInt FROM bigint NOT NULL;", ct);
+            await Exec(c, "IF OBJECT_ID('app.SeqC','SO') IS NULL CREATE SEQUENCE app.SeqC AS app.AliasInt START WITH 1 INCREMENT BY 1;", ct);
+        }
+
+        // ── the mechanism, before the verdict ────────────────────────────
+        await using (SqlConnection c = new(tgt))
+        {
+            await c.OpenAsync(ct);
+            await Exec(c, "IF SCHEMA_ID('app') IS NULL EXEC('CREATE SCHEMA app');", ct);
+
+            Func<Task> seqBeforeType = () => Exec(c,
+                "CREATE SEQUENCE app.SondaOrdine AS app.NonEsiste START WITH 1 INCREMENT BY 1;", ct);
+            (await seqBeforeType.Should().ThrowAsync<SqlException>())
+                .Which.Number.Should().Be(243, "CREATE SEQUENCE before its alias type is Msg 243, not the 2715 every other binding gives");
+
+            await Exec(c, "IF TYPE_ID('app.Sonda') IS NULL CREATE TYPE app.Sonda FROM bigint NOT NULL;", ct);
+            await Exec(c, "IF OBJECT_ID('app.SondaSeq','SO') IS NULL CREATE SEQUENCE app.SondaSeq AS app.Sonda START WITH 1 INCREMENT BY 1;", ct);
+            Func<Task> typeBeforeSeq = () => Exec(c, "DROP TYPE app.Sonda;", ct);
+            (await typeBeforeSeq.Should().ThrowAsync<SqlException>())
+                .Which.Number.Should().Be(3732, "DROP TYPE while a sequence still binds it is Msg 3732");
+            await Exec(c, "DROP SEQUENCE app.SondaSeq; DROP TYPE app.Sonda;", ct);
+        }
+
+        // ── CREATE direction ─────────────────────────────────────────────
+        Database source = (await new LiveDbSource(src).LoadAsync(ct)).Value!;
+        Database target = (await new LiveDbSource(tgt).LoadAsync(ct)).Value!;
+        string createScript = new ScriptGenerator().Generate(
+            new ComparisonEngine().Compare(source, target, ComparisonOptions.Default),
+            selection: null, options: ComparisonOptions.Default, dependencies: source.Dependencies);
+
+        SqlBatchResult up = await SqlExecutor.ExecuteAsync(tgt, createScript, ct, useOwnTransaction: false);
+        up.Success.Should().BeTrue(up.ErrorMessage ?? "the sequence was created before the type it is declared over");
+
+        // ── DROP direction, on the database the CREATE just built ────────
+        Database now = (await new LiveDbSource(tgt).LoadAsync(ct)).Value!;
+        Database empty = (await new LiveDbSource(src).LoadAsync(ct)).Value! with
+        {
+            Sequences = [],
+            UserDefinedTypes = [],
+        };
+        string dropScript = new ScriptGenerator().Generate(
+            new ComparisonEngine().Compare(empty, now, ComparisonOptions.Default),
+            selection: null, options: ComparisonOptions.Default,
+            dependencies: empty.Dependencies, dropDependencies: now.Dependencies);
+
+        SqlBatchResult down = await SqlExecutor.ExecuteAsync(tgt, dropScript, ct, useOwnTransaction: false);
+        down.Success.Should().BeTrue(down.ErrorMessage ?? "the type was dropped while the sequence still bound it");
+
+        Database after = (await new LiveDbSource(tgt).LoadAsync(ct)).Value!;
+        after.Sequences.Should().NotContain(x => x.Name == "SeqC");
+        after.UserDefinedTypes.Should().NotContain(x => x.Name == "AliasInt");
+    }
+
     private static async Task Create(string conn, string db, CancellationToken ct)
     {
         await using SqlConnection c = new(conn);

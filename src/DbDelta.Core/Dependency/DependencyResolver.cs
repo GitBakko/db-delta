@@ -14,8 +14,24 @@ public sealed class DependencyResolver
     private static readonly IReadOnlyDictionary<string, int> KindRank =
         new Dictionary<string, int>(StringComparer.Ordinal)
         {
-            ["Sequence"] = 0,
-            ["UserDefinedType"] = 1,
+            // UserDefinedType before Sequence, and it is not cosmetic. A
+            // sequence can be declared over an alias type -- CREATE SEQUENCE
+            // app.S AS app.AliasInt is accepted -- and no dependency EDGE can
+            // ever say so: that binding is not an expression, so
+            // sys.sql_expression_dependencies records no row for it, measured.
+            // (It DOES record a parameter bound to a type, which is what makes
+            // the absence easy to misread.) The rank is therefore the only
+            // thing ordering the pair, and it had them backwards in both
+            // directions at once: CREATE SEQUENCE before its type is Msg 243
+            // ("not a defined system type"), and the DROP order is this rank
+            // reversed, so DROP TYPE came out while the sequence still bound it
+            // -- Msg 3732. Safe because the arrow cannot point the other way:
+            // an alias type may not be based on another alias type or on a
+            // table type (Msg 222), and NEXT VALUE FOR is illegal in every
+            // expression a type can carry (Msg 11719), so nothing makes a type
+            // depend on a sequence.
+            ["UserDefinedType"] = 0,
+            ["Sequence"] = 1,
             ["TableType"] = 2,
             ["Table"] = 3,
             ["View"] = 4,
