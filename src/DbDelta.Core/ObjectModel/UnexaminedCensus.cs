@@ -112,5 +112,11 @@ public sealed record UnexaminedCensus(IReadOnlyList<UnexaminedGroup> Groups)
         ["TEMPORAL_TABLE"] = "tabelle temporali (versionamento non confrontato)",
         ["MEMORY_OPTIMIZED_TABLE"] = "tabelle memory-optimized (opzioni non confrontate)",
         ["MASKED_COLUMN"] = "colonne con Dynamic Data Masking",
+        // Compared by columns and keys like any table type, and DbDelta refuses
+        // to write one rather than emitting a disk-based copy. What stays
+        // unexamined is the rest: which keys are HASH and their BUCKET_COUNT,
+        // neither of which the model carries.
+        ["MEMORY_OPTIMIZED_TABLE_TYPE"] =
+            "tipi tabella memory-optimized (non scrivibili; hash e bucket count non confrontati)",
     };
 }

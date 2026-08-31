@@ -240,6 +240,273 @@ public class TableTypeUdtReaderTests(LiveDbFixture fixture)
     }
 
     /// <summary>
+    /// The flag reaches the model, and the disk-based type beside it does not
+    /// pick it up. Asserted on the READER for the usual reason: a flag nobody
+    /// reads is false on both sides, the comparison says Identical, and the
+    /// deploy replaces a memory-optimized type with a disk-based one under a
+    /// success banner.
+    /// </summary>
+    /// <remarks>
+    /// This is the test the 2026-08-31 audit could not write: it needs a
+    /// MEMORY_OPTIMIZED_DATA filegroup, which the image does not ship with but
+    /// which <see cref="FreshMemoryOptimizedDatabaseAsync"/> creates in four
+    /// lines. Without the filegroup the CREATE fails with Msg 41337, not with
+    /// something subtle.
+    /// </remarks>
+    [Fact]
+    public async Task The_memory_optimized_flag_of_a_table_type_reaches_the_model()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        string dbConn = await FreshMemoryOptimizedDatabaseAsync("DbDeltaTvpMemOpt", ct);
+
+        await using (SqlConnection c = new(dbConn))
+        {
+            await c.OpenAsync(ct);
+            await ExecAsync(c, MemoryOptimizedTypes, ct);
+        }
+
+        Result<Database> result = await new LiveDbSource(dbConn).LoadAsync(ct);
+
+        result.IsSuccess.Should().BeTrue(result.Error?.Message);
+        IReadOnlyList<TableTypeUdt> types = result.Value!.TableTypeUdts;
+
+        types.Single(t => t.Name == "MemOptHashTvp").IsMemoryOptimized.Should().BeTrue();
+        types.Single(t => t.Name == "MemOptRangeTvp").IsMemoryOptimized.Should().BeTrue();
+        types.Single(t => t.Name == "DiskTvp").IsMemoryOptimized
+             .Should().BeFalse("the control in the negative: the flag must separate the two engines");
+    }
+
+    /// <summary>
+    /// Why the flag and not the index shape — measured rather than argued.
+    /// </summary>
+    /// <remarks>
+    /// A memory-optimized type is free to key itself on a plain range index,
+    /// and <c>sys.indexes</c> then reports exactly what a disk-based type
+    /// reports. So every term the comparison already had — key columns, their
+    /// direction, uniqueness, clustering — is equal across the two engines, and
+    /// no amount of reading the index harder would have told them apart. If
+    /// this test ever fails, the design note on
+    /// <see cref="TableTypeUdt.IsMemoryOptimized"/> is wrong and the cheaper
+    /// fix it rejects becomes available again.
+    /// </remarks>
+    [Fact]
+    public async Task A_range_keyed_memory_optimized_type_is_indistinguishable_from_a_disk_based_one_by_its_keys()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        string dbConn = await FreshMemoryOptimizedDatabaseAsync("DbDeltaTvpMemOptKeys", ct);
+
+        await using (SqlConnection c = new(dbConn))
+        {
+            await c.OpenAsync(ct);
+            await ExecAsync(c, MemoryOptimizedTypes, ct);
+        }
+
+        Result<Database> result = await new LiveDbSource(dbConn).LoadAsync(ct);
+        result.IsSuccess.Should().BeTrue(result.Error?.Message);
+
+        TableIndex memOpt = result.Value!.TableTypeUdts.Single(t => t.Name == "MemOptRangeTvp").PrimaryKey!;
+        TableIndex disk = result.Value!.TableTypeUdts.Single(t => t.Name == "DiskTvp").PrimaryKey!;
+
+        memOpt.IsClustered.Should().Be(disk.IsClustered);
+        memOpt.IsUnique.Should().Be(disk.IsUnique);
+        memOpt.IsSystemNamed.Should().Be(disk.IsSystemNamed);
+        memOpt.KeyColumns.Select(k => $"{k.Name}:{k.IsDescending}")
+              .Should().Equal(disk.KeyColumns.Select(k => $"{k.Name}:{k.IsDescending}"));
+    }
+
+    /// <summary>
+    /// End to end on a live server: the difference is REPORTED, and only then
+    /// refused at generation. Reporting first is the half that matters — a
+    /// refusal on a row the grid never showed would be unexplainable.
+    /// </summary>
+    [Fact]
+    public async Task A_memory_optimized_table_type_is_refused_rather_than_deployed_as_a_disk_based_one()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        string srcConn = await FreshMemoryOptimizedDatabaseAsync("DbDeltaTvpMoSrc", ct);
+        string tgtConn = await FreshDatabaseAsync("DbDeltaTvpMoTgt", ct);
+
+        await using (SqlConnection c = new(srcConn))
+        {
+            await c.OpenAsync(ct);
+            await ExecAsync(c, MemoryOptimizedTypes, ct);
+        }
+
+        Result<Database> src = await new LiveDbSource(srcConn).LoadAsync(ct);
+        Result<Database> tgt = await new LiveDbSource(tgtConn).LoadAsync(ct);
+        src.IsSuccess.Should().BeTrue(src.Error?.Message);
+        tgt.IsSuccess.Should().BeTrue(tgt.Error?.Message);
+
+        ComparisonResult diff = new ComparisonEngine().Compare(src.Value!, tgt.Value!, ComparisonOptions.Default);
+
+        diff.Differences.Single(d => d.Identity.ObjectName == "MemOptHashTvp")
+            .Status.Should().Be(DifferenceStatus.OnlyInA, "the row is reported before anything refuses it");
+
+        Action generate = () => new ScriptGenerator().Generate(diff);
+
+        generate.Should().Throw<UnscriptableTableTypeException>()
+                .Which.Name.Should().BeOneOf("MemOptHashTvp", "MemOptRangeTvp");
+    }
+
+    /// <summary>
+    /// The census counts the shape none of its other branches can see — which
+    /// was measured on a probe database holding twelve memory-optimized table
+    /// types: the sys.tables branch, the dynamic branch and INDEX_NON_ROWSTORE
+    /// all returned 0.
+    /// </summary>
+    [Fact]
+    public async Task The_census_counts_a_memory_optimized_table_type()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        string dbConn = await FreshMemoryOptimizedDatabaseAsync("DbDeltaTvpMoCensus", ct);
+
+        await using (SqlConnection c = new(dbConn))
+        {
+            await c.OpenAsync(ct);
+            await ExecAsync(c, MemoryOptimizedTypes, ct);
+        }
+
+        Result<Database> result = await new LiveDbSource(dbConn).LoadAsync(ct);
+
+        result.IsSuccess.Should().BeTrue(result.Error?.Message);
+        result.Value!.Unexamined.Groups
+              .Should().ContainSingle(g => g.Key == "MEMORY_OPTIMIZED_TABLE_TYPE")
+              .Which.Count.Should().Be(2, "two of the three seeded types are memory-optimized");
+    }
+
+    /// <summary>
+    /// The diff pane renders what the type IS instead of letting the refusal
+    /// escape. Found by a mutation probe: deleting the branch that does this
+    /// left all 804 tests green, so the pane had no coverage at all.
+    /// </summary>
+    /// <remarks>
+    /// The caller — <c>AppStateViewModel.LoadDiffAsync</c> — turns any throw
+    /// into "Impossibile leggere il corpo di …", so without the branch a user
+    /// clicking a row the grid calls OnlyInA is told the body could not be
+    /// read, which is both wrong and unactionable. The deploy path is where the
+    /// refusal belongs; this one is the same choice
+    /// <c>TableScriptEmitter</c> makes for a non-rowstore index.
+    /// </remarks>
+    [Fact]
+    public async Task The_diff_pane_describes_a_memory_optimized_table_type_instead_of_refusing()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        string dbConn = await FreshMemoryOptimizedDatabaseAsync("DbDeltaTvpMoBody", ct);
+
+        await using (SqlConnection c = new(dbConn))
+        {
+            await c.OpenAsync(ct);
+            await ExecAsync(c, MemoryOptimizedTypes, ct);
+        }
+
+        ObjectBody.LiveDbObjectBodyResolver resolver = new(dbConn, dbConn);
+
+        string? memOpt = await resolver.ResolveSourceBodyAsync("TableType", "dbo", "MemOptHashTvp", ct);
+        string? disk = await resolver.ResolveSourceBodyAsync("TableType", "dbo", "DiskTvp", ct);
+
+        memOpt.Should().NotBeNull()
+              .And.Contain("MEMORY_OPTIMIZED")
+              .And.Contain("not scriptable by DbDelta");
+
+        // The caveat is the FIRST line and the body follows it. Asserting the
+        // body away — which the first cut of this test did — is what let the
+        // pane collapse two Different types into one identical text; see
+        // The_diff_pane_tells_two_memory_optimized_table_types_apart.
+        memOpt!.Split(Environment.NewLine)[0].Should().StartWith("--");
+        memOpt.Should().Contain("CREATE TYPE [dbo].[MemOptHashTvp] AS TABLE",
+            "with the deploy refusing, this pane is the only place left that can say what to build by hand");
+
+        // The control in the negative: the pane still emits a real body for a
+        // disk-based type, so the comment above is a branch and not the only
+        // thing this method can return.
+        disk.Should().NotBeNull().And.Contain("CREATE TYPE [dbo].[DiskTvp] AS TABLE");
+    }
+
+    /// <summary>
+    /// The caveat is a header, not a replacement: two memory-optimized types
+    /// that differ must still render two different bodies.
+    /// </summary>
+    /// <remarks>
+    /// The first cut of the fix returned the comment ALONE, and a comment built
+    /// from schema and name is identical on both sides — they are the pairing
+    /// key. So a row the grid calls Different showed two byte-identical panes
+    /// and no highlighted change: the exact drift the remarks on
+    /// <c>ResolveTableTypeBodyAsync</c> say it exists to prevent, reintroduced
+    /// one case over. The test above could not see it because it resolves the
+    /// SOURCE side of two different types; this one resolves the two SIDES of
+    /// the same type, which is what the diff viewer actually does.
+    /// </remarks>
+    [Fact]
+    public async Task The_diff_pane_tells_two_memory_optimized_table_types_apart()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        string srcConn = await FreshMemoryOptimizedDatabaseAsync("DbDeltaTvpMoPaneSrc", ct);
+        string tgtConn = await FreshMemoryOptimizedDatabaseAsync("DbDeltaTvpMoPaneTgt", ct);
+
+        await using (SqlConnection c = new(srcConn))
+        {
+            await c.OpenAsync(ct);
+            await ExecAsync(c, MemoryOptimizedTypes, ct);
+        }
+
+        await using (SqlConnection c = new(tgtConn))
+        {
+            await c.OpenAsync(ct);
+            await ExecAsync(c, """
+                IF TYPE_ID('dbo.MemOptHashTvp') IS NULL
+                    CREATE TYPE dbo.MemOptHashTvp AS TABLE (
+                        Id    int NOT NULL,
+                        Code  nvarchar(50) COLLATE Latin1_General_100_BIN2 NOT NULL,
+                        Extra int NOT NULL,
+                        PRIMARY KEY NONCLUSTERED HASH (Id) WITH (BUCKET_COUNT = 8)
+                    ) WITH (MEMORY_OPTIMIZED = ON);
+                """, ct);
+        }
+
+        ObjectBody.LiveDbObjectBodyResolver resolver = new(srcConn, tgtConn);
+
+        string? source = await resolver.ResolveSourceBodyAsync("TableType", "dbo", "MemOptHashTvp", ct);
+        string? target = await resolver.ResolveTargetBodyAsync("TableType", "dbo", "MemOptHashTvp", ct);
+
+        source.Should().NotBe(target, "a row the grid calls Different must not show two identical panes");
+        target.Should().Contain("[Extra]", "the pane has to name the column that differs");
+        source.Should().NotContain("[Extra]");
+
+        // The caveat survives on both sides: it is a header, and losing it
+        // would let the pane read as if the type were deployable.
+        source.Should().Contain("MEMORY_OPTIMIZED").And.Contain("not scriptable by DbDelta");
+        target.Should().Contain("MEMORY_OPTIMIZED").And.Contain("not scriptable by DbDelta");
+    }
+
+    /// <summary>
+    /// Three types that differ only in the two ways that matter: the storage
+    /// engine, and — between the two memory-optimized ones — whether the key is
+    /// a HASH or a range index.
+    /// </summary>
+    private const string MemoryOptimizedTypes = """
+        IF TYPE_ID('dbo.MemOptHashTvp') IS NULL
+            CREATE TYPE dbo.MemOptHashTvp AS TABLE (
+                Id   int NOT NULL,
+                Code nvarchar(50) COLLATE Latin1_General_100_BIN2 NOT NULL,
+                PRIMARY KEY NONCLUSTERED HASH (Id) WITH (BUCKET_COUNT = 8)
+            ) WITH (MEMORY_OPTIMIZED = ON);
+
+        IF TYPE_ID('dbo.MemOptRangeTvp') IS NULL
+            CREATE TYPE dbo.MemOptRangeTvp AS TABLE (
+                Id   int NOT NULL,
+                Code nvarchar(50) COLLATE Latin1_General_100_BIN2 NOT NULL,
+                PRIMARY KEY NONCLUSTERED (Id)
+            ) WITH (MEMORY_OPTIMIZED = ON);
+
+        IF TYPE_ID('dbo.DiskTvp') IS NULL
+            CREATE TYPE dbo.DiskTvp AS TABLE (
+                Id   int NOT NULL,
+                Code nvarchar(50) COLLATE Latin1_General_100_BIN2 NOT NULL,
+                PRIMARY KEY NONCLUSTERED (Id)
+            );
+        """;
+
+    /// <summary>
     /// Every shape SQL Server lets a table type declare. No <c>CONSTRAINT</c>
     /// clause anywhere: it is a syntax error inside <c>CREATE TYPE</c>.
     /// </summary>
@@ -264,6 +531,40 @@ public class TableTypeUdtReaderTests(LiveDbFixture fixture)
             await ExecAsync(bootstrap, $"IF DB_ID('{name}') IS NULL CREATE DATABASE [{name}];", ct);
         }
         return new SqlConnectionStringBuilder(fixture.ConnectionString) { InitialCatalog = name }.ConnectionString;
+    }
+
+    /// <summary>
+    /// The same, plus the MEMORY_OPTIMIZED_DATA filegroup a memory-optimized
+    /// table type needs. The stock image ships no such filegroup, which is why
+    /// the 2026-08-31 parity audit recorded the shape as "not reproduced in a
+    /// container" — it is four lines, not a blocker.
+    /// </summary>
+    /// <remarks>
+    /// Run against the new database rather than master, because
+    /// <c>sys.filegroups</c> is per-database — asking master whether the
+    /// filegroup exists always answers no, and the second run then fails on a
+    /// duplicate. <c>type = 'FX'</c> is the memory-optimized filegroup. The
+    /// container path is the Linux one: <c>mcr.microsoft.com/mssql/server</c>
+    /// is a Linux image.
+    /// </remarks>
+    private async Task<string> FreshMemoryOptimizedDatabaseAsync(string name, CancellationToken ct)
+    {
+        string conn = await FreshDatabaseAsync(name, ct);
+        await using (SqlConnection c = new(conn))
+        {
+            await c.OpenAsync(ct);
+            await ExecAsync(c, $"""
+                IF NOT EXISTS (SELECT 1 FROM sys.filegroups WHERE type = 'FX')
+                BEGIN
+                    EXEC sp_executesql N'
+                        ALTER DATABASE CURRENT ADD FILEGROUP [MemOptFg] CONTAINS MEMORY_OPTIMIZED_DATA;';
+                    EXEC sp_executesql N'
+                        ALTER DATABASE CURRENT ADD FILE (NAME = N''{name}_mod'',
+                            FILENAME = N''/var/opt/mssql/data/{name}_mod'') TO FILEGROUP [MemOptFg];';
+                END
+                """, ct);
+        }
+        return conn;
     }
 
     private static async Task<int> ScalarAsync(SqlConnection c, string sql, CancellationToken ct)

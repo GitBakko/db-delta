@@ -17,6 +17,12 @@ internal static class TableTypeComparison
 {
     internal static bool Equal(TableTypeUdt a, TableTypeUdt b, StringComparer names)
     {
+        // Storage engine first: a memory-optimized type and a disk-based one are
+        // never the same object, however identical their columns read. Leaving
+        // this out is what would let the pair compare Identical, emit nothing,
+        // and never reach the refusal in TableTypeUdtScriptEmitter — silence
+        // instead of a wrong script. See TableTypeUdt.IsMemoryOptimized.
+        if (a.IsMemoryOptimized != b.IsMemoryOptimized) { return false; }
         if (a.Columns.Count != b.Columns.Count) { return false; }
         var bByName = b.Columns.ToDictionary(c => c.Name, names);
         foreach (Column ac in a.Columns)

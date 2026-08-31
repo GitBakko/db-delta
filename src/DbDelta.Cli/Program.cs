@@ -88,6 +88,19 @@ catch (UnscriptableUserException ex)
         + $"the user {ex.UserName} from this run."));
     return ExitCodes.ScriptGenerationFailure;
 }
+catch (UnscriptableTableTypeException ex)
+{
+    // Same refusal, same code, fourth shape: emitting this row would have
+    // created a disk-based table type where the source has a memory-optimized
+    // one — valid SQL for a different object, which is the one outcome a green
+    // banner must never cover.
+    CliErrorMapper.WriteError(new Error(
+        ErrorCode.DataPreservationImpossible,
+        ex.Message,
+        $"Deploy the type {ex.Schema}.{ex.Name} by hand — the bucket counts are a sizing "
+        + "decision DbDelta cannot make — or leave it out of this run."));
+    return ExitCodes.ScriptGenerationFailure;
+}
 catch (Exception ex)
 {
     CliErrorMapper.WriteError(new Error(

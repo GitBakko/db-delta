@@ -62,6 +62,16 @@ internal sealed class UnexaminedReader
             UNION ALL SELECT 'MEMORY_OPTIMIZED_TABLE', COUNT(*) FROM sys.tables WHERE is_memory_optimized = 1
             UNION ALL SELECT 'MASKED_COLUMN', COUNT(*) FROM sys.masked_columns
 
+            -- A memory-optimized table TYPE is invisible to every branch above,
+            -- and that was measured, not assumed: the row over sys.tables is a
+            -- different catalog, the dynamic branch excludes 'TT', and the
+            -- INDEX_NON_ROWSTORE branch misses its HASH indexes because a type
+            -- table carries is_ms_shipped = 1. Twelve memory-optimized types on
+            -- a probe database produced a count of 0 from all three.
+            UNION ALL SELECT 'MEMORY_OPTIMIZED_TABLE_TYPE', COUNT(*)
+                      FROM sys.table_types
+                      WHERE is_user_defined = 1 AND is_memory_optimized = 1
+
             -- ModuleReader takes parent_class = 1 (DML triggers) only.
             UNION ALL SELECT 'DDL_TRIGGER_DATABASE', COUNT(*) FROM sys.triggers WHERE parent_class = 0
 

@@ -21,11 +21,18 @@ internal sealed class TableTypeUdtReader
     // sys.table_types is the canonical catalog view for user-defined table
     // types. It exposes type_table_object_id (the object_id of the hidden
     // type table that backs the column list) — sys.types lacks that column.
+    // is_memory_optimized is read here and nowhere else: it is a property of
+    // the TYPE, not of its indexes, and it is the only thing that separates a
+    // memory-optimized table type from a disk-based one — measured, because a
+    // memory-optimized type may key itself on a plain range index whose
+    // sys.indexes row is identical to a disk-based type's. Present since
+    // SQL Server 2014, below DbDelta's 2016 compat floor.
     private const string TypesQuery = """
         SELECT
             s.name                    AS SchemaName,
             tt.name                   AS TypeName,
-            tt.type_table_object_id   AS TypeTableObjectId
+            tt.type_table_object_id   AS TypeTableObjectId,
+            tt.is_memory_optimized    AS IsMemoryOptimized
         FROM sys.table_types AS tt
         INNER JOIN sys.schemas AS s ON s.schema_id = tt.schema_id
         WHERE tt.is_user_defined = 1
@@ -124,7 +131,7 @@ internal sealed class TableTypeUdtReader
     public async Task<IReadOnlyList<TableTypeUdt>> ReadAsync(
         SqlConnection connection, CancellationToken ct, string? schema = null, string? name = null)
     {
-        Dictionary<int, (string Schema, string Name)> shells = [];
+        Dictionary<int, (string Schema, string Name, bool IsMemoryOptimized)> shells = [];
         await using (SqlCommand cmd = new(TypesQuery, connection))
         {
             cmd.Parameters.AddWithValue("@schema", (object?)schema ?? DBNull.Value);
@@ -132,7 +139,7 @@ internal sealed class TableTypeUdtReader
             await using SqlDataReader r = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
             while (await r.ReadAsync(ct).ConfigureAwait(false))
             {
-                shells[r.GetInt32(2)] = (r.GetString(0), r.GetString(1));
+                shells[r.GetInt32(2)] = (r.GetString(0), r.GetString(1), r.GetBoolean(3));
             }
         }
 
@@ -147,7 +154,7 @@ internal sealed class TableTypeUdtReader
         Dictionary<int, List<CheckConstraint>> checks = await ReadChecksAsync(connection, shells, oid, ct).ConfigureAwait(false);
 
         List<TableTypeUdt> result = new(shells.Count);
-        foreach (KeyValuePair<int, (string Schema, string Name)> kv in shells)
+        foreach (KeyValuePair<int, (string Schema, string Name, bool IsMemoryOptimized)> kv in shells)
         {
             columns.TryGetValue(kv.Key, out List<Column>? cols);
             keys.TryGetValue(kv.Key, out List<TableIndex>? key);
@@ -156,6 +163,7 @@ internal sealed class TableTypeUdtReader
             {
                 Keys = key ?? [],
                 CheckConstraints = ck ?? [],
+                IsMemoryOptimized = kv.Value.IsMemoryOptimized,
             });
         }
         return result;
@@ -166,7 +174,7 @@ internal sealed class TableTypeUdtReader
 
     private static async Task<Dictionary<int, List<Column>>> ReadColumnsAsync(
         SqlConnection connection,
-        Dictionary<int, (string Schema, string Name)> shells,
+        Dictionary<int, (string Schema, string Name, bool IsMemoryOptimized)> shells,
         int? oid,
         CancellationToken ct)
     {
@@ -205,7 +213,7 @@ internal sealed class TableTypeUdtReader
 
     private static async Task<Dictionary<int, List<TableIndex>>> ReadKeysAsync(
         SqlConnection connection,
-        Dictionary<int, (string Schema, string Name)> shells,
+        Dictionary<int, (string Schema, string Name, bool IsMemoryOptimized)> shells,
         int? oid,
         CancellationToken ct)
     {
@@ -272,7 +280,7 @@ internal sealed class TableTypeUdtReader
 
     private static async Task<Dictionary<int, List<CheckConstraint>>> ReadChecksAsync(
         SqlConnection connection,
-        Dictionary<int, (string Schema, string Name)> shells,
+        Dictionary<int, (string Schema, string Name, bool IsMemoryOptimized)> shells,
         int? oid,
         CancellationToken ct)
     {

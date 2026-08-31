@@ -20,15 +20,25 @@ namespace DbDelta.Core.ScriptGen;
 /// What is deliberately absent, measured rather than assumed on
 /// <c>mssql/server:2022-latest</c>: a <b>named</b> constraint (rejected —
 /// "Incorrect syntax near the keyword 'CONSTRAINT'"), and a <b>filtered</b>
-/// inline index (rejected). A memory-optimized table type is a separate shape
-/// this emitter does not write; see the backlog.
+/// inline index (rejected).
+/// </para>
+/// <para>
+/// A memory-optimized table type is a separate shape this emitter does not
+/// write, and it is <b>refused</b> rather than quietly rewritten — see
+/// <see cref="UnscriptableTableTypeException"/>. <c>EmitDrop</c> is exempt on
+/// purpose, exactly as it is for a non-rowstore index.
 /// </para>
 /// </remarks>
 public sealed class TableTypeUdtScriptEmitter
 {
+    /// <exception cref="UnscriptableTableTypeException">
+    /// The type is memory-optimized, so the text below would declare a
+    /// disk-based type of the same name.
+    /// </exception>
     public string EmitCreate(TableTypeUdt udt)
     {
         ArgumentNullException.ThrowIfNull(udt);
+        UnscriptableTableTypeException.ThrowIfMemoryOptimized(udt);
         StringBuilder sb = new();
         sb.Append("CREATE TYPE ").Append(Sql.Q(udt.Schema, udt.Name)).AppendLine(" AS TABLE (");
 

@@ -108,6 +108,62 @@ public class ScriptCommandTests(CliFixture fixture)
             "the refusal happens during generation, so there is no script to write");
     }
 
+    /// <summary>
+    /// The fourth refusal, through the same boundary. Source has a
+    /// memory-optimized table type the target lacks; DbDelta writes no
+    /// MEMORY_OPTIMIZED clause, so without the refusal it emits a plain
+    /// CREATE TYPE that RUNS and leaves a disk-based type of the same name.
+    /// </summary>
+    /// <remarks>
+    /// This one has to be asserted here and not only in Core: the CLI dispatches
+    /// on the concrete exception type — three sibling catch blocks, no shared
+    /// base — so a fourth exception with no catch of its own falls through to
+    /// the general handler and exits 99 with "open an issue". Nothing in the
+    /// Core suite can see that.
+    /// </remarks>
+    [Fact]
+    public async Task Refuses_with_exit_30_when_the_source_has_a_memory_optimized_table_type()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        const string srcDb = "DbDeltaScriptMoSrc";
+        const string tgtDb = "DbDeltaScriptMoTgt";
+        await CreateDb(srcDb, ct);
+        await CreateDb(tgtDb, ct);
+
+        // The stock image ships no MEMORY_OPTIMIZED_DATA filegroup, and without
+        // one the CREATE TYPE fails with Msg 41337 rather than producing the
+        // shape under test. sys.filegroups is per-database, so the check runs
+        // against srcDb itself.
+        await Exec(srcDb, """
+            IF NOT EXISTS (SELECT 1 FROM sys.filegroups WHERE type = 'FX')
+            BEGIN
+                EXEC sp_executesql N'
+                    ALTER DATABASE CURRENT ADD FILEGROUP [MemOptFg] CONTAINS MEMORY_OPTIMIZED_DATA;';
+                EXEC sp_executesql N'
+                    ALTER DATABASE CURRENT ADD FILE (NAME = N''DbDeltaScriptMoSrc_mod'',
+                        FILENAME = N''/var/opt/mssql/data/DbDeltaScriptMoSrc_mod'') TO FILEGROUP [MemOptFg];';
+            END
+            """, ct);
+        await Exec(srcDb, """
+            IF TYPE_ID('dbo.MemOptTvp') IS NULL
+                CREATE TYPE dbo.MemOptTvp AS TABLE (
+                    Id   int NOT NULL,
+                    Code nvarchar(50) COLLATE Latin1_General_100_BIN2 NOT NULL,
+                    PRIMARY KEY NONCLUSTERED HASH (Id) WITH (BUCKET_COUNT = 8)
+                ) WITH (MEMORY_OPTIMIZED = ON);
+            """, ct);
+
+        using var sqlOut = TempFile.Sql();
+        int exit = await RunCli(["script",
+            "--source", ConnectionFor(srcDb),
+            "--target", ConnectionFor(tgtDb),
+            "--out", sqlOut.Path], ct);
+
+        exit.Should().Be(ExpectedExitCodes.ScriptGenerationFailure);
+        File.Exists(sqlOut.Path).Should().BeFalse(
+            "the refusal happens during generation, so there is no script to write");
+    }
+
     private async Task Exec(string db, string sql, CancellationToken ct)
     {
         await using SqlConnection c = new(ConnectionFor(db));

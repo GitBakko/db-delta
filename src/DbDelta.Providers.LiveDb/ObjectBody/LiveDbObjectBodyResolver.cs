@@ -136,8 +136,28 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
 
         TableTypeUdt? udt = match.Count == 1 ? match[0] : null;
 
-        return udt is null || udt.Columns.Count == 0
-            ? null
+        if (udt is null || udt.Columns.Count == 0) { return null; }
+
+        // The emitter REFUSES a memory-optimized type, and this pane must not
+        // be the place that refusal surfaces: the caller turns any throw into
+        // an error banner, so the user would click a row the grid calls
+        // Different and be told the body could not be read. Same choice the
+        // table emitter makes for a non-rowstore index — render what it is,
+        // and let the deploy path be the one that stops.
+        //
+        // The caveat is a HEADER above the real body, never a replacement for
+        // it. A comment built from schema and name alone is the same on both
+        // sides — they are the pairing key — so returning only that would show
+        // two byte-identical panes for a row the grid calls Different, which is
+        // the exact drift the remarks above say this method exists to prevent.
+        // It matters more here than anywhere else: with the deploy refusing,
+        // this pane is the only surface left that can tell the user what to
+        // build by hand. The flag is cleared on a COPY because the guard in
+        // EmitCreate is a deploy guard and this is not the deploy.
+        return udt.IsMemoryOptimized
+            ? $"-- {Sql.Q(udt.Schema, udt.Name)} is MEMORY_OPTIMIZED "
+              + "— read, not scriptable by DbDelta" + Environment.NewLine
+              + new TableTypeUdtScriptEmitter().EmitCreate(udt with { IsMemoryOptimized = false })
             : new TableTypeUdtScriptEmitter().EmitCreate(udt);
     }
 

@@ -971,6 +971,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
             StatusText = "Nessuno script generato: vedi il messaggio in alto.";
             return null;
         }
+        catch (UnscriptableTableTypeException ex)
+        {
+            AppState.LastError =
+                $"Script non generato: il tipo tabella {ex.Schema}.{ex.Name} è memory-optimized. "
+                + "DbDelta non scrive né la clausola MEMORY_OPTIMIZED né gli indici HASH con il loro "
+                + "BUCKET_COUNT, quindi lo script creerebbe un tipo su disco con lo stesso nome. "
+                + "Distribuiscilo a mano, oppure toglilo dalla selezione.";
+            StatusText = "Nessuno script generato: vedi il messaggio in alto.";
+            return null;
+        }
     }
 
     /// <summary>
