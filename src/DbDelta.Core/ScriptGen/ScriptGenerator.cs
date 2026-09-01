@@ -43,6 +43,18 @@ namespace DbDelta.Core.ScriptGen;
 ///   <item>Permissions — GRANT / REVOKE, gated on
 ///       <see cref="ComparisonOptions.IgnorePermissions"/> (default ON).</item>
 /// </list>
+/// <para>
+/// <b>Every DROP this generator emits is BARE — no <c>IF EXISTS</c>, no
+/// existence probe — and that is a decision, not an omission.</b> A DROP that
+/// fails says something true: the target is no longer the one the comparison
+/// read, and continuing would apply a delta computed against a database that
+/// has moved. Owner decision, 2026-09-01. Before it, the four module kinds
+/// (view, function, procedure, trigger) carried <c>IF EXISTS</c> and the other
+/// nine did not, so a second execution of the same script cleared the module
+/// drops and then died on the first table with Msg 3701 — the one outcome
+/// neither policy wants, because it leaves the target half-way. If you are
+/// about to add a guard back, that is the case to answer first.
+/// </para>
 /// </summary>
 public sealed class ScriptGenerator
 {

@@ -18,7 +18,7 @@ public class ViewGoldenTests
     }
 
     [Fact]
-    public Task Drop_view_emits_DROP_VIEW_IF_EXISTS()
+    public Task Drop_view_emits_a_bare_DROP_VIEW()
     {
         View v = new("dbo", "vCustomer", "CREATE VIEW dbo.vCustomer AS SELECT 1 AS X;", IsEncrypted: false);
         DifferencePair pair = new(v.Identity, DifferenceStatus.OnlyInB, null, v);

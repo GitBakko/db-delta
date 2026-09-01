@@ -32,5 +32,5 @@ public sealed class FunctionScriptEmitter
     }
 
     private static string EmitDrop(Function f) =>
-        $"DROP FUNCTION IF EXISTS {Sql.Q(f.Schema, f.Name)};";
+        $"DROP FUNCTION {Sql.Q(f.Schema, f.Name)};";
 }

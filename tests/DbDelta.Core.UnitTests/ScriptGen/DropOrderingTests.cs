@@ -43,8 +43,8 @@ public class DropOrderingTests
             selection: null,
             dropDependencies: targetEdges);
 
-        int dropTop = sql.IndexOf("DROP VIEW IF EXISTS [dbo].[vATop]", StringComparison.Ordinal);
-        int dropBase = sql.IndexOf("DROP VIEW IF EXISTS [dbo].[vZBase]", StringComparison.Ordinal);
+        int dropTop = sql.IndexOf("DROP VIEW [dbo].[vATop]", StringComparison.Ordinal);
+        int dropBase = sql.IndexOf("DROP VIEW [dbo].[vZBase]", StringComparison.Ordinal);
 
         dropTop.Should().BeGreaterThan(0);
         dropBase.Should().BeGreaterThan(dropTop, "vZBase cannot go while vATop is bound to it (Msg 3729)");
@@ -75,8 +75,8 @@ public class DropOrderingTests
             selection: null,
             dropDependencies: cyclicTargetEdges);
 
-        sql.Should().Contain("DROP VIEW IF EXISTS [dbo].[vATop]");
-        sql.Should().Contain("DROP VIEW IF EXISTS [dbo].[vZBase]");
+        sql.Should().Contain("DROP VIEW [dbo].[vATop]");
+        sql.Should().Contain("DROP VIEW [dbo].[vZBase]");
     }
 
     /// <summary>

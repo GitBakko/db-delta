@@ -6,7 +6,7 @@ namespace DbDelta.Core.ScriptGen;
 /// <summary>
 /// Emits DDL for stored-procedure differences. Same shape as
 /// <see cref="ViewScriptEmitter"/> but using <c>CREATE OR ALTER PROCEDURE</c>
-/// and <c>DROP PROCEDURE IF EXISTS</c>.
+/// and a bare <c>DROP PROCEDURE</c>.
 /// </summary>
 public sealed class ProcedureScriptEmitter
 {
@@ -33,5 +33,5 @@ public sealed class ProcedureScriptEmitter
     }
 
     private static string EmitDrop(StoredProcedure p) =>
-        $"DROP PROCEDURE IF EXISTS {Sql.Q(p.Schema, p.Name)};";
+        $"DROP PROCEDURE {Sql.Q(p.Schema, p.Name)};";
 }

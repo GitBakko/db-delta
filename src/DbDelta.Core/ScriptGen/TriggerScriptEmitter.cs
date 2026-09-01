@@ -59,7 +59,7 @@ public sealed class TriggerScriptEmitter
         + $"ON {Sql.Q(t.ParentSchema, t.ParentTable)};";
 
     private static string EmitDrop(Trigger t) =>
-        $"DROP TRIGGER IF EXISTS {Sql.Q(t.Schema, t.Name)};";
+        $"DROP TRIGGER {Sql.Q(t.Schema, t.Name)};";
 
     private static string EmitDifferent(Trigger sideA, Trigger sideB)
     {

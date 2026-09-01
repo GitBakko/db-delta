@@ -70,9 +70,9 @@ public class ParityFixtureTests(LiveDbFixture fixture)
         //    and is not bound to it, so its own position is free — asserting
         //    view-before-function would have demanded an order SQL Server
         //    does not ask for, and the first run of this test did.
-        int function = script.IndexOf("DROP FUNCTION IF EXISTS [dbo].[fnLegacyTotal]", StringComparison.Ordinal);
+        int function = script.IndexOf("DROP FUNCTION [dbo].[fnLegacyTotal]", StringComparison.Ordinal);
         int table = script.IndexOf("DROP TABLE [dbo].[LegacyStock]", StringComparison.Ordinal);
-        script.Should().Contain("DROP VIEW IF EXISTS [dbo].[vLegacyReport]");
+        script.Should().Contain("DROP VIEW [dbo].[vLegacyReport]");
         function.Should().BeGreaterThan(-1, "the function is target-only and has to go");
         function.Should().BeLessThan(table, "a schemabound function goes before the table it binds to");
 

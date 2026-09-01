@@ -7,7 +7,7 @@ namespace DbDelta.Core.ScriptGen;
 /// Emits DDL for view differences:
 /// <list type="bullet">
 ///   <item><c>OnlyInA</c> (add): the side-A body rewritten as <c>CREATE OR ALTER VIEW</c>.</item>
-///   <item><c>OnlyInB</c> (drop): <c>DROP VIEW IF EXISTS [schema].[name];</c></item>
+///   <item><c>OnlyInB</c> (drop): <c>DROP VIEW [schema].[name];</c></item>
 ///   <item><c>Different</c> (modify): the side-A body rewritten as <c>CREATE OR ALTER VIEW</c>.</item>
 ///   <item>Encrypted on side A: a <c>-- WARNING</c> comment, no DDL (cannot script an opaque body).</item>
 /// </list>
@@ -37,5 +37,5 @@ public sealed class ViewScriptEmitter
     }
 
     private static string EmitDrop(View v) =>
-        $"DROP VIEW IF EXISTS {Sql.Q(v.Schema, v.Name)};";
+        $"DROP VIEW {Sql.Q(v.Schema, v.Name)};";
 }

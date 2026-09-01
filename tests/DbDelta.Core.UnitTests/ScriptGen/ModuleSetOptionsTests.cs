@@ -108,6 +108,6 @@ public class ModuleSetOptionsTests
         string sql = new ViewScriptEmitter().Emit(
             new DifferencePair(v.Identity, DifferenceStatus.OnlyInB, null, v));
 
-        sql.Should().Be("DROP VIEW IF EXISTS [dbo].[v];");
+        sql.Should().Be("DROP VIEW [dbo].[v];");
     }
 }

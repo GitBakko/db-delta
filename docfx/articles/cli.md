@@ -68,6 +68,24 @@ its `transaction` field:
 | `client` | The script does not, so `apply` wraps every batch in one transaction and rolls back on the first failure. |
 | `none` | `--no-transaction` was passed. Each batch commits as it runs, and a failure halfway leaves the target halfway. |
 
+### Why no DROP is guarded
+
+Every `DROP` DbDelta writes is bare. There is no `IF EXISTS` and no existence
+probe, on any object kind, and that is deliberate: **a `DROP` that fails is
+telling you something true** — the target is no longer the database the
+comparison read, so the rest of the script is a delta computed against a
+database that has moved.
+
+It follows that a generated script is **not** meant to be run twice. After a
+failure, compare again and generate again; the second script is the one that
+matches what the target is now. Re-running the first one is how a half-applied
+target happens.
+
+Until 2026-09-01 the four module kinds — view, function, procedure, trigger —
+carried `IF EXISTS` while the other nine did not, so a second execution cleared
+the module drops and then died on the first table with Msg 3701. That was the
+worst of both policies: neither fail-fast nor re-runnable.
+
 ## `report`
 
 Produces a self-contained diff report.

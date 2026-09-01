@@ -1,1 +1,0 @@
-﻿DROP TRIGGER IF EXISTS [dbo].[trg_Customer_Audit];

@@ -21,7 +21,7 @@ public class TriggerGoldenTests
     }
 
     [Fact]
-    public Task Drop_trigger_emits_DROP_TRIGGER_IF_EXISTS()
+    public Task Drop_trigger_emits_a_bare_DROP_TRIGGER()
     {
         Trigger trg = new("dbo", "trg_Customer_Audit", "BODY", false, "dbo", "Customer", false, false);
         DifferencePair pair = new(trg.Identity, DifferenceStatus.OnlyInB, null, trg);

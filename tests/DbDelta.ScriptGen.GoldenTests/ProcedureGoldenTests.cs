@@ -20,7 +20,7 @@ public class ProcedureGoldenTests
     }
 
     [Fact]
-    public Task Drop_procedure_emits_DROP_PROCEDURE_IF_EXISTS()
+    public Task Drop_procedure_emits_a_bare_DROP_PROCEDURE()
     {
         StoredProcedure p = new("dbo", "uspGetCustomer", "CREATE PROCEDURE dbo.uspGetCustomer AS RETURN 0;", IsEncrypted: false);
         DifferencePair pair = new(p.Identity, DifferenceStatus.OnlyInB, null, p);

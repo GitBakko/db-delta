@@ -19,7 +19,7 @@ public class FunctionGoldenTests
     }
 
     [Fact]
-    public Task Drop_function_emits_DROP_FUNCTION_IF_EXISTS()
+    public Task Drop_function_emits_a_bare_DROP_FUNCTION()
     {
         Function fn = new("dbo", "fnSum",
             "CREATE FUNCTION dbo.fnSum() RETURNS int AS BEGIN RETURN 0; END",
