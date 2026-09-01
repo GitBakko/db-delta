@@ -17,7 +17,7 @@ vedi «Manutenzione» in fondo.
   serve**: stampa l'intestazione anche a daemon morto. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **2 voci aperte** — **P1 0 · P2 0 · P4 0** · P3 1 · P5 1 — più **22** in
+- **4 voci aperte** — **P1 0 · P2 0** · P3 1 · **P4 2** · P5 1 — più **22** in
   «Deciso — NON riaprire». **Le 4 critiche restano chiuse.** Per origine:
   delle **sei** aperte dall'audit di parità Redgate **non ne resta nessuna** —
   l'ultima, il gate d'errore di batch, è stata rimisurata e decisa il
@@ -29,14 +29,18 @@ vedi «Manutenzione» in fondo.
   tutte e due la misura ha allargato la voce: sei buchi invece di uno nelle due
   query del pannello, sette tipi invece dei soli alias nel suggerimento di
   backfill — né dalla P1 del 2026-09-01 sul tipo DROPpato mentre lo lega
-  qualcosa di **Identical**. **Le due che restano sono**: l'estrazione di
+  qualcosa di **Identical**. **Le quattro che restano sono**: l'estrazione di
   `DeployPreflight`, aperta il 2026-09-01 solo perché `CLAUDE.md` impone di
-  aprire una voce invece di far crescere un file in silenzio, e l'annuncio
-  pubblico, l'ultima delle **sette** del proprietario, escluso per scelta e non
-  bloccato. Il conteggio va ricontato, non decrementato a mente: `awk` sulle
-  righe di tabella, o si scolla come si era già scollato. L'`awk` che lo dà
-  conta **anche** le righe di «Deciso», che ha la stessa intestazione
-  `| Voce | Reg. |`: 24 righe meno le 22 decise fa 2.
+  aprire una voce invece di far crescere un file in silenzio; **due d'igiene
+  aperte il 2026-09-01 misurando il gate d'errore** — `NoTransactions` disfatto
+  da `apply`, e `RolledBack` mai misurato nella modalità che ogni script
+  generato usa: **nessuna delle due è dedotta**, entrambe girate contro le
+  classi vere su un container; e l'annuncio pubblico, l'ultima delle **sette**
+  del proprietario, escluso per scelta e non bloccato. Il conteggio va
+  ricontato, non decrementato a mente: `awk` sulle righe di tabella, o si scolla
+  come si era già scollato. L'`awk` che lo dà conta **anche** le righe di
+  «Deciso», che ha la stessa intestazione `| Voce | Reg. |`: 26 righe meno le
+  22 decise fa 4.
 - **La parità Redgate è stata eseguita il 2026-08-31 e chiusa**: 21 scenari,
   **zero difetti di parità**, un solo buco dichiarato (extended properties).
   L'unico difetto vero era nostro e nell'attrezzatura — `ParityFixtureTests`
@@ -271,6 +275,8 @@ la sua riga. (Diceva «una» mentre ne elencava sette: ricontate il 2026-09-01.)
 
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
+| **`ComparisonOptions.NoTransactions` viene disfatto da `apply`, e non ha mai prodotto uno script che tocchi un server.** Misurato il 2026-09-01 con le classi vere, non dedotto: uno script costruito da `DeploymentScriptWriter` con `useTransaction: false` non porta né il marker `-- dbdelta:transaction=script` né un `BEGIN TRANSACTION`, quindi `SqlExecutor.ScriptManagesItsOwnTransaction` torna **false** e `ApplyCommand` calcola `useOwnTransaction = true`: il JSON stampa `"transaction": "client"`, `rolledBack: true`, e il batch 1 viene rollato indietro. Cioè lo script generato **per non stare in una transazione** ci finisce dentro lo stesso, a meno che l'operatore non passi **anche** `--no-transaction` — e l'unica ragione per cui quel flag esiste è uno script che dentro una transazione non può girare. Il JSON è onesto (dice `client`), ma nulla avverte, e le due opzioni con lo stesso nome vivono su due lati del confine senza parlarsi. Nella stessa modalità il verdetto continua a emettere `IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION`, che sotto la transazione del client rollerebbe indietro **quella del client** dall'interno dello script: **non raggiungibile via SqlClient**, che si ferma alla prima `SqlException` prima del verdetto, e raggiungibile solo in SSMS, dove però la transazione client non c'è — quindi è una forma da guardare, non un difetto aperto. Tutta la copertura del flag sono **due asserzioni di forma**, il valore del bit e la presenza del nome nella lista | 2026-09-01 | S | `ScriptGenerator.cs:451` (`useTransaction`), `ApplyCommand` (`selfManaged` / `useOwnTransaction`), `SqlExecutor.ScriptManagesItsOwnTransaction`; test: solo `ComparisonOptionsTests.cs:27` e `:43` |
+| **`RolledBack` non è mai misurato nella modalità `script` — la sola che uno script generato usa — e lì torna sempre `false`.** Misurato il 2026-09-01: applicando uno script con l'inviluppo (marker presente, quindi `useOwnTransaction: false`) che fallisce al secondo batch, il bersaglio resta **provatamente intatto** — l'oggetto creato dal batch 1 non c'è — e `RolledBack` è comunque **`false`**. È l'under-claim deliberato di `SqlExecutor.TryRollbackAsync`, «true solo per un rollback che questo metodo ha davvero emesso», quindi il valore non mente; ma non porta **alcuna** informazione proprio dove servirebbe, perché per ogni script DbDelta l'operatore legge sempre il pessimista, e il campo esiste per distinguere «non è stato applicato nulla» da «non lo sappiamo». Le due asserzioni su server vero coprono le altre due modalità, `client` e `none`; di `"transaction": "script"` non c'è **nessuna** asserzione in tutto l'albero. Il rischio non è il comportamento di oggi: è che qualcuno lo «aggiusti» in over-claim sopra un bersaglio mezzo migrato senza che cada niente | 2026-09-01 | XS | `SqlExecutor.TryRollbackAsync` (ramo senza `tx`), `ApplyCommand.cs:115`; test: `ApplyCommandTests.cs:86-87` (`client`) e `:120-121` (`none`), nessuno su `script` |
 
 ---
 
