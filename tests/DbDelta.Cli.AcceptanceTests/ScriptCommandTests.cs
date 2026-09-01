@@ -109,6 +109,49 @@ public class ScriptCommandTests(CliFixture fixture)
     }
 
     /// <summary>
+    /// The schemabound refusal, through the process boundary. The IDENTITY flip
+    /// forces the rebuild; the SCHEMABINDING view on the TARGET is what the
+    /// DROP TABLE would run into.
+    /// </summary>
+    /// <remarks>
+    /// Exit 30 and no file written is the whole contract. Without the guard the
+    /// CLI writes a script that looks fine, and it dies on the operator's server
+    /// with Msg 3729 naming a view they never chose to touch — then XACT_ABORT
+    /// rolls the entire deploy back. This is also the only test that proves the
+    /// CLI passes the TARGET's edges: the guard reads dropDependencies, and with
+    /// the source's it would never fire.
+    /// </remarks>
+    [Fact]
+    public async Task Refuses_with_exit_30_when_a_schemabound_module_blocks_a_rebuild()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        const string srcDb = "DbDeltaScriptSbSrc";
+        const string tgtDb = "DbDeltaScriptSbTgt";
+        await CreateDb(srcDb, ct);
+        await CreateDb(tgtDb, ct);
+        await Exec(srcDb, """
+            IF OBJECT_ID('dbo.Ordini') IS NULL
+                CREATE TABLE dbo.Ordini (Id bigint IDENTITY(1,1) NOT NULL, Amt decimal(18,2) NOT NULL);
+            """, ct);
+        await Exec(srcDb, "CREATE OR ALTER VIEW dbo.vOrdiniSb WITH SCHEMABINDING AS SELECT Id, Amt FROM dbo.Ordini;", ct);
+        await Exec(tgtDb, """
+            IF OBJECT_ID('dbo.Ordini') IS NULL
+                CREATE TABLE dbo.Ordini (Id bigint NOT NULL, Amt decimal(18,2) NOT NULL);
+            """, ct);
+        await Exec(tgtDb, "CREATE OR ALTER VIEW dbo.vOrdiniSb WITH SCHEMABINDING AS SELECT Id, Amt FROM dbo.Ordini;", ct);
+
+        using var sqlOut = TempFile.Sql();
+        int exit = await RunCli(["script",
+            "--source", ConnectionFor(srcDb),
+            "--target", ConnectionFor(tgtDb),
+            "--out", sqlOut.Path], ct);
+
+        exit.Should().Be(ExpectedExitCodes.ScriptGenerationFailure);
+        File.Exists(sqlOut.Path).Should().BeFalse(
+            "the refusal happens during generation, so there is no script to write");
+    }
+
+    /// <summary>
     /// The fourth refusal, through the same boundary. Source has a
     /// memory-optimized table type the target lacks; DbDelta writes no
     /// MEMORY_OPTIMIZED clause, so without the refusal it emits a plain

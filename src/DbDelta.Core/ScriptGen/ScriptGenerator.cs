@@ -101,6 +101,10 @@ public sealed class ScriptGenerator
     {
         ArgumentNullException.ThrowIfNull(result);
         dependencies ??= [];
+        // Same normalisation as above, and the analyzer needs it to see the
+        // guard below is total: an empty list takes the same branch as null
+        // at every later probe.
+        dropDependencies ??= [];
         // Every (schema, table[, name]) key below is compared the way the
         // target resolves names. Value-tuple equality is ordinal, so once the
         // engine began pairing dbo.Clienti with dbo.CLIENTI, a set filled from
@@ -127,6 +131,8 @@ public sealed class ScriptGenerator
                 rebuildTargets.Add((src.Schema, src.Name));
             }
         }
+
+        RefuseRebuildsBlockedBySchemabinding(rebuildTargets, pairs, dropDependencies, pairKey);
 
         // The tables this run actually reshapes. A table outside the selection
         // keeps whatever the target already holds, which is what decides whose
@@ -766,6 +772,80 @@ public sealed class ScriptGenerator
         pair.Identity.Kind == "Trigger"
         && pair.SideA is Trigger t
         && rebuildTargets.Contains((t.ParentSchema, t.ParentTable));
+
+    /// <summary>
+    /// Refuses, before a line of SQL is written, a rebuild the server would
+    /// refuse halfway through — and names the module responsible.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This runs HERE and not in <c>TableScriptEmitter.EmitRebuild</c> for a
+    /// reason that is not style: <c>EmitRebuild</c> is private, receives
+    /// <c>(newT, oldT, names, backfillDefaults)</c> and has no way to see either
+    /// the dependency edges or what this run is about to drop. This method is
+    /// the one place holding all three.
+    /// </para>
+    /// <para>
+    /// The edges are the TARGET's (<c>dropDependencies</c>), never the source's:
+    /// the object the DROP TABLE runs into is the one the target has today.
+    /// </para>
+    /// <para>
+    /// <b>Two exclusions, and without either this refuses tables that deploy
+    /// perfectly well today.</b> Both were measured on
+    /// <c>mssql/server:2022-latest</c>, and the parity fixture cannot see the
+    /// difference — no scenario in it puts a schemabound module over a table
+    /// that gets rebuilt, so a wrong predicate would leave it green.
+    /// </para>
+    /// <para>
+    /// (1) A SELF reference is not a binder. A plain <c>CHECK (Amt &gt; 0)</c>
+    /// and a PERSISTED computed column each produce a row with
+    /// <c>is_schema_bound_reference = 1</c> whose referencing entity is the
+    /// table itself — <c>DependencyReader</c> manufactures it, by attributing a
+    /// C/D constraint's references to its parent — and both tables drop without
+    /// complaint.
+    /// </para>
+    /// <para>
+    /// (2) A binder this very script DROPS first is not a binder either.
+    /// Dropping the schemabound modules and then the table succeeds, measured;
+    /// the DROP pass runs before the CREATE pass that carries the rebuild, so an
+    /// <c>OnlyInB</c> module is already gone by then. Note the shape this does
+    /// NOT cover, because it is the failing one and not an exclusion: a module
+    /// present on BOTH sides. <c>Identical</c> is filtered out of
+    /// <c>pairs</c> and never enters the script; <c>Different</c> is emitted as
+    /// <c>CREATE OR ALTER</c> AFTER the table, since <c>KindRank</c> puts Table
+    /// before View. Neither is dropped, and that is exactly why the rebuild
+    /// dies.
+    /// </para>
+    /// </remarks>
+    private static void RefuseRebuildsBlockedBySchemabinding(
+        HashSet<(string Schema, string Name)> rebuildTargets,
+        List<DifferencePair> pairs,
+        IReadOnlyList<DependencyEdge> dropDependencies,
+        IEqualityComparer<(string Schema, string Name)> pairKey)
+    {
+        if (rebuildTargets.Count == 0 || dropDependencies.Count == 0) { return; }
+
+        // Names are unique per schema in sys.objects, so a (schema, name) key
+        // cannot confuse a view with the table it binds.
+        HashSet<(string Schema, string Name)> droppedFirst = new(
+            pairs.Where(p => p.Status == DifferenceStatus.OnlyInB)
+                 .Select(p => (p.Identity.SchemaName, p.Identity.ObjectName)),
+            pairKey);
+
+        foreach (DependencyEdge edge in dropDependencies)
+        {
+            if (!edge.IsSchemaBound) { continue; }
+
+            (string, string) binder = (edge.Dependent.SchemaName, edge.Dependent.ObjectName);
+            (string, string) bound = (edge.Referenced.SchemaName, edge.Referenced.ObjectName);
+
+            if (pairKey.Equals(binder, bound)) { continue; }        // exclusion (1)
+            if (droppedFirst.Contains(binder)) { continue; }        // exclusion (2)
+            if (!rebuildTargets.Contains(bound)) { continue; }
+
+            throw new SchemaboundRebuildException(edge.Referenced, edge.Dependent);
+        }
+    }
 
     // ── Phase-label helper ──────────────────────────────────────────────────
 

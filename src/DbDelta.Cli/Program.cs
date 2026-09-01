@@ -102,6 +102,22 @@ catch (UnscriptableTableTypeException ex)
         + "decision DbDelta cannot make — or leave it out of this run."));
     return ExitCodes.ScriptGenerationFailure;
 }
+catch (SchemaboundRebuildException ex)
+{
+    // Not one of the four above, and the file that defines it says why: nothing
+    // silent happens here. The server would refuse the DROP TABLE itself with
+    // Msg 3729 and roll the whole deploy back. What answering here buys is the
+    // NAME of the module doing the blocking, before a line of SQL runs, instead
+    // of a server message about an object the operator never chose to touch.
+    // Exit 30 all the same: §4.3 already reserves it for a script that could not
+    // be produced, and this one could not.
+    CliErrorMapper.WriteError(new Error(
+        ErrorCode.UnsupportedSchemaChange,
+        ex.Message,
+        $"Drop the SCHEMABINDING on {ex.Binder.SchemaName}.{ex.Binder.ObjectName}, deploy, and put it "
+        + $"back — or leave {ex.Table.SchemaName}.{ex.Table.ObjectName} out of this run."));
+    return ExitCodes.ScriptGenerationFailure;
+}
 catch (DependencyCycleException ex)
 {
     // Not a refusal like the four above — those decline to write a statement

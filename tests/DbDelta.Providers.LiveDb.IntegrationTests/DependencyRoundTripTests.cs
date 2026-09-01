@@ -300,6 +300,117 @@ public class DependencyRoundTripTests(LiveDbFixture fixture)
         return (string)await cmd.ExecuteScalarAsync(ct);
     }
 
+    /// <summary>
+    /// A SCHEMABINDING module over a table that needs an identity rebuild: the
+    /// server refuses the DROP TABLE with Msg 3729, XACT_ABORT rolls the whole
+    /// deploy back, and the target is left divergent. DbDelta now answers first
+    /// and names the module.
+    /// </summary>
+    /// <remarks>
+    /// This is the shape NO test in the tree had, and the parity fixture cannot
+    /// grow it by accident: scenarios 03 and 12 rebuild tables no module
+    /// references, and 16/17 put SCHEMABINDING on tables that are never rebuilt.
+    /// The second half is the negative control that matters most, because it
+    /// runs on the REAL reader output rather than a hand-built edge: an ordinary
+    /// CHECK constraint makes sys.sql_expression_dependencies report
+    /// is_schema_bound_reference = 1 against the table ITSELF, and that table
+    /// rebuilds perfectly well.
+    /// </remarks>
+    [Fact]
+    public async Task A_schemabound_module_over_a_rebuilt_table_is_refused_by_name()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        await Create(fixture.ConnectionString, "SbSrc", ct);
+        await Create(fixture.ConnectionString, "SbTgt", ct);
+        string src = Cat(fixture.ConnectionString, "SbSrc");
+        string tgt = Cat(fixture.ConnectionString, "SbTgt");
+
+        await using (SqlConnection c = new(src))
+        {
+            await c.OpenAsync(ct);
+            await Exec(c, "IF OBJECT_ID('dbo.Ordini','U') IS NULL CREATE TABLE dbo.Ordini (Id bigint IDENTITY(1,1) NOT NULL, Amt decimal(9,2) NOT NULL);", ct);
+            await Exec(c, "CREATE OR ALTER VIEW dbo.vOrdiniSb WITH SCHEMABINDING AS SELECT Id, Amt FROM dbo.Ordini;", ct);
+        }
+        await using (SqlConnection c = new(tgt))
+        {
+            await c.OpenAsync(ct);
+            // Plain int, not IDENTITY: the flip is what forces the rebuild.
+            await Exec(c, "IF OBJECT_ID('dbo.Ordini','U') IS NULL CREATE TABLE dbo.Ordini (Id bigint NOT NULL, Amt decimal(9,2) NOT NULL);", ct);
+            await Exec(c, "CREATE OR ALTER VIEW dbo.vOrdiniSb WITH SCHEMABINDING AS SELECT Id, Amt FROM dbo.Ordini;", ct);
+        }
+
+        Database source = (await new LiveDbSource(src).LoadAsync(ct)).Value!;
+        Database target = (await new LiveDbSource(tgt).LoadAsync(ct)).Value!;
+
+        // The reader has to actually carry the flag, or the guard is decoration.
+        target.Dependencies.Should().Contain(
+            e => e.IsSchemaBound && e.Referenced.ObjectName == "Ordini" && e.Dependent.ObjectName == "vOrdiniSb");
+
+        SchemaboundRebuildException ex = Assert.Throws<SchemaboundRebuildException>(() =>
+            new ScriptGenerator().Generate(
+                new ComparisonEngine().Compare(source, target, ComparisonOptions.Default),
+                selection: null,
+                options: ComparisonOptions.Default,
+                dependencies: source.Dependencies,
+                dropDependencies: target.Dependencies));
+
+        ex.Table.ObjectName.Should().Be("Ordini");
+        ex.Binder.ObjectName.Should().Be("vOrdiniSb");
+
+        // And the refusal is not pessimism: the server really does refuse.
+        await using (SqlConnection c = new(tgt))
+        {
+            await c.OpenAsync(ct);
+            Func<Task> drop = async () => await Exec(c, "DROP TABLE dbo.Ordini;", ct);
+            (await drop.Should().ThrowAsync<SqlException>()).Which.Number.Should().Be(3729);
+        }
+    }
+
+    /// <summary>
+    /// NEGATIVE CONTROL on real catalog data: a table whose own CHECK constraint
+    /// produces a self-referencing schemabound row still rebuilds.
+    /// </summary>
+    [Fact]
+    public async Task A_tables_own_CHECK_does_not_block_its_rebuild()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        await Create(fixture.ConnectionString, "SbCkSrc", ct);
+        await Create(fixture.ConnectionString, "SbCkTgt", ct);
+        string src = Cat(fixture.ConnectionString, "SbCkSrc");
+        string tgt = Cat(fixture.ConnectionString, "SbCkTgt");
+
+        await using (SqlConnection c = new(src))
+        {
+            await c.OpenAsync(ct);
+            await Exec(c, "IF OBJECT_ID('dbo.Righe','U') IS NULL CREATE TABLE dbo.Righe (Id bigint IDENTITY(1,1) NOT NULL, Amt decimal(9,2) NOT NULL CONSTRAINT CK_Righe CHECK (Amt > 0));", ct);
+        }
+        await using (SqlConnection c = new(tgt))
+        {
+            await c.OpenAsync(ct);
+            await Exec(c, "IF OBJECT_ID('dbo.Righe','U') IS NULL CREATE TABLE dbo.Righe (Id bigint NOT NULL, Amt decimal(9,2) NOT NULL CONSTRAINT CK_Righe CHECK (Amt > 0));", ct);
+        }
+
+        Database source = (await new LiveDbSource(src).LoadAsync(ct)).Value!;
+        Database target = (await new LiveDbSource(tgt).LoadAsync(ct)).Value!;
+
+        // The trap is real and it comes from the catalog, not from a fixture:
+        // the CHECK's row is schemabound and points the table at itself.
+        target.Dependencies.Should().Contain(
+            e => e.IsSchemaBound
+                 && e.Dependent.ObjectName == "Righe"
+                 && e.Referenced.ObjectName == "Righe");
+
+        string script = new ScriptGenerator().Generate(
+            new ComparisonEngine().Compare(source, target, ComparisonOptions.Default),
+            selection: null,
+            options: ComparisonOptions.Default,
+            dependencies: source.Dependencies,
+            dropDependencies: target.Dependencies);
+
+        SqlBatchResult apply = await SqlExecutor.ExecuteAsync(tgt, script, ct, useOwnTransaction: false);
+        apply.Success.Should().BeTrue(apply.ErrorMessage ?? "an ordinary CHECK must not stop a rebuild");
+    }
+
     private static async Task Create(string conn, string db, CancellationToken ct)
     {
         await using SqlConnection c = new(conn);

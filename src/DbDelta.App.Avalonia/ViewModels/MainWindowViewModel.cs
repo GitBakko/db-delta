@@ -942,6 +942,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 AppState.TargetDependencies,
                 backfill);
         }
+        catch (SchemaboundRebuildException ex)
+        {
+            AppState.LastError =
+                $"Script non generato: {ex.Table.SchemaName}.{ex.Table.ObjectName} va ricostruita, ma "
+                + $"{ex.Binder.SchemaName}.{ex.Binder.ObjectName} la lega con SCHEMABINDING. SQL Server rifiuta "
+                + "sia la DROP TABLE (Msg 3729) sia la sp_rename (Msg 15336), quindi il rilascio si fermerebbe "
+                + "a metà e tornerebbe indietro. Togli il SCHEMABINDING, rilascia e rimettilo, oppure togli "
+                + "la tabella dalla selezione.";
+            StatusText = "Nessuno script generato: vedi il messaggio in alto.";
+            return null;
+        }
         catch (UnscriptableIndexException ex)
         {
             AppState.LastError =

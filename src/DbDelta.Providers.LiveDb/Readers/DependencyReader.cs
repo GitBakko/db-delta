@@ -41,12 +41,19 @@ internal sealed class DependencyReader
             referencing_type   = oo.type,
             referenced_schema  = ISNULL(x.referenced_schema_name, OBJECT_SCHEMA_NAME(x.referenced_id)),
             referenced_name    = ISNULL(x.referenced_entity_name, OBJECT_NAME(x.referenced_id)),
-            referenced_type    = eo.type
+            referenced_type    = eo.type,
+            -- Not an ordering input: a schemabound edge points the same way as
+            -- any other. It says the server ENFORCES this reference, so the
+            -- referenced object cannot be dropped (Msg 3729) or renamed
+            -- (Msg 15336) while it stands — which is what makes an identity
+            -- rebuild of that table unwritable.
+            is_schema_bound    = x.is_schema_bound_reference
         FROM (
             SELECT
                 d.referenced_id,
                 d.referenced_schema_name,
                 d.referenced_entity_name,
+                d.is_schema_bound_reference,
                 -- A CHECK or DEFAULT constraint is an object of its own, and
                 -- not one DbDelta models: attribute its references to the table
                 -- that carries it, which is the node the resolver orders. A
@@ -75,6 +82,7 @@ internal sealed class DependencyReader
             string? refSchema = r.IsDBNull(3) ? null : r.GetString(3);
             string? refName = r.IsDBNull(4) ? null : r.GetString(4);
             string? refType = r.IsDBNull(5) ? null : r.GetString(5).Trim();
+            bool isSchemaBound = !r.IsDBNull(6) && r.GetBoolean(6);
 
             if (depSchema is null || depName is null || depType is null || refSchema is null || refName is null || refType is null)
             {
@@ -88,7 +96,8 @@ internal sealed class DependencyReader
             edges.Add(new DependencyEdge(
                 new ObjectIdentity(depSchema, depName, depKind),
                 new ObjectIdentity(refSchema, refName, refKind),
-                EdgeKind.ModuleReference));
+                EdgeKind.ModuleReference,
+                isSchemaBound));
         }
         return edges;
     }
