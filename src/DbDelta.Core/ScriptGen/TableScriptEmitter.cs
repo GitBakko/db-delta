@@ -70,11 +70,37 @@ public sealed class TableScriptEmitter(
                 .Where(c => !existing.Contains(c.Name))
                 .Where(c => !c.IsNullable
                             && !c.IsIdentity
+                            && !IsRowVersion(c)
                             && c.ComputedExpression is null
                             && string.IsNullOrEmpty(c.DefaultExpression)
                             && !namedDefaults.ContainsKey(c.Name))
                 .Select(c => c.Name)
         ];
+    }
+
+    /// <summary>
+    /// A <c>rowversion</c> column fills itself, so it must never reach the
+    /// backfill question at all.
+    /// </summary>
+    /// <remarks>
+    /// Msg 4901's own text names the exception — "or the column being added is
+    /// an identity or timestamp" — and identity was already filtered here while
+    /// this was not. Measured on <c>mssql/server:2022-latest</c>:
+    /// <c>ALTER TABLE … ADD C rowversion NOT NULL</c> succeeds on a populated
+    /// table with no DEFAULT, and any DEFAULT on such a column is refused
+    /// outright. Excluding it here fixes both paths at once, because both read
+    /// the operator's answers out of a dictionary this list is what fills: the
+    /// ALTER never emits the throwaway constraint, and
+    /// <see cref="SeedForCopiedRows"/> returns null so the rebuild leaves the
+    /// column out of its INSERT list — which is what lets the server fill it.
+    /// The model spells it <c>timestamp</c>, the way <c>sys.types</c> does;
+    /// <c>rowversion</c> is accepted too because a hand-built model may.
+    /// </remarks>
+    private static bool IsRowVersion(Column c)
+    {
+        string t = c.DataType.Split('(')[0].Trim();
+        return t.Equals("timestamp", StringComparison.OrdinalIgnoreCase)
+            || t.Equals("rowversion", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <inheritdoc />

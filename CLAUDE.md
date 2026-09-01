@@ -10,7 +10,7 @@
 - NEVER commit secrets, credentials, or .env files
 - Keep NEW files under 500 lines. Six existing ones are already over —
   measured 2026-09-01, `wc -l`, not remembered: ScriptGenerator 1334,
-  MainWindowViewModel 1186, TableScriptEmitter 978, LiveDbObjectBodyResolver
+  MainWindowViewModel 1186, TableScriptEmitter 1004, LiveDbObjectBodyResolver
   845, ComparisonEngine 741, ProjectEndpointPanelViewModel 689. Do not grow
   them without opening an item in `docs/BACKLOG.md`. These numbers age like
   any other: **four of the six drifted in one day** the last time they were

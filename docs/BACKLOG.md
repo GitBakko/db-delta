@@ -8,28 +8,28 @@ vedi «Manutenzione» in fondo.
 ## Stato — 2026-09-01
 
 - **v1.0.2 pubblicata** (2026-08-13), «Latest», MSI non firmata allegata.
-- **970 test verdi** nei sette progetti che girano senza Docker (Core 587,
+- **990 test verdi** nei sette progetti che girano senza Docker (Core 607,
   Headless 210, Persistence.Unit 81, Golden 68, Property 12, Architecture 6,
-  Shared 6) — ricontati il 2026-09-01 dopo la chiusura della direzione delle
-  colonne di chiave, non incrementati a mente. **Due** dei tre DB-backed vanno **rossi**, non skipped, con Docker
+  Shared 6) — ricontati il 2026-09-01 dopo la chiusura del suggerimento di
+  backfill, non incrementati a mente. **Due** dei tre DB-backed vanno **rossi**, non skipped, con Docker
   spento — LiveDb e Cli acceptance, che costruiscono il container in un
   inizializzatore di campo senza rete. Davanti a quel muro la prima domanda è
   `docker version`, che deve mostrare la sezione `Server:` — **`docker ps` non
   serve**: stampa l'intestazione anche a daemon morto. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **12 voci aperte** — P1 2 · P2 0 · P3 2 · P4 1 · P5 7 — più **17** in
-  «Deciso — NON riaprire». **Le 4 critiche restano chiuse.** Per origine le 12
+- **11 voci aperte** — P1 2 · P2 0 · P3 1 · P4 1 · P5 7 — più **17** in
+  «Deciso — NON riaprire». **Le 4 critiche restano chiuse.** Per origine le 11
   aperte sono: **tre** dall'audit di parità Redgate (P1 rebuild contro un modulo
   schemabound, P3 gate d'errore di batch, P4 politica delle DROP) —
   **nessuna è un fallimento di parità**, sono forme che la fixture non
   raggiunge; **nessuna** più dalla review adversariale della chiusura del tipo
   tabella — la direzione delle colonne di chiave, l'unica che ne restava, è
-  chiusa il 2026-09-01; **una** delle due aperte il
+  chiusa il 2026-09-01; **nessuna** delle due aperte il
   2026-08-31 chiudendo i nomi di tipo alias, entrambe **pre-esistenti e trovate
-  misurando**, non dedotte (resta P3 `BackfillPreflight` che propone `('')`; il
-  pannello diff senza `COLLATE` è **chiuso il 2026-09-01**, e misurandolo si è
-  visto che i buchi in quelle due query erano sei, non uno) — la terza, se
+  misurando**, non dedotte — **entrambe chiuse il 2026-09-01**, e in tutte e due
+  la misura ha allargato la voce: sei buchi invece di uno nelle due query del
+  pannello, e sette tipi invece dei soli alias nel suggerimento di backfill — la terza, se
   qualificare anche `dbo`, è stata **decisa e chiusa lo stesso giorno**;
   **una** aperta il
   2026-09-01 (P1: un tipo che va DROPpato mentre lo lega qualcosa di
@@ -49,8 +49,8 @@ vedi «Manutenzione» in fondo.
   rigenerare l'artefatto DbDelta serve `DBDELTA_PARITY_DUMP=<percorso>`.
 - **CI verde su `311c54a`** (run `33488633499`), entrambi i job, il 2026-09-01 —
   è il primo run che ha visto i sei commit del 2026-08-31. I DB-backed
-  aggiungono **96** test ai locali della riga sopra: LiveDb 65, Cli acceptance
-  24, Persistence integration 7 — **1066 in tutto**. Misurati il 2026-09-01 su Windows con
+  aggiungono **125** test ai locali della riga sopra: LiveDb 94, Cli acceptance
+  24, Persistence integration 7 — **1115 in tutto**. Misurati il 2026-09-01 su Windows con
   Docker acceso, dove i 7 passano tutti; senza Docker 3 dei 7 si skippano da sé.
   L'exit code di `script` e la forma JSON di `compare` girano solo lì.
 - **La guardia dello skip Testcontainers deve avvolgere `Build()`**, non solo
@@ -222,11 +222,14 @@ la riga qui sopra.
 
 ## P3 — Debito strutturale
 
-Una voce chiusa il 2026-08-31 dal commit che porta questa riga:
+Una voce chiusa il 2026-08-31 e una il 2026-09-01, ognuna dal commit che porta
+la sua riga:
 
 | Voce chiusa | Come | Prova |
 |---|---|---|
 | La PRIMARY KEY e la UNIQUE di una tabella perdevano la direzione delle colonne di chiave | `PrimaryKey.Columns` e `UniqueConstraint.Columns` portano ora `IndexColumn`, che la direzione ce l'aveva già — era `TableIndex` a usarlo, dal lato dei tipi tabella. **Misurato prima di scrivere**, e la perdita è a due stadi: `PRIMARY KEY CLUSTERED (A ASC, B DESC)` e `UNIQUE (C DESC, A ASC)` sono entrambe accettate e `sys.index_columns.is_descending_key` riporta 1 sulle metà discendenti; riemettendo i vincoli come DbDelta li scriveva — soli nomi — ogni `is_descending_key` è tornato **0**, senza un errore in nessun punto. E prima ancora il confronto le chiamava Identical, quindi non veniva emesso nulla e la perdita arrivava solo col primo rebuild per altra causa. **61 siti di costruzione, di cui solo 2 in `src/`**: allargare il tipo posizionale avrebbe toccato 59 test per un fix di difetto, quindi `IndexColumn` prende una **conversione implicita da `string`** — «una colonna nominata senza direzione è ascendente», che è il default di T-SQL — e le collection expression la applicano per elemento. Una sola verità, zero churn. I **tre** confronti (`ComparisonEngine`, `ConstraintPairing`, `TableScriptEmitter`) passano ora da `IndexColumn.KeysMatch`, che **pretende** il comparer invece di assumerlo, per la ragione imparata il 2026-09-01 su `TypeMatches`: sono identificatori di server e il motore appaia gli oggetti intorno con la collation del target. **`DESC` si scrive solo dove serve e `ASC` mai**: un vincolo di tabella è sempre uscito come `([A], [B])`, e scrivere ASC ora muoverebbe ogni golden per un guadagno nullo — `[A]` e `[A] ASC` sono la stessa chiave per il server, sempre. Diverso dal caso della qualifica `dbo`, dove il nome nudo poteva legarsi all'oggetto sbagliato: qui non c'è ambiguità, quindi la forma corta resta | `KeyColumnDirectionTests` (9 test Core, di cui **tre** controlli in negativo: una chiave tutta ascendente esce byte-identica e senza ASC, un nome nudo significa ancora ascendente, due chiavi uguali restano Identical) e `ConstraintReaderTests.A_key_columns_direction_reaches_the_model_and_the_diff_pane` (live). **La verifica sta sul READER**: due lati entrambi ciechi convergono su tutto-ascendente e il round-trip è verde per il motivo sbagliato — ed è esattamente così che è sopravvissuta, perché **ogni** chiave del corpus era ascendente. Il live copre anche il **secondo reader**, quello del pannello diff, che era derivato di nuovo. **Cinque sonde di mutazione, cinque uccidono**, una per struttura: i due reader, il confronto, l'emittente e il cablaggio di un call site che scavalca il seam. **Zero golden mossi** e nessuna asserzione esistente toccata: 578 Core, 68 golden, 12 property e 210 headless invariati sotto il cambio di tipo |
+| `BackfillPreflight` proponeva `('')` per ogni tipo che non riconosceva | **La voce descriveva il difetto giusto e la conseguenza sbagliata**, e la differenza è tutta la gravità: diceva che un alias su un tipo numerico dà «un errore di conversione al deploy». Misurato su `mssql/server:2022-latest` invece che dedotto: `('')` su un alias su `bigint` **non fallisce, memorizza `0`**; su `datetime2` memorizza **`1900-01-01`**. Non è un deploy che muore rumorosamente, è **un'istruzione valida che significa in silenzio un'altra cosa** — il criterio esatto della famiglia `Unscriptable*`. La superficie era più larga dei tipi alias, e anche questo è stato misurato tipo per tipo: l'unico ramo `_ => "('')"` copriva anche `binary`, `varbinary`, `image`, `hierarchyid`, `geometry`, `geography` e `rowversion`, e il server **rifiuta** `('')` per tutti tranne `image`. Ogni valore ora proposto è stato provato sul server, non scelto a memoria: `(0x)` per la famiglia binaria, `(hierarchyid::GetRoot())`, `(geometry::Parse('POINT EMPTY'))`. **La famiglia stringa è ora ELENCATA** invece che raggiunta cadendo in fondo allo switch, così un tipo che nessuno ha pensato prende un vuoto e non la risposta di una stringa; il vuoto è già gestito, perché `BackfillViewModel.CanConfirm` rifiuta una riga in bianco e disabilita Applica. **Nessun cambio di firma**: `CompareUserDefinedTypes` emette già una coppia per OGNI tipo alias a OGNI stato, `Identical` compreso, con `SideA` la sorgente — quindi la mappa alias→base è già dentro il primo parametro di `Scan`. Passare il `Database` avrebbe voluto un campo nuovo su `AppStateViewModel`, che oggi butta via entrambi. **E una voce nuova non è servita per `rowversion`**: il Msg 4901 nomina l'eccezione da sé («or the column being added is an identity or timestamp»), l'identity era già filtrata e il rowversion no. Senza quel filtro il nuovo vuoto avrebbe **bloccato** un deploy oggi possibile — Applica disabilitata su una colonna che non vuole alcun valore. Filtrato in `ColumnsNeedingABackfillDefault`, che risolve i due percorsi insieme: l'ALTER non emette il vincolo usa-e-getta e `SeedForCopiedRows` torna null, quindi il rebuild lascia la colonna fuori dalla INSERT e il server la riempie | `BackfillPreflightTests` — 31 test (era 1 sul suggerimento, ora 11 righe di teoria più il vuoto, la risoluzione dell'alias su 6 basi, l'alias `Identical`, l'alias non trovato e il rowversion). `BackfillSuggestionTests` — **29 test su container reale**: ogni valore che la classe può produrre viene aggiunto NOT NULL a una tabella con una riga dentro, nella forma esatta che l'emittente scrive. È la sola prova possibile: un unit test asserisce la stringa che lo switch ritorna, cioè esattamente quella che qualcuno ha deciso, e non può dire che il server la rifiuta. Copre anche i quattro valori che non sono letterali, dove un refuso in `geometry::Parse` compilerebbe e passerebbe ogni unit test. **Otto sonde di mutazione, otto uccise.** Tre non giravano alla prima passata, tutti e tre i modi che la memoria elenca: `IDE0047` sulle parentesi ridondanti, cinque ancore con `
+` contro un file CRLF, e `IDE0051` per aver orfanato `IsRowVersion` togliendone l'unica chiamata — rifatta neutralizzando la costante |
 
 | Voce chiusa | Come | Prova |
 |---|---|---|
@@ -248,7 +251,6 @@ Una voce chiusa il 2026-08-20 dal commit che porta questa riga:
 
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
-| **`BackfillPreflight` propone `('')` come DEFAULT per ogni tipo che non riconosce, tipi alias compresi.** `SuggestedValue` fa switch sul **testo** del tipo e il ramo di scarto è `_ => "('')"`: una colonna NOT NULL di tipo `app.MioIntTipo` — un alias su `bigint` — si vede proporre una stringa vuota, che l'operatore conferma e che finisce nello script emesso. Un alias su un tipo numerico dà quindi un errore di conversione al deploy, e un alias su un tipo stringa dà un valore plausibile ma arbitrario. Il modello sa già distinguerli (`Column.IsUserDefinedType`, e da oggi `TypeSchema`), ma il preflight non lo guarda. Percorso della sola app: la CLI non usa `BackfillPreflight` | 2026-08-31 | S | `src/DbDelta.Core/ScriptGen/BackfillPreflight.cs` (`SuggestedValue`); il valore raggiunge lo script in `src/DbDelta.Core/ScriptGen/TableScriptEmitter.cs` |
 | **Il gate d'errore di batch legge solo l'`@@ERROR` dell'ultima istruzione.** `SET XACT_ABORT ON` non rende abortivo ogni errore. Misurato su `mssql/server:2022-latest` 16.0.4265.3, dentro `BEGIN TRANSACTION` con `XACT_ABORT ON`: una `DROP TABLE dbo.NoSuchTable` a metà batch (Msg 3701, Level 11) ha lasciato proseguire il batch **e committare**; `EXEC sp_rename 'dbo.NoSuchObject', …` (Msg 15225, alzato da `RAISERROR` dentro una procedura di sistema) idem, e anche l'istruzione precedente è sopravvissuta. Entrambe le classi sono raggiungibili nello script di parità, sulle due `DROP TABLE` e le due `sp_rename` del rebuild. **Rischio e non difetto** perché lì il sopravvissuto è seguito subito da un `ALTER TABLE … ADD CONSTRAINT` contro la tabella che il rename fallito ha lasciato mancante — Msg 4902, che *è* abortivo, quindi torna indietro tutto. È anche il motivo per cui Redgate avvolge `sp_addextendedproperty` in TRY/CATCH e nient'altro: stessa classe non abortiva | 2026-08-31 | M | `docs/parity/redgate-2026-08-31.md` R5 (le due riproduzioni) |
 
 ---

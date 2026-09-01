@@ -125,6 +125,133 @@ public class BackfillPreflightTests
     [InlineData("nvarchar(16)", "('')")]
     [InlineData("datetime2", "(SYSUTCDATETIME())")]
     [InlineData("uniqueidentifier", "(NEWID())")]
+    // Below: every arm the single `_ => "('')"` fallback used to swallow. All
+    // measured on mssql/server:2022-latest, not reasoned about — ('') is
+    // REFUSED by the server for each of these.
+    [InlineData("varbinary(16)", "(0x)")]
+    [InlineData("binary(4)", "(0x)")]
+    [InlineData("image", "(0x)")]
+    [InlineData("hierarchyid", "(hierarchyid::GetRoot())")]
+    [InlineData("geometry", "(geometry::Parse('POINT EMPTY'))")]
+    [InlineData("geography", "(geography::Parse('POINT EMPTY'))")]
+    // ('') is right for these, and they are now LISTED rather than reached by
+    // falling off the end of the switch.
+    [InlineData("varchar(8)", "('')")]
+    [InlineData("sysname", "('')")]
+    [InlineData("xml", "('')")]
+    [InlineData("sql_variant", "('')")]
     public void The_suggested_value_matches_the_column_type(string dataType, string expected) =>
         new BackfillRequirement("dbo", "T", "C", dataType).SuggestedValue.Should().Be(expected);
+
+    /// <summary>
+    /// A type the switch does not know gets NOTHING, not a string's answer.
+    /// </summary>
+    /// <remarks>
+    /// The dialog refuses to confirm a blank row (BackfillViewModel.CanConfirm),
+    /// so a blank asks the operator. The old fallback answered ('') for
+    /// everything it did not recognise, which for half of those shapes was a
+    /// statement the server rejects and for the other half a value it silently
+    /// converted into something the operator never chose.
+    /// </remarks>
+    [Fact]
+    public void A_type_with_no_dull_value_suggests_nothing_rather_than_guessing() =>
+        new BackfillRequirement("dbo", "T", "C", "some_future_type").SuggestedValue.Should().BeEmpty();
+
+    /// <summary>
+    /// The defect this entry was opened for, and the reason it is not cosmetic:
+    /// ('') on an alias over bigint does NOT fail. It stores 0.
+    /// </summary>
+    [Theory]
+    [InlineData("bigint", "((0))")]
+    [InlineData("datetime2", "(SYSUTCDATETIME())")]
+    [InlineData("uniqueidentifier", "(NEWID())")]
+    [InlineData("decimal", "((0))")]
+    [InlineData("nvarchar", "('')")]
+    [InlineData("varbinary", "(0x)")]
+    public void An_alias_type_is_suggested_a_value_of_its_BASE_type(string baseType, string expected)
+    {
+        Table src = SourceWith(new Column("Codice", "MioTipo", false, 2)
+        {
+            IsUserDefinedType = true,
+            TypeSchema = "app",
+        });
+
+        ComparisonResult result =
+            CompareWithAlias(src, new UserDefinedType("app", "MioTipo", baseType, 8, 0, 0, false));
+
+        IReadOnlyList<BackfillRequirement> found = BackfillPreflight.Scan(result);
+
+        found.Should().ContainSingle();
+        // The operator still reads the alias name, never the base type.
+        found[0].DataType.Should().Be("MioTipo");
+        found[0].SuggestedValue.Should().Be(expected);
+    }
+
+    /// <summary>
+    /// An alias the deploy does not touch compares Identical, and Identical is
+    /// the COMMON case — a lookup built only from Different pairs would miss
+    /// exactly the columns this exists for.
+    /// </summary>
+    [Fact]
+    public void An_alias_type_that_is_Identical_still_resolves()
+    {
+        Table src = SourceWith(new Column("Codice", "MioTipo", false, 2)
+        {
+            IsUserDefinedType = true,
+            TypeSchema = "app",
+        });
+        UserDefinedType udt = new("app", "MioTipo", "bigint", 8, 0, 0, false);
+
+        ComparisonResult result = new([
+            new DifferencePair(src.Identity, DifferenceStatus.Different, src, Target()),
+            new DifferencePair(udt.Identity, DifferenceStatus.Identical, udt, udt),
+        ]);
+
+        BackfillPreflight.Scan(result)[0].SuggestedValue.Should().Be("((0))");
+    }
+
+    /// <summary>
+    /// An alias in a schema the map does not hold must not borrow another
+    /// type's base: no lookup, no BaseType, and a blank rather than a guess.
+    /// </summary>
+    [Fact]
+    public void An_alias_the_lookup_cannot_find_suggests_nothing()
+    {
+        Table src = SourceWith(new Column("Codice", "MioTipo", false, 2)
+        {
+            IsUserDefinedType = true,
+            TypeSchema = "altro",
+        });
+
+        ComparisonResult result =
+            CompareWithAlias(src, new UserDefinedType("app", "MioTipo", "bigint", 8, 0, 0, false));
+
+        BackfillPreflight.Scan(result)[0].SuggestedValue.Should().BeEmpty();
+    }
+
+    /// <summary>
+    /// A rowversion column fills itself, so it must never be asked about at all.
+    /// </summary>
+    /// <remarks>
+    /// Msg 4901 names the exception itself — "or the column being added is an
+    /// identity or timestamp" — and identity was already filtered here while
+    /// this was not. Asking would be worse than pointless: any DEFAULT on such
+    /// a column is refused, so the answer the operator gives builds a statement
+    /// the server rejects.
+    /// </remarks>
+    [Fact]
+    public void A_rowversion_column_is_never_reported()
+    {
+        Table src = SourceWith(
+            new Column("Ver", "timestamp", false, 2),
+            new Column("Ver2", "rowversion", false, 3));
+
+        BackfillPreflight.Scan(Compare(src, Target())).Should().BeEmpty();
+    }
+
+    private static ComparisonResult CompareWithAlias(Table src, UserDefinedType udt) =>
+        new([
+            new DifferencePair(src.Identity, DifferenceStatus.Different, src, Target()),
+            new DifferencePair(udt.Identity, DifferenceStatus.Different, udt, null),
+        ]);
 }
