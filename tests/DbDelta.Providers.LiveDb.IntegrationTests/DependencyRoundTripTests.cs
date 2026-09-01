@@ -207,6 +207,99 @@ public class DependencyRoundTripTests(LiveDbFixture fixture)
         after.UserDefinedTypes.Should().NotContain(x => x.Name == "AliasInt");
     }
 
+    /// <summary>
+    /// A rebuilt table leaves every plain view that reads it holding the column
+    /// list it cached at CREATE time, and the view keeps answering SELECTs, so
+    /// nothing looks wrong. The generated script now refreshes them.
+    /// </summary>
+    /// <remarks>
+    /// The mechanism is asserted first, in a scratch database, by running the
+    /// rebuild dance by hand: without a refresh the view really does report the
+    /// old type while the base reports the new one. Without that half the test
+    /// would pass against a generator that emitted nothing, since a freshly
+    /// deployed view is fresh by construction.
+    /// </remarks>
+    [Fact]
+    public async Task A_plain_view_over_a_rebuilt_table_does_not_keep_the_old_column_types()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        await Create(fixture.ConnectionString, "RefreshMech", ct);
+        await Create(fixture.ConnectionString, "RefreshSrc", ct);
+        await Create(fixture.ConnectionString, "RefreshTgt", ct);
+        string mech = Cat(fixture.ConnectionString, "RefreshMech");
+        string src = Cat(fixture.ConnectionString, "RefreshSrc");
+        string tgt = Cat(fixture.ConnectionString, "RefreshTgt");
+
+        // ── the mechanism: the dance by hand, no refresh ──────────────────
+        await using (SqlConnection c = new(mech))
+        {
+            await c.OpenAsync(ct);
+            await Exec(c, "IF OBJECT_ID('dbo.M','U') IS NULL CREATE TABLE dbo.M (Id int NOT NULL, Nota nvarchar(50) NULL);", ct);
+            await Exec(c, "CREATE OR ALTER VIEW dbo.vM AS SELECT Id, Nota FROM dbo.M;", ct);
+            await Exec(c, """
+                CREATE TABLE dbo.M_tmp (Id bigint IDENTITY(1,1) NOT NULL, Nota nvarchar(50) NULL);
+                SET IDENTITY_INSERT dbo.M_tmp ON;
+                INSERT INTO dbo.M_tmp (Id, Nota) SELECT Id, Nota FROM dbo.M;
+                SET IDENTITY_INSERT dbo.M_tmp OFF;
+                DROP TABLE dbo.M;
+                EXEC sp_rename 'dbo.M_tmp', 'M';
+                """, ct);
+
+            (await ColumnTypeAsync(c, "dbo.M", "Id", ct)).Should().Be("bigint", "the base table really was rebuilt");
+            (await ColumnTypeAsync(c, "dbo.vM", "Id", ct)).Should().Be(
+                "int", "this is the silence: the view still reports the OLD type and still SELECTs cleanly");
+        }
+
+        // ── the verdict: DbDelta's own script ─────────────────────────────
+        await using (SqlConnection c = new(src))
+        {
+            await c.OpenAsync(ct);
+            await Exec(c, "IF OBJECT_ID('dbo.Ordine','U') IS NULL CREATE TABLE dbo.Ordine (Id bigint IDENTITY(1,1) NOT NULL, Nota nvarchar(50) NULL);", ct);
+            await Exec(c, "CREATE OR ALTER VIEW dbo.vOrdine AS SELECT Id, Nota FROM dbo.Ordine;", ct);
+            await Exec(c, "CREATE OR ALTER VIEW dbo.vOrdineEsterna AS SELECT Id, Nota FROM dbo.vOrdine;", ct);
+        }
+        await using (SqlConnection c = new(tgt))
+        {
+            await c.OpenAsync(ct);
+            // Same shape, but Id is a plain int: the identity flip forces the
+            // rebuild and the widening is what the views then get wrong.
+            await Exec(c, "IF OBJECT_ID('dbo.Ordine','U') IS NULL CREATE TABLE dbo.Ordine (Id int NOT NULL, Nota nvarchar(50) NULL);", ct);
+            await Exec(c, "CREATE OR ALTER VIEW dbo.vOrdine AS SELECT Id, Nota FROM dbo.Ordine;", ct);
+            await Exec(c, "CREATE OR ALTER VIEW dbo.vOrdineEsterna AS SELECT Id, Nota FROM dbo.vOrdine;", ct);
+        }
+
+        Database source = (await new LiveDbSource(src).LoadAsync(ct)).Value!;
+        Database target = (await new LiveDbSource(tgt).LoadAsync(ct)).Value!;
+        string script = new ScriptGenerator().Generate(
+            new ComparisonEngine().Compare(source, target, ComparisonOptions.Default),
+            selection: null, options: ComparisonOptions.Default, dependencies: source.Dependencies);
+
+        script.Should().Contain("sp_refreshsqlmodule", "the rebuild has to carry the refresh with it");
+
+        SqlBatchResult apply = await SqlExecutor.ExecuteAsync(tgt, script, ct, useOwnTransaction: false);
+        apply.Success.Should().BeTrue(apply.ErrorMessage ?? "the rebuild script failed to apply");
+
+        await using (SqlConnection c = new(tgt))
+        {
+            await c.OpenAsync(ct);
+            (await ColumnTypeAsync(c, "dbo.Ordine", "Id", ct)).Should().Be("bigint");
+            (await ColumnTypeAsync(c, "dbo.vOrdine", "Id", ct)).Should().Be("bigint", "the direct view was refreshed");
+            (await ColumnTypeAsync(c, "dbo.vOrdineEsterna", "Id", ct)).Should().Be(
+                "bigint", "and the view over that view too — refreshing the inner one alone does not reach it");
+        }
+    }
+
+    private static async Task<string> ColumnTypeAsync(SqlConnection c, string obj, string col, CancellationToken ct)
+    {
+        await using SqlCommand cmd = new(
+            "SELECT ty.name FROM sys.columns AS cl"
+            + " INNER JOIN sys.types AS ty ON ty.user_type_id = cl.user_type_id"
+            + " WHERE cl.object_id = OBJECT_ID(@obj) AND cl.name = @col;", c);
+        cmd.Parameters.AddWithValue("@obj", obj);
+        cmd.Parameters.AddWithValue("@col", col);
+        return (string)await cmd.ExecuteScalarAsync(ct);
+    }
+
     private static async Task Create(string conn, string db, CancellationToken ct)
     {
         await using SqlConnection c = new(conn);

@@ -602,6 +602,16 @@ public sealed class ScriptGenerator
             {
                 writer.WriteBatch("Re-creating triggers on rebuilt tables", triggerBody.ToString());
             }
+
+            // A rebuilt table leaves every non-schemabound view and TVF that
+            // reads it holding the column list it cached at CREATE time — and
+            // still answering SELECTs, so nothing looks wrong. See
+            // ModuleRefresh: the only SILENT failure on this path, unlike the
+            // schemabound case, which refuses the DROP TABLE loudly.
+            if (ModuleRefresh.Emit(rebuildTargets, dependencies, result.NameComparer) is { Length: > 0 } refreshBody)
+            {
+                writer.WriteBatch("Refreshing modules over rebuilt tables", refreshBody);
+            }
         }
 
         // Foreign keys — emitted last so referenced tables already exist; this
