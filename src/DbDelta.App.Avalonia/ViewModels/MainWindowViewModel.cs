@@ -9,6 +9,7 @@ using Avalonia.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DbDelta.Core.Abstractions;
+using DbDelta.Core.Dependency;
 using DbDelta.Core.Diff;
 using DbDelta.Core.Reports;
 using DbDelta.Core.ScriptGen;
@@ -968,6 +969,21 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 + "connessione non può leggere il nome. Scriverlo lo creerebbe WITHOUT LOGIN, cioè "
                 + "senza nessuno che possa autenticarsi. Rileggi quell'estremità con un login che veda "
                 + "sys.server_principals, oppure togli l'utente dalla selezione.";
+            StatusText = "Nessuno script generato: vedi il messaggio in alto.";
+            return null;
+        }
+        catch (DependencyCycleException ex)
+        {
+            // Senza questo ramo l'eccezione sfugge al gestore di ultima istanza
+            // e la finestra mostra il banner sbagliato: qui non c'è alcun catch
+            // generico, di proposito.
+            AppState.LastError =
+                "Script non generato: le dipendenze fra questi oggetti formano un ciclo, "
+                + $"quindi non esiste un ordine in cui scriverli — {ex.Message}. Succede quando un "
+                + "CHECK chiama una funzione che legge la stessa tabella: DbDelta scrive il vincolo "
+                + "dentro CREATE TABLE, e allora la tabella dovrebbe venire prima della funzione che "
+                + "però ha bisogno della tabella. Togli uno dei due dalla selezione, oppure aggiungi "
+                + "il vincolo a mano con un ALTER TABLE dopo il rilascio.";
             StatusText = "Nessuno script generato: vedi il messaggio in alto.";
             return null;
         }

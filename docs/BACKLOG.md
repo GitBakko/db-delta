@@ -8,9 +8,9 @@ vedi «Manutenzione» in fondo.
 ## Stato — 2026-09-01
 
 - **v1.0.2 pubblicata** (2026-08-13), «Latest», MSI non firmata allegata.
-- **955 test verdi** nei sette progetti che girano senza Docker (Core 574,
-  Headless 208, Persistence.Unit 81, Golden 68, Property 12, Architecture 6,
-  Shared 6) — ricontati il 2026-09-01 dopo la chiusura della vista stantia,
+- **961 test verdi** nei sette progetti che girano senza Docker (Core 578,
+  Headless 210, Persistence.Unit 81, Golden 68, Property 12, Architecture 6,
+  Shared 6) — ricontati il 2026-09-01 dopo la chiusura del ciclo di dipendenze,
   non incrementati a mente. **Due** dei tre DB-backed vanno **rossi**, non skipped, con Docker
   spento — LiveDb e Cli acceptance, che costruiscono il container in un
   inizializzatore di campo senza rete. Davanti a quel muro la prima domanda è
@@ -18,11 +18,10 @@ vedi «Manutenzione» in fondo.
   serve**: stampa l'intestazione anche a daemon morto. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **15 voci aperte** — P1 2 · P2 2 · P3 3 · P4 1 · P5 7 — più **17** in
+- **14 voci aperte** — P1 2 · P2 1 · P3 3 · P4 1 · P5 7 — più **17** in
   «Deciso — NON riaprire». **Le 4 critiche restano chiuse.** Per origine le 15
-  aperte sono: **quattro** dall'audit di parità Redgate (P1 rebuild contro un
-  modulo schemabound, P2 CHECK in linea, P3 gate d'errore di batch, P4 politica
-  delle DROP) —
+  aperte sono: **tre** dall'audit di parità Redgate (P1 rebuild contro un modulo
+  schemabound, P3 gate d'errore di batch, P4 politica delle DROP) —
   **nessuna è un fallimento di parità**, sono forme che la fixture non
   raggiunge; **una** dalla review adversariale della chiusura del tipo tabella
   (la direzione delle colonne di chiave persa anche sulle tabelle),
@@ -44,9 +43,9 @@ vedi «Manutenzione» in fondo.
   invece del risolutore. Tutto in `docs/parity/redgate-2026-08-31.md`; per
   rigenerare l'artefatto DbDelta serve `DBDELTA_PARITY_DUMP=<percorso>`.
 - **CI verde su `3c48735`** (run `32140004994`), entrambi i job — **quel run è
-  anteriore ai commit locali e non li ha visti**. I DB-backed aggiungono **91**
-  test ai locali della riga sopra: LiveDb 61, Cli acceptance 23, Persistence
-  integration 7 — **1046 in tutto**. Misurati il 2026-08-31 su Windows con
+  anteriore ai commit locali e non li ha visti**. I DB-backed aggiungono **92**
+  test ai locali della riga sopra: LiveDb 61, Cli acceptance 24, Persistence
+  integration 7 — **1053 in tutto**. Misurati il 2026-08-31 su Windows con
   Docker acceso, dove i 7 passano tutti; senza Docker 3 dei 7 si skippano da sé.
   L'exit code di `script` e la forma JSON di `compare` girano solo lì.
 - **La guardia dello skip Testcontainers deve avvolgere `Build()`**, non solo
@@ -185,6 +184,10 @@ script di chi usa la CLI già rilasciata, quindi è una decisione del proprietar
 `Compare_json_keeps_its_published_field_names` la fissa, ed era l'unica delle
 due senza test.
 
+| Voce chiusa | Come | Prova |
+|---|---|---|
+| Il CHECK in linea trasformava uno schema legale in un errore interno | **Exit 31, non 30**, e la voce diceva 30 per analogia con le altre tre: 30 è `ScriptGenerationFailure`, mentre `ExitCodes.UnresolvableDependencyCycle = 31` **esisteva già**, `CliErrorMapper` lo mappava già ed è documentato in spec §4.3 — semplicemente **nessuno lo produceva mai**. Una promessa pubblicata e mai mantenuta, non un codice da inventare. **La causa vera era una frase**: il doc-comment di `DependencyCycleException` diceva che un ciclo del genere «è increabile in un database sorgente valido, quindi segnala un bug del reader e non un errore dell'utente». Falso, e misurato: tabella, funzione e `CHECK (dbo.fnRowCount() < 100)` si creano tutti e la tabella poi accetta righe. È quella frase ad aver tenuto scoperto il percorso CREATE, ed è riscritta qui. La query del reader di DbDelta restituisce i due archi che chiudono l'anello — `fnRowCount [FN] → Righe [U]` e `Righe [U] → fnRowCount [FN]`, il secondo perché i riferimenti di un CHECK sono attribuiti alla sua tabella padre. **Non è un rifiuto della famiglia `Unscriptable*`**: quelle quattro si rifiutano di scrivere un'istruzione; questa non riesce a decidere un **ordine** — abbastanza diverso che §4.3 le avesse dato un codice suo. Il percorso DROP continua ad **assorbirlo** e a ripiegare sull'ordine inverso, di proposito: lì un ripiego legale esiste, sul CREATE no | `DependencyCycleRefusalTests` (4 test Core, di cui **due** controlli in negativo: gli stessi due oggetti senza l'arco che chiude generano, e il percorso DROP non lancia), `DependencyCycleBannerTests` (2 headless, di cui uno in negativo) e `ScriptCommandTests.Refuses_with_exit_31_when_a_CHECK_calls_a_function_that_reads_its_own_table` (acceptance, **attraverso il confine di processo**: la CLI smista sul tipo concreto, quindi senza una `catch` propria l'eccezione cade nel gestore generico e esce **99** — misurato prima del rimedio, exit 99, e nessun test sotto quel confine può vederlo). **Quattro sonde di mutazione, quattro uccidono.** Due tornate buttate: sostituire il tipo nella `catch` rende inutile il `using` (**IDE0005 come errore**) e la sonda non gira — serve un filtro `when (…)` che non scatta mai ma tiene il tipo in uso. `AppStateViewModel.SourceDependencies` passa a `internal set` perché il ciclo è una proprietà degli **archi**, non degli oggetti: è l'unico dei cinque rifiuti che un test headless non può costruire dal solo modello |
+
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
 | **Un tipo che va DROPpato o ricostruito muore se lo lega qualcosa di Identical, e nessun ordine può salvarlo.** Chiusa la parte d'ordine, resta questa, che è un'altra cosa: `ScriptGenerator.cs:112-113` scarta le coppie `Identical` prima di generare, quindi ciò che lega il tipo **non compare nello script** e non c'è posizione in cui metterlo. Forma raggiungibile e misurata sul codice: un tipo alias **Different** — sorgente `FROM bigint`, destinazione `FROM int` — con sopra una sequence che è Identical da entrambi i lati (stesso nome, stesso `DataType`, stesso `TypeSchema`). `ScriptGenerator.cs:832-835` emette `EmitDrop(tgtU)` e `EmitCreate(srcU)` in **un corpo solo e indivisibile** allo slot topologico del tipo, e la `DROP TYPE` gira mentre la vecchia sequence lo lega ancora → **Msg 3732**. Il server vuole `DROP SEQUENCE → DROP TYPE → CREATE TYPE → CREATE SEQUENCE`, cioè che il legante venga ricostruito insieme al tipo. **«La quinta della famiglia» era la voce che perorava la propria causa, ed è stata ritirata il 2026-09-01**: il criterio delle quattro `Unscriptable*` è scritto e non è questo — esistono perché l'alternativa era un'**istruzione valida che significa in silenzio un'altra cosa**. Qui il server fallisce **rumorosamente** e sotto `XACT_ABORT` torna indietro tutto, che è esattamente la classe già archiviata in «Deciso» per la DROP di schema: «fallimento rumoroso dal server, non danno silenzioso. Cambiarlo è una **decisione di prodotto**». Un rifiuto qui comprerebbe **qualità diagnostica** — nominare il legante invece di Msg 3732 — non prevenzione di danno. **Serve la decisione del proprietario, non altro codice.** Misurato intanto: dei cinque leganti che bloccano `DROP TYPE`, **tre** sono già visibili nel modello (colonna di tabella, sequence, colonna di table type) e **due** — parametro di procedura e di funzione — stanno nella vista che `DependencyReader` **legge già e poi butta**. **Chi legge non se ne accorge**: l'ordine è ora giusto, quindi sembra chiusa | 2026-09-01 | M | `src/DbDelta.Core/ScriptGen/ScriptGenerator.cs:112-113` e `:832-835`; misurato sul server, Msg 3732 |
@@ -208,7 +211,6 @@ Voci chiuse il 2026-08-20, ognuna dal commit che porta la sua riga:
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
 | **Il pannello diff non emette MAI `COLLATE`, lo script sì — quindi il corpo che si approva non è quello che si deploya.** `LiveDbObjectBodyResolver` costruisce le sue `Column` senza `collation`: la sua query sulle colonne non seleziona `c.collation_name`, mentre `TableReader` sì. La regola generale di DbDelta, allineata a Redgate e ripristinata apposta dal proprietario, è **COLLATE esplicita su ogni colonna stringa**: il pannello la omette su **tutte**. Non riguarda i tipi alias — riguarda ogni `nvarchar` di ogni tabella, ed è la superficie che esiste per dare consenso informato prima di un'operazione irreversibile. **Sforzo ora XS**: il join a `sys.types` che mancava è stato aggiunto il 2026-08-31 dalla voce dei nomi di tipo, quindi resta una colonna nella SELECT e un argomento nel costruttore | 2026-08-31 | XS | `src/DbDelta.Providers.LiveDb/ObjectBody/LiveDbObjectBodyResolver.cs` (la `columnsSql` di `ReadSingleTableAsync`) contro `src/DbDelta.Providers.LiveDb/Readers/TableReader.cs` |
-| **Il CHECK in linea trasforma uno schema legale in un errore interno.** DbDelta scrive `CONSTRAINT … CHECK` dentro `CREATE TABLE`, il che forza la tabella **dopo** la funzione: l'arco CHECK→funzione e l'arco funzione→tabella devono quindi formare un DAG. `CHECK (dbo.fnRowCount() < 100)` dove `fnRowCount` legge la stessa tabella è legale su un server vivo ed è esattamente quel ciclo. `DependencyResolver` alza `DependencyCycleException`; il percorso **DROP** la cattura (`ScriptGenerator.cs:742`), quello **CREATE** a `:331-332` no, e l'unico gestore che resta nella CLI è quello generico (`Program.cs:104`) → exit **99** con «open an issue», invece del rifiuto dichiarato exit 30 che DbDelta usa già per tre altre forme non scrivibili. Redgate, che il CHECK lo mette in coda con un `ALTER TABLE`, è immune per costruzione. **Sforzo contenuto**: una `catch` e un tipo di eccezione sul modello dei tre esistenti | 2026-08-31 | S | `docs/parity/redgate-2026-08-31.md` R4; `src/DbDelta.Core/ScriptGen/ScriptGenerator.cs:332-333` contro `:742`; `src/DbDelta.Cli/Program.cs:56-104` |
 
 ---
 

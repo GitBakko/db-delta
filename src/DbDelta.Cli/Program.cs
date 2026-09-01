@@ -3,6 +3,7 @@ using System.Text;
 using DbDelta.Cli;
 using DbDelta.Cli.Commands;
 using DbDelta.Core.Abstractions;
+using DbDelta.Core.Dependency;
 using DbDelta.Core.ScriptGen;
 
 // Every user-facing line this tool prints is Italian, and half of them carry an
@@ -100,6 +101,22 @@ catch (UnscriptableTableTypeException ex)
         $"Deploy the type {ex.Schema}.{ex.Name} by hand — the bucket counts are a sizing "
         + "decision DbDelta cannot make — or leave it out of this run."));
     return ExitCodes.ScriptGenerationFailure;
+}
+catch (DependencyCycleException ex)
+{
+    // Not a refusal like the four above — those decline to write a statement
+    // they cannot write correctly; this one cannot decide an ORDER. Distinct
+    // enough that §4.3 gave it a code of its own, 31, which nothing produced
+    // until now. The cycle is a legal source schema, not a reader bug: a CHECK
+    // calling a function that reads its own table closes the loop as soon as
+    // the constraint is written inside CREATE TABLE.
+    CliErrorMapper.WriteError(new Error(
+        ErrorCode.UnresolvableDependencyCycle,
+        ex.Message,
+        "Leave one of those objects out of this run, or add the constraint by hand "
+        + "with an ALTER TABLE after the deploy — inside CREATE TABLE it has to come "
+        + "before the function it calls, and that function needs the table."));
+    return ExitCodes.UnresolvableDependencyCycle;
 }
 catch (Exception ex)
 {

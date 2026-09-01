@@ -68,7 +68,15 @@ public sealed partial class AppStateViewModel(ConnectionStoreViewModel? connecti
     /// degenerates to kind-then-alphabetical order, which emits a new view
     /// before the new function it selects from (Msg 208).
     /// </summary>
-    public IReadOnlyList<DependencyEdge> SourceDependencies { get; private set; } = [];
+    /// <remarks>
+    /// The setter is <c>internal</c>, not <c>private</c>: only the compare flow
+    /// in this class writes it, but a headless test has to be able to hand the
+    /// view model a cycle — the one refusal of the five that cannot be built
+    /// from the object model alone, because a cycle is a property of the EDGES.
+    /// Without this the banner branch for DependencyCycleException would have
+    /// no test and a mutation probe on it would survive.
+    /// </remarks>
+    public IReadOnlyList<DependencyEdge> SourceDependencies { get; internal set; } = [];
 
     /// <summary>
     /// Target-side dependency edges from the most recent comparison. Since S3
@@ -78,7 +86,7 @@ public sealed partial class AppStateViewModel(ConnectionStoreViewModel? connecti
     /// schemabound view over a schemabound view. An inverse (rollback) script
     /// would need them too, for the same reason.
     /// </summary>
-    public IReadOnlyList<DependencyEdge> TargetDependencies { get; private set; } = [];
+    public IReadOnlyList<DependencyEdge> TargetDependencies { get; internal set; } = [];
 
     /// <summary>
     /// The endpoint pair the results on screen were computed from, or null while

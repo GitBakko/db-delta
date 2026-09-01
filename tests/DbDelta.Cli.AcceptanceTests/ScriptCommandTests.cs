@@ -164,6 +164,62 @@ public class ScriptCommandTests(CliFixture fixture)
             "the refusal happens during generation, so there is no script to write");
     }
 
+    /// <summary>
+    /// A CHECK constraint that calls a function reading the same table is a
+    /// legal schema, and it is a dependency CYCLE for anything that writes the
+    /// constraint inside CREATE TABLE — which DbDelta does. Exit 31, the code
+    /// §4.3 already reserves for it, never 99 with "open an issue".
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Measured on mssql/server:2022-latest: the table, the function and the
+    /// constraint all create, and the table then accepts rows. DbDelta's own
+    /// reader query returns the two edges that close the loop —
+    /// <c>fnRowCount [FN] -&gt; Righe [U]</c> and <c>Righe [U] -&gt;
+    /// fnRowCount [FN]</c>, the second one because a CHECK's references are
+    /// attributed to its parent table.
+    /// </para>
+    /// <para>
+    /// It has to be asserted here and not only in Core, for the same reason the
+    /// fourth refusal does: the CLI dispatches on the concrete exception type,
+    /// so an exception with no catch of its own falls through to the general
+    /// handler and exits 99. Nothing in the Core suite can see that.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task Refuses_with_exit_31_when_a_CHECK_calls_a_function_that_reads_its_own_table()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        const string srcDb = "DbDeltaScriptCycSrc";
+        const string tgtDb = "DbDeltaScriptCycTgt";
+        await CreateDb(srcDb, ct);
+        await CreateDb(tgtDb, ct);
+
+        await Exec(srcDb, "IF OBJECT_ID('dbo.Righe','U') IS NULL CREATE TABLE dbo.Righe (Id int NOT NULL, Qta int NOT NULL);", ct);
+        await Exec(srcDb, """
+            IF OBJECT_ID('dbo.fnRowCount','FN') IS NULL
+                EXEC sp_executesql N'CREATE FUNCTION dbo.fnRowCount() RETURNS int AS
+                BEGIN RETURN (SELECT COUNT(*) FROM dbo.Righe); END;';
+            """, ct);
+        await Exec(srcDb, """
+            IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_Righe_Max')
+                ALTER TABLE dbo.Righe ADD CONSTRAINT CK_Righe_Max CHECK (dbo.fnRowCount() < 100);
+            """, ct);
+
+        // The mechanism before the verdict: this schema is legal and holds data.
+        await Exec(srcDb, "INSERT dbo.Righe (Id, Qta) VALUES (1, 10);", ct);
+
+        using var sqlOut = TempFile.Sql();
+        int exit = await RunCli(["script",
+            "--source", ConnectionFor(srcDb),
+            "--target", ConnectionFor(tgtDb),
+            "--out", sqlOut.Path], ct);
+
+        exit.Should().Be(ExpectedExitCodes.UnresolvableDependencyCycle);
+        File.Exists(sqlOut.Path).Should().BeFalse(
+            "the refusal happens during generation, so there is no script to write");
+    }
+
     private async Task Exec(string db, string sql, CancellationToken ct)
     {
         await using SqlConnection c = new(ConnectionFor(db));
