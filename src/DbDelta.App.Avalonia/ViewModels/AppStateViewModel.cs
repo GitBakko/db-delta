@@ -333,11 +333,18 @@ public sealed partial class AppStateViewModel(ConnectionStoreViewModel? connecti
             LiveDbSource tgt = new(tgtCs, "target");
 
             Result<Database> srcRes = await src.LoadAsync(ct).ConfigureAwait(true);
-            // Cancelling a read in flight does not necessarily raise: the driver
-            // reports an aborted command as SqlException -2, which LiveDbSource
-            // turns into a CannotConnect *Result*. Without this the red banner
-            // would blame the network for what the user just asked for. Throwing
-            // rather than returning funnels it into the one catch below.
+            // MEASURED 2026-09-01, and this comment used to say something else:
+            // cancelling a read in flight DOES raise. The driver honours the
+            // token on ReadAsync and throws TaskCanceledException, which flies
+            // straight out of LoadAsync past every SqlException filter. What
+            // maps to a CannotConnect *Result* is SqlException -2, and -2 is a
+            // TIMEOUT — the two had been conflated here.
+            //
+            // The line stays, and for the race the old comment described by
+            // accident: a read that times out at the same moment the user
+            // presses Annulla returns that CannotConnect result, and without
+            // this the red banner would blame the network for what the user
+            // just asked for. See LargeCatalogTests, which pins both paths.
             ct.ThrowIfCancellationRequested();
             if (!srcRes.IsSuccess)
             {

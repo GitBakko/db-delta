@@ -17,8 +17,8 @@ vedi «Manutenzione» in fondo.
   serve**: stampa l'intestazione anche a daemon morto. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **5 voci aperte** — **P1 0 · P2 0 · P4 0** · P3 2 · P5 3 — più **21** in
-  «Deciso — NON riaprire». **Le 4 critiche restano chiuse.** Per origine le 5
+- **3 voci aperte** — **P1 0 · P2 0 · P4 0** · P3 2 · P5 1 — più **21** in
+  «Deciso — NON riaprire». **Le 4 critiche restano chiuse.** Per origine le 3
   aperte sono: **tre** dall'audit di parità Redgate (P1 rebuild contro un modulo
   schemabound, P3 gate d'errore di batch, P4 politica delle DROP) —
   **nessuna è un fallimento di parità**, sono forme che la fixture non
@@ -48,8 +48,8 @@ vedi «Manutenzione» in fondo.
   rigenerare l'artefatto DbDelta serve `DBDELTA_PARITY_DUMP=<percorso>`.
 - **CI verde su `311c54a`** (run `33488633499`), entrambi i job, il 2026-09-01 —
   è il primo run che ha visto i sei commit del 2026-08-31. I DB-backed
-  aggiungono **132** test ai locali della riga sopra: LiveDb 99, Cli acceptance
-  26, Persistence integration 7 — **1141 in tutto**. Misurati il 2026-09-01 su Windows con
+  aggiungono **135** test ai locali della riga sopra: LiveDb 102, Cli acceptance
+  26, Persistence integration 7 — **1144 in tutto**. Misurati il 2026-09-01 su Windows con
   Docker acceso, dove i 7 passano tutti; senza Docker 3 dei 7 si skippano da sé.
   L'exit code di `script` e la forma JSON di `compare` girano solo lì.
 - **La guardia dello skip Testcontainers deve avvolgere `Build()`**, non solo
@@ -280,11 +280,17 @@ la sua riga. (Diceva «una» mentre ne elencava sette: ricontate il 2026-09-01.)
 
 ## P5 — Del proprietario o non verificabile da soli
 
+Due voci chiuse il 2026-09-01 dal commit che porta la loro riga, ed **entrambe
+hanno risposto il contrario di come erano poste**:
+
+| Voce chiusa | Come | Prova |
+|---|---|---|
+| L'annullamento di una lettura in volo non era mai stato visto | **La voce, e il commento nel codice, dicevano una cosa falsa.** Diceva: «il driver riporta una lettura interrotta come `SqlException -2`, che `LiveDbSource` trasforma in un `CannotConnect` *Result*», e da lì la riga `ct.ThrowIfCancellationRequested()` in `AppStateViewModel` che lo raddrizza. Misurato: **cancellare SOLLEVA**. `Microsoft.Data.SqlClient` onora il token su `ReadAsync` e alza `TaskCanceledException`, che esce da `TableReader` e vola fuori da `LoadAsync` passando accanto a ogni filtro `SqlException`. Il `-2` è ciò che dà un **timeout**: le due cose erano confuse. La riga nel ViewModel **resta**, ma per la corsa che il vecchio commento descriveva per caso — un timeout che scade mentre l'utente preme Annulla torna davvero come `CannotConnect`, e senza quella riga la banda rossa incolperebbe la rete di ciò che l'utente ha appena chiesto. Commento corretto in **due** punti, incluso quello che avevo scritto io nel test prima di misurare | `LargeCatalogTests` — 3 test su container. Il primo semina il catalogo che rende la finestra possibile; senza volume non c'è nulla da interrompere |
+| I 300 s non erano mai stati misurati | **Misurati, e la voce guardava la leva sbagliata.** Non è la DIMENSIONE a raggiungere il tetto: 2000 tabelle, 30.000 colonne, 6000 indici e 500 viste si leggono in **~3 s**, e nessun singolo comando arriva vicino al secondo — due ordini di grandezza di margine. Alle 300 tabelle del test committato sono **341 ms**. Ciò che raggiunge il tetto è **una lettura bloccata dietro il lock di qualcun altro**, che è esattamente ciò che il doc-comment di `ConnectionFactory` ha sempre detto — «a read blocked behind someone else's schema lock has to end by itself, because nothing else would end it» — e che nessuno aveva mai esercitato. Le due candidate che la voce nominava (lettura colonne e lettura indici) non sforano né a quella scala né vicino | Un'altra sessione tiene Sch-M su una tabella, la lettura si blocca e il tetto la chiude: `CannotConnect`, con la rimedizione che nomina `Command Timeout`. **Due sonde di mutazione, due uccise**: tolto il filtro `-2` e tolto il nome del rimedio dal testo. Il tetto è spinto a 1 s nel test perché 300 s in CI sarebbero cinque minuti di attesa per la stessa porta |
+
 | Voce | Reg. | Sforzo | Stato reale |
 |---|---|---|---|
 | **Annuncio pubblico — escluso per scelta del proprietario (2026-09-01), non bloccato.** Il draft è completo ma fermo a 1.0.1 mentre la release è 1.0.2. **La voce diceva «da fare dopo le docs (P2)» e quel motivo è caduto**: `docfx/articles/getting-started.md:11-12` manda già alla MSI dal commit docs del 2026-08-20, non più a compilare da sorgente. Resta qui perché è un'azione ancora possibile, non una decisione chiusa | 2026-05-28 | S | `docs/announcements/v1.0.1-draft.md`; `README.md:16-33` |
-| **Resta da vedere girare il pulsante Annulla.** Il dialogo di conferma e la banda ambra del censimento sono stati visti dal vivo il 2026-08-18. Annulla no: su `PcrmV2Pl_test` → `PcrmV2Pl_Badii` il confronto dura 2,6 s e il pulsante non è raggiungibile. Il secondo ingresso nel catch di annullamento — la lettura interrotta a metà, che il driver riporta come `SqlException -2` — lo può produrre solo un server lento o un catalogo enorme. **Il banner di rifiuto NON è qui**: sta in «Deciso — NON riaprire», perché la prova richiederebbe due DB seminati apposta e il proprietario l'ha scartata | 2026-08-16 | S | Serve una coppia grossa o lenta, non queste |
-| **I 300 s non sono mai stati misurati contro un server lento.** Via d'uscita già provata: l'utente può scrivere `Command Timeout=0` e la stringa torna intatta. Candidate a sforare: lettura colonne e lettura indici | 2026-08-17 | S | `ConnectionFactory.cs:27`; `ConnectionTimeoutTests.cs` non tocca alcun container |
 
 ---
 
