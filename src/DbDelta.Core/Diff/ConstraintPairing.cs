@@ -93,8 +93,8 @@ internal static class ConstraintPairing
 
     private static bool ShapeEqual(Constraint a, Constraint b, StringComparer names) => (a, b) switch
     {
-        (PrimaryKey pa, PrimaryKey pb) => pa.Columns.SequenceEqual(pb.Columns, names),
-        (UniqueConstraint ua, UniqueConstraint ub) => ua.Columns.SequenceEqual(ub.Columns, names),
+        (PrimaryKey pa, PrimaryKey pb) => IndexColumn.KeysMatch(pa.Columns, pb.Columns, names),
+        (UniqueConstraint ua, UniqueConstraint ub) => IndexColumn.KeysMatch(ua.Columns, ub.Columns, names),
         (CheckConstraint ca, CheckConstraint cb) =>
             BodyNormalizer.ExpressionsEqual(ca.Expression, cb.Expression),
         // A column holds at most one DEFAULT, so the column IS the identity.

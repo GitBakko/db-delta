@@ -446,7 +446,12 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
     {
         const string sql = """
             SELECT kc.parent_object_id, kc.name, kc.type, i.type AS IndexType,
-                   ic.key_ordinal, c.name AS ColumnName, kc.is_system_named
+                   ic.key_ordinal, c.name AS ColumnName, kc.is_system_named,
+                   -- The pane reads the catalog through a query of its own, and
+                   -- it drifted from the compared reader before. See
+                   -- ConstraintReader: without this the pane renders a key the
+                   -- deploy does not write.
+                   ic.is_descending_key
             FROM sys.key_constraints AS kc
             INNER JOIN sys.indexes AS i ON i.object_id = kc.parent_object_id
                                         AND i.index_id = kc.unique_index_id
@@ -462,7 +467,7 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
         string? currentType = null;
         bool isClustered = false;
         bool isSystemNamed = false;
-        List<string> currentCols = [];
+        List<IndexColumn> currentCols = [];
 
         await using SqlCommand cmd = new(sql, connection);
         cmd.Parameters.AddWithValue("@objectId", objectId);
@@ -486,7 +491,7 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
             currentType = type;
             isClustered = indexType == 1;
             isSystemNamed = systemNamed;
-            currentCols.Add(column);
+            currentCols.Add(new IndexColumn(column, r.GetBoolean(7)));
         }
 
         if (currentName is not null)
@@ -502,7 +507,7 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
         string type,
         bool isClustered,
         bool isSystemNamed,
-        List<string> columns)
+        List<IndexColumn> columns)
     {
         Constraint c = type switch
         {

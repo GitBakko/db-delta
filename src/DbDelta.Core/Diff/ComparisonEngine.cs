@@ -611,9 +611,9 @@ public sealed class ComparisonEngine
         StringComparer names) => left switch
         {
             PrimaryKey pk when right is PrimaryKey other =>
-                pk.IsClustered == other.IsClustered && pk.Columns.SequenceEqual(other.Columns, names),
+                pk.IsClustered == other.IsClustered && IndexColumn.KeysMatch(pk.Columns, other.Columns, names),
             UniqueConstraint uq when right is UniqueConstraint other =>
-                uq.IsClustered == other.IsClustered && uq.Columns.SequenceEqual(other.Columns, names),
+                uq.IsClustered == other.IsClustered && IndexColumn.KeysMatch(uq.Columns, other.Columns, names),
             ForeignKey fk when right is ForeignKey other =>
                 fk.Columns.SequenceEqual(other.Columns, names)
                 && names.Equals(fk.ReferencedSchema, other.ReferencedSchema)

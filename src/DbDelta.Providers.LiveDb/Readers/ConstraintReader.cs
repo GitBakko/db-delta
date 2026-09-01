@@ -18,7 +18,12 @@ internal sealed class ConstraintReader
             i.type              AS IndexType,
             ic.key_ordinal      AS KeyOrdinal,
             c.name              AS ColumnName,
-            kc.is_system_named  AS IsSystemNamed
+            kc.is_system_named  AS IsSystemNamed,
+            -- A key column carries a direction and a PRIMARY KEY (A ASC, B DESC)
+            -- is legal on a table, measured. Read as names only it came back
+            -- all-ascending, compared Identical, and the next rebuild wrote the
+            -- flattened form.
+            ic.is_descending_key AS IsDescending
         FROM sys.key_constraints AS kc
         INNER JOIN sys.indexes AS i ON i.object_id = kc.parent_object_id
                                     AND i.index_id = kc.unique_index_id
@@ -112,7 +117,7 @@ internal sealed class ConstraintReader
         string? currentType = null;
         bool isClustered = false;
         bool isSystemNamed = false;
-        List<string> currentCols = [];
+        List<IndexColumn> currentCols = [];
 
         await using SqlCommand cmd = new(KeysQuery, connection);
         await using SqlDataReader reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
@@ -137,7 +142,7 @@ internal sealed class ConstraintReader
             currentType = type;
             isClustered = indexType == 1;
             isSystemNamed = systemNamed;
-            currentCols.Add(column);
+            currentCols.Add(new IndexColumn(column, reader.GetBoolean(7)));
         }
 
         if (currentName is not null)
@@ -153,7 +158,7 @@ internal sealed class ConstraintReader
         string type,
         bool isClustered,
         bool isSystemNamed,
-        List<string> columns)
+        List<IndexColumn> columns)
     {
         Constraint c = type switch
         {

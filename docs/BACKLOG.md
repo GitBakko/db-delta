@@ -8,24 +8,24 @@ vedi «Manutenzione» in fondo.
 ## Stato — 2026-09-01
 
 - **v1.0.2 pubblicata** (2026-08-13), «Latest», MSI non firmata allegata.
-- **961 test verdi** nei sette progetti che girano senza Docker (Core 578,
+- **970 test verdi** nei sette progetti che girano senza Docker (Core 587,
   Headless 210, Persistence.Unit 81, Golden 68, Property 12, Architecture 6,
-  Shared 6) — ricontati il 2026-09-01 dopo la chiusura del ciclo di dipendenze,
-  non incrementati a mente. **Due** dei tre DB-backed vanno **rossi**, non skipped, con Docker
+  Shared 6) — ricontati il 2026-09-01 dopo la chiusura della direzione delle
+  colonne di chiave, non incrementati a mente. **Due** dei tre DB-backed vanno **rossi**, non skipped, con Docker
   spento — LiveDb e Cli acceptance, che costruiscono il container in un
   inizializzatore di campo senza rete. Davanti a quel muro la prima domanda è
   `docker version`, che deve mostrare la sezione `Server:` — **`docker ps` non
   serve**: stampa l'intestazione anche a daemon morto. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **14 voci aperte** — P1 2 · P2 1 · P3 3 · P4 1 · P5 7 — più **17** in
+- **13 voci aperte** — P1 2 · P2 1 · P3 2 · P4 1 · P5 7 — più **17** in
   «Deciso — NON riaprire». **Le 4 critiche restano chiuse.** Per origine le 15
   aperte sono: **tre** dall'audit di parità Redgate (P1 rebuild contro un modulo
   schemabound, P3 gate d'errore di batch, P4 politica delle DROP) —
   **nessuna è un fallimento di parità**, sono forme che la fixture non
-  raggiunge; **una** dalla review adversariale della chiusura del tipo tabella
-  (la direzione delle colonne di chiave persa anche sulle tabelle),
-  **pre-esistente e resa visibile dalla correzione**; **due** aperte il
+  raggiunge; **nessuna** più dalla review adversariale della chiusura del tipo
+  tabella — la direzione delle colonne di chiave, l'unica che ne restava, è
+  chiusa il 2026-09-01; **due** aperte il
   2026-08-31 chiudendo i nomi di tipo alias, entrambe **pre-esistenti e trovate
   misurando**, non dedotte (P2 il pannello diff che non emette mai `COLLATE`,
   P3 `BackfillPreflight` che propone `('')`) — la terza, se qualificare anche
@@ -43,9 +43,9 @@ vedi «Manutenzione» in fondo.
   invece del risolutore. Tutto in `docs/parity/redgate-2026-08-31.md`; per
   rigenerare l'artefatto DbDelta serve `DBDELTA_PARITY_DUMP=<percorso>`.
 - **CI verde su `3c48735`** (run `32140004994`), entrambi i job — **quel run è
-  anteriore ai commit locali e non li ha visti**. I DB-backed aggiungono **92**
-  test ai locali della riga sopra: LiveDb 61, Cli acceptance 24, Persistence
-  integration 7 — **1053 in tutto**. Misurati il 2026-08-31 su Windows con
+  anteriore ai commit locali e non li ha visti**. I DB-backed aggiungono **93**
+  test ai locali della riga sopra: LiveDb 62, Cli acceptance 24, Persistence
+  integration 7 — **1063 in tutto**. Misurati il 2026-08-31 su Windows con
   Docker acceso, dove i 7 passano tutti; senza Docker 3 dei 7 si skippano da sé.
   L'exit code di `script` e la forma JSON di `compare` girano solo lì.
 - **La guardia dello skip Testcontainers deve avvolgere `Build()`**, non solo
@@ -220,6 +220,10 @@ Una voce chiusa il 2026-08-31 dal commit che porta questa riga:
 
 | Voce chiusa | Come | Prova |
 |---|---|---|
+| La PRIMARY KEY e la UNIQUE di una tabella perdevano la direzione delle colonne di chiave | `PrimaryKey.Columns` e `UniqueConstraint.Columns` portano ora `IndexColumn`, che la direzione ce l'aveva già — era `TableIndex` a usarlo, dal lato dei tipi tabella. **Misurato prima di scrivere**, e la perdita è a due stadi: `PRIMARY KEY CLUSTERED (A ASC, B DESC)` e `UNIQUE (C DESC, A ASC)` sono entrambe accettate e `sys.index_columns.is_descending_key` riporta 1 sulle metà discendenti; riemettendo i vincoli come DbDelta li scriveva — soli nomi — ogni `is_descending_key` è tornato **0**, senza un errore in nessun punto. E prima ancora il confronto le chiamava Identical, quindi non veniva emesso nulla e la perdita arrivava solo col primo rebuild per altra causa. **61 siti di costruzione, di cui solo 2 in `src/`**: allargare il tipo posizionale avrebbe toccato 59 test per un fix di difetto, quindi `IndexColumn` prende una **conversione implicita da `string`** — «una colonna nominata senza direzione è ascendente», che è il default di T-SQL — e le collection expression la applicano per elemento. Una sola verità, zero churn. I **tre** confronti (`ComparisonEngine`, `ConstraintPairing`, `TableScriptEmitter`) passano ora da `IndexColumn.KeysMatch`, che **pretende** il comparer invece di assumerlo, per la ragione imparata il 2026-09-01 su `TypeMatches`: sono identificatori di server e il motore appaia gli oggetti intorno con la collation del target. **`DESC` si scrive solo dove serve e `ASC` mai**: un vincolo di tabella è sempre uscito come `([A], [B])`, e scrivere ASC ora muoverebbe ogni golden per un guadagno nullo — `[A]` e `[A] ASC` sono la stessa chiave per il server, sempre. Diverso dal caso della qualifica `dbo`, dove il nome nudo poteva legarsi all'oggetto sbagliato: qui non c'è ambiguità, quindi la forma corta resta | `KeyColumnDirectionTests` (9 test Core, di cui **tre** controlli in negativo: una chiave tutta ascendente esce byte-identica e senza ASC, un nome nudo significa ancora ascendente, due chiavi uguali restano Identical) e `ConstraintReaderTests.A_key_columns_direction_reaches_the_model_and_the_diff_pane` (live). **La verifica sta sul READER**: due lati entrambi ciechi convergono su tutto-ascendente e il round-trip è verde per il motivo sbagliato — ed è esattamente così che è sopravvissuta, perché **ogni** chiave del corpus era ascendente. Il live copre anche il **secondo reader**, quello del pannello diff, che era derivato di nuovo. **Cinque sonde di mutazione, cinque uccidono**, una per struttura: i due reader, il confronto, l'emittente e il cablaggio di un call site che scavalca il seam. **Zero golden mossi** e nessuna asserzione esistente toccata: 578 Core, 68 golden, 12 property e 210 headless invariati sotto il cambio di tipo |
+
+| Voce chiusa | Come | Prova |
+|---|---|---|
 | **Parità Redgate: mancava la tua metà** | Fatta. Il proprietario ha eseguito la fixture in SSMS e prodotto lo script Redgate; il diff è stato fatto scenario per scenario e ogni divergenza rivendicata è stata **ri-derivata da una passata indipendente** che ha rifiutato la prima sulla fiducia. **Zero difetti di parità su 21 scenari** — tutti match, cosmetici accettati, o l'unico buco dichiarato (extended properties); un diff meccanico degli insiemi di istruzioni non trova **alcun oggetto** su cui uno strumento agisca e l'altro no. Ma la corsa ha trovato un difetto **nostro, nell'attrezzatura**: `ParityFixtureTests` non passava `dropDependencies`, quindi lo scenario 18 — quello il cui unico scopo è l'ordine di DROP — misurava il fallback `createOrder.Reverse()`, cioè il rango di kind invertito, e non la topologia che CLI (`ScriptCommand.cs:93`) e GUI (`DeployScriptBuilder.cs:105`) danno davvero al generatore. L'ordine di fallback era legale **solo** perché `vLegacyReport` chiama `fnLegacyTotal` senza esserne schema-bound: con `SCHEMABINDING` sulla vista lo stesso fallback droppa la funzione per prima e muore su Msg 3729. Corretto qui: l'ordine di DROP ora coincide con Redgate (`view → function → table`), e il percorso vero di `ScriptCommand` ha finalmente copertura end-to-end. **Cinque rischi aperti come voci a sé** (P1×3, P2, P3) più una di igiene: sono forme che la fixture non raggiunge, non fallimenti di parità | `docs/parity/redgate-2026-08-31.md` — matrice completa dei 21 scenari, le riproduzioni su container e i claim **refutati** rieseguendoli. `ParityFixtureTests` 2/2 verdi con `dropDependencies: target.Dependencies`; `DBDELTA_PARITY_DUMP` rigenera l'artefatto |
 
 Una voce chiusa il 2026-08-20 dal commit che porta questa riga:
@@ -239,7 +243,6 @@ Una voce chiusa il 2026-08-20 dal commit che porta questa riga:
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
 | **`BackfillPreflight` propone `('')` come DEFAULT per ogni tipo che non riconosce, tipi alias compresi.** `SuggestedValue` fa switch sul **testo** del tipo e il ramo di scarto è `_ => "('')"`: una colonna NOT NULL di tipo `app.MioIntTipo` — un alias su `bigint` — si vede proporre una stringa vuota, che l'operatore conferma e che finisce nello script emesso. Un alias su un tipo numerico dà quindi un errore di conversione al deploy, e un alias su un tipo stringa dà un valore plausibile ma arbitrario. Il modello sa già distinguerli (`Column.IsUserDefinedType`, e da oggi `TypeSchema`), ma il preflight non lo guarda. Percorso della sola app: la CLI non usa `BackfillPreflight` | 2026-08-31 | S | `src/DbDelta.Core/ScriptGen/BackfillPreflight.cs` (`SuggestedValue`); il valore raggiunge lo script in `src/DbDelta.Core/ScriptGen/TableScriptEmitter.cs` |
-| **La PRIMARY KEY e la UNIQUE di una TABELLA perdono la direzione delle colonne di chiave.** `PrimaryKey.Columns` e `UniqueConstraint.Columns` sono liste di nomi: una `PRIMARY KEY (A ASC, B DESC)` viene riletta come tutta ascendente, il confronto la dice Identical e un rebuild la appiattisce. **Pre-esistente**, e ora visibile perché il tipo tabella ha dovuto risolverlo per conto suo — `TableIndex` porta `IndexColumn`, che la direzione ce l'ha. La strada breve è far portare anche a `PrimaryKey`/`UniqueConstraint` una lista di `IndexColumn`, come `init`, e leggere `is_descending_key` in `ConstraintReader` | 2026-08-31 | M | `src/DbDelta.Core/ObjectModel/PrimaryKey.cs`, `UniqueConstraint.cs`; `src/DbDelta.Providers.LiveDb/Readers/ConstraintReader.cs:160`; contrasto con `src/DbDelta.Core/ObjectModel/TableIndex.cs` |
 | **Il gate d'errore di batch legge solo l'`@@ERROR` dell'ultima istruzione.** `SET XACT_ABORT ON` non rende abortivo ogni errore. Misurato su `mssql/server:2022-latest` 16.0.4265.3, dentro `BEGIN TRANSACTION` con `XACT_ABORT ON`: una `DROP TABLE dbo.NoSuchTable` a metà batch (Msg 3701, Level 11) ha lasciato proseguire il batch **e committare**; `EXEC sp_rename 'dbo.NoSuchObject', …` (Msg 15225, alzato da `RAISERROR` dentro una procedura di sistema) idem, e anche l'istruzione precedente è sopravvissuta. Entrambe le classi sono raggiungibili nello script di parità, sulle due `DROP TABLE` e le due `sp_rename` del rebuild. **Rischio e non difetto** perché lì il sopravvissuto è seguito subito da un `ALTER TABLE … ADD CONSTRAINT` contro la tabella che il rename fallito ha lasciato mancante — Msg 4902, che *è* abortivo, quindi torna indietro tutto. È anche il motivo per cui Redgate avvolge `sp_addextendedproperty` in TRY/CATCH e nient'altro: stessa classe non abortiva | 2026-08-31 | M | `docs/parity/redgate-2026-08-31.md` R5 (le due riproduzioni) |
 
 ---

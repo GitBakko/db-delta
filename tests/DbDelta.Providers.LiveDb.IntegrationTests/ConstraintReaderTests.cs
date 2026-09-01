@@ -184,6 +184,60 @@ public class ConstraintReaderTests(LiveDbFixture fixture)
         fk.OnUpdate.Should().Be(ReferentialAction.NoAction);
     }
 
+    /// <summary>
+    /// A key column's direction reaches the model, and the diff pane renders it.
+    /// </summary>
+    /// <remarks>
+    /// <b>The verification is on the READER.</b> Two sides both blind to the
+    /// direction converge on all-ascending and a round-trip is green for the
+    /// wrong reason — which is exactly how this survived: every key in the whole
+    /// corpus was ascending, so nothing ever disagreed.
+    /// </remarks>
+    [Fact]
+    public async Task A_key_columns_direction_reaches_the_model_and_the_diff_pane()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        await using (SqlConnection bootstrap = new(fixture.ConnectionString))
+        {
+            await bootstrap.OpenAsync(ct);
+            await ExecAsync(bootstrap, "IF DB_ID('DbDeltaKeyDir') IS NULL CREATE DATABASE DbDeltaKeyDir;", ct);
+        }
+
+        string dbConn = new SqlConnectionStringBuilder(fixture.ConnectionString)
+        {
+            InitialCatalog = "DbDeltaKeyDir"
+        }.ConnectionString;
+
+        await using (SqlConnection c = new(dbConn))
+        {
+            await c.OpenAsync(ct);
+            await ExecAsync(c, """
+                IF OBJECT_ID('dbo.Misto','U') IS NULL
+                    CREATE TABLE dbo.Misto (
+                        A int NOT NULL, B int NOT NULL, C int NOT NULL,
+                        CONSTRAINT PK_Misto PRIMARY KEY CLUSTERED (A ASC, B DESC),
+                        CONSTRAINT UQ_Misto UNIQUE NONCLUSTERED (C DESC, A ASC));
+                """, ct);
+        }
+
+        Database db = (await new LiveDbSource(dbConn).LoadAsync(ct)).Value!;
+        Table t = db.Tables.Single(x => x.Name == "Misto");
+
+        PrimaryKey pk = t.Constraints.OfType<PrimaryKey>().Single();
+        pk.Columns.Select(k => (k.Name, k.IsDescending))
+          .Should().Equal(("A", false), ("B", true));
+
+        UniqueConstraint uq = t.Constraints.OfType<UniqueConstraint>().Single();
+        uq.Columns.Select(k => (k.Name, k.IsDescending))
+          .Should().Equal(("C", true), ("A", false));
+
+        // The pane reads the catalog through a query of its own and had drifted
+        // from the compared reader before; here it must say the same thing.
+        ObjectBody.LiveDbObjectBodyResolver resolver = new(dbConn, dbConn);
+        string? body = await resolver.ResolveSourceBodyAsync("Table", "dbo", "Misto", ct);
+        body.Should().Contain("[B] DESC").And.Contain("[C] DESC");
+    }
+
     private static async Task ExecAsync(SqlConnection c, string sql, CancellationToken ct)
     {
         await using SqlCommand cmd = new(sql, c);

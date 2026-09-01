@@ -138,7 +138,7 @@ public sealed class TableScriptEmitter(
                         AppendLineSeparator(sb, ref firstLine);
                         sb.Append("    ").Append(NameClause(uq)).Append("UNIQUE ")
                           .Append(uq.IsClustered ? "CLUSTERED " : "NONCLUSTERED ")
-                          .Append('(').Append(string.Join(", ", uq.Columns.Select(Sql.Q))).Append(')');
+                          .Append('(').Append(KeyColumnList(uq.Columns)).Append(')');
                         break;
                     case CheckConstraint ck:
                         AppendLineSeparator(sb, ref firstLine);
@@ -557,8 +557,8 @@ public sealed class TableScriptEmitter(
     /// </remarks>
     private static bool DependsOnColumn(Constraint c, IReadOnlySet<string> touchedColumns) => c switch
     {
-        PrimaryKey pk => pk.Columns.Any(touchedColumns.Contains),
-        UniqueConstraint uq => uq.Columns.Any(touchedColumns.Contains),
+        PrimaryKey pk => pk.Columns.Any(k => touchedColumns.Contains(k.Name)),
+        UniqueConstraint uq => uq.Columns.Any(k => touchedColumns.Contains(k.Name)),
         // Catalog CHECK definitions bracket their column references, so the
         // bracketed tokens ARE the column list. Testing them against the set
         // lets the set's own comparer decide, which keeps the case rule in one
@@ -827,12 +827,27 @@ public sealed class TableScriptEmitter(
     /// only emits DROP+ADD when ComparisonEngine would consider the constraint
     /// to have changed.
     /// </summary>
+    /// <summary>
+    /// A key column list: <c>[A], [B] DESC</c>.
+    /// </summary>
+    /// <remarks>
+    /// <c>DESC</c> is written only where it is meant, and <c>ASC</c> never is —
+    /// unlike <c>IndexScriptEmitter</c> and <c>TableTypeUdtScriptEmitter</c>,
+    /// which spell both out. The difference is deliberate and it is not style:
+    /// a table constraint has always been emitted as <c>([A], [B])</c>, so
+    /// spelling ASC now would move every golden file and every assertion for a
+    /// gain of nothing — <c>[A]</c> and <c>[A] ASC</c> are the same key to the
+    /// server, always. Only the case that was WRONG changes shape.
+    /// </remarks>
+    private static string KeyColumnList(IEnumerable<IndexColumn> columns) =>
+        string.Join(", ", columns.Select(k => k.IsDescending ? $"{Sql.Q(k.Name)} DESC" : Sql.Q(k.Name)));
+
     private static bool ConstraintShapeEqual(Constraint a, Constraint b, StringComparer names) => (a, b) switch
     {
         (PrimaryKey pa, PrimaryKey pb) =>
-            pa.IsClustered == pb.IsClustered && pa.Columns.SequenceEqual(pb.Columns, names),
+            pa.IsClustered == pb.IsClustered && IndexColumn.KeysMatch(pa.Columns, pb.Columns, names),
         (UniqueConstraint ua, UniqueConstraint ub) =>
-            ua.IsClustered == ub.IsClustered && ua.Columns.SequenceEqual(ub.Columns, names),
+            ua.IsClustered == ub.IsClustered && IndexColumn.KeysMatch(ua.Columns, ub.Columns, names),
         (CheckConstraint ca, CheckConstraint cb) =>
             BodyNormalizer.ExpressionsEqual(ca.Expression, cb.Expression),
         (DefaultConstraint da, DefaultConstraint db) =>
@@ -859,8 +874,8 @@ public sealed class TableScriptEmitter(
 
     private static string FormatStandaloneConstraintBody(Constraint c) => c switch
     {
-        PrimaryKey pk => $"PRIMARY KEY {(pk.IsClustered ? "CLUSTERED" : "NONCLUSTERED")} ({string.Join(", ", pk.Columns.Select(Sql.Q))})",
-        UniqueConstraint uq => $"UNIQUE {(uq.IsClustered ? "CLUSTERED" : "NONCLUSTERED")} ({string.Join(", ", uq.Columns.Select(Sql.Q))})",
+        PrimaryKey pk => $"PRIMARY KEY {(pk.IsClustered ? "CLUSTERED" : "NONCLUSTERED")} ({KeyColumnList(pk.Columns)})",
+        UniqueConstraint uq => $"UNIQUE {(uq.IsClustered ? "CLUSTERED" : "NONCLUSTERED")} ({KeyColumnList(uq.Columns)})",
         CheckConstraint ck => $"CHECK {ck.Expression}",
         DefaultConstraint df => $"DEFAULT {df.Expression} FOR {Sql.Q(df.ColumnName)}",
         ForeignKey => string.Empty,
