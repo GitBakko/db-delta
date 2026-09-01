@@ -86,6 +86,40 @@ carried `IF EXISTS` while the other nine did not, so a second execution cleared
 the module drops and then died on the first table with Msg 3701. That was the
 worst of both policies: neither fail-fast nor re-runnable.
 
+### What the failure gate catches, and what it does not
+
+Every batch is followed by `IF @@ERROR <> 0 SET NOEXEC ON`, and the closing
+verdict rolls the transaction back when that gate tripped. Measured on
+`mssql/server:2022-latest` 16.0.4265.3 rather than assumed:
+
+- `@@ERROR` **survives the `GO`**, so the gate does read the previous batch's
+  last statement — it is not a no-op.
+- It is blind as soon as the failed statement is followed, in the same batch, by
+  one that succeeds. `@@ERROR` reports the *last* statement, and even a `PRINT`
+  clears it.
+- It is blind to `EXEC` in **every** position, last included: a failed
+  `sp_rename` leaves `@@ERROR` at 0 while returning a non-zero return code.
+
+What decides whether that matters is the error's **severity**, not
+`SET XACT_ABORT ON`:
+
+| Severity | Example | The batch |
+|----------|---------|-----------|
+| 11 | Msg 3701 on a missing table, view, procedure, function, index, sequence, synonym or trigger; Msg 15225 and 15335 from `sp_rename` | continues, and commits |
+| 14 and up | Msg 2714, 3726, 3727/3728, 4902, 8106, 218, 15151, 207 — and Msg 3701 itself when it means *you do not have permission*, which is raised at severity 14 | aborts, and rolls back |
+
+So the only error a generated script can swallow is "the object this `DROP` was
+about to remove is already gone" — the re-run case the policy above already
+declares unsupported. Every error that would leave the target in a shape you did
+not ask for aborts the batch and takes the transaction with it.
+
+One asymmetry is worth knowing, because the same file behaves differently in the
+two places it can run. `dbdelta apply` and the desktop app are **stricter** than
+the script: `Microsoft.Data.SqlClient` raises an exception for a severity-11
+error too, so the run stops at that batch, the script's `COMMIT` is never sent,
+and the deploy is reported as failed with the target unchanged. The same file run
+by hand in SSMS or `sqlcmd` commits and prints `The database update succeeded`.
+
 ## `report`
 
 Produces a self-contained diff report.

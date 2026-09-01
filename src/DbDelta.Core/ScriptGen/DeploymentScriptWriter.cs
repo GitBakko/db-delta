@@ -10,6 +10,32 @@ namespace DbDelta.Core.ScriptGen;
 /// false the BEGIN/COMMIT are omitted (the verdict still rolls back any open
 /// transaction).
 /// </summary>
+/// <remarks>
+/// <para>
+/// What that gate catches was measured on <c>mssql/server:2022-latest</c>
+/// 16.0.4265.3, not assumed. <c>@@ERROR</c> survives the <c>GO</c>, so the gate
+/// does read the previous batch's last statement — it is not a no-op. It is
+/// blind as soon as a statement that succeeds follows the failed one in the same
+/// batch, because <c>@@ERROR</c> reports the LAST statement and even a
+/// <c>PRINT</c> clears it; and it is blind to <c>EXEC</c> in every position,
+/// last included — a failed <c>sp_rename</c> leaves <c>@@ERROR</c> at 0 and
+/// reports the failure only through a non-zero return code.
+/// </para>
+/// <para>
+/// That is survivable, and the reason is severity rather than
+/// <c>XACT_ABORT</c>. Severity 11 lets the batch continue and commit, and only
+/// one thing reaches severity 11: "the object is not there" — Msg 3701 for a
+/// missing table, view, procedure, function, index, sequence, synonym or
+/// trigger, plus Msg 15225 and 15335 from <c>sp_rename</c>. Everything that
+/// would leave the target in a shape nobody asked for is severity 14 or higher
+/// and aborts the batch, taking the transaction with it: Msg 2714, 3726,
+/// 3727/3728, 4902, 8106, 218, 15151, 207 — and Msg 3701 ITSELF when it means
+/// "you do not have permission", which is raised at severity 14. So a swallowed
+/// error can only be the second-run case that bare DROPs already declare
+/// unsupported. The whole rule, including why <c>apply</c> is stricter than the
+/// saved script, is "Why no DROP is guarded" in <c>docfx/articles/cli.md</c>.
+/// </para>
+/// </remarks>
 public sealed class DeploymentScriptWriter(StringBuilder sb, bool useTransaction)
 {
     /// <summary>

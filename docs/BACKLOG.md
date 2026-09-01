@@ -17,37 +17,34 @@ vedi «Manutenzione» in fondo.
   serve**: stampa l'intestazione anche a daemon morto. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **3 voci aperte** — **P1 0 · P2 0 · P4 0** · P3 2 · P5 1 — più **21** in
-  «Deciso — NON riaprire». **Le 4 critiche restano chiuse.** Per origine le 3
-  aperte sono: **tre** dall'audit di parità Redgate (P1 rebuild contro un modulo
-  schemabound, P3 gate d'errore di batch, P4 politica delle DROP) —
-  **nessuna è un fallimento di parità**, sono forme che la fixture non
-  raggiunge; **nessuna** più dalla review adversariale della chiusura del tipo
-  tabella — la direzione delle colonne di chiave, l'unica che ne restava, è
-  chiusa il 2026-09-01; **nessuna** delle due aperte il
-  2026-08-31 chiudendo i nomi di tipo alias, entrambe **pre-esistenti e trovate
-  misurando**, non dedotte — **entrambe chiuse il 2026-09-01**, e in tutte e due
-  la misura ha allargato la voce: sei buchi invece di uno nelle due query del
-  pannello, e sette tipi invece dei soli alias nel suggerimento di backfill — la terza, se
-  qualificare anche `dbo`, è stata **decisa e chiusa lo stesso giorno**;
-  **una** aperta il
-  2026-09-01 (P1: un tipo che va DROPpato mentre lo lega qualcosa di
-  **Identical**, che nessun ordine può salvare) — la vista stantia, trovata
-  misurando le altre due, è stata **aperta e chiusa lo stesso giorno**;
-  **sette** del proprietario, riverificate sul codice il 2026-08-18. Delle sei
-  che l'audit di parità aveva aperto ne restano **tre**, e quella d'igiene è una
-  di quelle tre, non una quarta. Il conteggio va ricontato, non decrementato a
-  mente: `awk` sulle righe di tabella, o si scolla come si era già scollato.
-  L'`awk` che lo dà conta **anche** le righe di «Deciso», che ha la stessa
-  intestazione `| Voce | Reg. |`: 29 righe meno le 17 decise fa 12.
+- **2 voci aperte** — **P1 0 · P2 0 · P4 0** · P3 1 · P5 1 — più **22** in
+  «Deciso — NON riaprire». **Le 4 critiche restano chiuse.** Per origine:
+  delle **sei** aperte dall'audit di parità Redgate **non ne resta nessuna** —
+  l'ultima, il gate d'errore di batch, è stata rimisurata e decisa il
+  2026-09-01, e nessuna delle sei era un fallimento di parità: erano forme che
+  la fixture non raggiunge. Non resta nulla nemmeno dalla review adversariale
+  della chiusura del tipo tabella (la direzione delle colonne di chiave, l'ultima,
+  chiusa il 2026-09-01), né dalle due aperte il 2026-08-31 chiudendo i nomi di
+  tipo alias — entrambe **pre-esistenti e trovate misurando**, non dedotte, e in
+  tutte e due la misura ha allargato la voce: sei buchi invece di uno nelle due
+  query del pannello, sette tipi invece dei soli alias nel suggerimento di
+  backfill — né dalla P1 del 2026-09-01 sul tipo DROPpato mentre lo lega
+  qualcosa di **Identical**. **Le due che restano sono**: l'estrazione di
+  `DeployPreflight`, aperta il 2026-09-01 solo perché `CLAUDE.md` impone di
+  aprire una voce invece di far crescere un file in silenzio, e l'annuncio
+  pubblico, l'ultima delle **sette** del proprietario, escluso per scelta e non
+  bloccato. Il conteggio va ricontato, non decrementato a mente: `awk` sulle
+  righe di tabella, o si scolla come si era già scollato. L'`awk` che lo dà
+  conta **anche** le righe di «Deciso», che ha la stessa intestazione
+  `| Voce | Reg. |`: 24 righe meno le 22 decise fa 2.
 - **La parità Redgate è stata eseguita il 2026-08-31 e chiusa**: 21 scenari,
   **zero difetti di parità**, un solo buco dichiarato (extended properties).
   L'unico difetto vero era nostro e nell'attrezzatura — `ParityFixtureTests`
   non passava `dropDependencies`, quindi lo scenario 18 misurava il fallback
   invece del risolutore. Tutto in `docs/parity/redgate-2026-08-31.md`; per
   rigenerare l'artefatto DbDelta serve `DBDELTA_PARITY_DUMP=<percorso>`.
-- **CI verde su `311c54a`** (run `33488633499`), entrambi i job, il 2026-09-01 —
-  è il primo run che ha visto i sei commit del 2026-08-31. I DB-backed
+- **CI verde su `741b9a7`**, la punta di `origin/main`, entrambi i job, il
+  2026-09-01: run `33523954366` (ci, 3m53s) e `33523954367` (docs, 53s). I DB-backed
   aggiungono **135** test ai locali della riga sopra: LiveDb 102, Cli acceptance
   26, Persistence integration 7 — **1144 in tutto**. Misurati il 2026-09-01 su Windows con
   Docker acceso, dove i 7 passano tutti; senza Docker 3 dei 7 si skippano da sé.
@@ -252,8 +249,7 @@ Una voce chiusa il 2026-08-20 dal commit che porta questa riga:
 
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
-| **`ScriptGenerator` è cresciuto da 1334 a 1527 righe il 2026-09-01**, chiudendo le due P1, e la regola di `CLAUDE.md` dice di aprire una voce invece di crescerlo in silenzio. Le due guardie nuove — `RefuseRebuildsBlockedBySchemabinding` e `RefuseTypeDropsBlockedByABinder` più `TargetSideTypeUsers` — stanno lì **perché è l'unico punto che tiene insieme** la decisione di rebuild, gli archi del target e le coppie da cui esce il set droppato, e questo non cambia: **spostarle non deve significare rifarle su meno input**, che è esattamente il difetto che hanno appena chiuso. La forma plausibile è una classe `DeployPreflight` che riceva quei tre input e restituisca i blocchi, lasciando a `Generate` una chiamata sola — stessa forma di `BackfillPreflight`, che è già fuori. **Non urgente e non un difetto**: nessuno lo subisce, e le due guardie sono coperte da 19 unit, 3 test su container, 2 acceptance e 13 sonde di mutazione, quindi un'estrazione avrebbe una rete sotto | 2026-09-01 | S | `src/DbDelta.Core/ScriptGen/ScriptGenerator.cs` (`RefuseRebuildsBlockedBySchemabinding`, `RefuseTypeDropsBlockedByABinder`, `TargetSideTypeUsers`) |
-| **Il gate d'errore di batch legge solo l'`@@ERROR` dell'ultima istruzione.** `SET XACT_ABORT ON` non rende abortivo ogni errore. Misurato su `mssql/server:2022-latest` 16.0.4265.3, dentro `BEGIN TRANSACTION` con `XACT_ABORT ON`: una `DROP TABLE dbo.NoSuchTable` a metà batch (Msg 3701, Level 11) ha lasciato proseguire il batch **e committare**; `EXEC sp_rename 'dbo.NoSuchObject', …` (Msg 15225, alzato da `RAISERROR` dentro una procedura di sistema) idem, e anche l'istruzione precedente è sopravvissuta. Entrambe le classi sono raggiungibili nello script di parità, sulle due `DROP TABLE` e le due `sp_rename` del rebuild. **Rischio e non difetto** perché lì il sopravvissuto è seguito subito da un `ALTER TABLE … ADD CONSTRAINT` contro la tabella che il rename fallito ha lasciato mancante — Msg 4902, che *è* abortivo, quindi torna indietro tutto. È anche il motivo per cui Redgate avvolge `sp_addextendedproperty` in TRY/CATCH e nient'altro: stessa classe non abortiva | 2026-08-31 | M | `docs/parity/redgate-2026-08-31.md` R5 (le due riproduzioni) |
+| **`ScriptGenerator` è cresciuto da 1334 a 1527 righe il 2026-09-01** chiudendo le due P1, e a **1539** col commit che ha reso nude tutte le DROP (ricontate il 2026-09-01, `wc -l`), e la regola di `CLAUDE.md` dice di aprire una voce invece di crescerlo in silenzio. Le due guardie nuove — `RefuseRebuildsBlockedBySchemabinding` e `RefuseTypeDropsBlockedByABinder` più `TargetSideTypeUsers` — stanno lì **perché è l'unico punto che tiene insieme** la decisione di rebuild, gli archi del target e le coppie da cui esce il set droppato, e questo non cambia: **spostarle non deve significare rifarle su meno input**, che è esattamente il difetto che hanno appena chiuso. La forma plausibile è una classe `DeployPreflight` che riceva quei tre input e restituisca i blocchi, lasciando a `Generate` una chiamata sola — stessa forma di `BackfillPreflight`, che è già fuori. **Non urgente e non un difetto**: nessuno lo subisce, e le due guardie sono coperte da 19 unit, 3 test su container, 2 acceptance e 13 sonde di mutazione, quindi un'estrazione avrebbe una rete sotto | 2026-09-01 | S | `src/DbDelta.Core/ScriptGen/ScriptGenerator.cs` (`RefuseRebuildsBlockedBySchemabinding`, `RefuseTypeDropsBlockedByABinder`, `TargetSideTypeUsers`) |
 
 ---
 
@@ -323,6 +319,7 @@ perché una sessione futura non le riscopra come nuove.
 | Trimming, e con esso i 94 MB della MSI | 2026-05-25 | **Deciso dal proprietario il 2026-09-01: restare così.** Il motivo del rinvio regge — `XmlSerializer` è costruito per riflessione e un trim spezzerebbe il salvataggio dei `.dbd`. La MSI è self-contained apposta: framework-dependent la rimpicciolirebbe subito ma sposterebbe il costo sull'utente, che senza .NET 10 preinstallato non parte. **Assorbe la voce «MSI 94 MB»** — stessa leva vista da causa e sintomo, e non va riaperta dal sintomo |
 | Sezione D — parking-lot v2, tutte e otto | 2026-05-28 | **Deciso dal proprietario il 2026-09-01: fuori v1.** Otto cose ferme su un brainstorming che in tre mesi nessuno ha fatto sono già fuori scope, e dichiararle aperte faceva mentire il conteggio. Restano nominate qui perché siano trovabili per una v2: provider Scripts-Folder, Snapshot e Source-Control, migration script, kind Tier-3, estensioni SSMS/VS, OTel, auto-update, CLI Linux/macOS |
 | Code signing della MSI | 2026-05-28 | **Deciso dal proprietario il 2026-09-01: resta non firmata.** Non è assenza di garanzie: la Release allega già il `.sha256` e l'attestazione di provenienza firmata da GitHub, e `getting-started.md:20-26` dice all'utente che SmartScreen avvisa e come verificare l'artefatto. Il costo accettato è quell'attrito al primo avvio. Se un giorno si firma, lo step va **fra «Build MSI» e «Smoke install»**: firmare riscrive il file, quindi lo smoke deve esercitare quello firmato |
+| Il gate d'errore di batch non vede ogni errore | 2026-08-31 | **Deciso dal proprietario il 2026-09-01: è la stessa decisione delle DROP nude.** Rimisurato quel giorno su `mssql/server:2022-latest` 16.0.4265.3 con lo script scritto dal **vero** `DeploymentScriptWriter`, e la voce aveva ragione sul meccanismo e torto su due cose. Primo: `@@ERROR` **sopravvive al `GO`**, quindi il gate in batch separato scatta davvero quando il fallimento è l'ultima istruzione — ma è cieco appena ne segue una riuscita, **anche solo una `PRINT`**, e su `EXEC` è cieco **sempre**, pure in ultima posizione (`sp_rename` fallito ultimo del batch: `@@ERROR` = 0, mentre il suo `rc` = 1). Secondo, ed è la ragione per cui non morde: la leva non è `XACT_ABORT` ma la **severità**. Al livello 11 il batch prosegue e committa, dal 14 in su aborta e rolla indietro; e al livello 11 arriva **una cosa sola**, «l'oggetto non c'è» — Msg 3701 su table, view, procedure, function, index, sequence, synonym e trigger, più Msg 15225 e 15335 di `sp_rename`. Ogni errore che lascerebbe uno stato **sbagliato** è ≥14 e aborta: misurati 2714, 3726, 3727/3728, 4902, 8106, 218 (`DROP TYPE`), 15151 (`DROP SCHEMA`), 207 (`sp_refreshsqlmodule` che non lega più) — **e Msg 3701 stesso quando significa «permesso negato», che è livello 14**, cioè proprio il caso che avrebbe lasciato l'oggetto in piedi. Quindi ciò che viene inghiottito è la ri-esecuzione, che la politica delle DROP nude dichiara **già** non supportata. La mitigazione che la voce affermava — «segue un `ALTER TABLE … ADD CONSTRAINT` che dà 4902» — non era la ragione generale. Resta un'asimmetria, ed è documentata invece che chiusa: `apply` e la GUI **falliscono** su quell'errore, perché `Microsoft.Data.SqlClient` alza `SqlException` anche a severità 11 e `SqlExecutor` si ferma prima di mandare il `COMMIT` (misurato: `Success=False`, `RolledBack=True`, bersaglio intatto), mentre lo stesso file eseguito a mano in SSMS committa e stampa `The database update succeeded`. Scritta in due posti: `<remarks>` su `DeploymentScriptWriter` e «Why no DROP is guarded» in `docfx/articles/cli.md` |
 
 **Le 17 proposte scartate con motivo** stanno in
 `docs/review/2026-08-14-improvement-scan.md`, Parte 3. Valgono quanto la lista:
