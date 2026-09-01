@@ -362,7 +362,23 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
                 -- alias type from a built-in, so it would have rendered the bare
                 -- name for a row the grid calls Different — two identical panes.
                 ISNULL(ty.is_user_defined, 0)              AS IsUserDefinedType,
-                CASE WHEN ty.is_user_defined = 1 THEN SCHEMA_NAME(ty.schema_id) END AS TypeSchema
+                CASE WHEN ty.is_user_defined = 1 THEN SCHEMA_NAME(ty.schema_id) END AS TypeSchema,
+                -- Every field ComparisonEngine reads has to be read HERE too, or
+                -- the pane renders two identical bodies for a row the grid calls
+                -- Different. TableScriptEmitter says exactly that at its index
+                -- branch; this query is the other half of the sentence.
+                -- COLLATE is explicit on every string column (Redgate parity), and
+                -- AppendCollation emits it off Column.Collation alone.
+                c.collation_name                           AS CollationName,
+                -- The table's OWN rows — heap (index_id 0) or clustered (1), first
+                -- partition, exactly as TableReader reads it. Constant for every
+                -- row of this result: carried on the column query rather than a
+                -- second round-trip, because this resolver already fires up to 16
+                -- per click.
+                (SELECT TOP 1 p.data_compression_desc
+                 FROM sys.partitions AS p
+                 WHERE p.object_id = c.object_id AND p.index_id <= 1
+                 ORDER BY p.index_id, p.partition_number)  AS DataCompression
             FROM sys.columns AS c
             -- LEFT, never INNER: this query had no join at all before, so an
             -- INNER one could only ever REMOVE rows it used to return —
@@ -380,6 +396,7 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
             """;
 
         List<Column> columns = [];
+        string? dataCompression = null;
         await using SqlCommand cmd = new(columnsSql, connection);
         cmd.Parameters.AddWithValue("@objectId", objectId);
         await using SqlDataReader r = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
@@ -400,6 +417,8 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
             int ordinal = r.GetInt32(12);
             bool isUdt = !r.IsDBNull(13) && r.GetBoolean(13);
             string? typeSchema = r.IsDBNull(14) ? null : r.GetString(14);
+            string? collation = r.IsDBNull(15) ? null : r.GetString(15);
+            dataCompression = r.IsDBNull(16) ? null : r.GetString(16);
             columns.Add(new Column(
                 name: columnName,
                 dataType: CatalogDataType.Format(typeName, maxLength, precision, scale),
@@ -410,14 +429,18 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
                 identitySeed: identitySeed,
                 identityIncrement: identityIncrement,
                 computedExpression: computedExpr,
-                isPersistedComputed: isPersistedComputed)
+                isPersistedComputed: isPersistedComputed,
+                collation: collation)
             {
                 IsUserDefinedType = isUdt,
                 TypeSchema = typeSchema,
             });
         }
 
-        return new Table(schemaName, objectName, columns);
+        // The 3-arg convenience ctor left DataCompression null, which
+        // Compression.Normalize reads as NONE — so the pane could never render
+        // the ") WITH (DATA_COMPRESSION = PAGE);" that ComparisonEngine compares.
+        return new Table(schemaName, objectName, columns) { DataCompression = dataCompression };
     }
 
     private static async Task<IReadOnlyDictionary<int, List<Constraint>>> ReadConstraintsForObjectAsync(
@@ -683,16 +706,34 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
     {
         const string sql = """
             SELECT i.name, i.is_unique, i.type, i.has_filter, i.filter_definition,
-                   i.index_id, ic.key_ordinal, ic.is_descending_key, ic.is_included_column, c.name AS ColumnName
+                   i.index_id, ic.key_ordinal, ic.is_descending_key, ic.is_included_column, c.name AS ColumnName,
+                   -- First partition only, as IndexReader: DbDelta does not model
+                   -- per-partition compression.
+                   (SELECT TOP 1 p.data_compression_desc
+                    FROM sys.partitions AS p
+                    WHERE p.object_id = i.object_id AND p.index_id = i.index_id
+                    ORDER BY p.partition_number) AS DataCompression,
+                   i.type_desc AS IndexTypeDesc
             FROM sys.indexes AS i
             INNER JOIN sys.index_columns AS ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
             INNER JOIN sys.columns AS c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
             WHERE i.object_id = @objectId
               AND i.is_primary_key = 0
               AND i.is_unique_constraint = 0
-              AND i.type IN (1, 2)
+              -- No type filter, and it is not a widening: this query still carried
+              -- the `AND i.type IN (1, 2)` that IndexReader removed as silent
+              -- destruction, so a columnstore was absent from BOTH panes while the
+              -- compared model had it. TypeDesc travels with it because
+              -- GenerateFullTableBody picks CREATE INDEX vs the "read, not
+              -- scriptable" line off IsRowstore — dropping the filter without the
+              -- column would render a plain CREATE INDEX for a columnstore, which
+              -- is a worse lie than hiding it.
               AND i.name IS NOT NULL
-            ORDER BY i.index_id, ic.is_included_column, ic.key_ordinal;
+            -- index_column_id is the tiebreak IndexReader documents: key_ordinal is
+            -- ZERO for every included column, so ordering by it alone left INCLUDE
+            -- in engine order and the two panes could disagree on an index nobody
+            -- touched.
+            ORDER BY i.index_id, ic.is_included_column, ic.key_ordinal, ic.index_column_id;
             """;
 
         Dictionary<int, List<TableIndex>> byObject = [];
@@ -700,6 +741,8 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
         string? currentName = null;
         bool isUnique = false, isClustered = false;
         string? filter = null;
+        string? compression = null;
+        string? typeDesc = null;
         List<IndexColumn> keys = [];
         List<string> included = [];
 
@@ -718,10 +761,14 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
             bool isDesc = r.GetBoolean(7);
             bool isIncl = r.GetBoolean(8);
             string column = r.GetString(9);
+            string? rowCompression = r.IsDBNull(10) ? null : r.GetString(10);
+            string? rowTypeDesc = r.IsDBNull(11) ? null : r.GetString(11);
 
             if (currentIndexId is not null && currentIndexId != indexId)
             {
-                FlushIndex(byObject, objectId, currentName!, isUnique, isClustered, filter, keys, included);
+                // Flushes the PREVIOUS index, so every field it carries is assigned
+                // BELOW this block, never above it.
+                FlushIndex(byObject, objectId, currentName!, isUnique, isClustered, filter, compression, typeDesc, keys, included);
                 keys = [];
                 included = [];
             }
@@ -731,6 +778,8 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
             isUnique = isUq;
             isClustered = indexType == 1;
             filter = hasFilter ? filterDef : null;
+            compression = rowCompression;
+            typeDesc = rowTypeDesc;
 
             if (isIncl) { included.Add(column); }
             else { keys.Add(new IndexColumn(column, isDesc)); }
@@ -738,7 +787,7 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
 
         if (currentIndexId is not null)
         {
-            FlushIndex(byObject, objectId, currentName!, isUnique, isClustered, filter, keys, included);
+            FlushIndex(byObject, objectId, currentName!, isUnique, isClustered, filter, compression, typeDesc, keys, included);
         }
 
         return byObject;
@@ -751,6 +800,8 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
         bool isUnique,
         bool isClustered,
         string? filter,
+        string? dataCompression,
+        string? typeDesc,
         List<IndexColumn> keys,
         List<string> included)
     {
@@ -760,7 +811,9 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
             IsClustered: isClustered,
             FilterExpression: filter,
             KeyColumns: [.. keys],
-            IncludedColumns: [.. included]);
+            IncludedColumns: [.. included],
+            DataCompression: dataCompression,
+            TypeDesc: typeDesc);
 
         if (!byObject.TryGetValue(objectId, out List<TableIndex>? list))
         {

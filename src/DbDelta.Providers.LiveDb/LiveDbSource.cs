@@ -44,8 +44,13 @@ public sealed class LiveDbSource
                     "Run, in that database: " + string.Join(" ", missing.Select(m => m.Grant))));
             }
 
-            // M13-PARITY.5 #32 — capture DB default collation up-front so the
-            // emitter can skip COLLATE clauses on columns that match it.
+            // M13-PARITY.5 #32 — the database default collation. It does NOT
+            // gate COLLATE emission, whatever this comment used to say:
+            // TableScriptEmitter.AppendCollation never reads it and emits the
+            // clause on every string column, which is the Redgate-parity rule.
+            // What it decides is how the whole comparison pairs NAMES, via
+            // NameComparison.ForCollation — see the remarks on
+            // Database.DefaultCollation.
             string? defaultCollation = await ReadDefaultCollationAsync(connection, cancellationToken);
             IReadOnlyList<Schema> schemas = await new SchemaReader().ReadAsync(connection, cancellationToken);
 
@@ -250,11 +255,18 @@ public sealed class LiveDbSource
 
     /// <summary>
     /// Reads the database default collation via <c>DATABASEPROPERTYEX</c>.
-    /// Falls back to null on any failure — the script generator treats a null
-    /// default as "no default known" and emits explicit COLLATE on every
-    /// string column with a non-null collation, matching Redgate's defensive
-    /// shape (M13-PARITY.5 #32).
+    /// Falls back to null on any failure, and null is the SAFE value: it means
+    /// case-insensitive name pairing, which at worst pairs two objects that
+    /// should have stayed apart, while assuming case-sensitivity on a
+    /// case-insensitive server generates a DROP of live data.
     /// </summary>
+    /// <remarks>
+    /// It does not gate COLLATE emission and never did — every string column
+    /// gets an explicit clause whatever this returns, which is Redgate's
+    /// defensive shape (M13-PARITY.5 #32). The single consumer is
+    /// <c>NameComparison.ForCollation</c> at <c>ComparisonEngine</c>'s first
+    /// line; see the remarks on <c>Database.DefaultCollation</c>.
+    /// </remarks>
     private static async Task<string?> ReadDefaultCollationAsync(SqlConnection connection, CancellationToken ct)
     {
         const string sql = "SELECT CAST(DATABASEPROPERTYEX(DB_NAME(), 'Collation') AS nvarchar(128));";

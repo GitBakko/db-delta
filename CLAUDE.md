@@ -9,11 +9,12 @@
 - ALWAYS read a file before editing it
 - NEVER commit secrets, credentials, or .env files
 - Keep NEW files under 500 lines. Six existing ones are already over —
-  measured 2026-08-31, `wc -l`, not remembered: ScriptGenerator 1324,
-  MainWindowViewModel 1160, TableScriptEmitter 960, LiveDbObjectBodyResolver
-  752, ComparisonEngine 741, ProjectEndpointPanelViewModel 689. Do not grow
+  measured 2026-09-01, `wc -l`, not remembered: ScriptGenerator 1334,
+  MainWindowViewModel 1186, TableScriptEmitter 978, LiveDbObjectBodyResolver
+  845, ComparisonEngine 741, ProjectEndpointPanelViewModel 689. Do not grow
   them without opening an item in `docs/BACKLOG.md`. These numbers age like
-  any other: re-measure before quoting them
+  any other: **four of the six drifted in one day** the last time they were
+  checked — re-measure before quoting them
 - Validate input at system boundaries
 
 ## Single source of truth — FUNDAMENTAL

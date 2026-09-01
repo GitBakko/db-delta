@@ -18,34 +18,39 @@ vedi «Manutenzione» in fondo.
   serve**: stampa l'intestazione anche a daemon morto. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **13 voci aperte** — P1 2 · P2 1 · P3 2 · P4 1 · P5 7 — più **17** in
-  «Deciso — NON riaprire». **Le 4 critiche restano chiuse.** Per origine le 15
+- **12 voci aperte** — P1 2 · P2 0 · P3 2 · P4 1 · P5 7 — più **17** in
+  «Deciso — NON riaprire». **Le 4 critiche restano chiuse.** Per origine le 12
   aperte sono: **tre** dall'audit di parità Redgate (P1 rebuild contro un modulo
   schemabound, P3 gate d'errore di batch, P4 politica delle DROP) —
   **nessuna è un fallimento di parità**, sono forme che la fixture non
   raggiunge; **nessuna** più dalla review adversariale della chiusura del tipo
   tabella — la direzione delle colonne di chiave, l'unica che ne restava, è
-  chiusa il 2026-09-01; **due** aperte il
+  chiusa il 2026-09-01; **una** delle due aperte il
   2026-08-31 chiudendo i nomi di tipo alias, entrambe **pre-esistenti e trovate
-  misurando**, non dedotte (P2 il pannello diff che non emette mai `COLLATE`,
-  P3 `BackfillPreflight` che propone `('')`) — la terza, se qualificare anche
-  `dbo`, è stata **decisa e chiusa lo stesso giorno**; **una** aperta il
+  misurando**, non dedotte (resta P3 `BackfillPreflight` che propone `('')`; il
+  pannello diff senza `COLLATE` è **chiuso il 2026-09-01**, e misurandolo si è
+  visto che i buchi in quelle due query erano sei, non uno) — la terza, se
+  qualificare anche `dbo`, è stata **decisa e chiusa lo stesso giorno**;
+  **una** aperta il
   2026-09-01 (P1: un tipo che va DROPpato mentre lo lega qualcosa di
   **Identical**, che nessun ordine può salvare) — la vista stantia, trovata
   misurando le altre due, è stata **aperta e chiusa lo stesso giorno**;
   **sette** del proprietario, riverificate sul codice il 2026-08-18. Delle sei
-  che l'audit di parità aveva aperto ne restano tre più quella d'igiene. Il conteggio va ricontato, non decrementato a
+  che l'audit di parità aveva aperto ne restano **tre**, e quella d'igiene è una
+  di quelle tre, non una quarta. Il conteggio va ricontato, non decrementato a
   mente: `awk` sulle righe di tabella, o si scolla come si era già scollato.
+  L'`awk` che lo dà conta **anche** le righe di «Deciso», che ha la stessa
+  intestazione `| Voce | Reg. |`: 29 righe meno le 17 decise fa 12.
 - **La parità Redgate è stata eseguita il 2026-08-31 e chiusa**: 21 scenari,
   **zero difetti di parità**, un solo buco dichiarato (extended properties).
   L'unico difetto vero era nostro e nell'attrezzatura — `ParityFixtureTests`
   non passava `dropDependencies`, quindi lo scenario 18 misurava il fallback
   invece del risolutore. Tutto in `docs/parity/redgate-2026-08-31.md`; per
   rigenerare l'artefatto DbDelta serve `DBDELTA_PARITY_DUMP=<percorso>`.
-- **CI verde su `3c48735`** (run `32140004994`), entrambi i job — **quel run è
-  anteriore ai commit locali e non li ha visti**. I DB-backed aggiungono **93**
-  test ai locali della riga sopra: LiveDb 62, Cli acceptance 24, Persistence
-  integration 7 — **1063 in tutto**. Misurati il 2026-08-31 su Windows con
+- **CI verde su `311c54a`** (run `33488633499`), entrambi i job, il 2026-09-01 —
+  è il primo run che ha visto i sei commit del 2026-08-31. I DB-backed
+  aggiungono **96** test ai locali della riga sopra: LiveDb 65, Cli acceptance
+  24, Persistence integration 7 — **1066 in tutto**. Misurati il 2026-09-01 su Windows con
   Docker acceso, dove i 7 passano tutti; senza Docker 3 dei 7 si skippano da sé.
   L'exit code di `script` e la forma JSON di `compare` girano solo lì.
 - **La guardia dello skip Testcontainers deve avvolgere `Build()`**, non solo
@@ -197,7 +202,8 @@ due senza test.
 
 ## P2 — Valore alto, sforzo contenuto: da fare per prime a parità di gravità
 
-Voci chiuse il 2026-08-20, ognuna dal commit che porta la sua riga:
+Sei voci chiuse il 2026-08-20 e una il 2026-09-01, ognuna dal commit che porta
+la sua riga:
 
 | Voce chiusa | Come | Prova |
 |---|---|---|
@@ -206,11 +212,11 @@ Voci chiuse il 2026-08-20, ognuna dal commit che porta la sua riga:
 | Cinque header promettevano un ordinamento che non esisteva | In una `DataGridTemplateColumn` `CanUserSort` da solo disegna la freccia e non ordina niente: manca `SortMemberPath`, che è l'unica cosa che dice **su cosa**. Aggiunto ai cinque. Le due colonne di data puntano al `DateTime`, **non** alla stringa `dd/MM/yyyy` che la cella stampa: come testo `31/12/2025` viene dopo `01/02/2026` | `ResultsGridSortTests` — 4 test headless: uno è l'invariante su OGNI colonna che offre un sort, quindi vale anche per le colonne future, e uno è il controllo in negativo sulla colonna checkbox. **Sonda di mutazione fatta:** puntando la data alla stringa stampata cade il test della data, e solo quello |
 | I pannelli diff non virtualizzavano | **Misurato prima di toccare niente, ed è stata la misura a trovare il colpevole: 30.000 righe = 70,3 s di layout.** Non erano i tre pannelli: erano le **due minimappe**, legate a `Rows` con un `Canvas` — che non può virtualizzare — e un rettangolo per RIGA reso invisibile da un converter. 60.000 visuali per disegnare due segni. Ora sono legate alle sole righe che un segno ce l'hanno (`SourceMarkRows` / `TargetMarkRows`), e il posizionamento usa `LineDiff.Index` invece della posizione nella lista. I tre `ItemsPanel` sono `VirtualizingStackPanel` (da soli valevano 70 → 16 s). **Risultato: 70,3 s → 0,47 s, 150×** | `DiffViewerScaleTests` — stampa i numeri e fallisce sopra i 3 s. **Sonda di mutazione:** rimettere `Rows` su UNA delle due strisce riporta il layout a 6,7 s e il test cade — è così che il limite è stato scelto. **Provato che NON dipendeva dalla voce 10:** il costo era il layout, non il caricamento |
 | Le docs mentivano in cinque punti | Il blocco di stato di questo file era già stato rimesso in pari il 2026-08-18. Restavano: il sito che non nominava mai la MSI (`getting-started.md` mandava tutti a compilare da sorgente), il README che linkava le note Redgate come «Architecture», la sezione Blazor morta in `CONTRIBUTING.md`, e `cli.md` che dichiarava `apply` «GO-split inside a single transaction». **Quest'ultima era la peggiore**: la transazione è decisa per script, e uno che se la apre da sé viene lasciato fare — avvolgerlo porta `@@TRANCOUNT` a 2 e il suo `COMMIT` diventa un decremento. Ora la tabella nomina i tre esiti (`script` / `client` / `none`) come li nomina l'output JSON. Trovate e corrette anche due bugie che l'elenco non aveva: «Renovate-bot opens PRs weekly» (nessun renovate.json nel repo) e «CONTRIBUTING.md (coming soon)» (esiste dal 2026-05) | `README.md`, `CONTRIBUTING.md`, `docfx/articles/cli.md`, `docfx/articles/getting-started.md`, `docfx/index.md`. **Le quattro `docs/0*.md` restano dove sono**: sono note su Redgate, non su DbDelta, e il README ora lo dice invece di linkarle come documentazione nostra |
+| Il pannello diff non emetteva MAI `COLLATE` | **La voce aveva ragione sul difetto e torto sulla taglia: XS erano i buchi che conosceva, i buchi erano SEI.** Misurata la superficie prima di scrivere, colonna per colonna, contro i reader veri: `ReadSingleTableAsync` e `ReadIndexesForObjectAsync` erano **copie invecchiate** di `TableReader` e `IndexReader`. Mancavano `Column.Collation`, `Table.DataCompression`, `TableIndex.DataCompression`, `TableIndex.TypeDesc`, l'ordinamento `ic.index_column_id` dell'INCLUDE — e la query indici portava ancora `AND i.type IN (1, 2)`, **il filtro che le remarks di `IndexReader.cs:12-18` chiamano «silent destruction»** e che quel reader aveva già tolto: un columnstore era assente da ENTRAMBI i pannelli mentre il modello confrontato ce l'aveva. **Il filtro e `TypeDesc` sono un fix solo**: toglierlo senza portare il tipo avrebbe reso un columnstore come un `CREATE INDEX` normale, che è una bugia peggiore del nasconderlo. Le altre quattro forme misurate NON sono difetti e sono state lasciate stare: `is_ms_shipped` e il filtro `is_fixed_role` sui membri di ruolo sono **irraggiungibili** (il pannello è chiamato per nome, e i nomi vengono dai reader che già filtrano), `ModifyDate` non è referenziato da nulla sotto `ScriptGen/`, e il `LEFT JOIN sys.types` del resolver è più sicuro dell'`INNER` del reader, non meno | `ObjectBodyPaneParityTests` — 3 test su container reale. Il primo è **un'uguaglianza sola**: il corpo del pannello deve essere byte per byte quello che `GenerateFullTableBody` produce dal modello confrontato, quindi un settimo buco che nessuno ha ancora pensato lo fa cadere lo stesso. **Sonde di mutazione: sei, cinque uccise** (COLLATE, compressione tabella, compressione indice, `TypeDesc`, filtro sul tipo). **La sesta è sopravvissuta e va detto**: togliere il tiebreak `ic.index_column_id` lascia i test verdi — l'ordine dell'INCLUDE è allineato a `IndexReader` per costruzione, non dimostrato da un test, perché il motore quell'ordine lo restituisce comunque quando gli va. Due delle sei mutazioni erano rotte alla prima passata — aggiungevano una colonna e spostavano gli ordinali, così il codice continuava a leggere quella vera: rifatte affamando la subquery invece di spostarla |
 | Nessun dialogo rispondeva a Invio/Esc | `IsCancel` su ogni pulsante di uscita (nove dialoghi) e `IsDefault` su quello che conferma, dove confermare non distrugge niente. **`ConfirmDialog` e `ConfirmExecuteDialog` restano senza `IsDefault` di proposito**: uscire da una conferma è gratis, entrarci la esegue. I due gestori scritti a mano sono cancellati — quello di `ConfirmDialog` intercettava Esc nel costruttore, quello di `SaveProjectDialog` rispondeva solo mentre la casella di testo aveva il fuoco | `DialogKeyboardTests` — 5 test headless: l'invariante su TUTTI e nove i dialoghi, due controlli in negativo (nessun doppio default, niente default sulle due conferme distruttive) e due funzionali. **Due sonde di mutazione:** togliendo `IsCancel` cade l'Esc, togliendo `IsDefault` cade l'Invio — ed è quest'ultima a provare che a rispondere è l'attributo e non un resto del gestore cancellato |
 
-| Voce | Reg. | Sforzo | Evidenza verificata |
-|---|---|---|---|
-| **Il pannello diff non emette MAI `COLLATE`, lo script sì — quindi il corpo che si approva non è quello che si deploya.** `LiveDbObjectBodyResolver` costruisce le sue `Column` senza `collation`: la sua query sulle colonne non seleziona `c.collation_name`, mentre `TableReader` sì. La regola generale di DbDelta, allineata a Redgate e ripristinata apposta dal proprietario, è **COLLATE esplicita su ogni colonna stringa**: il pannello la omette su **tutte**. Non riguarda i tipi alias — riguarda ogni `nvarchar` di ogni tabella, ed è la superficie che esiste per dare consenso informato prima di un'operazione irreversibile. **Sforzo ora XS**: il join a `sys.types` che mancava è stato aggiunto il 2026-08-31 dalla voce dei nomi di tipo, quindi resta una colonna nella SELECT e un argomento nel costruttore | 2026-08-31 | XS | `src/DbDelta.Providers.LiveDb/ObjectBody/LiveDbObjectBodyResolver.cs` (la `columnsSql` di `ReadSingleTableAsync`) contro `src/DbDelta.Providers.LiveDb/Readers/TableReader.cs` |
+**Vuota.** L'unica voce che restava è chiusa il 2026-09-01 dal commit che porta
+la riga qui sopra.
 
 ---
 
