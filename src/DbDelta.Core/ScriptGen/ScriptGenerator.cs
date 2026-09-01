@@ -133,6 +133,7 @@ public sealed class ScriptGenerator
         }
 
         RefuseRebuildsBlockedBySchemabinding(rebuildTargets, pairs, dropDependencies, pairKey);
+        RefuseTypeDropsBlockedByABinder(result, pairs, dropDependencies, pairKey);
 
         // The tables this run actually reshapes. A table outside the selection
         // keeps whatever the target already holds, which is what decides whose
@@ -844,6 +845,118 @@ public sealed class ScriptGenerator
             if (!rebuildTargets.Contains(bound)) { continue; }
 
             throw new SchemaboundRebuildException(edge.Referenced, edge.Dependent);
+        }
+    }
+
+    /// <summary>
+    /// Refuses, naming the object responsible, a <c>DROP TYPE</c> the server
+    /// would refuse with Msg 3732.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>No ordering can save this one, and that is why it is a refusal rather
+    /// than a sort.</b> A changed alias type is emitted as
+    /// <c>EmitDrop(tgtU) + EmitCreate(srcU)</c> in ONE indivisible body at the
+    /// type's topological slot, and <c>UserDefinedType</c> ranks before every
+    /// kind that can bind it — so even a binder this script does emit is emitted
+    /// after the DROP that already failed. A binder that is <c>Identical</c> is
+    /// not emitted at all: it is filtered out of <c>pairs</c> before generation.
+    /// </para>
+    /// <para>
+    /// <b>Six binder forms, and they need TWO sources</b> — measured on
+    /// <c>mssql/server:2022-latest</c>, one type per form so each DROP was
+    /// isolated. A table column, a sequence and a table type's column are
+    /// DECLARATIONS: they appear in no dependency view, and are read off the
+    /// model here. A procedure parameter, a function parameter and a function's
+    /// RETURN type appear only in <c>sys.sql_expression_dependencies</c>, whose
+    /// <c>referenced_class = 6</c> rows <c>DependencyReader</c> used to read and
+    /// throw away. Covering one source and not the other would leave three of
+    /// the six silently unguarded.
+    /// </para>
+    /// <para>
+    /// The model side is scanned over <c>result.Differences</c> UNFILTERED, not
+    /// over <c>pairs</c>: a binder that compares <c>Identical</c> is precisely
+    /// the case this exists for, and <c>pairs</c> has already dropped it.
+    /// </para>
+    /// <para>
+    /// One exclusion, and it is the same as the schemabound guard's: a binder
+    /// this very script DROPS first is not a binder, because the DROP pass runs
+    /// before the CREATE pass that carries the type's drop-and-recreate.
+    /// </para>
+    /// </remarks>
+    private static void RefuseTypeDropsBlockedByABinder(
+        ComparisonResult result,
+        List<DifferencePair> pairs,
+        IReadOnlyList<DependencyEdge> dropDependencies,
+        IEqualityComparer<(string Schema, string Name)> pairKey)
+    {
+        // Types this run drops: changed (drop + re-create) or removed outright.
+        HashSet<(string Schema, string Name)> droppedTypes = new(pairKey);
+        foreach (DifferencePair pair in pairs.Where(p => p.Identity.Kind == "UserDefinedType"
+                                                      && p.Status != DifferenceStatus.OnlyInA))
+        {
+            droppedTypes.Add((pair.Identity.SchemaName, pair.Identity.ObjectName));
+        }
+        if (droppedTypes.Count == 0) { return; }
+
+        HashSet<(string Schema, string Name)> droppedFirst = new(
+            pairs.Where(p => p.Status == DifferenceStatus.OnlyInB)
+                 .Select(p => (p.Identity.SchemaName, p.Identity.ObjectName)),
+            pairKey);
+
+        foreach ((ObjectIdentity binder, string typeSchema, string typeName) in
+                 TargetSideTypeUsers(result))
+        {
+            if (droppedFirst.Contains((binder.SchemaName, binder.ObjectName))) { continue; }
+            if (!droppedTypes.Contains((typeSchema, typeName))) { continue; }
+            throw new BoundTypeDropException(
+                new ObjectIdentity(typeSchema, typeName, "UserDefinedType"), binder);
+        }
+
+        foreach (DependencyEdge edge in dropDependencies)
+        {
+            if (edge.Referenced.Kind != "UserDefinedType") { continue; }
+            if (droppedFirst.Contains((edge.Dependent.SchemaName, edge.Dependent.ObjectName))) { continue; }
+            if (!droppedTypes.Contains((edge.Referenced.SchemaName, edge.Referenced.ObjectName))) { continue; }
+            throw new BoundTypeDropException(edge.Referenced, edge.Dependent);
+        }
+    }
+
+    /// <summary>
+    /// Every object the TARGET declares with an alias type, and the type it
+    /// names — the three binder forms no dependency view records.
+    /// </summary>
+    /// <remarks>
+    /// <c>TypeSchema</c> is required, not the owning object's schema: an alias
+    /// lives where it was created, which need not be where the thing using it
+    /// lives. A model that never said carries null, and then nothing is claimed
+    /// about it rather than the wrong thing.
+    /// </remarks>
+    private static IEnumerable<(ObjectIdentity Binder, string TypeSchema, string TypeName)>
+        TargetSideTypeUsers(ComparisonResult result)
+    {
+        foreach (DifferencePair pair in result.Differences)
+        {
+            switch (pair.SideB)
+            {
+                case Table t:
+                    foreach (Column c in t.Columns.Where(c => c.IsUserDefinedType && c.TypeSchema is not null))
+                    {
+                        yield return (t.Identity, c.TypeSchema!, c.DataType);
+                    }
+                    break;
+                case TableTypeUdt tt:
+                    foreach (Column c in tt.Columns.Where(c => c.IsUserDefinedType && c.TypeSchema is not null))
+                    {
+                        yield return (tt.Identity, c.TypeSchema!, c.DataType);
+                    }
+                    break;
+                case Sequence s when s.TypeSchema is not null:
+                    yield return (s.Identity, s.TypeSchema, s.DataType);
+                    break;
+                default:
+                    break;
+            }
         }
     }
 

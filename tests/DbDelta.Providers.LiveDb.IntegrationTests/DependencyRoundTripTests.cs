@@ -411,6 +411,139 @@ public class DependencyRoundTripTests(LiveDbFixture fixture)
         apply.Success.Should().BeTrue(apply.ErrorMessage ?? "an ordinary CHECK must not stop a rebuild");
     }
 
+    /// <summary>
+    /// The shape the entry was opened for, on a real server: an alias type whose
+    /// base changed, with a sequence over it that is Identical on both sides.
+    /// The sequence is filtered out before generation, so nothing drops it, and
+    /// the DROP TYPE dies with Msg 3732.
+    /// </summary>
+    /// <remarks>
+    /// No ordering saves this: the type's DROP and CREATE are one indivisible
+    /// body at the type's slot, which comes before every kind that can bind it.
+    /// </remarks>
+    [Fact]
+    public async Task A_type_bound_by_an_Identical_sequence_is_refused_by_name()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        await Create(fixture.ConnectionString, "TypeSeqSrc", ct);
+        await Create(fixture.ConnectionString, "TypeSeqTgt", ct);
+        string src = Cat(fixture.ConnectionString, "TypeSeqSrc");
+        string tgt = Cat(fixture.ConnectionString, "TypeSeqTgt");
+
+        await SeedTypeAsync(src, "bigint", "CREATE SEQUENCE dbo.SeqOrdini AS app.Codice START WITH 1;", ct);
+        await SeedTypeAsync(tgt, "int", "CREATE SEQUENCE dbo.SeqOrdini AS app.Codice START WITH 1;", ct);
+
+        Database source = (await new LiveDbSource(src).LoadAsync(ct)).Value!;
+        Database target = (await new LiveDbSource(tgt).LoadAsync(ct)).Value!;
+        ComparisonResult comparison = new ComparisonEngine().Compare(source, target, ComparisonOptions.Default);
+
+        // MEASURED CORRECTION to the backlog entry, which called this binder
+        // Identical: it is Different. A sequence AS app.Codice inherits the
+        // base type's MIN/MAX, so bigint and int genuinely disagree and the
+        // catalog reports it. Different is just as fatal, and for a reason the
+        // entry did not give: KindRank puts UserDefinedType at 0 and Sequence at
+        // 1, so the type's indivisible DROP+CREATE body runs FIRST and the
+        // sequence is still there. Identical is the other way to die, not the
+        // only one.
+        comparison.Differences.Should().Contain(
+            d => d.Identity.ObjectName == "SeqOrdini" && d.Status == DifferenceStatus.Different);
+
+        BoundTypeDropException ex = Assert.Throws<BoundTypeDropException>(() =>
+            new ScriptGenerator().Generate(
+                comparison, selection: null, options: ComparisonOptions.Default,
+                dependencies: source.Dependencies, dropDependencies: target.Dependencies));
+
+        ex.Type.ObjectName.Should().Be("Codice");
+        ex.Binder.ObjectName.Should().Be("SeqOrdini");
+
+        // And the refusal is not pessimism.
+        await using SqlConnection c = new(tgt);
+        await c.OpenAsync(ct);
+        Func<Task> drop = async () => await Exec(c, "DROP TYPE app.Codice;", ct);
+        (await drop.Should().ThrowAsync<SqlException>()).Which.Number.Should().Be(3732);
+    }
+
+    /// <summary>
+    /// The other half of the surface: a procedure PARAMETER of the type. This
+    /// one is invisible to the object model — it is a referenced_class = 6 row
+    /// in sys.sql_expression_dependencies, which the reader used to drop on the
+    /// floor because referenced_id is a type_id and the join to sys.objects
+    /// cannot match it.
+    /// </summary>
+    [Fact]
+    public async Task A_type_bound_by_a_procedure_parameter_is_refused_by_name()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        await Create(fixture.ConnectionString, "TypeParSrc", ct);
+        await Create(fixture.ConnectionString, "TypeParTgt", ct);
+        string src = Cat(fixture.ConnectionString, "TypeParSrc");
+        string tgt = Cat(fixture.ConnectionString, "TypeParTgt");
+
+        await SeedTypeAsync(src, "bigint", "CREATE OR ALTER PROCEDURE dbo.UsaCodice @p app.Codice AS SELECT @p;", ct);
+        await SeedTypeAsync(tgt, "int", "CREATE OR ALTER PROCEDURE dbo.UsaCodice @p app.Codice AS SELECT @p;", ct);
+
+        Database target = (await new LiveDbSource(tgt).LoadAsync(ct)).Value!;
+
+        // The reader has to emit the type edge, or the guard cannot see three of
+        // the six binder forms at all.
+        target.Dependencies.Should().Contain(
+            e => e.Referenced.Kind == "UserDefinedType"
+                 && e.Referenced.ObjectName == "Codice"
+                 && e.Dependent.ObjectName == "UsaCodice");
+
+        Database source = (await new LiveDbSource(src).LoadAsync(ct)).Value!;
+        BoundTypeDropException ex = Assert.Throws<BoundTypeDropException>(() =>
+            new ScriptGenerator().Generate(
+                new ComparisonEngine().Compare(source, target, ComparisonOptions.Default),
+                selection: null, options: ComparisonOptions.Default,
+                dependencies: source.Dependencies, dropDependencies: target.Dependencies));
+
+        ex.Binder.ObjectName.Should().Be("UsaCodice");
+    }
+
+    /// <summary>
+    /// And the Identical binder the entry actually described, which a table
+    /// column gives: both sides read the column as app.Codice, so the table
+    /// compares Identical, is filtered out before generation, and there is no
+    /// slot anywhere to drop it from.
+    /// </summary>
+    [Fact]
+    public async Task A_type_bound_by_an_Identical_table_column_is_refused_by_name()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        await Create(fixture.ConnectionString, "TypeColSrc", ct);
+        await Create(fixture.ConnectionString, "TypeColTgt", ct);
+        string src = Cat(fixture.ConnectionString, "TypeColSrc");
+        string tgt = Cat(fixture.ConnectionString, "TypeColTgt");
+
+        const string tbl = "IF OBJECT_ID('dbo.Ordini','U') IS NULL CREATE TABLE dbo.Ordini (Id int NOT NULL, C app.Codice NOT NULL);";
+        await SeedTypeAsync(src, "bigint", tbl, ct);
+        await SeedTypeAsync(tgt, "int", tbl, ct);
+
+        Database source = (await new LiveDbSource(src).LoadAsync(ct)).Value!;
+        Database target = (await new LiveDbSource(tgt).LoadAsync(ct)).Value!;
+        ComparisonResult comparison = new ComparisonEngine().Compare(source, target, ComparisonOptions.Default);
+
+        comparison.Differences.Should().Contain(
+            d => d.Identity.ObjectName == "Ordini" && d.Status == DifferenceStatus.Identical,
+            "the column reads app.Codice on both sides, so nothing about the table changed");
+
+        Assert.Throws<BoundTypeDropException>(() =>
+            new ScriptGenerator().Generate(
+                comparison, selection: null, options: ComparisonOptions.Default,
+                dependencies: source.Dependencies, dropDependencies: target.Dependencies))
+            .Binder.ObjectName.Should().Be("Ordini");
+    }
+
+    private static async Task SeedTypeAsync(string conn, string baseType, string binder, CancellationToken ct)
+    {
+        await using SqlConnection c = new(conn);
+        await c.OpenAsync(ct);
+        await Exec(c, "IF SCHEMA_ID('app') IS NULL EXEC('CREATE SCHEMA app');", ct);
+        await Exec(c, $"IF TYPE_ID('app.Codice') IS NULL CREATE TYPE app.Codice FROM {baseType};", ct);
+        await Exec(c, binder, ct);
+    }
+
     private static async Task Create(string conn, string db, CancellationToken ct)
     {
         await using SqlConnection c = new(conn);

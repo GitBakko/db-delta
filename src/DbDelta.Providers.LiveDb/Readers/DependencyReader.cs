@@ -41,7 +41,16 @@ internal sealed class DependencyReader
             referencing_type   = oo.type,
             referenced_schema  = ISNULL(x.referenced_schema_name, OBJECT_SCHEMA_NAME(x.referenced_id)),
             referenced_name    = ISNULL(x.referenced_entity_name, OBJECT_NAME(x.referenced_id)),
-            referenced_type    = eo.type,
+            -- referenced_class 6 is a TYPE, and its referenced_id is a
+            -- type_id, NOT an object_id: the LEFT JOIN below cannot match it,
+            -- so every one of these rows used to die at the null check that
+            -- follows. Measured on mssql/server:2022-latest — three of the six
+            -- things that block a DROP TYPE (Msg 3732) are visible ONLY here:
+            -- a procedure parameter, a function parameter and a function's
+            -- RETURN type. The other three (table column, sequence, table type
+            -- column) are declarations, not expressions, and never appear in
+            -- this view at all.
+            referenced_type    = CASE WHEN x.referenced_class = 6 THEN 'TYPE' ELSE eo.type END,
             -- Not an ordering input: a schemabound edge points the same way as
             -- any other. It says the server ENFORCES this reference, so the
             -- referenced object cannot be dropped (Msg 3729) or renamed
@@ -54,6 +63,7 @@ internal sealed class DependencyReader
                 d.referenced_schema_name,
                 d.referenced_entity_name,
                 d.is_schema_bound_reference,
+                d.referenced_class,
                 -- A CHECK or DEFAULT constraint is an object of its own, and
                 -- not one DbDelta models: attribute its references to the table
                 -- that carries it, which is the node the resolver orders. A
@@ -111,6 +121,9 @@ internal sealed class DependencyReader
         "TR" => "Trigger",
         "SN" => "Synonym",
         "SO" => "Sequence",
+        // Not a sys.objects type at all: synthesised above for a
+        // referenced_class 6 row, whose referenced_id indexes sys.types.
+        "TYPE" => "UserDefinedType",
         _ => null,
     };
 }

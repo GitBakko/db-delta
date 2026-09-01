@@ -109,6 +109,43 @@ public class ScriptCommandTests(CliFixture fixture)
     }
 
     /// <summary>
+    /// The bound-type refusal, through the process boundary: an alias type whose
+    /// base changed, with a table column on both sides still declared with it.
+    /// </summary>
+    /// <remarks>
+    /// The table compares Identical, so it is filtered out before generation and
+    /// nothing drops it; and no ordering would help anyway, because the type's
+    /// DROP and CREATE are one body at a slot that precedes every kind that can
+    /// bind it. Without the guard the CLI writes a script that dies on the
+    /// operator's server with Msg 3732.
+    /// </remarks>
+    [Fact]
+    public async Task Refuses_with_exit_30_when_something_still_uses_a_type_being_rebuilt()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        const string srcDb = "DbDeltaScriptTypeSrc";
+        const string tgtDb = "DbDeltaScriptTypeTgt";
+        await CreateDb(srcDb, ct);
+        await CreateDb(tgtDb, ct);
+        foreach ((string db, string baseType) in new[] { (srcDb, "bigint"), (tgtDb, "int") })
+        {
+            await Exec(db, "IF SCHEMA_ID('app') IS NULL EXEC('CREATE SCHEMA app');", ct);
+            await Exec(db, $"IF TYPE_ID('app.Codice') IS NULL CREATE TYPE app.Codice FROM {baseType};", ct);
+            await Exec(db, "IF OBJECT_ID('dbo.Ordini') IS NULL CREATE TABLE dbo.Ordini (Id int NOT NULL, C app.Codice NOT NULL);", ct);
+        }
+
+        using var sqlOut = TempFile.Sql();
+        int exit = await RunCli(["script",
+            "--source", ConnectionFor(srcDb),
+            "--target", ConnectionFor(tgtDb),
+            "--out", sqlOut.Path], ct);
+
+        exit.Should().Be(ExpectedExitCodes.ScriptGenerationFailure);
+        File.Exists(sqlOut.Path).Should().BeFalse(
+            "the refusal happens during generation, so there is no script to write");
+    }
+
+    /// <summary>
     /// The schemabound refusal, through the process boundary. The IDENTITY flip
     /// forces the rebuild; the SCHEMABINDING view on the TARGET is what the
     /// DROP TABLE would run into.

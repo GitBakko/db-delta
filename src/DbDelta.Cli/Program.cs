@@ -102,6 +102,19 @@ catch (UnscriptableTableTypeException ex)
         + "decision DbDelta cannot make — or leave it out of this run."));
     return ExitCodes.ScriptGenerationFailure;
 }
+catch (BoundTypeDropException ex)
+{
+    // Sibling of the one below, same owner decision, same reason it is not an
+    // Unscriptable*: the server says Msg 3732 out loud. What it cannot say
+    // usefully is WHICH object — for a table type's column it names the internal
+    // type-table, a name nobody wrote.
+    CliErrorMapper.WriteError(new Error(
+        ErrorCode.UnsupportedSchemaChange,
+        ex.Message,
+        $"Deploy {ex.Binder.SchemaName}.{ex.Binder.ObjectName} first so it stops using "
+        + $"{ex.Type.SchemaName}.{ex.Type.ObjectName}, or leave the type out of this run."));
+    return ExitCodes.ScriptGenerationFailure;
+}
 catch (SchemaboundRebuildException ex)
 {
     // Not one of the four above, and the file that defines it says why: nothing

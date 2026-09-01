@@ -942,6 +942,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 AppState.TargetDependencies,
                 backfill);
         }
+        catch (BoundTypeDropException ex)
+        {
+            AppState.LastError =
+                $"Script non generato: il tipo {ex.Type.SchemaName}.{ex.Type.ObjectName} va ricostruito, ma "
+                + $"{ex.Binder.SchemaName}.{ex.Binder.ObjectName} lo usa ancora. SQL Server rifiuta la DROP TYPE "
+                + "(Msg 3732), e nessun ordine può salvarlo: la DROP e la CREATE del tipo sono un corpo solo, "
+                + "allo slot del tipo, che viene prima di tutto ciò che può legarlo. Allinea prima chi lo usa, "
+                + "oppure togli il tipo dalla selezione.";
+            StatusText = "Nessuno script generato: vedi il messaggio in alto.";
+            return null;
+        }
         catch (SchemaboundRebuildException ex)
         {
             AppState.LastError =
