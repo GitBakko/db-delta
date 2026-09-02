@@ -5,7 +5,7 @@
 contenuto. Chi chiude una voce la depenna QUI, nello stesso commit del codice —
 vedi «Manutenzione» in fondo.
 
-## Stato — 2026-09-01
+## Stato — 2026-09-02
 
 - **v1.0.2 pubblicata** (2026-08-13), «Latest», MSI non firmata allegata.
 - **1009 test verdi** nei sette progetti che girano senza Docker (Core 626,
@@ -17,7 +17,7 @@ vedi «Manutenzione» in fondo.
   serve**: stampa l'intestazione anche a daemon morto. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **4 voci aperte** — **P1 0 · P2 0** · P3 1 · **P4 2** · P5 1 — più **22** in
+- **3 voci aperte** — **P1 0 · P2 0** · P3 1 · **P4 1** · P5 1 — più **22** in
   «Deciso — NON riaprire». **Le 4 critiche restano chiuse.** Per origine:
   delle **sei** aperte dall'audit di parità Redgate **non ne resta nessuna** —
   l'ultima, il gate d'errore di batch, è stata rimisurata e decisa il
@@ -29,18 +29,22 @@ vedi «Manutenzione» in fondo.
   tutte e due la misura ha allargato la voce: sei buchi invece di uno nelle due
   query del pannello, sette tipi invece dei soli alias nel suggerimento di
   backfill — né dalla P1 del 2026-09-01 sul tipo DROPpato mentre lo lega
-  qualcosa di **Identical**. **Le quattro che restano sono**: l'estrazione di
+  qualcosa di **Identical**. **Le tre che restano sono**: l'estrazione di
   `DeployPreflight`, aperta il 2026-09-01 solo perché `CLAUDE.md` impone di
-  aprire una voce invece di far crescere un file in silenzio; **due d'igiene
-  aperte il 2026-09-01 misurando il gate d'errore** — `NoTransactions` disfatto
-  da `apply`, e `RolledBack` mai misurato nella modalità che ogni script
-  generato usa: **nessuna delle due è dedotta**, entrambe girate contro le
-  classi vere su un container; e l'annuncio pubblico, l'ultima delle **sette**
-  del proprietario, escluso per scelta e non bloccato. Il conteggio va
-  ricontato, non decrementato a mente: `awk` sulle righe di tabella, o si scolla
-  come si era già scollato. L'`awk` che lo dà conta **anche** le righe di
-  «Deciso», che ha la stessa intestazione `| Voce | Reg. |`: 26 righe meno le
-  22 decise fa 4.
+  aprire una voce invece di far crescere un file in silenzio; **una delle due
+  d'igiene aperte il 2026-09-01 misurando il gate d'errore** — `NoTransactions`
+  disfatto da `apply`, girata contro le classi vere su un container e **non
+  dedotta**; e l'annuncio pubblico, l'ultima delle **sette** del proprietario,
+  escluso per scelta e non bloccato. L'altra d'igiene, `RolledBack` mai misurato
+  nella modalità `script`, è **chiusa il 2026-09-02** — e come le sette prima di
+  lei aveva ragione sul buco e torto sulla legge: non è «sempre `false`». Il
+  flag dice se la transazione era **ancora aperta**, e a severità 11 lo è, quindi
+  il rollback viene emesso davvero e `RolledBack` è `true`. Il discriminante non
+  è il numero di Msg — `3701` sta su entrambi i lati — né `XACT_ABORT`, misurato
+  ON e OFF con esito identico. Il conteggio va ricontato, non decrementato a
+  mente: `awk` sulle righe di tabella, o si scolla come si era già scollato. L'`awk` che lo dà
+  conta **anche** le righe di «Deciso», che ha la stessa intestazione
+  `| Voce | Reg. |`: 25 righe meno le 22 decise fa 3.
 - **La parità Redgate è stata eseguita il 2026-08-31 e chiusa**: 21 scenari,
   **zero difetti di parità**, un solo buco dichiarato (extended properties).
   L'unico difetto vero era nostro e nell'attrezzatura — `ParityFixtureTests`
@@ -52,8 +56,8 @@ vedi «Manutenzione» in fondo.
   primo run che ha visto i quattro commit pushati quella sera, dopo che
   `github.com:443` era stato irraggiungibile per ore mentre `api.github.com`
   rispondeva. I DB-backed
-  aggiungono **135** test ai locali della riga sopra: LiveDb 102, Cli acceptance
-  26, Persistence integration 7 — **1144 in tutto**. Misurati il 2026-09-01 su Windows con
+  aggiungono **137** test ai locali della riga sopra: LiveDb 104, Cli acceptance
+  26, Persistence integration 7 — **1146 in tutto**. Misurati il 2026-09-02 su Windows con
   Docker acceso, dove i 7 passano tutti; senza Docker 3 dei 7 si skippano da sé.
   L'exit code di `script` e la forma JSON di `compare` girano solo lì.
 - **La guardia dello skip Testcontainers deve avvolgere `Build()`**, non solo
@@ -262,8 +266,8 @@ Una voce chiusa il 2026-08-20 dal commit che porta questa riga:
 
 ## P4 — Igiene
 
-Sette voci chiuse il 2026-08-20 e una il 2026-09-01, ognuna dal commit che porta
-la sua riga. (Diceva «una» mentre ne elencava sette: ricontate il 2026-09-01.)
+Sette voci chiuse il 2026-08-20, una il 2026-09-01 e una il 2026-09-02, ognuna
+dal commit che porta la sua riga. (Diceva «una» mentre ne elencava sette: ricontate il 2026-09-01.)
 
 | Voce chiusa | Come | Prova |
 |---|---|---|
@@ -275,11 +279,11 @@ la sua riga. (Diceva «una» mentre ne elencava sette: ricontate il 2026-09-01.)
 | La regola DRY era violata dal codice che la governa | Sette delle otto copie inline di icona+etichetta sono ora `Views/Controls/IconButtonContent.axaml` — 65 righe in meno in `MainWindow.axaml`. Il controllo espone `Geometry` e `Text` **più** `IconSize` e `StrokeThickness`: le tre famiglie di pulsanti erano disegnate a 16/14/13 px di proposito, e schiacciarle su un valore solo sarebbe stato un cambio di design nascosto dentro un refactor. **L'ottava resta inline ed è l'eccezione dichiarata**: «Allinea destinazione» ha un triangolo pieno senza contorno e l'etichetta SemiBold in `PrimaryFgBrush` | `IconButtonContentTests` — 3 test, di cui uno è il controllo in negativo sui tre pesi. **Sonda di mutazione:** con un `Data` fisso nel template i primi due test passavano lo stesso — l'asserzione è stata stretta finché non ha visto la differenza (`BeSameAs`), e allora la sonda è caduta. Il guscio va costruito **con un confronto pubblicato**, altrimenti la barra azioni non entra nell'albero visuale e se ne contano cinque su sette |
 | Gli invarianti UI non erano asseriti in sé | `UiInvariantTests` — 13 test — chiede alle **brush**, non ai nomi delle classi: `.ghost` non vuol più dire trasparente e il nome è l'unica cosa di cui non fidarsi. Copre la regola #1 su tutte e undici le classi di pulsante e la regola #2 sui cinque controlli monoriga. **I due «buchi minori» non erano difetti:** il `CheckBox` non ha uno stile suo ma il default Fluent misura già 32 (ora asserito, quindi se si muove lo si sa), e `SaveProjectDialog` usa `ghost` per Annulla perché la regola #1 dice esattamente questo — `ghost` **è** il neutro pieno, e Annulla è un'azione di utilità | `UiInvariantTests`, più il controllo in negativo su `Button.swap`, che è 36×36 per eccezione dichiarata: senza, la regola dell'altezza si soddisferebbe mettendo 32 su tutto. **Due sonde di mutazione:** rimesso `Transparent` su `.ghost` cade un caso della teoria; portata l'altezza a 28 cade l'altro test |
 | Le `DROP` non seguivano una politica sola | **Decisione del proprietario, 2026-09-01: tutte NUDE.** Erano guardate esattamente i quattro kind MODULO (view, function, procedure, trigger) con `DROP … IF EXISTS`, nudi gli altri nove — uno schema coerente ma senza regola scritta, e con il peggio delle due politiche: una seconda esecuzione superava i drop dei moduli e moriva sulla prima tabella (Msg 3701), lasciando il target a metà. Ora **un DROP che fallisce dice una cosa vera**: il target non è più quello che il confronto ha letto, e il resto dello script è un delta calcolato su un database che si è mosso. Ne segue che uno script generato **non va rieseguito**: dopo un fallimento si ri-confronta e si rigenera. Il parity doc la chiamava «un'inconsistenza interna, non una divergenza» — Redgate non decideva per noi | Quattro emittenti, e la regola scritta in **due** posti perché nessuno la rimetta per distrazione: il `<para>` sul doc di `ScriptGenerator`, che nomina il caso a cui rispondere prima di riaggiungere una guardia, e la sezione «Why no DROP is guarded» di `docfx/articles/cli.md`. Quattro golden **rinominati insieme al contenuto**, perché il nome del file conteneva l'asserzione (`Drop_view_emits_DROP_VIEW_IF_EXISTS` → `…_emits_a_bare_DROP_VIEW`), più tre siti d'asserzione (`DropOrderingTests`, `ModuleSetOptionsTests`, `ParityFixtureTests`). **Quattro sonde di mutazione, quattro uccise** |
+| `RolledBack` non era mai misurato nella modalità `script` | **La voce aveva ragione sul buco e torto sulla legge — e la prima riscrittura di questa riga aveva torto pure lei.** Diceva «lì torna **sempre** `false`»: falso. Rimisurato il 2026-09-02 con il **vero** `DeploymentScriptWriter` e il **vero** `SqlExecutor` su `mssql/server:2022-latest` 16.0.4265.3, leggendo `@@TRANCOUNT` e `XACT_STATE()` sulla connessione che ha fallito. `RolledBack` dice **una cosa sola: se la transazione era ancora aperta quando l'esecutore l'ha chiesto.** Ancora aperta → il `ROLLBACK` viene emesso davvero e il flag è **`true`**: Msg 3701 quando significa «l'oggetto non c'è» (sev 11), Msg 15225 di `sp_rename`, e Msg 4145, un errore di **compilazione** il cui batch non è mai partito. Già sparita → no-op e **`false`**, che è l'under-claim deliberato: Msg 3701 quando significa «permesso negato» (sev **14**), Msg 2714, Msg 1767, Msg 8134. **Due cose che il discriminante NON è.** Non è il numero di Msg: **`3701` sta su tutti e due i lati**, a 11 e a 14. E **non è `XACT_ABORT`**: ogni caso è stato girato col flag ON e di nuovo OFF ed è uscito **identico** — cioè quel che il resto del repo già diceva («la ragione è la severità, non `XACT_ABORT`»), che la prima stesura di questa voce aveva contraddetto. La severità segue lo spartiacque per gli errori di run-time; il 4145 a sev 15 è il caso che mostra che è un buon predittore e non il meccanismo. E `true` **non salva il bersaglio, lo certifica**: nel ramo «ancora aperta» chiudere la connessione la rollerebbe indietro comunque, quindi emettere il `ROLLBACK` serve a poter **dire** che il bersaglio è intatto. Quel ramo è anche il modo più probabile in cui un deploy vero fallisce: la `DROP` nuda di un oggetto che non c'è più, cioè il secondo giro già dichiarato non supportato. Corretti nello stesso commit **due** testi in `src/` che la misura smentiva: il `<remarks>` di `SqlExecutor.TryRollbackAsync` («no-op su una transazione già condannata», «guadagna il pane su TIMEOUT e CANCELLATION») e — 138 righe più su, quindi facile da non vedere — il **param doc pubblico** di `useOwnTransaction`, che prometteva «the script's own `XACT_ABORT`/`ROLLBACK` logic takes full effect» mentre il footer dello script non gira mai, perché l'esecutore si ferma al batch che lancia | `DeployErrorHandlingTests.Script_mode_reports_rollback_by_severity_with_the_target_intact` — `[Theory]` a due righe **della stessa identica forma** (un oggetto creato, poi una istruzione che fallisce), così l'unica cosa che varia è quanto duro è stato il fallimento: `DROP` di ciò che non c'è → 3701/11 → `true`; `CREATE` di ciò che c'è già → 2714/16 → `false`. Ogni riga asserisce **quattro** cose insieme: la `PRINT` dell'etichetta — senza la quale «bersaglio pulito» non proverebbe niente, perché sarebbe pulito anche se il primo batch non fosse mai partito — il **numero** e la **severità** dell'errore, lo stato del bersaglio, e `RolledBack`. Lo script è costruito dal **vero** writer, non ricopiato. **Tre sonde di mutazione sulle asserzioni nuove, tre uccise**: etichetta della `PRINT` cambiata (cadono entrambe le righe), numero di Msg 3701→1767 sulla riga sev 11, e `false`→`true` su quella sev 16 |
 
 | Voce | Reg. | Sforzo | Evidenza verificata |
 |---|---|---|---|
 | **`ComparisonOptions.NoTransactions` viene disfatto da `apply`, e non ha mai prodotto uno script che tocchi un server.** Misurato il 2026-09-01 con le classi vere, non dedotto: uno script costruito da `DeploymentScriptWriter` con `useTransaction: false` non porta né il marker `-- dbdelta:transaction=script` né un `BEGIN TRANSACTION`, quindi `SqlExecutor.ScriptManagesItsOwnTransaction` torna **false** e `ApplyCommand` calcola `useOwnTransaction = true`: il JSON stampa `"transaction": "client"`, `rolledBack: true`, e il batch 1 viene rollato indietro. Cioè lo script generato **per non stare in una transazione** ci finisce dentro lo stesso, a meno che l'operatore non passi **anche** `--no-transaction` — e l'unica ragione per cui quel flag esiste è uno script che dentro una transazione non può girare. Il JSON è onesto (dice `client`), ma nulla avverte, e le due opzioni con lo stesso nome vivono su due lati del confine senza parlarsi. Nella stessa modalità il verdetto continua a emettere `IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION`, che sotto la transazione del client rollerebbe indietro **quella del client** dall'interno dello script: **non raggiungibile via SqlClient**, che si ferma alla prima `SqlException` prima del verdetto, e raggiungibile solo in SSMS, dove però la transazione client non c'è — quindi è una forma da guardare, non un difetto aperto. Tutta la copertura del flag sono **due asserzioni di forma**, il valore del bit e la presenza del nome nella lista | 2026-09-01 | S | `ScriptGenerator.cs:451` (`useTransaction`), `ApplyCommand` (`selfManaged` / `useOwnTransaction`), `SqlExecutor.ScriptManagesItsOwnTransaction`; test: solo `ComparisonOptionsTests.cs:27` e `:43` |
-| **`RolledBack` non è mai misurato nella modalità `script` — la sola che uno script generato usa — e lì torna sempre `false`.** Misurato il 2026-09-01: applicando uno script con l'inviluppo (marker presente, quindi `useOwnTransaction: false`) che fallisce al secondo batch, il bersaglio resta **provatamente intatto** — l'oggetto creato dal batch 1 non c'è — e `RolledBack` è comunque **`false`**. È l'under-claim deliberato di `SqlExecutor.TryRollbackAsync`, «true solo per un rollback che questo metodo ha davvero emesso», quindi il valore non mente; ma non porta **alcuna** informazione proprio dove servirebbe, perché per ogni script DbDelta l'operatore legge sempre il pessimista, e il campo esiste per distinguere «non è stato applicato nulla» da «non lo sappiamo». Le due asserzioni su server vero coprono le altre due modalità, `client` e `none`; di `"transaction": "script"` non c'è **nessuna** asserzione in tutto l'albero. Il rischio non è il comportamento di oggi: è che qualcuno lo «aggiusti» in over-claim sopra un bersaglio mezzo migrato senza che cada niente | 2026-09-01 | XS | `SqlExecutor.TryRollbackAsync` (ramo senza `tx`), `ApplyCommand.cs:115`; test: `ApplyCommandTests.cs:86-87` (`client`) e `:120-121` (`none`), nessuno su `script` |
 
 ---
 

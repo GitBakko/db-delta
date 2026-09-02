@@ -74,8 +74,12 @@ public static partial class SqlExecutor
     /// single transaction it owns and rolls back on failure.  Set to
     /// <see langword="false"/> when the script manages its own transaction (e.g. a
     /// self-contained deploy script with <c>BEGIN TRANSACTION … ROLLBACK</c>); in
-    /// that case no outer transaction is started so the script's own
-    /// <c>XACT_ABORT</c>/<c>ROLLBACK</c> logic takes full effect.
+    /// that case no outer transaction is started, so the script's envelope is the
+    /// only one. Its FOOTER, though, does not get to act on a failure: this method
+    /// stops at the batch that throws, so the script's <c>IF @@ERROR</c> gate and
+    /// its closing verdict never run. What keeps the target whole is that the
+    /// script's <c>COMMIT</c> is never reached — not the rollback the footer
+    /// would have emitted.
     /// </param>
     /// <param name="commandTimeoutSeconds">
     /// Per-batch command timeout. <c>0</c> means unlimited, which is what a DBA
@@ -208,15 +212,44 @@ public static partial class SqlExecutor
     /// </returns>
     /// <remarks>
     /// Two cases. With a client-owned transaction we roll that back. Without one
-    /// — the self-contained deploy script manages its own — the script's
-    /// <c>XACT_ABORT</c> plus its failure gate normally handle it, and this is a
-    /// no-op on an already-doomed transaction. It earns its keep on TIMEOUT and
-    /// CANCELLATION, where the client gave up mid-batch and the script's own
-    /// footer never ran, so a server-side transaction can still be open. Purely
-    /// best-effort: after a timeout the connection may be unusable, and in that
-    /// case dispose (which returns it to the pool and triggers
-    /// <c>sp_reset_connection</c>) is what actually rolls it back — we just
-    /// cannot confirm it, so we report false rather than claim it.
+    /// — the self-contained deploy script manages its own — this method reports
+    /// exactly one thing: whether the transaction was STILL OPEN when we asked.
+    /// Measured rather than assumed, on <c>mssql/server:2022-latest</c>
+    /// 16.0.4265.3, reading <c>@@TRANCOUNT</c> and <c>XACT_STATE()</c> on the
+    /// failing connection itself.
+    /// <list type="bullet">
+    /// <item>Still open, so the ROLLBACK below really is issued and we report
+    /// true: Msg 3701 where it means "the object is not there" (severity 11),
+    /// Msg 15225 from <c>sp_rename</c>, and Msg 4145, a compile error whose batch
+    /// never ran at all.</item>
+    /// <item>Already gone, so this is a no-op and we report false: Msg 3701 where
+    /// it means "you do not have permission" (severity 14), Msg 2714, Msg 1767,
+    /// Msg 8134.</item>
+    /// </list>
+    /// Two things the discriminant is NOT. It is not the message number: Msg 3701
+    /// sits on both lists, at severity 11 and at severity 14. And it is not
+    /// <c>XACT_ABORT</c> — every case above was run with the flag ON and again
+    /// with it OFF and came out identical, which is what the rest of this repo
+    /// already says (see the <c>&lt;remarks&gt;</c> on
+    /// <c>DeploymentScriptWriter</c>: "the reason is severity rather than
+    /// XACT_ABORT"). Severity tracks the split for the run-time errors; the
+    /// compile error at severity 15 is the case that shows severity is a good
+    /// predictor and not the mechanism.
+    /// <para>
+    /// What true buys is CONFIRMATION, not preservation. In the still-open case
+    /// disposing the connection returns it to the pool and rolls the transaction
+    /// back anyway, so the target survives either way — issuing the ROLLBACK
+    /// ourselves is how we get to SAY it survived. And that case is the likeliest
+    /// way a real deploy fails: a bare DROP of an object that is no longer there,
+    /// i.e. the second run that bare DROPs already declare unsupported. The
+    /// script's own footer helps in neither case, because this executor stops at
+    /// the batch that throws — the <c>IF @@ERROR</c> gate and the final verdict
+    /// never run. It earns its keep on TIMEOUT and CANCELLATION too, where the
+    /// client gave up mid-batch. Purely best-effort: after a timeout the
+    /// connection may be unusable, and in that case dispose (which returns it to
+    /// the pool and triggers <c>sp_reset_connection</c>) is what rolls it back —
+    /// we just cannot confirm it, so we report false rather than claim it.
+    /// </para>
     /// <para>
     /// In that second case the answer comes from <c>@@TRANCOUNT</c>, not from
     /// the command succeeding. One branch used to serve two opposite meanings

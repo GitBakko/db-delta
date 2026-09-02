@@ -1,3 +1,5 @@
+using System.Text;
+using DbDelta.Core.ScriptGen;
 using DbDelta.Persistence.Sql;
 using FluentAssertions;
 using Microsoft.Data.SqlClient;
@@ -57,7 +59,9 @@ public class DeployErrorHandlingTests(LiveDbFixture fixture)
         SqlBatchResult result = await SqlExecutor.ExecuteAsync(conn, script, ct, useOwnTransaction: false);
         result.Success.Should().BeFalse("the failing FK step must surface as a failure");
         (await ObjectExistsAsync(conn, "dbo.ErrA", ct)).Should().BeFalse("rolled back");
-        (await ObjectExistsAsync(conn, "dbo.ErrC", ct)).Should().BeFalse("skipped under NOEXEC");
+        (await ObjectExistsAsync(conn, "dbo.ErrC", ct)).Should().BeFalse(
+            "never sent at all: the executor stops at the batch that throws, so the "
+            + "NOEXEC gate this script writes never gets to run");
     }
 
     [Fact]
@@ -160,6 +164,78 @@ public class DeployErrorHandlingTests(LiveDbFixture fixture)
         result.Errors.Should().BeEmpty();
         result.Messages.Should().ContainSingle()
             .Which.Text.Should().Contain("Creating [dbo].[MsgOk]");
+    }
+
+    /// <summary>
+    /// The mode every generated script deploys in, and the one nothing asserted
+    /// before: the script carries its own transaction, so
+    /// <c>useOwnTransaction</c> is false and <see cref="SqlExecutor"/> owns no
+    /// transaction to roll back. <c>RolledBack</c> there reports whether the
+    /// transaction was still open when the executor asked, and that is only
+    /// legible next to the target's real state — so both rows assert the pair,
+    /// on a script built by the real <see cref="DeploymentScriptWriter"/> rather
+    /// than a hand-typed lookalike that could drift from what the app ships.
+    /// </summary>
+    /// <remarks>
+    /// The two rows are deliberately the SAME SHAPE — one object created, then
+    /// one statement that fails — so the only thing that varies is how hard the
+    /// server failed. Dropping an object that is not there raises Msg 3701 at
+    /// severity 11, which does not abort the transaction: it is still open, the
+    /// rollback really is issued, and <c>true</c> is accurate. Creating an object
+    /// that already exists raises Msg 2714 at severity 16, which does abort it:
+    /// nothing is left to roll back and <c>false</c> is the deliberate under-claim
+    /// of a flag documented as "known to be unchanged". The target is intact in
+    /// both, which is why asserting <c>RolledBack</c> on its own would pin half a
+    /// contract — and why the label PRINT is asserted too, since a clean target
+    /// proves nothing unless the earlier batch actually ran.
+    /// <para>
+    /// Measured on <c>mssql/server:2022-latest</c> 16.0.4265.3 before it was
+    /// written. The backlog entry that opened this said <c>RolledBack</c> is
+    /// "always false" in this mode; it is not. Two things the split is NOT, also
+    /// measured: the message number — Msg 3701 is severity 11 for "the object is
+    /// not there" and severity 14 for "you do not have permission", and only the
+    /// second aborts — and <c>XACT_ABORT</c>, since every case came out identical
+    /// with the flag ON and with it OFF. The <c>IF @@ERROR</c> gate plays no part
+    /// either: SqlClient throws on the first error of severity 11 or higher and
+    /// the executor stops at that batch, so neither the gate nor the closing
+    /// verdict ever runs.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [InlineData("Sev11", "DROP TABLE [dbo].[NotThere];", 3701, 11, true)]
+    [InlineData("Sev16", "CREATE TABLE [dbo].[RbA] (Id int NOT NULL);", 2714, 16, false)]
+    public async Task Script_mode_reports_rollback_by_severity_with_the_target_intact(
+        string tag, string failingBody, int number, int severity, bool expectedRolledBack)
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        string conn = await FreshDbAsync($"DeployRb{tag}", ct);
+
+        StringBuilder sb = new();
+        DeploymentScriptWriter writer = new(sb, useTransaction: true);
+        writer.WritePreamble(includeHeader: false);
+        writer.WriteBatch("Creating [dbo].[RbA]", "CREATE TABLE [dbo].[RbA] (Id int NOT NULL);");
+        writer.WriteBatch("The step that fails", failingBody);
+        writer.WriteVerdict();
+        string script = sb.ToString();
+
+        SqlExecutor.ScriptManagesItsOwnTransaction(script).Should().BeTrue(
+            "apply reads the marker to decide, and this is the shape it decides on");
+
+        SqlBatchResult result = await SqlExecutor.ExecuteAsync(
+            conn, script, ct, useOwnTransaction: false);
+
+        result.Success.Should().BeFalse();
+        result.Messages.Select(m => m.Text).Should().Contain(
+            t => t.Contains("Creating [dbo].[RbA]", StringComparison.Ordinal),
+            "the earlier batch has to have run, or a clean target would prove nothing");
+        result.Errors.Should().Contain(
+            e => e.Number == number && e.Severity == severity,
+            "this row is about that failure and no other");
+        (await ObjectExistsAsync(conn, "dbo.RbA", ct)).Should().BeFalse(
+            "the script's COMMIT was never reached, so the earlier batch does not survive");
+        result.RolledBack.Should().Be(
+            expectedRolledBack,
+            "the field says whether a rollback was ISSUED, not whether the target is clean");
     }
 
     private async Task<string> FreshDbAsync(string db, CancellationToken ct)
