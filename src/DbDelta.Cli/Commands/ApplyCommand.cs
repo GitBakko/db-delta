@@ -116,6 +116,23 @@ internal static class ApplyCommand
             SqlBatchResult result = await SqlExecutor.ExecuteAsync(
                 tgtConn, script, ct, useOwnTransaction, timeout).ConfigureAwait(false);
 
+            // `rolledBack` answers a narrower question than its name: did apply
+            // ITSELF roll back and see it acknowledged. On a script that owns
+            // its transaction — which is every script `dbdelta script` writes —
+            // SQL Server rolls back on its own at severity 14 and above, so
+            // apply finds nothing left to undo and reports false with the whole
+            // deploy already gone. Measured 2026-09-02 on a real catalog: same
+            // script, same Msg 208, `false` both times — 0 objects left with the
+            // envelope, 1599 without it. One bit cannot carry that, and the GUI
+            // has always said it in two different sentences. So the CLI names
+            // the outcome instead of leaving the reader to derive it, and says
+            // `unknown` where it genuinely does not know.
+            string targetState =
+                result.Success ? "applied"
+                : result.RolledBack ? "unchanged"
+                : selfManaged || useOwnTransaction ? "unknown"
+                : "partial";
+
             JsonSerializerOptions opts = new() { WriteIndented = true };
             await Console.Out.WriteLineAsync(JsonSerializer.Serialize(new
             {
@@ -125,6 +142,7 @@ internal static class ApplyCommand
                 totalDurationMs = result.TotalDurationMs,
                 rolledBack = result.RolledBack,
                 transaction = selfManaged ? "script" : useOwnTransaction ? "client" : "none",
+                targetState,
             }, opts)).ConfigureAwait(false);
 
             return ct.IsCancellationRequested

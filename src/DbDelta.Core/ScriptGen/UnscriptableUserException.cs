@@ -32,14 +32,27 @@ namespace DbDelta.Core.ScriptGen;
 /// </para>
 /// </remarks>
 public sealed class UnscriptableUserException(DatabaseUser user)
-    : Exception($"Refusing to script the user {Sql.Q(user.Name)}: it is mapped to a login "
-              + "whose name this connection cannot see, so the statement would create it "
-              + "WITHOUT LOGIN and leave a principal nobody can sign in as.")
+    : Exception(MessageFor(user))
 {
     /// <summary>The user that stopped the run.</summary>
     public DatabaseUser User { get; } = user;
 
     public string UserName { get; } = user.Name;
+
+    /// <summary>
+    /// The login is gone rather than merely invisible. Callers word their
+    /// remediation from this: re-reading with a better login fixes the second
+    /// case and cannot fix the first.
+    /// </summary>
+    public bool LoginIsOrphaned { get; } = user.LoginIsOrphaned;
+
+    private static string MessageFor(DatabaseUser user) =>
+        $"Refusing to script the user {Sql.Q(user.Name)}: "
+        + (user.LoginIsOrphaned
+            ? "the login it is mapped to no longer exists on this server"
+            : "it is mapped to a login whose name this connection cannot see")
+        + ", so the statement would create it WITHOUT LOGIN and leave a principal "
+        + "nobody can sign in as.";
 
     /// <summary>
     /// Throws when the login name was hidden from the reader. The single guard

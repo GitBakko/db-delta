@@ -82,11 +82,16 @@ catch (UnscriptableUserException ex)
 {
     // Same refusal, same code, third securable: emitting this row would have
     // created the user WITHOUT LOGIN instead of mapped to the login it has.
+    // The two causes need two remedies, and the CLI must not name an action it
+    // does not have: it has no way to exclude one object from a run, so it says
+    // what can actually be done on the server instead.
     CliErrorMapper.WriteError(new Error(
         ErrorCode.DataPreservationImpossible,
         ex.Message,
-        $"Re-read that endpoint with a login that can see sys.server_principals, or exclude "
-        + $"the user {ex.UserName} from this run."));
+        ex.LoginIsOrphaned
+            ? $"The login the user {ex.UserName} was created from no longer exists. Re-create that "
+              + $"login, or drop the orphaned user, on the endpoint being read."
+            : $"Re-read that endpoint with a login that can see sys.server_principals."));
     return ExitCodes.ScriptGenerationFailure;
 }
 catch (UnscriptableTableTypeException ex)

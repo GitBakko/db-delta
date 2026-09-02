@@ -31,7 +31,10 @@ internal sealed class UserReader
             sp.name             AS LoginName,
             p.default_schema_name AS DefaultSchema,
             CAST(CASE WHEN sp.name IS NULL AND p.authentication_type IN (1, 3)
-                      THEN 1 ELSE 0 END AS bit) AS LoginNameIsHidden
+                      THEN 1 ELSE 0 END AS bit) AS LoginNameIsHidden,
+            CAST(CASE WHEN sp.name IS NULL AND p.authentication_type IN (1, 3)
+                      AND HAS_PERMS_BY_NAME(NULL, NULL, 'VIEW ANY DEFINITION') = 1
+                      THEN 1 ELSE 0 END AS bit) AS LoginIsOrphaned
         FROM sys.database_principals AS p
         LEFT JOIN sys.server_principals AS sp ON sp.sid = p.sid
         WHERE p.type IN ('S','U','G','E','X')
@@ -54,6 +57,7 @@ internal sealed class UserReader
             result.Add(new DatabaseUser(name, type, login, defaultSchema)
             {
                 LoginNameIsHidden = r.GetBoolean(4),
+                LoginIsOrphaned = r.GetBoolean(5),
             });
         }
         return result;

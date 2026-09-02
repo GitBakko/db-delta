@@ -103,4 +103,51 @@ public class HiddenLoginNameTests
         new UserScriptEmitter().EmitCreate(new DatabaseUser("orphan", "S", null, "dbo"))
             .Should().Be("CREATE USER [orphan] WITHOUT LOGIN;");
     }
+
+    /// <summary>
+    /// The refusal has to say WHICH of the two it is. Both come back as a NULL
+    /// login name with an authentication_type that says "mapped", so one flag
+    /// cannot tell them apart — and the smoke of 2026-09-02 measured what that
+    /// costs: connected as sa with sysadmin = 1 against a real database, the
+    /// message blamed metadata visibility for a login that simply did not
+    /// exist, and sent the reader after a permission problem there was no way
+    /// to fix. The refusal itself is unchanged; only the words are.
+    /// </summary>
+    [Fact]
+    public void An_orphaned_user_is_refused_for_the_reason_it_actually_has()
+    {
+        Action act = () => new UserScriptEmitter().EmitCreate(Orphaned("appuser"));
+
+        act.Should().Throw<UnscriptableUserException>()
+            .Which.Message.Should().Contain("no longer exists")
+            .And.NotContain("cannot see",
+                "as sa there is nothing hidden — saying so sends the reader after a ghost");
+    }
+
+    [Fact]
+    public void A_hidden_login_name_is_still_refused_for_ITS_reason()
+    {
+        Action act = () => new UserScriptEmitter().EmitCreate(Hidden("appuser"));
+
+        act.Should().Throw<UnscriptableUserException>()
+            .Which.Message.Should().Contain("cannot see")
+            .And.NotContain("no longer exists");
+    }
+
+    /// <summary>
+    /// The control. An orphaned user is still a user mapped to a login as far
+    /// as the catalog is concerned, so it must keep comparing Identical against
+    /// a reader that CAN see the login — the rule this whole file exists for.
+    /// </summary>
+    [Fact]
+    public void An_orphaned_user_does_not_become_Different()
+    {
+        ComparisonResult r = Compare(Visible("appuser", "appuser_login"), Orphaned("appuser"));
+
+        r.Differences.Where(p => p.Identity.Kind == "User")
+            .Should().OnlyContain(p => p.Status == DifferenceStatus.Identical);
+    }
+
+    private static DatabaseUser Orphaned(string name, string schema = "dbo") =>
+        new(name, "S", null, schema) { LoginNameIsHidden = true, LoginIsOrphaned = true };
 }

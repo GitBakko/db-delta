@@ -175,7 +175,10 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
         const string sql = """
             SELECT p.type, sp.name AS LoginName, p.default_schema_name,
                    CAST(CASE WHEN sp.name IS NULL AND p.authentication_type IN (1, 3)
-                             THEN 1 ELSE 0 END AS bit) AS LoginNameIsHidden
+                             THEN 1 ELSE 0 END AS bit) AS LoginNameIsHidden,
+                   CAST(CASE WHEN sp.name IS NULL AND p.authentication_type IN (1, 3)
+                             AND HAS_PERMS_BY_NAME(NULL, NULL, 'VIEW ANY DEFINITION') = 1
+                             THEN 1 ELSE 0 END AS bit) AS LoginIsOrphaned
             FROM sys.database_principals AS p
             LEFT JOIN sys.server_principals AS sp ON sp.sid = p.sid
             WHERE p.name = @name;
@@ -191,6 +194,7 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
             DefaultSchema: r.IsDBNull(2) ? "dbo" : r.GetString(2))
         {
             LoginNameIsHidden = r.GetBoolean(3),
+            LoginIsOrphaned = r.GetBoolean(4),
         };
 
         // This body is read, not run: the diff viewer renders it. EmitCreate
@@ -198,7 +202,8 @@ public sealed class LiveDbObjectBodyResolver(string sourceConnectionString, stri
         // throw here would empty the pane for a row the grid can perfectly well
         // show — the same failure as an unscriptable index, one kind over.
         return user.LoginNameIsHidden
-            ? $"-- USER {Sql.Q(user.Name)} is mapped to a login this connection cannot name "
+            ? $"-- USER {Sql.Q(user.Name)} is mapped to a login "
+              + (user.LoginIsOrphaned ? "that no longer exists on this server " : "this connection cannot name ")
               + $"(DEFAULT_SCHEMA = {Sql.Q(user.DefaultSchema)}) — read, not scriptable by DbDelta"
             : new UserScriptEmitter().EmitCreate(user);
     }

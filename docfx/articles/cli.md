@@ -97,6 +97,46 @@ its `transaction` field:
 | `client` | The script does not say, and no line-anchored `BEGIN TRANSACTION` was found, so `apply` wraps every batch in one transaction and rolls back on the first failure. |
 | `none` | The script declares `-- dbdelta:transaction=none`, or `--no-transaction` was passed **on a script that does not manage its own**. Each batch commits as it runs, and a failure halfway leaves the target halfway. `--no-transaction` against a `-- dbdelta:transaction=script` script still reports `script`: the flag only removes a client transaction, and there was never going to be one. |
 
+
+### What `rolledBack` does and does not promise
+
+`apply`'s JSON also carries a `rolledBack` field, and it answers a narrower
+question than its name suggests: **did `apply` itself issue a rollback and see
+it acknowledged.** Read it as a one-way guarantee.
+
+| `rolledBack` | What you may conclude |
+|--------------|-----------------------|
+| `true` | The target is unchanged. `apply` rolled back and the server confirmed it. |
+| `false` | **Nothing.** Either the run succeeded, or the failure left the outcome indeterminate from the client's side. It is *not* a statement that the target kept the work. |
+
+The case that surprises people is a script that manages its own transaction —
+which is every script `dbdelta script` writes, unless you asked for
+`--no-transaction`. SQL Server rolls such a transaction back on its own for a
+failure at severity 14 or above, so by the time `apply` looks there is no open
+transaction left for it to roll back, and it reports `false` with the whole
+deploy already undone.
+
+Measured on 2026-09-02 against a real catalog, same script and the same
+`Msg 208`, two throwaway targets:
+
+| Run | `transaction` | `rolledBack` | `batchesExecuted` | Objects left in the target |
+|-----|---------------|--------------|-------------------|----------------------------|
+| with the envelope | `script` | `false` | 1400 | **0** — everything undone |
+| `--no-transaction` | `none` | `false` | 1398 | **1599** — everything kept |
+
+Same field, same value, opposite outcomes. So `apply` also emits `targetState`,
+which names the outcome instead of leaving you to derive it:
+
+| `targetState` | Meaning |
+|---------------|---------|
+| `applied` | The run succeeded. |
+| `unchanged` | `apply` rolled back and the server acknowledged it. |
+| `partial` | There was no transaction (`transaction` is `none`), so the batches before the failure are committed and stay committed. |
+| `unknown` | The script or the client owned a transaction, and `apply` could not confirm what became of it. Usually the server had already rolled it back — but "usually" is not a guarantee, and this field will not pretend otherwise. |
+
+On `unknown`, the target's own catalog is the only unambiguous answer: re-run
+`dbdelta compare`.
+
 ### Why no DROP is guarded
 
 Every `DROP` DbDelta writes is bare. There is no `IF EXISTS` and no existence

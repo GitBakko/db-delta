@@ -6,6 +6,135 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-09-02 — the deploy stops writing statements that mean something else
+
+Eighty-nine commits since `1.0.2`, and one theme runs through nearly all of
+them: where DbDelta could not write a statement that means what the source
+means, it used to write one anyway — not an invalid statement, a **valid one
+that quietly meant something else**, under a green banner. A memory-optimized
+table type came back as a disk-based one. A table type kept its columns and lost
+its keys. A user whose login the connection could not read was re-created
+`WITHOUT LOGIN`. Each of those is now a refusal that names the object and exits
+on a code a pipeline can gate on.
+
+`1.1.0` and not `1.0.3`: there are new CLI options, new refusals and new output
+fields, all of them additive and backward compatible, which is a MINOR under
+SemVer. Windows Installer compares the first three fields of `ProductVersion`,
+so `1.1.0` upgrades `1.0.2` in place.
+
+### Added
+
+- **`dbdelta script --no-transaction`.** Generates a script that opens no
+  transaction of its own and says so with `-- dbdelta:transaction=none` on its
+  first line, so `apply` does not wrap it in one either. For a deploy that
+  cannot run inside a transaction. A failure halfway leaves the target halfway:
+  re-compare and re-generate, never re-run the script.
+- **Generated scripts declare who owns the transaction.** Every script now
+  carries `-- dbdelta:transaction=script` or `-- dbdelta:transaction=none` on
+  its first line, and `apply` reads it. The declaration beats the syntactic
+  guess, which matters more than it sounds: `BEGIN TRANSACTION` at the start of
+  a line is something a `CREATE PROCEDURE` body carries perfectly innocently —
+  a real 52,000-line script measured on 2026-09-02 had fifteen of them — and
+  without the declaration such a script was reported as self-managed while
+  running inside no transaction at all.
+- **`apply` reports `targetState`.** `applied`, `unchanged`, `partial`, or
+  `unknown`. `rolledBack` answers a narrower question than its name suggests —
+  did `apply` itself roll back and see it acknowledged — and on a script that
+  owns its transaction the server rolls back first, so `rolledBack` reads
+  `false` with the whole deploy already undone. Measured against a real catalog:
+  the same script and the same `Msg 208` reported `false` both ways, leaving
+  **0** objects in the target with the transaction envelope and **1599**
+  without it. `targetState` names the outcome, and says `unknown` where the
+  client genuinely cannot know rather than borrowing a neighbour's answer.
+- **Refusals instead of silent damage**, each with its own exit code and a
+  message naming the object: a rebuild that would drop a columnstore index
+  (exit 30), a memory-optimized table type, an alias type still bound by
+  something the script does not touch, a rebuild blocked by a `SCHEMABINDING`
+  module, a permission on an object the reading login cannot resolve, a user
+  mapped to a login that is missing or unreadable, and an unresolvable
+  dependency cycle (exit 31 — a `CHECK` calling a function that reads its own
+  table is a legal schema, and used to exit 99 with "open an issue").
+- **The comparison discloses what it did not examine.** An amber band in both
+  the GUI and the CLI names the kinds and the counts left out, so "no
+  differences" stops meaning two different things.
+- **The deploy script is shown before it runs**, with the objects that will be
+  dropped named in the confirmation, and the passwords in both connection
+  strings redacted.
+- **The HTML report is reachable from the app**, not only from the CLI.
+- **A compare can be cancelled** while it runs, and catalog reads carry a
+  command timeout so a read blocked behind someone else's schema lock ends by
+  itself instead of hanging forever.
+- **Release artefacts carry a SHA256 and a build-provenance attestation.**
+
+### Changed
+
+- **`dbdelta script` exits 1 when differences are pending**, 0 when the two
+  sides are aligned. It used to return 0 either way, so a CI step gating on the
+  exit code never saw pending work. `compare` and `report` always distinguished
+  the two.
+- **Every `DROP` is bare** — no `IF EXISTS`, no existence probe, on any kind.
+  A `DROP` that fails is telling you something true: the target is no longer the
+  database the comparison read. It follows that a generated script is not meant
+  to be run twice; after a failure, re-compare and re-generate.
+- **System-named constraints pair by shape, not by name**, and are emitted
+  unnamed, so two servers that named the same constraint differently stop
+  producing a `DROP`/`CREATE` churn that changes nothing.
+- **A login name the reader cannot see is not a login name that differs.**
+  Under a least-privilege account every user used to compare Different, and the
+  script dropped and re-created principals that were already correct.
+
+### Removed
+
+- Fourteen `ComparisonOptions` flags that nothing read, `ProjectOptions` and the
+  owner/table mappings, and several unreachable views — each removed on an
+  explicit decision rather than left as dead weight.
+
+### Fixed
+
+- **Table types lost everything but their columns on a rebuild** — primary keys,
+  unique constraints and checks all silently dropped.
+- **Alias types**: one outside `dbo` was named as if it were inside it; a bare
+  `dbo` name bound to whichever type the deployer could see; a sequence declared
+  on one came out before the type existed and its `DROP` came after; and a
+  column of one carried a `COLLATE` clause the deploy rejects.
+- **A `PRIMARY KEY (A ASC, B DESC)` came back all-ascending**, and the next
+  rebuild made the target match the wrong reading.
+- **A rebuilt table left every view over it reporting the old column types.**
+- **A rebuild did not carry the defaults the row copy needs.**
+- **The backfill suggestion answered `('')` for any type it did not recognise**,
+  which for an alias over `bigint` quietly means `0`.
+- **A `CHECK` that calls a function is a dependency**, and was not being treated
+  as one.
+- **Indexes on indexed views were invisible**, and only rowstore index types
+  were read at all.
+- **The diff pane read the catalog through an aged copy** of the readers and hid
+  six kinds of difference, including a columnstore absent from both panes while
+  the compared model had it.
+- **The diff pane showed one object's SQL under another's name.**
+- **Four critical defects** found by a full backlog re-verification: a permission
+  on an unresolved object was written as a database-wide `GRANT`; two
+  permissions sharing an object identity crashed the app; an unbounded
+  `stackalloc` and reserved device names in report filenames; and stored
+  credentials followed the user when the server name changed.
+- **Dialogs answer Invio and Esc**, the grid sorts what its headers promise, and
+  the pre-deploy script pane opens where it can be read rather than scrolled to
+  the far corner of a window that could not be resized.
+
+### Performance
+
+- **The diff panes stopped drawing one mark per line: 70 s to 0.5 s.**
+- **The comparison runs off the UI thread**, so a large catalog no longer
+  freezes the window, and the diff stopped allocating gigabytes on a large pair.
+
+### Security
+
+- **A real credential used as a test fixture was removed and the history
+  rewritten** on 2026-08-18. Commit hashes older than that date do not resolve.
+- **The password stopped travelling through the UI Automation tree**, where an
+  accessibility client could read it in clear text.
+- **The SQL Browser's UDP reply is no longer taken at its word** — it is the one
+  place the product reads bytes off the network from an unauthenticated source.
+
 ## [1.0.2] — 2026-08-13 — theme follows Windows, and the grid points at the newer side
 
 Two additions to the shell, both driven by what the app looked like in use

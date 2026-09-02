@@ -987,10 +987,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
         catch (UnscriptableUserException ex)
         {
             AppState.LastError =
-                $"Script non generato: l'utente {ex.UserName} è associato a un login di cui questa "
-                + "connessione non può leggere il nome. Scriverlo lo creerebbe WITHOUT LOGIN, cioè "
-                + "senza nessuno che possa autenticarsi. Rileggi quell'estremità con un login che veda "
-                + "sys.server_principals, oppure togli l'utente dalla selezione.";
+                $"Script non generato: l'utente {ex.UserName} è associato a un login "
+                + (ex.LoginIsOrphaned
+                    ? "che su questo server non esiste più"
+                    : "di cui questa connessione non può leggere il nome")
+                + ". Scriverlo lo creerebbe WITHOUT LOGIN, cioè "
+                + "senza nessuno che possa autenticarsi. "
+                + (ex.LoginIsOrphaned
+                    ? "Ricrea quel login, oppure elimina l'utente orfano, sull'estremità che stai leggendo, "
+                    : "Rileggi quell'estremità con un login che veda sys.server_principals, ")
+                + "oppure togli l'utente dalla selezione.";
             StatusText = "Nessuno script generato: vedi il messaggio in alto.";
             return null;
         }

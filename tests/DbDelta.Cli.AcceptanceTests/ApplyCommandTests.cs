@@ -85,6 +85,7 @@ public class ApplyCommandTests(CliFixture fixture)
         // really is rolled back, so the operator is told so.
         stdout.Should().Contain("\"rolledBack\": true");
         stdout.Should().Contain("\"transaction\": \"client\"");
+        stdout.Should().Contain("\"targetState\": \"unchanged\"");
     }
 
     [Fact]
@@ -119,6 +120,60 @@ public class ApplyCommandTests(CliFixture fixture)
         // the old `IF @@TRANCOUNT > 0 ROLLBACK` / return-true branch printed.
         stdout.Should().Contain("\"rolledBack\": false");
         stdout.Should().Contain("\"transaction\": \"none\"");
+        stdout.Should().Contain("\"targetState\": \"partial\"",
+            "the batches before the failure are committed and stay committed");
+    }
+
+    /// <summary>
+    /// The third outcome, and the one the live smoke of 2026-09-02 walked into:
+    /// a script that manages its own transaction, failing at a severity SQL
+    /// Server rolls back by itself. By the time <c>apply</c> looks there is no
+    /// open transaction left to roll back, so <c>rolledBack</c> is
+    /// <c>false</c> — with the whole deploy already undone.
+    /// </summary>
+    /// <remarks>
+    /// Measured against a real catalog before this test was written: the same
+    /// script and the same Msg, with the envelope, reported
+    /// <c>"rolledBack": false</c> after 1400 batches and left <b>zero</b>
+    /// objects in the target; without the envelope it reported the same
+    /// <c>false</c> and left 1599. One field, one value, opposite outcomes —
+    /// which is why <c>targetState</c> exists and why this case has to say
+    /// <c>unknown</c> rather than borrow either neighbour's answer.
+    /// </remarks>
+    [Fact]
+    public async Task A_self_managed_script_that_fails_reports_an_outcome_it_cannot_confirm()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        const string tgtDb = "DbDeltaApplySelfTxTgt";
+        await CreateDb(tgtDb, ct);
+
+        using var sqlScript = TempFile.Sql();
+        await File.WriteAllTextAsync(sqlScript.Path, """
+            BEGIN TRANSACTION
+            GO
+            CREATE TABLE dbo.SelfFirst (Id int NOT NULL);
+            GO
+            CREATE TABLE dbo.SelfBad (Id int NOT NULL, Oops int NOT NULL REFERENCES dbo.NoSuchTable(Id));
+            GO
+            COMMIT TRANSACTION
+            GO
+            """, ct);
+
+        (int exit, string stdout) = await RunCliCapturing(["apply",
+            "--target", ConnectionFor(tgtDb),
+            "--script", sqlScript.Path], ct);
+
+        exit.Should().Be(ExpectedExitCodes.DeploymentFailure);
+        stdout.Should().Contain("\"transaction\": \"script\"");
+        stdout.Should().Contain("\"rolledBack\": false",
+            "the server had already rolled it back, so there was nothing left for apply to undo");
+        stdout.Should().Contain("\"targetState\": \"unknown\"",
+            "apply cannot confirm what happened here, and must not borrow \"unchanged\"");
+
+        // And the catalog, which is the only unambiguous answer: it really is
+        // gone. That is precisely why "rolledBack": false must not be read as
+        // "the target kept the work".
+        (await ObjectExistsAsync(tgtDb, "dbo.SelfFirst", ct)).Should().BeFalse();
     }
 
     [Fact]

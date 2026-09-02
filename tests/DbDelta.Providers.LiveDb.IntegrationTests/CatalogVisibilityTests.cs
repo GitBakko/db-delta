@@ -2,6 +2,7 @@ using DbDelta.Core.Abstractions;
 using DbDelta.Core.Diff;
 using DbDelta.Core.ObjectModel;
 using DbDelta.Core.Options;
+using DbDelta.Core.ScriptGen;
 using FluentAssertions;
 using Microsoft.Data.SqlClient;
 using Xunit;
@@ -141,6 +142,8 @@ public class CatalogVisibilityTests(LiveDbFixture fixture)
         asProbe.IsSuccess.Should().BeTrue(asProbe.Error?.Message);
         asProbe.Value!.Users.Single(u => u.Name == otherUser).LoginNameIsHidden.Should().BeTrue(
             "authentication_type still says the user is mapped to an instance login");
+        asProbe.Value!.Users.Single(u => u.Name == otherUser).LoginIsOrphaned.Should().BeFalse(
+            "the login exists and is merely invisible — calling that orphaned would be a lie");
 
         ComparisonResult r = new ComparisonEngine().Compare(
             asOwner.Value!, asProbe.Value!, ComparisonOptions.Default);
@@ -148,6 +151,89 @@ public class CatalogVisibilityTests(LiveDbFixture fixture)
         r.Differences.Where(p => p.Identity.Kind == "User")
             .Should().OnlyContain(p => p.Status == DifferenceStatus.Identical)
             .And.Contain(p => p.Identity.ObjectName == otherUser);
+    }
+
+
+    /// <summary>
+    /// The two NULLs, told apart. A login the reader may not see and a login
+    /// that is gone both come back as a NULL name with an authentication_type
+    /// that still says "mapped", so one flag reads them the same — and on
+    /// 2026-09-02 that cost a real message: connected as sa against a real
+    /// database, the refusal blamed metadata visibility for a login that did
+    /// not exist and told the operator to re-read with more privilege they
+    /// already had.
+    /// </summary>
+    /// <remarks>
+    /// The control is the point, and it is inside this one test: the SAME
+    /// orphaned user is read twice, once by an account holding
+    /// <c>VIEW ANY DEFINITION</c> and once by one that does not. Both see
+    /// <c>LoginNameIsHidden</c> true — the verdict does not move, and neither
+    /// does the refusal. Only <c>LoginIsOrphaned</c> separates them, and it does
+    /// so for the one reason that can separate them: whether this connection
+    /// would have been shown the login had it existed.
+    /// </remarks>
+    [Fact]
+    public async Task An_orphaned_login_is_told_apart_from_one_merely_hidden()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        const string login = "dbdelta_probe_orphan";
+        const string goneLogin = "dbdelta_gone_login";
+        const string orphanUser = "dbdelta_orphan_user";
+        string dbConn = await SetUpProbeDatabaseAsync(
+            "VisibilityOrphan",
+            login,
+            Grants.ViewDefinition | Grants.SelectOnDependencies,
+            ct);
+        string ownerConn = WithCatalog(fixture.ConnectionString, "VisibilityOrphan");
+
+        // Cleaned per case, not once per run: a login left behind by an earlier
+        // round makes CREATE fail before the statement under test, and the probe
+        // then measures a database that never reached the shape it asserts.
+        await using (SqlConnection master = new(fixture.ConnectionString))
+        {
+            await master.OpenAsync(ct);
+            await Exec(master, $"IF SUSER_ID('{goneLogin}') IS NOT NULL DROP LOGIN {goneLogin};", ct);
+            await Exec(master, $"CREATE LOGIN {goneLogin} WITH PASSWORD = '{Password}';", ct);
+        }
+        await using (SqlConnection db = new(ownerConn))
+        {
+            await db.OpenAsync(ct);
+            await Exec(db, $"IF DATABASE_PRINCIPAL_ID('{orphanUser}') IS NOT NULL DROP USER {orphanUser};", ct);
+            await Exec(db, $"CREATE USER {orphanUser} FOR LOGIN {goneLogin};", ct);
+        }
+        // And now the login goes away underneath it. This is what a restored
+        // database looks like, and it is the shape the live smoke ran into.
+        await using (SqlConnection master = new(fixture.ConnectionString))
+        {
+            await master.OpenAsync(ct);
+            await Exec(master, $"DROP LOGIN {goneLogin};", ct);
+        }
+
+        // The mechanism before the verdict: the name really is NULL for both
+        // readers, so nothing below is explained by one of them still seeing it.
+        (await ReadLoginNameAsync(ownerConn, orphanUser, ct)).Should().BeNull();
+        (await ReadLoginNameAsync(dbConn, orphanUser, ct)).Should().BeNull();
+
+        Result<Database> asOwner = await new LiveDbSource(ownerConn, "source").LoadAsync(ct);
+        Result<Database> asProbe = await new LiveDbSource(dbConn, "target").LoadAsync(ct);
+        asOwner.IsSuccess.Should().BeTrue(asOwner.Error?.Message);
+        asProbe.IsSuccess.Should().BeTrue(asProbe.Error?.Message);
+
+        DatabaseUser seenByOwner = asOwner.Value!.Users.Single(u => u.Name == orphanUser);
+        DatabaseUser seenByProbe = asProbe.Value!.Users.Single(u => u.Name == orphanUser);
+
+        seenByOwner.LoginIsOrphaned.Should().BeTrue(
+            "the reader can see every login, so a missing one is missing, not hidden");
+        seenByProbe.LoginIsOrphaned.Should().BeFalse(
+            "the probe holds no VIEW ANY DEFINITION, so this NULL stays ambiguous "
+            + "and keeps the conservative reading");
+
+        seenByOwner.LoginNameIsHidden.Should().BeTrue("the refusal itself does not move");
+        seenByProbe.LoginNameIsHidden.Should().BeTrue();
+
+        Action refuse = () => new UserScriptEmitter().EmitCreate(seenByOwner);
+        refuse.Should().Throw<UnscriptableUserException>()
+            .Which.Message.Should().Contain("no longer exists");
     }
 
     private static async Task<string?> ReadLoginNameAsync(
