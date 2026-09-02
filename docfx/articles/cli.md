@@ -29,6 +29,7 @@ Generates a dependency-ordered T-SQL deployment script.
 | `--target` | yes | Target connection string. |
 | `--out` | no | Output file path, or `-` for stdout. |
 | `--include-permissions` | no | Emit `GRANT`/`REVOKE` statements (off by default — Redgate-parity). |
+| `--no-transaction` | no | Emit a script that opens no transaction of its own and declares it with `-- dbdelta:transaction=none` on its first line, so `apply` does not add one either. A failure halfway leaves the target halfway: re-compare and re-generate, never re-run the script. |
 
 ```bash
 dbdelta script --source "..." --target "..." --out deploy.sql
@@ -56,18 +57,23 @@ dbdelta apply --target "..." --script deploy.sql --dry-run
 run it, because wrapping it would nest one inside another: `@@TRANCOUNT` reaches
 2 and the script's `COMMIT` only decrements it, so the outer transaction stays
 open and the deploy neither commits nor rolls back. The scripts `dbdelta script`
-writes are exactly that kind and carry a `-- dbdelta:transaction=script` marker
-saying so.
+writes are exactly that kind — unless `--no-transaction` is passed, see below —
+and carry a `-- dbdelta:transaction=script` marker saying so.
 
 A script can also declare the opposite, with `-- dbdelta:transaction=none` **on
 its first line**. `apply` honours it without `--no-transaction` on the command
 line. `ScriptGenerator` writes that marker when a caller passes
-`ComparisonOptions.NoTransactions` — which today **no CLI option and no GUI
-control sets**, so in practice the line is one you put at the top of a script
-yourself. Before the marker existed such a script came out with no envelope at
-all, `apply` could not tell it from a hand-written one, and wrapped it in a
-client transaction — undoing the option that had generated it unless the operator
-passed the flag as well.
+`ComparisonOptions.NoTransactions`, which is what `dbdelta script
+--no-transaction` sets; the GUI has no control for it, so from there the line is
+one you put at the top of a script yourself. Before the marker existed such a
+script came out with no envelope at all, `apply` could not tell it from a
+hand-written one, and wrapped it in a client transaction — undoing the option
+that had generated it unless the operator passed the flag as well.
+
+The two verbs spell the flag the same way on purpose, and it does two different
+things: `script --no-transaction` writes the declaration, `apply
+--no-transaction` suppresses the client transaction. A script that carries the
+declaration needs no flag on `apply` at all.
 
 The marker has to be the FIRST line, not merely present somewhere: this answer
 only ever REMOVES the client transaction, and no flag puts it back, so a marker

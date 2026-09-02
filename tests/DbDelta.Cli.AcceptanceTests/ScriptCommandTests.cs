@@ -300,6 +300,49 @@ public class ScriptCommandTests(CliFixture fixture)
             "the refusal happens during generation, so there is no script to write");
     }
 
+    /// <summary>
+    /// The other half of the no-transaction contract, through the process
+    /// boundary: <c>--no-transaction</c> on <c>script</c> produces the marker
+    /// that <c>apply</c> already knows how to read.
+    /// </summary>
+    /// <remarks>
+    /// <c>ComparisonOptions.NoTransactions</c> was honoured end to end from
+    /// <c>ScriptGenerator</c> to <c>apply</c>, but no front end could ask
+    /// for it: every call site passed <c>ComparisonOptions.Default</c>, so the
+    /// only way to get a <c>=none</c> script out of the published binaries was
+    /// to type the line by hand. This asserts the option reaches the flag —
+    /// a Core unit test cannot, because the CLI is where the gap was.
+    /// </remarks>
+    [Fact]
+    public async Task Writes_a_script_that_declares_no_transaction_when_the_flag_is_passed()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        const string srcDb = "DbDeltaScriptNoTxSrc";
+        const string tgtDb = "DbDeltaScriptNoTxTgt";
+        await CreateDb(srcDb, ct);
+        await CreateDb(tgtDb, ct);
+        await CreateCustomerTable(srcDb, ct);
+
+        using var sqlOut = TempFile.Sql();
+        int exit = await RunCli(["script",
+            "--source", ConnectionFor(srcDb),
+            "--target", ConnectionFor(tgtDb),
+            "--out", sqlOut.Path,
+            "--no-transaction"], ct);
+
+        exit.Should().Be(ExpectedExitCodes.SuccessDifferencesFound);
+        string content = await File.ReadAllTextAsync(sqlOut.Path, ct);
+
+        // StartWith, not Contain: apply reads the FIRST line, on purpose, so a
+        // marker anywhere else would not be honoured and this test would be
+        // asserting something no one can use.
+        content.Should().StartWith("-- dbdelta:transaction=none");
+        content.Should().NotContain("BEGIN TRANSACTION",
+            "the marker has to describe what the script actually does");
+        content.Should().Contain("CREATE TABLE [dbo].[Customer]",
+            "and it still has to be a deploy script");
+    }
+
     private async Task Exec(string db, string sql, CancellationToken ct)
     {
         await using SqlConnection c = new(ConnectionFor(db));

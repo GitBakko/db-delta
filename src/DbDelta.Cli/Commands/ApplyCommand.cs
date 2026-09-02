@@ -11,11 +11,13 @@ namespace DbDelta.Cli.Commands;
 /// executed.
 /// </summary>
 /// <remarks>
-/// Transaction handling is decided per script, because the two modes are
-/// mutually exclusive. A DbDelta-generated script is self-contained — it opens
+/// Transaction handling is decided per script, because the modes are mutually
+/// exclusive. A DbDelta-generated script is self-contained — it opens
 /// its own transaction and gates every step — so wrapping it in a client
 /// transaction would give <c>@@TRANCOUNT = 2</c> and turn its <c>COMMIT</c> into
-/// a bare decrement. Any other script (hand-written, produced by another tool,
+/// a bare decrement; unless it was generated with <c>--no-transaction</c>, in
+/// which case it declares <c>-- dbdelta:transaction=none</c> on its first line
+/// and is given a transaction by no one. Any other script (hand-written, produced by another tool,
 /// or a generated one whose envelope was edited out) gets a client-owned
 /// transaction instead: without one a failure at batch 3 of 5 left the database
 /// half-migrated, which was the only genuine half-migration hole in the product.

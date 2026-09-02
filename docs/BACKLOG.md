@@ -17,7 +17,7 @@ vedi «Manutenzione» in fondo.
   serve**: stampa l'intestazione anche a daemon morto. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **2 voci aperte** — **P1 0 · P2 0 · P3 0 · P4 0** · P5 2 — più **22** in
+- **1 voce aperta** — **P1 0 · P2 0 · P3 0 · P4 0** · P5 1 — più **22** in
   «Deciso — NON riaprire». **Le 4 critiche restano chiuse.** Per origine:
   delle **sei** aperte dall'audit di parità Redgate **non ne resta nessuna** —
   l'ultima, il gate d'errore di batch, è stata rimisurata e decisa il
@@ -29,12 +29,13 @@ vedi «Manutenzione» in fondo.
   tutte e due la misura ha allargato la voce: sei buchi invece di uno nelle due
   query del pannello, sette tipi invece dei soli alias nel suggerimento di
   backfill — né dalla P1 del 2026-09-01 sul tipo DROPpato mentre lo lega
-  qualcosa di **Identical**. **Le due che restano sono entrambe del
-  proprietario**: l'annuncio pubblico, l'ultima delle **sette**, escluso per
-  scelta e non bloccato; e `NoTransactions`, che dal 2026-09-02 `apply` onora da
-  un capo all'altro mentre **nessun front end può chiederla** — aperta dalla
-  review pre-push dei quattro commit di quel giorno, ed è una scelta fra
-  esporla e cancellarla, non un difetto. **Nessuna voce aperta descrive un
+  qualcosa di **Identical**. **L'unica che resta è del proprietario**:
+  l'annuncio pubblico, l'ultima delle **sette**, escluso per scelta e non
+  bloccato. `NoTransactions` — che `apply` onorava da un capo all'altro mentre
+  **nessun front end poteva chiederla**, aperta dalla review pre-push del
+  2026-09-02 come scelta fra esporla e cancellarla, mai come difetto — è
+  **chiusa il 2026-09-02: il proprietario ha scelto di esporla**, ed è
+  `dbdelta script --no-transaction`. **Nessuna voce aperta descrive un
   difetto, e nessuna è lavoro che si possa fare da soli.** L'estrazione di `DeployPreflight` — aperta il 2026-09-01 solo
   perché `CLAUDE.md` impone di aprire una voce invece di far crescere un file in
   silenzio, e mai un difetto — è **chiusa il 2026-09-02**, e anche lei aveva
@@ -46,12 +47,13 @@ vedi «Manutenzione» in fondo.
   aperta**, e a severità 11 lo è, quindi il rollback viene emesso davvero ed è
   `true` — il discriminante non è il numero di Msg (`3701` sta su entrambi i
   lati, a 11 e a 14) né `XACT_ABORT`, misurato ON e OFF con esito identico.
-  `NoTransactions` è chiusa da una **decisione del proprietario**, non da una
-  misura: le due opzioni omonime ora si parlano tramite un marker, e la
-  dichiarazione batte l'euristica. Il conteggio va ricontato, non decrementato a
+  La **P4** `NoTransactions` — quella del marker, da non confondere con la P5
+  omonima chiusa lo stesso giorno — è chiusa da una **decisione del
+  proprietario**, non da una misura: le due opzioni omonime ora si parlano
+  tramite un marker, e la dichiarazione batte l'euristica. Il conteggio va ricontato, non decrementato a
   mente: `awk` sulle righe di tabella, o si scolla come si era già scollato.
   L'`awk` che lo dà conta **anche** le righe di «Deciso», che ha la stessa
-  intestazione `| Voce | Reg. |`: 24 righe meno le 22 decise fa 2.
+  intestazione `| Voce | Reg. |`: 23 righe meno le 22 decise fa 1.
 - **La parità Redgate è stata eseguita il 2026-08-31 e chiusa**: 21 scenari,
   **zero difetti di parità**, un solo buco dichiarato (extended properties).
   L'unico difetto vero era nostro e nell'attrezzatura — `ParityFixtureTests`
@@ -63,9 +65,11 @@ vedi «Manutenzione» in fondo.
   primo run che ha visto i cinque commit pushati quel pomeriggio, cioè le tre
   voci chiuse più la review pre-push. `git ls-remote` ha risposto subito: la
   trappola di rete del 2026-09-01, `github.com:443` irraggiungibile mentre
-  `api.github.com` rispondeva, non si è ripetuta. I DB-backed
-  aggiungono **138** test ai locali della riga sopra: LiveDb 104, Cli acceptance
-  27, Persistence integration 7 — **1155 in tutto**. Misurati il 2026-09-02 su Windows con
+  `api.github.com` rispondeva, non si è ripetuta. Su `ffc1b56`, che è solo
+  documentazione, sono verdi anche `33613604762` (ci) e `33613604727` (docs),
+  ricontrollati il 2026-09-02. I DB-backed
+  aggiungono **139** test ai locali della riga sopra: LiveDb 104, Cli acceptance
+  28, Persistence integration 7 — **1156 in tutto**. Misurati il 2026-09-02 su Windows con
   Docker acceso, dove i 7 passano tutti; senza Docker 3 dei 7 si skippano da sé.
   L'exit code di `script` e la forma JSON di `compare` girano solo lì.
 - **La guardia dello skip Testcontainers deve avvolgere `Build()`**, non solo
@@ -250,7 +254,7 @@ dal commit che porta la sua riga:
 
 | Voce chiusa | Come | Prova |
 |---|---|---|
-| **Parità Redgate: mancava la tua metà** | Fatta. Il proprietario ha eseguito la fixture in SSMS e prodotto lo script Redgate; il diff è stato fatto scenario per scenario e ogni divergenza rivendicata è stata **ri-derivata da una passata indipendente** che ha rifiutato la prima sulla fiducia. **Zero difetti di parità su 21 scenari** — tutti match, cosmetici accettati, o l'unico buco dichiarato (extended properties); un diff meccanico degli insiemi di istruzioni non trova **alcun oggetto** su cui uno strumento agisca e l'altro no. Ma la corsa ha trovato un difetto **nostro, nell'attrezzatura**: `ParityFixtureTests` non passava `dropDependencies`, quindi lo scenario 18 — quello il cui unico scopo è l'ordine di DROP — misurava il fallback `createOrder.Reverse()`, cioè il rango di kind invertito, e non la topologia che CLI (`ScriptCommand.cs:93`) e GUI (`DeployScriptBuilder.cs:105`) danno davvero al generatore. L'ordine di fallback era legale **solo** perché `vLegacyReport` chiama `fnLegacyTotal` senza esserne schema-bound: con `SCHEMABINDING` sulla vista lo stesso fallback droppa la funzione per prima e muore su Msg 3729. Corretto qui: l'ordine di DROP ora coincide con Redgate (`view → function → table`), e il percorso vero di `ScriptCommand` ha finalmente copertura end-to-end. **Cinque rischi aperti come voci a sé** (P1×3, P2, P3) più una di igiene: sono forme che la fixture non raggiunge, non fallimenti di parità | `docs/parity/redgate-2026-08-31.md` — matrice completa dei 21 scenari, le riproduzioni su container e i claim **refutati** rieseguendoli. `ParityFixtureTests` 2/2 verdi con `dropDependencies: target.Dependencies`; `DBDELTA_PARITY_DUMP` rigenera l'artefatto |
+| **Parità Redgate: mancava la tua metà** | Fatta. Il proprietario ha eseguito la fixture in SSMS e prodotto lo script Redgate; il diff è stato fatto scenario per scenario e ogni divergenza rivendicata è stata **ri-derivata da una passata indipendente** che ha rifiutato la prima sulla fiducia. **Zero difetti di parità su 21 scenari** — tutti match, cosmetici accettati, o l'unico buco dichiarato (extended properties); un diff meccanico degli insiemi di istruzioni non trova **alcun oggetto** su cui uno strumento agisca e l'altro no. Ma la corsa ha trovato un difetto **nostro, nell'attrezzatura**: `ParityFixtureTests` non passava `dropDependencies`, quindi lo scenario 18 — quello il cui unico scopo è l'ordine di DROP — misurava il fallback `createOrder.Reverse()`, cioè il rango di kind invertito, e non la topologia che CLI e GUI danno davvero al generatore (l'argomento `dropDependencies:` alla `ScriptGenerator.Generate`, in `ScriptCommand` e in `DeployScriptBuilder`). L'ordine di fallback era legale **solo** perché `vLegacyReport` chiama `fnLegacyTotal` senza esserne schema-bound: con `SCHEMABINDING` sulla vista lo stesso fallback droppa la funzione per prima e muore su Msg 3729. Corretto qui: l'ordine di DROP ora coincide con Redgate (`view → function → table`), e il percorso vero di `ScriptCommand` ha finalmente copertura end-to-end. **Cinque rischi aperti come voci a sé** (P1×3, P2, P3) più una di igiene: sono forme che la fixture non raggiunge, non fallimenti di parità | `docs/parity/redgate-2026-08-31.md` — matrice completa dei 21 scenari, le riproduzioni su container e i claim **refutati** rieseguendoli. `ParityFixtureTests` 2/2 verdi con `dropDependencies: target.Dependencies`; `DBDELTA_PARITY_DUMP` rigenera l'artefatto |
 
 Una voce chiusa il 2026-08-20 dal commit che porta questa riga:
 
@@ -297,18 +301,20 @@ chiuse entrambe il 2026-09-02, dai commit che portano le loro righe qui sopra.
 
 ## P5 — Del proprietario o non verificabile da soli
 
-Due voci chiuse il 2026-09-01 dal commit che porta la loro riga, ed **entrambe
-hanno risposto il contrario di come erano poste**:
+Due voci chiuse il 2026-09-01 e una il 2026-09-02, ognuna dal commit che porta
+la sua riga. **Le prime due hanno risposto il contrario di come erano poste**;
+la terza no, ed è la prima del backlog che aveva ragione su tutt'e tre —
+difetto, taglia e rimedio:
 
 | Voce chiusa | Come | Prova |
 |---|---|---|
 | L'annullamento di una lettura in volo non era mai stato visto | **La voce, e il commento nel codice, dicevano una cosa falsa.** Diceva: «il driver riporta una lettura interrotta come `SqlException -2`, che `LiveDbSource` trasforma in un `CannotConnect` *Result*», e da lì la riga `ct.ThrowIfCancellationRequested()` in `AppStateViewModel` che lo raddrizza. Misurato: **cancellare SOLLEVA**. `Microsoft.Data.SqlClient` onora il token su `ReadAsync` e alza `TaskCanceledException`, che esce da `TableReader` e vola fuori da `LoadAsync` passando accanto a ogni filtro `SqlException`. Il `-2` è ciò che dà un **timeout**: le due cose erano confuse. La riga nel ViewModel **resta**, ma per la corsa che il vecchio commento descriveva per caso — un timeout che scade mentre l'utente preme Annulla torna davvero come `CannotConnect`, e senza quella riga la banda rossa incolperebbe la rete di ciò che l'utente ha appena chiesto. Commento corretto in **due** punti, incluso quello che avevo scritto io nel test prima di misurare | `LargeCatalogTests` — 3 test su container. Il primo semina il catalogo che rende la finestra possibile; senza volume non c'è nulla da interrompere |
 | I 300 s non erano mai stati misurati | **Misurati, e la voce guardava la leva sbagliata.** Non è la DIMENSIONE a raggiungere il tetto: 2000 tabelle, 30.000 colonne, 6000 indici e 500 viste si leggono in **~3 s**, e nessun singolo comando arriva vicino al secondo — due ordini di grandezza di margine. Alle 300 tabelle del test committato sono **341 ms**. Ciò che raggiunge il tetto è **una lettura bloccata dietro il lock di qualcun altro**, che è esattamente ciò che il doc-comment di `ConnectionFactory` ha sempre detto — «a read blocked behind someone else's schema lock has to end by itself, because nothing else would end it» — e che nessuno aveva mai esercitato. Le due candidate che la voce nominava (lettura colonne e lettura indici) non sforano né a quella scala né vicino | Un'altra sessione tiene Sch-M su una tabella, la lettura si blocca e il tetto la chiude: `CannotConnect`, con la rimedizione che nomina `Command Timeout`. **Due sonde di mutazione, due uccise**: tolto il filtro `-2` e tolto il nome del rimedio dal testo. Il tetto è spinto a 1 s nel test perché 300 s in CI sarebbero cinque minuti di attesa per la stessa porta |
+| `NoTransactions` non era richiedibile da nessun front end | **Decisione del proprietario, 2026-09-02: esporla, non cancellarla.** `dbdelta script --no-transaction` mette il flag, e lo script esce col marker `-- dbdelta:transaction=none` in **prima riga**, che `apply` già onorava dal commit del mattino. È **additiva**: nessuna opzione esistente cambia comportamento, la 1.0.2 pubblicata non si rompe. **Questa voce aveva ragione su tutt'e tre** — difetto, taglia (S: la sola opzione è **+21/−1** in `ScriptCommand.cs`, più 43 righe di acceptance) e rimedio, esattamente la `Option<bool>` su `script` che nominava — ed è la prima dopo **nove** di fila che ne sbagliavano almeno una. Due cose che però non vedeva, entrambe **misurate**: le due opzioni **omonime** ora vivono su due verbi e fanno cose diverse — `script --no-transaction` scrive la dichiarazione, `apply --no-transaction` toglie la transazione del client, e uno script che dichiara non ha bisogno del flag su `apply` (scritto in `cli.md`); e un'opzione sconosciuta fa uscire System.CommandLine con **exit 1**, cioè lo stesso `SuccessDifferencesFound`, quindi nell'acceptance l'asserzione sull'exit code **non discrimina** quel fallimento — a reggere è quella sul contenuto, ed è per questo che il RED è stato letto sulla riga giusta e non sul codice di uscita. Il ramo `=none` resta coperto **due volte**, e non per ridondanza: la unit di wiring è l'unica copertura nei job **senza** Docker, l'acceptance è l'unica che passa dal processo | `src/DbDelta.Cli/Commands/ScriptCommand.cs` (`noTransaction`, `opts \|= ComparisonOptions.NoTransactions`); acceptance `ScriptCommandTests.Writes_a_script_that_declares_no_transaction_when_the_flag_is_passed` — RED misurato prima dell'implementazione: nessuno script scritto, perché l'opzione non esisteva; unit `DeploymentScriptWriterTests.NoTransactions_reaches_the_writer_and_comes_out_as_the_marker`; `docfx/articles/cli.md`, tabella di `script` e sezione «Who owns the transaction» |
 
 | Voce | Reg. | Sforzo | Stato reale |
 |---|---|---|---|
 | **Annuncio pubblico — escluso per scelta del proprietario (2026-09-01), non bloccato.** Il draft è completo ma fermo a 1.0.1 mentre la release è 1.0.2. **La voce diceva «da fare dopo le docs (P2)» e quel motivo è caduto**: `docfx/articles/getting-started.md:11-12` manda già alla MSI dal commit docs del 2026-08-20, non più a compilare da sorgente. Resta qui perché è un'azione ancora possibile, non una decisione chiusa | 2026-05-28 | S | `docs/announcements/v1.0.1-draft.md`; `README.md:16-33` |
-| **`ComparisonOptions.NoTransactions` è onorata da un capo all'altro, ma nessuno può chiederla.** Trovata il 2026-09-02 dalla review pre-push e **verificata, non dedotta**: `grep -rn 'ComparisonOptions' src/DbDelta.Cli src/DbDelta.App.Avalonia` restituisce **solo** `ComparisonOptions.Default` — `ScriptCommand` dichiara quattro `Option<>` (`--source`, `--target`, `--out`, `--include-permissions`) e la sua unica mutazione è `opts &= ~IgnorePermissions`; la GUI passa `Default` da `AppStateViewModel` e `Default \| DoNotOutputCommentHeader` da `DeployScriptBuilder`. Il flag quindi esiste nell'enum, `ScriptGenerator` lo legge, il writer emette `-- dbdelta:transaction=none` e `apply` lo onora — ma **l'unico modo di ottenere uno script `=none` dai binari pubblicati è scrivere quella riga a mano**. Non è un difetto: niente si comporta male, e `docfx/articles/cli.md` ora lo dice esplicitamente invece di promettere un verbo che non esiste. È una **decisione**, ed è del proprietario perché entrambe le strade toccano superficie pubblica: **esporla** (una `Option<bool>` su `script`, additiva e quindi non rompe la 1.0.2 pubblicata) oppure **cancellarla**, come già fatto con `ProjectOptions` — morta per esattamente la stessa ragione, e quella cancellazione è già in «Deciso». Finché non è decisa il ramo è tenuto vivo da una sola unit di wiring, scritta apposta perché non muoia in silenzio | 2026-09-02 | S | `src/DbDelta.Cli/Commands/ScriptCommand.cs` (le quattro `Option<>` e `opts &= ~IgnorePermissions`), `AppStateViewModel` e `DeployScriptBuilder` (entrambi `Default`), `ScriptGenerator` (`useTransaction`); test: `DeploymentScriptWriterTests.NoTransactions_reaches_the_writer_and_comes_out_as_the_marker` |
 
 ---
 

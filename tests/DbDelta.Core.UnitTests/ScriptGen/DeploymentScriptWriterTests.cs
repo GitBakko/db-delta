@@ -82,9 +82,12 @@ public class DeploymentScriptWriterTests
     /// <summary>
     /// The wiring, not the writer: that `ComparisonOptions.NoTransactions`
     /// actually reaches `useTransaction: false` and comes out as the marker
-    /// `apply` reads. Nothing else covers it — no CLI option and no GUI control
-    /// sets that flag today, so without this test the whole `=none` branch could
-    /// be deleted and every other test would stay green.
+    /// `apply` reads. `dbdelta script --no-transaction` sets that flag since
+    /// 2026-09-02 and `ScriptCommandTests`
+    /// `.Writes_a_script_that_declares_no_transaction_when_the_flag_is_passed`
+    /// asserts it through the process boundary — but that one needs Docker, and
+    /// this is the whole cover the `=none` branch has in the jobs that run
+    /// without it. No GUI control sets the flag.
     /// </summary>
     [Fact]
     public void NoTransactions_reaches_the_writer_and_comes_out_as_the_marker()

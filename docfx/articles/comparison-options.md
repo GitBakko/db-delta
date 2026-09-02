@@ -3,7 +3,8 @@
 A comparison is shaped by the `ComparisonOptions` flags enum
 (`DbDelta.Core.Options.ComparisonOptions`). The CLI uses the `Default` set;
 library consumers can pass any combination. `script --include-permissions`
-clears `IgnorePermissions`.
+clears `IgnorePermissions`, and `script --no-transaction` sets
+`NoTransactions`.
 
 `Default` = `IgnoreWhitespace | IgnoreComments | IgnoreFillFactor |
 IgnorePermissions | IgnoreStatistics` — the toggles Redgate ships on.
@@ -26,7 +27,7 @@ IgnorePermissions | IgnoreStatistics` — the toggles Redgate ships on.
 | `IgnoreFileGroups` | Ignore filegroup placement. |
 | `IgnoreIdentitySeed` | Ignore identity seed/increment. |
 | `IgnoreUsersPermissionsAndRoleMemberships` | Ignore users, permissions, and role memberships together. |
-| `NoTransactions` | Emit the script without the transaction envelope. |
+| `NoTransactions` | Emit the script with no transaction envelope, declaring `-- dbdelta:transaction=none` on its first line so `apply` adds none either. Set by `script --no-transaction`. |
 | `ForceColumnOrder` | Treat column ordering as significant. |
 | `ThrowOnFileParseFailed` | Fail loudly on an unparseable definition. |
 | `DoNotOutputCommentHeader` | Suppress the generated comment header. |

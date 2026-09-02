@@ -37,13 +37,23 @@ internal static class ScriptCommand
         {
             Description = "Emit GRANT / REVOKE statements. Off by default (Redgate parity)."
         };
+        Option<bool> noTransaction = new("--no-transaction")
+        {
+            Description =
+                "Generate a script that opens no transaction of its own, and says so with "
+                + $"`{DeploymentScriptWriter.NoTransactionMarker}` on its first line, so `apply` "
+                + "does not wrap it in one either. For a deploy that cannot run inside a "
+                + "transaction. A failure halfway then leaves the target halfway: re-compare "
+                + "and re-generate, never re-run the script."
+        };
 
         Command command = new("script", "Generate a T-SQL deployment script from source to target")
         {
             source,
             target,
             outPath,
-            includePermissions
+            includePermissions,
+            noTransaction
         };
 
         command.SetAction(async (parseResult, ct) =>
@@ -52,6 +62,7 @@ internal static class ScriptCommand
             string tgtConn = parseResult.GetValue(target)!;
             string output = parseResult.GetValue(outPath) ?? "-";
             bool emitPerms = parseResult.GetValue(includePermissions);
+            bool noTx = parseResult.GetValue(noTransaction);
 
             LiveDbSource srcSource = new(srcConn, "source");
             LiveDbSource tgtSource = new(tgtConn, "target");
@@ -74,6 +85,15 @@ internal static class ScriptCommand
             if (emitPerms)
             {
                 opts &= ~ComparisonOptions.IgnorePermissions;
+            }
+
+            // The only way to ask for it. The flag was honoured from here to
+            // apply, but nothing set it: every call site passed
+            // ComparisonOptions.Default, so a =none script could only be had by
+            // typing the marker line by hand.
+            if (noTx)
+            {
+                opts |= ComparisonOptions.NoTransactions;
             }
 
             // opts, not ComparisonOptions.Default. The two calls used to disagree:

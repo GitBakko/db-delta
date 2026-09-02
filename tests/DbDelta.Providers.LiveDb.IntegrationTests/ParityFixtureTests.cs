@@ -48,7 +48,8 @@ public class ParityFixtureTests(LiveDbFixture fixture)
         // order, which is kind rank, not topology. This test exists to measure
         // drop ordering (scenario 18), so omitting the one input that decides it
         // measured the fallback and called it the resolver. Both shipping call
-        // sites pass it — ScriptCommand.cs:93 and DeployScriptBuilder.cs:105.
+        // sites pass it — the dropDependencies: argument to Generate, in
+        // ScriptCommand and in DeployScriptBuilder.
         string script = new ScriptGenerator().Generate(
             diff,
             selection: null,
