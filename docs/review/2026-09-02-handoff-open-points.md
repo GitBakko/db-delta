@@ -17,6 +17,15 @@ due punti, vedi «La misura, per intero».
 
 ## Stato al momento della scrittura
 
+> **Sorpassato lo stesso giorno, prima ancora di essere pushato.** Le tre voci
+> che questo documento diceva di aprire sono **tutte chiuse il 2026-09-02**:
+> `61754b8` (`RolledBack` in modalità `script`), `18ab52c` (il marker
+> `-- dbdelta:transaction=none`) e `bfd87f7` (l'estrazione di
+> `DeployPreflight`). Resta aperto **solo l'annuncio pubblico**, che è del
+> proprietario. Il conteggio, i numeri dei test e l'hash qui sotto descrivono il
+> 2026-09-02 **mattina** e sono tenuti com'erano: servono a leggere il resto del
+> documento, non a sapere dove sta il lavoro. Per quello c'è `docs/BACKLOG.md`.
+
 - **`main` = `origin/main` = `8a20e54`**, zero commit locali. I quattro commit
   della sera del 2026-09-01 sono stati pushati tutti insieme dopo che
   `github.com:443` era rimasto irraggiungibile per ore **mentre
@@ -159,7 +168,12 @@ successivo dopo un errore).
 ## Da dove si riparte
 
 **Il *cosa* sta in `docs/BACKLOG.md`.** Qui c'è solo il *come*, il vincolo e il
-primo passo di ciascuno. L'ordine consigliato è ③ → ② → ①.
+primo passo di ciascuno. L'ordine consigliato era ③ → ② → ①.
+
+> **Tutte e tre eseguite in quest'ordine il 2026-09-02** — `61754b8`, `18ab52c`,
+> `bfd87f7` — e in tutte e tre il vincolo scritto qui sotto ha retto mentre la
+> voce di backlog no. Le sezioni che seguono restano perché sono il ragionamento
+> che è stato pagato, non lavoro da fare: **niente qui sotto è aperto.**
 
 ### ③ P4 — `RolledBack` mai misurato in modalità `script` · XS · è un test
 

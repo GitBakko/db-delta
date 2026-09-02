@@ -199,10 +199,16 @@ public class SqlExecutorTests
     [InlineData("CREATE TABLE dbo.T (Id int NOT NULL);")]
     [InlineData("SELECT 1;\nGO\nSELECT 2;")]
     [InlineData("")]
-    // The DELIBERATE asymmetry with its twin: no syntactic fallback. A script
-    // that simply has no BEGIN TRANSACTION has declared nothing, and it is
-    // exactly the case that needs a client transaction — reading its silence as
-    // an opt-out would reopen the half-migration hole.
+    // The marker has to be where the writer puts it. A script that merely
+    // CONTAINS those characters — in a comment copied out of a procedure body,
+    // or in a string literal — has declared nothing, and a substring match would
+    // silently take its client transaction away with no flag to put it back.
+    [InlineData("PRINT '-- dbdelta:transaction=none';\nCREATE TABLE dbo.T (Id int NOT NULL);")]
+    [InlineData("CREATE PROCEDURE dbo.p AS\n-- dbdelta:transaction=none\nSELECT 1;")]
+    // The DELIBERATE asymmetry with its twin: no syntactic fallback either. A
+    // script that simply has no BEGIN TRANSACTION has declared nothing, and it
+    // is exactly the case that needs a client transaction — reading its silence
+    // as an opt-out would reopen the half-migration hole.
     public void ScriptDeclaresNoTransaction_is_false_when_nothing_says_so(string script) =>
         SqlExecutor.ScriptDeclaresNoTransaction(script).Should().BeFalse();
 

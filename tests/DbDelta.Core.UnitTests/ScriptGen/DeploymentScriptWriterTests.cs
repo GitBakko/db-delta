@@ -1,4 +1,7 @@
 using System.Text;
+using DbDelta.Core.Diff;
+using DbDelta.Core.ObjectModel;
+using DbDelta.Core.Options;
 using DbDelta.Core.ScriptGen;
 using FluentAssertions;
 using Xunit;
@@ -75,5 +78,29 @@ public class DeploymentScriptWriterTests
         // it. Spelled literally: it is a wire format other versions have to read.
         s.Should().StartWith("-- dbdelta:transaction=none");
         s.Should().NotContain("-- dbdelta:transaction=script");
+    }
+    /// <summary>
+    /// The wiring, not the writer: that `ComparisonOptions.NoTransactions`
+    /// actually reaches `useTransaction: false` and comes out as the marker
+    /// `apply` reads. Nothing else covers it — no CLI option and no GUI control
+    /// sets that flag today, so without this test the whole `=none` branch could
+    /// be deleted and every other test would stay green.
+    /// </summary>
+    [Fact]
+    public void NoTransactions_reaches_the_writer_and_comes_out_as_the_marker()
+    {
+        Table t = new("dbo", "T", [new Column("Id", "int", false, 1)], [], []);
+        Database src = new("Db", Schemas: [new Schema("dbo")], Tables: [t], Views: [], Procedures: []);
+        Database tgt = new("Db", Schemas: [new Schema("dbo")], Tables: [], Views: [], Procedures: []);
+        ComparisonResult result = new ComparisonEngine().Compare(src, tgt, ComparisonOptions.Default);
+
+        string script = new ScriptGenerator().Generate(
+            result, options: ComparisonOptions.Default | ComparisonOptions.NoTransactions);
+
+        // First line, because that is where the reader looks: a marker further
+        // down would not count, on purpose.
+        script.Should().StartWith("-- dbdelta:transaction=none");
+        script.Should().NotContain("BEGIN TRANSACTION", "the marker must describe what the script does");
+        script.Should().Contain("CREATE TABLE", "and it still has to be a deploy script");
     }
 }

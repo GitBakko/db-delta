@@ -59,13 +59,19 @@ open and the deploy neither commits nor rolls back. The scripts `dbdelta script`
 writes are exactly that kind and carry a `-- dbdelta:transaction=script` marker
 saying so.
 
-A generated script can also declare the opposite. Asking `dbdelta script` for
-`NoTransactions` writes `-- dbdelta:transaction=none` instead, and `apply`
-honours it without `--no-transaction` on the command line. Before that marker
-existed the two same-named options contradicted each other: the script came out
-with no envelope, `apply` could not tell it from a hand-written one, and wrapped
-it in a client transaction — undoing the option that had generated it unless the
-operator passed the flag as well.
+A script can also declare the opposite, with `-- dbdelta:transaction=none` **on
+its first line**. `apply` honours it without `--no-transaction` on the command
+line. `ScriptGenerator` writes that marker when a caller passes
+`ComparisonOptions.NoTransactions` — which today **no CLI option and no GUI
+control sets**, so in practice the line is one you put at the top of a script
+yourself. Before the marker existed such a script came out with no envelope at
+all, `apply` could not tell it from a hand-written one, and wrapped it in a
+client transaction — undoing the option that had generated it unless the operator
+passed the flag as well.
+
+The marker has to be the FIRST line, not merely present somewhere: this answer
+only ever REMOVES the client transaction, and no flag puts it back, so a marker
+arriving inside a copied comment or a string literal must not count.
 
 **A declaration outranks the guess.** For a script with no marker — written by
 hand or by another tool — `apply` falls back to looking for a line-anchored
@@ -83,7 +89,7 @@ its `transaction` field:
 |---------------|------|
 | `script` | The script manages its own — DbDelta stays out of the way. |
 | `client` | The script does not say, and no line-anchored `BEGIN TRANSACTION` was found, so `apply` wraps every batch in one transaction and rolls back on the first failure. |
-| `none` | `--no-transaction` was passed, or the script declares `-- dbdelta:transaction=none`. Each batch commits as it runs, and a failure halfway leaves the target halfway. |
+| `none` | The script declares `-- dbdelta:transaction=none`, or `--no-transaction` was passed **on a script that does not manage its own**. Each batch commits as it runs, and a failure halfway leaves the target halfway. `--no-transaction` against a `-- dbdelta:transaction=script` script still reports `script`: the flag only removes a client transaction, and there was never going to be one. |
 
 ### Why no DROP is guarded
 
@@ -124,6 +130,11 @@ What decides whether that matters is the error's **severity**, not
 |----------|---------|-----------|
 | 11 | Msg 3701 on a missing table, view, procedure, function, index, sequence, synonym or trigger; Msg 15225 and 15335 from `sp_rename` | continues, and commits |
 | 14 and up | Msg 2714, 3726, 3727/3728, 4902, 8106, 218, 15151, 207 — and Msg 3701 itself when it means *you do not have permission*, which is raised at severity 14 | aborts, and rolls back |
+
+That split was measured for **run-time** errors. A batch that fails to COMPILE
+is a third case and behaves like severity 11 here: Msg 4145 at severity 15 never
+runs a statement, so it leaves the transaction open. It cannot be a swallowed
+error either — nothing in that batch executed.
 
 So the only error a generated script can swallow is "the object this `DROP` was
 about to remove is already gone" — the re-run case the policy above already

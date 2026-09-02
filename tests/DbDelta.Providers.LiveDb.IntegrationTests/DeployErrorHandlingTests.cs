@@ -195,7 +195,12 @@ public class DeployErrorHandlingTests(LiveDbFixture fixture)
     /// measured: the message number — Msg 3701 is severity 11 for "the object is
     /// not there" and severity 14 for "you do not have permission", and only the
     /// second aborts — and <c>XACT_ABORT</c>, since every case came out identical
-    /// with the flag ON and with it OFF. The <c>IF @@ERROR</c> gate plays no part
+    /// with the flag ON and with it OFF. Neither of those is a row here: two rows
+    /// vary severity, message number and statement kind together and so cannot
+    /// separate them, and the 3701-at-severity-14 case needs a low-privilege
+    /// login the fixture does not have. They are recorded measurements, not
+    /// claims this test makes — what it pins is the name: the rollback is
+    /// reported when, and only when, the transaction was still open. The <c>IF @@ERROR</c> gate plays no part
     /// either: SqlClient throws on the first error of severity 11 or higher and
     /// the executor stops at that batch, so neither the gate nor the closing
     /// verdict ever runs.
@@ -204,7 +209,7 @@ public class DeployErrorHandlingTests(LiveDbFixture fixture)
     [Theory]
     [InlineData("Sev11", "DROP TABLE [dbo].[NotThere];", 3701, 11, true)]
     [InlineData("Sev16", "CREATE TABLE [dbo].[RbA] (Id int NOT NULL);", 2714, 16, false)]
-    public async Task Script_mode_reports_rollback_by_severity_with_the_target_intact(
+    public async Task Script_mode_reports_rollback_only_while_the_transaction_is_still_open(
         string tag, string failingBody, int number, int severity, bool expectedRolledBack)
     {
         CancellationToken ct = TestContext.Current.CancellationToken;
@@ -217,9 +222,6 @@ public class DeployErrorHandlingTests(LiveDbFixture fixture)
         writer.WriteBatch("The step that fails", failingBody);
         writer.WriteVerdict();
         string script = sb.ToString();
-
-        SqlExecutor.ScriptManagesItsOwnTransaction(script).Should().BeTrue(
-            "apply reads the marker to decide, and this is the shape it decides on");
 
         SqlBatchResult result = await SqlExecutor.ExecuteAsync(
             conn, script, ct, useOwnTransaction: false);

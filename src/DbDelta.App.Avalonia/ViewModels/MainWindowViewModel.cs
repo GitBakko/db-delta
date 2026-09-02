@@ -1089,9 +1089,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// A successful run has just made every row on screen a lie — the objects it
     /// aligned still show as different, and the ticks are still there to be
     /// deployed a second time. Refreshing by hand worked, but nobody should have
-    /// to know that. On FAILURE nothing is touched: the script rolls itself back,
-    /// so the rows still describe the target exactly, and throwing them away
-    /// would cost the operator the selection they are about to retry.
+    /// to know that. On FAILURE nothing is touched — not because the script rolls
+    /// itself back, which it never gets to do, but because its <c>COMMIT</c> is
+    /// never reached — so the rows still describe the target exactly, and throwing
+    /// them away would cost the operator the selection they are about to retry.
     /// </remarks>
     /// <param name="result">The outcome, or null when the user never executed.</param>
     /// <param name="resultMessage">The dialog's rendering of that outcome.</param>

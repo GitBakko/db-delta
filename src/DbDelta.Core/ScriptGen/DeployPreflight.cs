@@ -46,6 +46,7 @@ internal static class DeployPreflight
         RefuseRebuildsBlockedBySchemabinding(rebuildTargets, pairs, dropDependencies, pairKey);
         RefuseTypeDropsBlockedByABinder(result, pairs, dropDependencies, pairKey);
     }
+
     /// <summary>
     /// Refuses, before a line of SQL is written, a rebuild the server would
     /// refuse halfway through — and names the module responsible.

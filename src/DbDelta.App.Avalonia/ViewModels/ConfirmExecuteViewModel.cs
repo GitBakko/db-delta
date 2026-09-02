@@ -131,9 +131,13 @@ public sealed partial class ConfirmExecuteViewModel : ObservableObject
 
     /// <summary>
     /// Runs the injected execution delegate and transitions the dialog to the
-    /// outcome phase. The generated script self-manages its transaction
-    /// (XACT_ABORT + rollback on failure), so a failed run leaves the target
-    /// untouched and the error message is the real SQL Server error.
+    /// outcome phase. The generated script self-manages its transaction, so a
+    /// failed run leaves the target untouched and the error message is the real
+    /// SQL Server error. What keeps it untouched is that the script's
+    /// <c>COMMIT</c> is never reached — the executor stops at the batch that
+    /// throws, so the script's own gate and closing rollback never run, and
+    /// <c>XACT_ABORT</c> is not the lever either (measured ON and OFF, identical).
+    /// See the <c>&lt;remarks&gt;</c> on <c>SqlExecutor.TryRollbackAsync</c>.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanExecute))]
     private async Task ExecuteAsync()

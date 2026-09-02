@@ -376,11 +376,21 @@ public static partial class SqlExecutor
     /// would reopen the half-migration hole — batch 1 committed, batch 3 failed,
     /// the database left in between — that <c>apply</c>'s client transaction
     /// closes. Only a script that says so gets to opt out.
+    /// <para>
+    /// And it has to say so where the writer puts it: on the FIRST line. A
+    /// substring search anywhere in the file would let the marker arrive inside
+    /// a copied <c>CREATE PROCEDURE</c> comment or a string literal, and this
+    /// answer only ever REMOVES the client transaction — there is no flag that
+    /// puts it back, since <c>--no-transaction</c> also only removes. Its twin
+    /// can afford to over-detect and merely records that it does; this one
+    /// cannot, so the contract is the line, not the file.
+    /// </para>
     /// </remarks>
     public static bool ScriptDeclaresNoTransaction(string script)
     {
         ArgumentNullException.ThrowIfNull(script);
-        return script.Contains(DeploymentScriptWriter.NoTransactionMarker, StringComparison.Ordinal);
+        ReadOnlySpan<char> head = script.AsSpan().TrimStart('\uFEFF').TrimStart();
+        return head.StartsWith(DeploymentScriptWriter.NoTransactionMarker, StringComparison.Ordinal);
     }
 
     [GeneratedRegex(@"^\s*GO\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
