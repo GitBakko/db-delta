@@ -7,7 +7,16 @@ vedi «Manutenzione» in fondo.
 
 ## Stato — 2026-09-02
 
-- **v1.0.2 pubblicata** (2026-08-13), «Latest», MSI non firmata allegata.
+- **v1.1.0 pubblicata** (2026-09-02) dal tag `v1.1.0` su `1d4581c`, «Latest»,
+  MSI **non firmata** allegata con il suo `.sha256` e un'attestazione di
+  provenienza. Misurata, non stimata: `DbDelta-1.1.0-win-x64.msi` è di
+  **99.270.792 byte**, cioè **94,7 MiB** — che è lo stesso numero che il
+  backlog chiama «94 MB» in «Deciso», scritto in MiB. Il workflow `release` è
+  guidato dal tag e la versione viene da lì: non esiste nessun file di versione
+  da bumpare. Tutti e undici i suoi step verdi, **incluso lo smoke di
+  installazione vero** — installa, verifica app, CLI e PATH di macchina,
+  disinstalla, verifica che sia sparito. La v1.0.2 (2026-08-13) resta la
+  precedente.
 - **1020 test verdi** nei sette progetti che girano senza Docker (Core 630,
   Headless 210, Persistence.Unit 88, Golden 68, Property 12, Architecture 6,
   Shared 6) — ricontati il 2026-09-02, non incrementati a mente. **Due** dei tre DB-backed vanno **rossi**, non skipped, con Docker
@@ -68,14 +77,13 @@ vedi «Manutenzione» in fondo.
   non passava `dropDependencies`, quindi lo scenario 18 misurava il fallback
   invece del risolutore. Tutto in `docs/parity/redgate-2026-08-31.md`; per
   rigenerare l'artefatto DbDelta serve `DBDELTA_PARITY_DUMP=<percorso>`.
-- **CI verde su `11f1caa`**, la punta di `origin/main`, entrambi i job, il
-  2026-09-02: run `33613183345` (ci, 3m45s) e `33613183350` (docs, 1m8s) — è il
-  primo run che ha visto i cinque commit pushati quel pomeriggio, cioè le tre
-  voci chiuse più la review pre-push. `git ls-remote` ha risposto subito: la
+- **CI verde su `1d4581c`**, la punta di `origin/main`, entrambi i job, il
+  2026-09-02: run `33622205347` (ci) e `33622205430` (docs), più `33622223661`
+  (release, sul tag `v1.1.0`). È il primo run che ha visto l'ondata del
+  2026-09-02 per intero: l'opzione `--no-transaction`, lo smoke dal vivo e le
+  due P2 che lo smoke ha aperto e chiuso. `git ls-remote` ha risposto subito: la
   trappola di rete del 2026-09-01, `github.com:443` irraggiungibile mentre
-  `api.github.com` rispondeva, non si è ripetuta. Su `ffc1b56`, che è solo
-  documentazione, sono verdi anche `33613604762` (ci) e `33613604727` (docs),
-  ricontrollati il 2026-09-02. I DB-backed
+  `api.github.com` rispondeva, non si è ripetuta. I DB-backed
   aggiungono **141** test ai locali della riga sopra: LiveDb 105, Cli acceptance
   29, Persistence integration 7 — **1161 in tutto**. Misurati il 2026-09-02 su Windows con
   Docker acceso, dove i 7 passano tutti; senza Docker 3 dei 7 si skippano da sé.

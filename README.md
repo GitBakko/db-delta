@@ -8,7 +8,7 @@
 
 Open-source schema comparison and deployment tool for Microsoft SQL Server. An OSS alternative to Redgate SQL Compare.
 
-> **Status:** Stable — [v1.0.2](https://github.com/GitBakko/db-delta/releases/tag/v1.0.2) is the current release; [v1.0.1](https://github.com/GitBakko/db-delta/releases/tag/v1.0.1) was the first final one.
+> **Status:** Stable — [v1.1.0](https://github.com/GitBakko/db-delta/releases/tag/v1.1.0) is the current release; [v1.0.1](https://github.com/GitBakko/db-delta/releases/tag/v1.0.1) was the first final one.
 > v1 scope: Live DB ↔ Live DB, 13 object kinds, Windows-first, SQL Server 2016+ and Azure SQL DB.
 
 📖 **Documentation site:** <https://gitbakko.github.io/db-delta/> · [Version history](https://gitbakko.github.io/db-delta/articles/version-history.html)
