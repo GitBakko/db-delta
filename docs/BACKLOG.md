@@ -47,8 +47,11 @@ vedi «Manutenzione» in fondo.
   non passava `dropDependencies`, quindi lo scenario 18 misurava il fallback
   invece del risolutore. Tutto in `docs/parity/redgate-2026-08-31.md`; per
   rigenerare l'artefatto DbDelta serve `DBDELTA_PARITY_DUMP=<percorso>`.
-- **CI verde su `741b9a7`**, la punta di `origin/main`, entrambi i job, il
-  2026-09-01: run `33523954366` (ci, 3m53s) e `33523954367` (docs, 53s). I DB-backed
+- **CI verde su `8a20e54`**, la punta di `origin/main`, entrambi i job, il
+  2026-09-01: run `33560365612` (ci, 4m19s) e `33560366060` (docs, 1m2s) — è il
+  primo run che ha visto i quattro commit pushati quella sera, dopo che
+  `github.com:443` era stato irraggiungibile per ore mentre `api.github.com`
+  rispondeva. I DB-backed
   aggiungono **135** test ai locali della riga sopra: LiveDb 102, Cli acceptance
   26, Persistence integration 7 — **1144 in tutto**. Misurati il 2026-09-01 su Windows con
   Docker acceso, dove i 7 passano tutti; senza Docker 3 dei 7 si skippano da sé.
