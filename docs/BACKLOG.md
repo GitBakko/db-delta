@@ -17,7 +17,7 @@ vedi «Manutenzione» in fondo.
   serve**: stampa l'intestazione anche a daemon morto. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **2 voci aperte** — **P1 0 · P2 0 · P3 0 · P4 0** · P5 2 — più **22** in
+- **1 voce aperta** — **P1 0 · P2 0 · P3 0 · P4 0** · P5 1 — più **23** in
   «Deciso — NON riaprire». **Le 4 critiche restano chiuse.** Per origine:
   delle **sei** aperte dall'audit di parità Redgate **non ne resta nessuna** —
   l'ultima, il gate d'errore di batch, è stata rimisurata e decisa il
@@ -34,9 +34,10 @@ vedi «Manutenzione» in fondo.
   giorno; **le due di P2 sono chiuse lo stesso giorno** — il rifiuto
   sull'utente orfano ora distingue «login assente» da «login invisibile», e
   `apply` emette `targetState` perché `rolledBack` da solo non poteva dirlo.
-  Restano **due voci, entrambe del proprietario**: l'annuncio pubblico,
-  l'ultima delle **sette**, escluso per scelta e non bloccato; e la selezione
-  degli oggetti dalla CLI, che ogni rimedio fa passare per superficie pubblica.
+  Resta **una voce, del proprietario**: la selezione degli oggetti dalla CLI,
+  che ogni rimedio fa passare per superficie pubblica. **L'annuncio pubblico è
+  chiuso il 2026-09-02** ed è in «Deciso»: era aperto solo perché era un'azione
+  possibile, e il draft è ormai indietro di due release.
   `NoTransactions` — che `apply` onorava da un capo all'altro mentre
   **nessun front end poteva chiederla**, aperta dalla review pre-push del
   2026-09-02 come scelta fra esporla e cancellarla, mai come difetto — è
@@ -60,7 +61,7 @@ vedi «Manutenzione» in fondo.
   tramite un marker, e la dichiarazione batte l'euristica. Il conteggio va ricontato, non decrementato a
   mente: `awk` sulle righe di tabella, o si scolla come si era già scollato.
   L'`awk` che lo dà conta **anche** le righe di «Deciso», che ha la stessa
-  intestazione `| Voce | Reg. |`: 24 righe meno le 22 decise fa 2.
+  intestazione `| Voce | Reg. |`: 24 righe meno le 23 decise fa 1.
 - **La parità Redgate è stata eseguita il 2026-08-31 e chiusa**: 21 scenari,
   **zero difetti di parità**, un solo buco dichiarato (extended properties).
   L'unico difetto vero era nostro e nell'attrezzatura — `ParityFixtureTests`
@@ -352,7 +353,6 @@ difetto, taglia e rimedio:
 
 | Voce | Reg. | Sforzo | Stato reale |
 |---|---|---|---|
-| **Annuncio pubblico — escluso per scelta del proprietario (2026-09-01), non bloccato.** Il draft è completo ma fermo a 1.0.1 mentre la release è 1.0.2. **La voce diceva «da fare dopo le docs (P2)» e quel motivo è caduto**: `docfx/articles/getting-started.md:11-12` manda già alla MSI dal commit docs del 2026-08-20, non più a compilare da sorgente. Resta qui perché è un'azione ancora possibile, non una decisione chiusa | 2026-05-28 | S | `docs/announcements/v1.0.1-draft.md`; `README.md:16-33` |
 | **Nessun modo di escludere un oggetto da una corsa della CLI, quindi un solo oggetto non scrivibile o non costruibile blocca il verbo intero e la procedura di ripresa non avanza.** Trovata dallo smoke del 2026-09-02 e **misurata due volte, in due forme diverse**. (1) *Non scrivibile*: l'utente orfano `pcrm_ro` fa uscire `script` con **30** e senza file — l'intero catalogo di 845 oggetti è irraggiungibile per via di un principale. (2) *Non costruibile*: `PcrmV2Pl_Badii` ha **tre viste** (`VwAppuntamentiRiprogrammatiNexi`, `VwMigrazioneOdsNexi`, `VwMigrazioneRitiriNexi`) che referenziano `PartnerCrmNexi`, database **assente da `.243`**. La regola documentata «dopo un fallimento si ri-confronta e si rigenera, mai si riesegue» è stata applicata alla lettera per **quattro giri**: ogni giro muore al **batch 5** sulla stessa vista e il censimento non si muove di un oggetto — 160 Identical / 303 Different / 354 OnlyInA, identico ogni volta. **657 oggetti restano pendenti per sempre.** La GUI ha la selezione per oggetto e può passare oltre; la CLI no. **Non è un difetto del generatore** — nessuno strumento può creare una vista su un database che non c'è — ma è l'unica superficie da cui un operatore CLI non ha via d'uscita, ed è **del proprietario** perché ogni rimedio tocca superficie pubblica: una `Option` di esclusione (`--exclude`), oppure un `--continue-on-error`, oppure dichiarare che per queste forme si usa la GUI e dirlo in `cli.md` | 2026-09-02 | M | Riproduzione in `scripts/smoke/` (git-ignored) del 2026-09-02; `src/DbDelta.Cli/Commands/ScriptCommand.cs` (cinque `Option<>`, nessuna di selezione); `docfx/articles/cli.md`, la regola «re-compare and re-generate, never re-run» |
 
 ---
@@ -387,6 +387,7 @@ perché una sessione futura non le riscopra come nuove.
 | Sezione D — parking-lot v2, tutte e otto | 2026-05-28 | **Deciso dal proprietario il 2026-09-01: fuori v1.** Otto cose ferme su un brainstorming che in tre mesi nessuno ha fatto sono già fuori scope, e dichiararle aperte faceva mentire il conteggio. Restano nominate qui perché siano trovabili per una v2: provider Scripts-Folder, Snapshot e Source-Control, migration script, kind Tier-3, estensioni SSMS/VS, OTel, auto-update, CLI Linux/macOS |
 | Code signing della MSI | 2026-05-28 | **Deciso dal proprietario il 2026-09-01: resta non firmata.** Non è assenza di garanzie: la Release allega già il `.sha256` e l'attestazione di provenienza firmata da GitHub, e `getting-started.md:20-26` dice all'utente che SmartScreen avvisa e come verificare l'artefatto. Il costo accettato è quell'attrito al primo avvio. Se un giorno si firma, lo step va **fra «Build MSI» e «Smoke install»**: firmare riscrive il file, quindi lo smoke deve esercitare quello firmato |
 | Il gate d'errore di batch non vede ogni errore | 2026-08-31 | **Deciso dal proprietario il 2026-09-01: è la stessa decisione delle DROP nude.** Rimisurato quel giorno su `mssql/server:2022-latest` 16.0.4265.3 con lo script scritto dal **vero** `DeploymentScriptWriter`, e la voce aveva ragione sul meccanismo e torto su due cose. Primo: `@@ERROR` **sopravvive al `GO`**, quindi il gate in batch separato scatta davvero quando il fallimento è l'ultima istruzione — ma è cieco appena ne segue una riuscita, **anche solo una `PRINT`**, e su `EXEC` è cieco **sempre**, pure in ultima posizione (`sp_rename` fallito ultimo del batch: `@@ERROR` = 0, mentre il suo `rc` = 1). Secondo, ed è la ragione per cui non morde: la leva non è `XACT_ABORT` ma la **severità**. Al livello 11 il batch prosegue e committa, dal 14 in su aborta e rolla indietro; e al livello 11 arriva **una cosa sola**, «l'oggetto non c'è» — Msg 3701 su table, view, procedure, function, index, sequence, synonym e trigger, più Msg 15225 e 15335 di `sp_rename`. Ogni errore che lascerebbe uno stato **sbagliato** è ≥14 e aborta: misurati 2714, 3726, 3727/3728, 4902, 8106, 218 (`DROP TYPE`), 15151 (`DROP SCHEMA`), 207 (`sp_refreshsqlmodule` che non lega più) — **e Msg 3701 stesso quando significa «permesso negato», che è livello 14**, cioè proprio il caso che avrebbe lasciato l'oggetto in piedi. Quindi ciò che viene inghiottito è la ri-esecuzione, che la politica delle DROP nude dichiara **già** non supportata. La mitigazione che la voce affermava — «segue un `ALTER TABLE … ADD CONSTRAINT` che dà 4902» — non era la ragione generale. Resta un'asimmetria, ed è documentata invece che chiusa: `apply` e la GUI **falliscono** su quell'errore, perché `Microsoft.Data.SqlClient` alza `SqlException` anche a severità 11 e `SqlExecutor` si ferma prima di mandare il `COMMIT` (misurato: `Success=False`, `RolledBack=True`, bersaglio intatto), mentre lo stesso file eseguito a mano in SSMS committa e stampa `The database update succeeded`. Scritta in due posti: `<remarks>` su `DeploymentScriptWriter` e «Why no DROP is guarded» in `docfx/articles/cli.md` |
+| Annuncio pubblico | 2026-05-28 | **Deciso dal proprietario il 2026-09-02: chiusa, non si fa.** Era aperta solo perché era «un'azione ancora possibile», non una decisione: ora lo è. Il draft `docs/announcements/v1.0.1-draft.md` è completo ma fermo a **1.0.1**, e con la 1.1.0 sarebbe indietro di **due** release — pubblicarlo annuncerebbe una versione che non è più quella corrente, e riscriverlo è lavoro nuovo, non la chiusura di questo. L'unico motivo che la teneva legata a un'altra voce era caduto da solo: diceva «da fare dopo le docs (P2)» perché il README mandava a compilare da sorgente, e dal commit docs del 2026-08-20 `getting-started.md` manda già alla MSI. Il draft **resta su disco** come storia, non è cancellato. Se un giorno si annuncia qualcosa, si parte dal CHANGELOG della release corrente, non da questo file |
 
 **Le 17 proposte scartate con motivo** stanno in
 `docs/review/2026-08-14-improvement-scan.md`, Parte 3. Valgono quanto la lista:
