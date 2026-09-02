@@ -54,7 +54,7 @@ internal static class ApplyCommand
                 "Do not wrap the script in a transaction. Needed for a script that cannot "
                 + "run inside one (e.g. it contains CREATE DATABASE or a backup), and for a "
                 + "script written elsewhere that opens its own transaction without saying so "
-                + "in a way we can detect. A DbDelta-generated script declares it."
+                + "in a way we can detect. A DbDelta-generated script declares which of the two it is."
         };
 
         Command command = new("apply", "Execute a generated T-SQL deployment script against the target")
@@ -98,9 +98,18 @@ internal static class ApplyCommand
 
             // A self-contained DbDelta script manages its own transaction and says
             // so with its provenance marker; anything else needs one from us, or a
-            // mid-script failure leaves the database half-migrated.
-            bool selfManaged = SqlExecutor.ScriptManagesItsOwnTransaction(script);
-            bool useOwnTransaction = !selfManaged && !noTx;
+            // mid-script failure leaves the database half-migrated. A script
+            // generated with NoTransactions declares THAT instead, and is taken at
+            // its word: it used to need --no-transaction on top to get what it had
+            // already asked for, so the two same-named options contradicted.
+            // The declaration deliberately wins over the syntactic guess:
+            // ScriptManagesItsOwnTransaction also matches a BEGIN TRANSACTION at
+            // the start of any line, which a CREATE PROCEDURE body carries
+            // perfectly innocently, and without this order such a script would
+            // report "transaction": "script" while running inside none.
+            bool declaredNoTransaction = SqlExecutor.ScriptDeclaresNoTransaction(script);
+            bool selfManaged = !declaredNoTransaction && SqlExecutor.ScriptManagesItsOwnTransaction(script);
+            bool useOwnTransaction = !selfManaged && !declaredNoTransaction && !noTx;
 
             SqlBatchResult result = await SqlExecutor.ExecuteAsync(
                 tgtConn, script, ct, useOwnTransaction, timeout).ConfigureAwait(false);

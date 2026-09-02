@@ -69,5 +69,11 @@ public class DeploymentScriptWriterTests
         s.Should().NotContain("BEGIN TRANSACTION");
         s.Should().NotContain("COMMIT TRANSACTION");
         s.Should().Contain("SET NOEXEC OFF");
+        // Omitting the envelope is not the same as saying so. Without this line
+        // the script was indistinguishable from a hand-written one and `apply`
+        // wrapped it in a client transaction, undoing the option that generated
+        // it. Spelled literally: it is a wire format other versions have to read.
+        s.Should().StartWith("-- dbdelta:transaction=none");
+        s.Should().NotContain("-- dbdelta:transaction=script");
     }
 }

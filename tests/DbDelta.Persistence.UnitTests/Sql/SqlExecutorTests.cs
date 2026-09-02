@@ -185,6 +185,50 @@ public class SqlExecutorTests
     }
 
     [Fact]
+    public void ScriptDeclaresNoTransaction_trusts_the_marker_and_only_the_marker()
+    {
+        // Literal, not the constant: a wire format that has to keep matching
+        // scripts written by other versions.
+        SqlExecutor.ScriptDeclaresNoTransaction("-- dbdelta:transaction=none\nSELECT 1;")
+            .Should().BeTrue();
+        SqlExecutor.ScriptDeclaresNoTransaction("-- dbdelta:transaction=script\nBEGIN TRANSACTION\nSELECT 1;")
+            .Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("CREATE TABLE dbo.T (Id int NOT NULL);")]
+    [InlineData("SELECT 1;\nGO\nSELECT 2;")]
+    [InlineData("")]
+    // The DELIBERATE asymmetry with its twin: no syntactic fallback. A script
+    // that simply has no BEGIN TRANSACTION has declared nothing, and it is
+    // exactly the case that needs a client transaction — reading its silence as
+    // an opt-out would reopen the half-migration hole.
+    public void ScriptDeclaresNoTransaction_is_false_when_nothing_says_so(string script) =>
+        SqlExecutor.ScriptDeclaresNoTransaction(script).Should().BeFalse();
+
+    [Fact]
+    public void Both_answers_can_be_true_which_is_why_apply_orders_them()
+    {
+        // A CREATE PROCEDURE body carries a line-anchored BEGIN TRANSACTION
+        // perfectly innocently, and the syntactic fallback cannot tell. So a
+        // script that DECLARES no transaction still reads as self-managed.
+        // ApplyCommand resolves it by letting the declaration win; without that
+        // order the run would report "transaction": "script" while running with
+        // no transaction at all.
+        const string script = """
+            -- dbdelta:transaction=none
+            CREATE PROCEDURE dbo.p AS
+            BEGIN TRANSACTION
+              UPDATE dbo.T SET x = 1;
+              COMMIT
+            """;
+
+        SqlExecutor.ScriptDeclaresNoTransaction(script).Should().BeTrue();
+        SqlExecutor.ScriptManagesItsOwnTransaction(script).Should().BeTrue(
+            "the fallback over-detects, which is the whole reason the order matters");
+    }
+
+    [Fact]
     public async Task ExecuteAsync_rejects_a_negative_command_timeout()
     {
         // 0 means unlimited; negative is a caller bug, not "very short".

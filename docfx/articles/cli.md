@@ -43,7 +43,7 @@ Executes a pre-generated script against the target, split on `GO`.
 | `--target` | yes | Target connection string. |
 | `--script` | yes | Path to the T-SQL script to apply. |
 | `--dry-run` | no | Parse and count batches without executing. |
-| `--no-transaction` | no | Never open a client-side transaction. |
+| `--no-transaction` | no | Never open a client-side transaction. Not needed for a script that already declares `-- dbdelta:transaction=none`. |
 | `--command-timeout` | no | Per-batch timeout in seconds, default `60`. `0` means no limit — for batches that legitimately run long, such as a table rebuild copying rows. |
 
 ```bash
@@ -59,14 +59,31 @@ open and the deploy neither commits nor rolls back. The scripts `dbdelta script`
 writes are exactly that kind and carry a `-- dbdelta:transaction=script` marker
 saying so.
 
+A generated script can also declare the opposite. Asking `dbdelta script` for
+`NoTransactions` writes `-- dbdelta:transaction=none` instead, and `apply`
+honours it without `--no-transaction` on the command line. Before that marker
+existed the two same-named options contradicted each other: the script came out
+with no envelope, `apply` could not tell it from a hand-written one, and wrapped
+it in a client transaction — undoing the option that had generated it unless the
+operator passed the flag as well.
+
+**A declaration outranks the guess.** For a script with no marker — written by
+hand or by another tool — `apply` falls back to looking for a line-anchored
+`BEGIN TRANSACTION`, and that fallback over-detects: a `CREATE PROCEDURE` body
+carrying one reads as self-managed. When a marker is present it decides, so a
+script that declares `none` is never reported as `script`. Silence is not a
+declaration, though: a script that merely has no `BEGIN TRANSACTION` still gets
+a client transaction, because that is the case where a failure at batch 3 of 5
+would otherwise leave the database half-migrated.
+
 So there are three outcomes, and the JSON output names the one that happened in
 its `transaction` field:
 
 | `transaction` | When |
 |---------------|------|
 | `script` | The script manages its own — DbDelta stays out of the way. |
-| `client` | The script does not, so `apply` wraps every batch in one transaction and rolls back on the first failure. |
-| `none` | `--no-transaction` was passed. Each batch commits as it runs, and a failure halfway leaves the target halfway. |
+| `client` | The script does not say, and no line-anchored `BEGIN TRANSACTION` was found, so `apply` wraps every batch in one transaction and rolls back on the first failure. |
+| `none` | `--no-transaction` was passed, or the script declares `-- dbdelta:transaction=none`. Each batch commits as it runs, and a failure halfway leaves the target halfway. |
 
 ### Why no DROP is guarded
 

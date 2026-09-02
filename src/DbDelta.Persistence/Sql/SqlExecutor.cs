@@ -364,6 +364,25 @@ public static partial class SqlExecutor
             || BeginTransactionPattern().IsMatch(script);
     }
 
+    /// <summary>
+    /// True when <paramref name="script"/> declares that it must run with NO
+    /// transaction at all — the generated counterpart of <c>--no-transaction</c>.
+    /// </summary>
+    /// <remarks>
+    /// Provenance ONLY, deliberately without the syntactic fallback its twin has.
+    /// The absence of a <c>BEGIN TRANSACTION</c> is not a declaration: a
+    /// hand-written script that simply has no transaction is exactly the case
+    /// that needs a client-owned one, and reading that absence as an opt-out
+    /// would reopen the half-migration hole — batch 1 committed, batch 3 failed,
+    /// the database left in between — that <c>apply</c>'s client transaction
+    /// closes. Only a script that says so gets to opt out.
+    /// </remarks>
+    public static bool ScriptDeclaresNoTransaction(string script)
+    {
+        ArgumentNullException.ThrowIfNull(script);
+        return script.Contains(DeploymentScriptWriter.NoTransactionMarker, StringComparison.Ordinal);
+    }
+
     [GeneratedRegex(@"^\s*GO\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex GoLinePattern();
 

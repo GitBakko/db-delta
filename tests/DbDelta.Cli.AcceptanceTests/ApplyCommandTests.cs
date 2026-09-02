@@ -122,6 +122,54 @@ public class ApplyCommandTests(CliFixture fixture)
     }
 
     [Fact]
+    public async Task A_script_that_declares_no_transaction_is_not_given_one_by_apply()
+    {
+        // The two same-named options used to contradict each other: generating
+        // with ComparisonOptions.NoTransactions produced a script `apply` then
+        // wrapped in a client transaction anyway, so the operator had to pass
+        // --no-transaction as well to get what they had already asked for. The
+        // generated script now declares the mode and is taken at its word. The
+        // marker is spelled literally here on purpose: it is the wire format,
+        // and this test is the contract other versions have to keep.
+        //
+        // The CREATE PROCEDURE is deliberate too. Its BEGIN TRANSACTION is
+        // line-anchored, so ScriptManagesItsOwnTransaction's syntactic fallback
+        // reads the whole file as self-managed — a known over-detection. The
+        // declaration has to win, or this run reports "script" for a run that
+        // had no transaction at all.
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        const string tgtDb = "DbDeltaApplyDeclaredNoTxTgt";
+        await CreateDb(tgtDb, ct);
+
+        using var sqlScript = TempFile.Sql();
+        await File.WriteAllTextAsync(sqlScript.Path, """
+            -- dbdelta:transaction=none
+            CREATE TABLE dbo.KeptWithoutTheFlag (Id int NOT NULL);
+            GO
+            CREATE PROCEDURE dbo.OpensOneAtCallTime AS
+            BEGIN TRANSACTION
+              UPDATE dbo.KeptWithoutTheFlag SET Id = 1;
+              COMMIT
+            GO
+            CREATE TABLE dbo.BadBatch (Id int NOT NULL, Oops int NOT NULL REFERENCES dbo.NoSuchTable(Id));
+            GO
+            """, ct);
+
+        (int exit, string stdout) = await RunCliCapturing(["apply",
+            "--target", ConnectionFor(tgtDb),
+            "--script", sqlScript.Path], ct);
+
+        exit.Should().Be(ExpectedExitCodes.DeploymentFailure);
+        stdout.Should().Contain("\"transaction\": \"none\"",
+            "the script declared it, and no --no-transaction was passed");
+        (await ObjectExistsAsync(tgtDb, "dbo.KeptWithoutTheFlag", ct)).Should()
+            .BeTrue("no transaction means exactly that: the earlier batches stay applied");
+        // Nothing was rolled back and nothing could be, so claiming otherwise
+        // over a half-migrated target is the lie this field exists to avoid.
+        stdout.Should().Contain("\"rolledBack\": false");
+    }
+
+    [Fact]
     public async Task Returns_project_file_error_when_script_file_does_not_exist()
     {
         CancellationToken ct = TestContext.Current.CancellationToken;
