@@ -17,7 +17,7 @@ vedi «Manutenzione» in fondo.
   serve**: stampa l'intestazione anche a daemon morto. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **1 voce aperta** — **P1 0 · P2 0 · P3 0 · P4 0** · P5 1 — più **22** in
+- **4 voci aperte** — **P1 0 · P3 0 · P4 0** · P2 **2** · P5 2 — più **22** in
   «Deciso — NON riaprire». **Le 4 critiche restano chiuse.** Per origine:
   delle **sei** aperte dall'audit di parità Redgate **non ne resta nessuna** —
   l'ultima, il gate d'errore di batch, è stata rimisurata e decisa il
@@ -29,14 +29,19 @@ vedi «Manutenzione» in fondo.
   tutte e due la misura ha allargato la voce: sei buchi invece di uno nelle due
   query del pannello, sette tipi invece dei soli alias nel suggerimento di
   backfill — né dalla P1 del 2026-09-01 sul tipo DROPpato mentre lo lega
-  qualcosa di **Identical**. **L'unica che resta è del proprietario**:
+  qualcosa di **Identical**. **Il 2026-09-02 lo smoke dal vivo ne ha aperte
+  tre**, tutte **pre-esistenti** e nessuna introdotta dai commit di quel
+  giorno: due in P2 — il rifiuto sull'utente orfano attribuisce la causa
+  sbagliata, e `rolledBack` non distingue i due casi per cui esiste — e una in
+  P5, nessuna esclusione dalla CLI. La quarta è **del proprietario**:
   l'annuncio pubblico, l'ultima delle **sette**, escluso per scelta e non
   bloccato. `NoTransactions` — che `apply` onorava da un capo all'altro mentre
   **nessun front end poteva chiederla**, aperta dalla review pre-push del
   2026-09-02 come scelta fra esporla e cancellarla, mai come difetto — è
   **chiusa il 2026-09-02: il proprietario ha scelto di esporla**, ed è
-  `dbdelta script --no-transaction`. **Nessuna voce aperta descrive un
-  difetto, e nessuna è lavoro che si possa fare da soli.** L'estrazione di `DeployPreflight` — aperta il 2026-09-01 solo
+  `dbdelta script --no-transaction`, **verificata dal vivo** lo stesso giorno.
+  **Le due di P2 sono le prime voci aperte che descrivono un difetto da
+  luglio**, e non le ha trovate un test: le ha trovate un deploy vero. L'estrazione di `DeployPreflight` — aperta il 2026-09-01 solo
   perché `CLAUDE.md` impone di aprire una voce invece di far crescere un file in
   silenzio, e mai un difetto — è **chiusa il 2026-09-02**, e anche lei aveva
   ragione sul problema e torto sul rimedio: la forma di `BackfillPreflight` che
@@ -53,7 +58,7 @@ vedi «Manutenzione» in fondo.
   tramite un marker, e la dichiarazione batte l'euristica. Il conteggio va ricontato, non decrementato a
   mente: `awk` sulle righe di tabella, o si scolla come si era già scollato.
   L'`awk` che lo dà conta **anche** le righe di «Deciso», che ha la stessa
-  intestazione `| Voce | Reg. |`: 23 righe meno le 22 decise fa 1.
+  intestazione `| Voce | Reg. |`: 26 righe meno le 22 decise fa 4.
 - **La parità Redgate è stata eseguita il 2026-08-31 e chiusa**: 21 scenari,
   **zero difetti di parità**, un solo buco dichiarato (extended properties).
   L'unico difetto vero era nostro e nell'attrezzatura — `ParityFixtureTests`
@@ -171,6 +176,37 @@ per un conteggio che non torna fra due esecuzioni, chiedi a `sys.objects` cosa
 
 ---
 
+## Smoke dal vivo — 2026-09-02, `.243`, con scritture su DB usa-e-getta
+
+Primo smoke che **deploya** invece di solo leggere, e il primo sui commit del
+2026-09-02. Quattro database usa-e-getta creati e distrutti su `.243`; nessun
+database reale modificato.
+
+| Verifica | Esito |
+|---|---|
+| **Invariante di convergenza, dal vivo** | `DbDeltaParity_Source` → vuoto: 30 OnlyInA → `apply` riuscito, 108 batch → **30 Identical, `compare` esce 0**. È la prima volta che l'invariante è misurata contro un server vero e non un container |
+| **La stessa, sul percorso nuovo `--no-transaction`** | Marker in prima riga → `apply` riporta `"transaction": "none"` → **30 Identical, exit 0**. **104** batch invece di 108: i quattro dell'envelope spariti |
+| **La dichiarazione batte l'euristica, su dati veri** | Lo script `=none` di `PcrmV2Pl_Badii` è di **51.987 righe** e contiene **15** `BEGIN TRANSACTION` a inizio riga, tutti dentro corpi di `CREATE PROCEDURE` copiati dalla sorgente: `ScriptManagesItsOwnTransaction` direbbe **true**. `apply` riporta `"none"`. La forma per cui esiste quell'ordine non è ipotetica — è **il caso normale** per qualunque database con procedure transazionali |
+| Lettura di un catalogo vero | 3160 righe di `sys.objects` → 845 oggetti DbDelta in **2,3 s**. Nessun comando vicino al tetto |
+| Exit code | `1` con differenze pendenti, `0` a convergenza, `30` sul rifiuto, `40` sul fallimento di `apply`. Tutti come documentati |
+| Collation | I bersagli sono creati con la collation della sorgente: senza, ogni colonna esce Different per una ragione che non è un difetto |
+
+**Tre difetti trovati, tutti pre-esistenti e nessuno introdotto dai commit del
+2026-09-02**: due in P2 (il rifiuto sull'utente orfano attribuisce la causa
+sbagliata; `rolledBack` non distingue i due casi) e uno in P5 (nessuna
+esclusione dalla CLI). Sono **esattamente** la classe che
+`docs/review/2026-07-31` prometteva: cose che 1156 test verdi, 68 golden e un
+gate ScriptDom non possono vedere, perché esistono solo contro un server vero
+con dati veri.
+
+**Un difetto d'ambiente, non del prodotto**: `PcrmV2Pl_Badii` referenzia
+`PartnerCrmNexi`, che su `.243` non esiste. DbDelta ha riprodotto fedelmente ciò
+che c'era; SQL Server rifiuta in `CREATE`. Prima di dare la colpa al generatore
+per un `Msg 208` su un nome a tre parti, chiedi a `sys.databases` se quel
+database c'è.
+
+---
+
 ## P1 — Alte: risultato o script sbagliato
 
 Tre voci chiuse il 2026-08-31 e quattro il 2026-09-01, ognuna dal commit che
@@ -236,8 +272,13 @@ la sua riga:
 | Il pannello diff non emetteva MAI `COLLATE` | **La voce aveva ragione sul difetto e torto sulla taglia: XS erano i buchi che conosceva, i buchi erano SEI.** Misurata la superficie prima di scrivere, colonna per colonna, contro i reader veri: `ReadSingleTableAsync` e `ReadIndexesForObjectAsync` erano **copie invecchiate** di `TableReader` e `IndexReader`. Mancavano `Column.Collation`, `Table.DataCompression`, `TableIndex.DataCompression`, `TableIndex.TypeDesc`, l'ordinamento `ic.index_column_id` dell'INCLUDE — e la query indici portava ancora `AND i.type IN (1, 2)`, **il filtro che le remarks di `IndexReader.cs:12-18` chiamano «silent destruction»** e che quel reader aveva già tolto: un columnstore era assente da ENTRAMBI i pannelli mentre il modello confrontato ce l'aveva. **Il filtro e `TypeDesc` sono un fix solo**: toglierlo senza portare il tipo avrebbe reso un columnstore come un `CREATE INDEX` normale, che è una bugia peggiore del nasconderlo. Le altre quattro forme misurate NON sono difetti e sono state lasciate stare: `is_ms_shipped` e il filtro `is_fixed_role` sui membri di ruolo sono **irraggiungibili** (il pannello è chiamato per nome, e i nomi vengono dai reader che già filtrano), `ModifyDate` non è referenziato da nulla sotto `ScriptGen/`, e il `LEFT JOIN sys.types` del resolver è più sicuro dell'`INNER` del reader, non meno | `ObjectBodyPaneParityTests` — 3 test su container reale. Il primo è **un'uguaglianza sola**: il corpo del pannello deve essere byte per byte quello che `GenerateFullTableBody` produce dal modello confrontato, quindi un settimo buco che nessuno ha ancora pensato lo fa cadere lo stesso. **Sonde di mutazione: sei, cinque uccise** (COLLATE, compressione tabella, compressione indice, `TypeDesc`, filtro sul tipo). **La sesta è sopravvissuta e va detto**: togliere il tiebreak `ic.index_column_id` lascia i test verdi — l'ordine dell'INCLUDE è allineato a `IndexReader` per costruzione, non dimostrato da un test, perché il motore quell'ordine lo restituisce comunque quando gli va. Due delle sei mutazioni erano rotte alla prima passata — aggiungevano una colonna e spostavano gli ordinali, così il codice continuava a leggere quella vera: rifatte affamando la subquery invece di spostarla |
 | Nessun dialogo rispondeva a Invio/Esc | `IsCancel` su ogni pulsante di uscita (nove dialoghi) e `IsDefault` su quello che conferma, dove confermare non distrugge niente. **`ConfirmDialog` e `ConfirmExecuteDialog` restano senza `IsDefault` di proposito**: uscire da una conferma è gratis, entrarci la esegue. I due gestori scritti a mano sono cancellati — quello di `ConfirmDialog` intercettava Esc nel costruttore, quello di `SaveProjectDialog` rispondeva solo mentre la casella di testo aveva il fuoco | `DialogKeyboardTests` — 5 test headless: l'invariante su TUTTI e nove i dialoghi, due controlli in negativo (nessun doppio default, niente default sulle due conferme distruttive) e due funzionali. **Due sonde di mutazione:** togliendo `IsCancel` cade l'Esc, togliendo `IsDefault` cade l'Invio — ed è quest'ultima a provare che a rispondere è l'attributo e non un resto del gestore cancellato |
 
-**Vuota.** L'unica voce che restava è chiusa il 2026-09-01 dal commit che porta
-la riga qui sopra.
+**Due voci aperte dallo smoke dal vivo del 2026-09-02**, entrambe misurate su
+`192.168.3.243` **con un controllo**, e in nessuna delle due il modello sbaglia:
+
+| Voce | Reg. | Sforzo | Stato reale |
+|---|---|---|---|
+| **Il rifiuto su un utente orfano attribuisce la causa sbagliata e propone una rimediazione che la CLI non ha.** `UnscriptableUserException` dice «it is mapped to a login whose name **this connection cannot see**» e rimedia con «re-read that endpoint with a login that can see `sys.server_principals`, or **exclude the user** from this run». Misurato su `PcrmV2Pl_test`: connessi come `sa` con `IS_SRVROLEMEMBER('sysadmin') = 1`, `pcrm_ro` ha SID `0xD16A4EF4…` e `sys.server_principals` **non ha alcun login con quel SID** — l'utente è **orfano**, non nascosto. Rileggere con più privilegi non cambia nulla: siamo già al massimo. Il modello ha un solo bit, `DatabaseUser.LoginNameIsHidden`, che il reader setta da `authentication_type` e che quindi **fonde due stati diversi**: «login esistente ma invisibile» e «login inesistente». Il **rifiuto in sé resta giusto** — `CREATE USER … WITHOUT LOGIN` è un'istruzione valida che significa un'altra cosa, il criterio della famiglia `Unscriptable*` — ma un `sa` che legge quel messaggio insegue un problema di permessi che non esiste, e la seconda metà della rimediazione nomina un'azione che `dbdelta script` **non può eseguire** (cinque `Option<>`, nessuna di esclusione: vedi la voce in P5) | 2026-09-02 | S | `src/DbDelta.Core/ScriptGen/UnscriptableUserException.cs:34-37` (testo) e `:20-25` (le remarks che dichiarano la causa unica); `src/DbDelta.Core/ObjectModel/DatabaseUser.cs` (`LoginNameIsHidden`); riprodotto: `dbdelta script --source PcrmV2Pl_test --target <vuoto>` esce **30** e non scrive nulla, **con e senza** `--include-permissions` |
+| **`rolledBack` nella JSON di `apply` non distingue i due casi per cui il campo esiste.** Il suo doc-comment lo dice esplicitamente — «false on success, and false when the failure left the outcome **indeterminate**… an operator needs to be able to tell "nothing was applied" from "we do not know"» — e la **GUI lo fa**, stampando «rollback eseguito, la destinazione è invariata» oppure «non è stato possibile confermare il rollback». La CLI emette **un bit solo**, quindi non lo distingue. Misurato con un controllo, stesso script e stesso errore (`Msg 208`, sev 16), due bersagli usa-e-getta: **con** envelope → `"rolledBack": false`, `batchesExecuted: 1400`, e nel bersaglio **0 oggetti** (annullato tutto, tre giri identici); **senza** envelope (`--no-transaction`) → `"rolledBack": false`, `batchesExecuted: 1398`, e nel bersaglio **1599 oggetti, 399 tabelle su 399** (trattenuto tutto). Stesso valore, esiti opposti. È il corollario che la misura del 2026-09-02 non aveva enunciato: si era detto «`true` non salva il bersaglio, lo certifica», ma non che **`false` non garantisce affatto che il bersaglio abbia tenuto il lavoro** — su uno script generato, che porta sempre la propria transazione, `false` significa il contrario nel modo di fallire più comune. `docfx/articles/cli.md` documenta il campo `transaction` e **non nomina `rolledBack` da nessuna parte** | 2026-09-02 | S | `src/DbDelta.Persistence/Sql/SqlExecutor.cs:16-22` (il contratto); `src/DbDelta.Cli/Commands/ApplyCommand.cs:126`; `src/DbDelta.App.Avalonia/ViewModels/LastRunViewModel.cs:65-79` (la GUI che li separa); `docfx/articles/cli.md` (la tabella che non lo cita) |
 
 ---
 
@@ -315,6 +356,7 @@ difetto, taglia e rimedio:
 | Voce | Reg. | Sforzo | Stato reale |
 |---|---|---|---|
 | **Annuncio pubblico — escluso per scelta del proprietario (2026-09-01), non bloccato.** Il draft è completo ma fermo a 1.0.1 mentre la release è 1.0.2. **La voce diceva «da fare dopo le docs (P2)» e quel motivo è caduto**: `docfx/articles/getting-started.md:11-12` manda già alla MSI dal commit docs del 2026-08-20, non più a compilare da sorgente. Resta qui perché è un'azione ancora possibile, non una decisione chiusa | 2026-05-28 | S | `docs/announcements/v1.0.1-draft.md`; `README.md:16-33` |
+| **Nessun modo di escludere un oggetto da una corsa della CLI, quindi un solo oggetto non scrivibile o non costruibile blocca il verbo intero e la procedura di ripresa non avanza.** Trovata dallo smoke del 2026-09-02 e **misurata due volte, in due forme diverse**. (1) *Non scrivibile*: l'utente orfano `pcrm_ro` fa uscire `script` con **30** e senza file — l'intero catalogo di 845 oggetti è irraggiungibile per via di un principale. (2) *Non costruibile*: `PcrmV2Pl_Badii` ha **tre viste** (`VwAppuntamentiRiprogrammatiNexi`, `VwMigrazioneOdsNexi`, `VwMigrazioneRitiriNexi`) che referenziano `PartnerCrmNexi`, database **assente da `.243`**. La regola documentata «dopo un fallimento si ri-confronta e si rigenera, mai si riesegue» è stata applicata alla lettera per **quattro giri**: ogni giro muore al **batch 5** sulla stessa vista e il censimento non si muove di un oggetto — 160 Identical / 303 Different / 354 OnlyInA, identico ogni volta. **657 oggetti restano pendenti per sempre.** La GUI ha la selezione per oggetto e può passare oltre; la CLI no. **Non è un difetto del generatore** — nessuno strumento può creare una vista su un database che non c'è — ma è l'unica superficie da cui un operatore CLI non ha via d'uscita, ed è **del proprietario** perché ogni rimedio tocca superficie pubblica: una `Option` di esclusione (`--exclude`), oppure un `--continue-on-error`, oppure dichiarare che per queste forme si usa la GUI e dirlo in `cli.md` | 2026-09-02 | M | Riproduzione in `scripts/smoke/` (git-ignored) del 2026-09-02; `src/DbDelta.Cli/Commands/ScriptCommand.cs` (cinque `Option<>`, nessuna di selezione); `docfx/articles/cli.md`, la regola «re-compare and re-generate, never re-run» |
 
 ---
 
