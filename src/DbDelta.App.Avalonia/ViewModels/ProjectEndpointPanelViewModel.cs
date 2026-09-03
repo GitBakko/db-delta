@@ -18,6 +18,13 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
     private CancellationTokenSource? _autoConnectCts;
     private const int AutoConnectDebounceMs = 450;
 
+    /// <summary>
+    /// Cancelled when the dialog that owns this panel closes. Every network and
+    /// credential-store call below runs on this token, so "the window is gone"
+    /// actually stops the work instead of merely hiding it.
+    /// </summary>
+    private readonly CancellationTokenSource _lifetime = new();
+
     public ProjectEndpointPanelViewModel(string title, bool isTarget, ICredentialStore? credentialStore = null)
     {
         (Title, IsTarget) = (title, isTarget);
@@ -189,7 +196,7 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
         try
         {
             IReadOnlyList<DiscoveredServer> list =
-                await SqlServerDiscovery.EnumerateServersAsync(CancellationToken.None)
+                await SqlServerDiscovery.EnumerateServersAsync(_lifetime.Token)
                                         .ConfigureAwait(true);
             ApplyScanResults(list);
         }
@@ -332,7 +339,7 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
         {
             string cs = BuildConnectionString(includeDatabase: false);
             IReadOnlyList<string> dbs =
-                await SqlServerDiscovery.ListDatabasesAsync(cs, CancellationToken.None)
+                await SqlServerDiscovery.ListDatabasesAsync(cs, _lifetime.Token)
                                         .ConfigureAwait(true);
             foreach (string db in dbs)
             {
@@ -358,7 +365,7 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
             try
             {
                 string? version = await SqlServerDiscovery
-                    .GetServerVersionAsync(cs, CancellationToken.None)
+                    .GetServerVersionAsync(cs, _lifetime.Token)
                     .ConfigureAwait(true);
                 ServerVersion = version;
                 if (version is not null)
@@ -367,7 +374,8 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
                     // We re-query SERVERPROPERTY via the same connection string, but
                     // the version string itself starts with the product year — extract major
                     // from the connection (the method already succeeded so the server is reachable).
-                    int? major = await TryGetMajorVersionAsync(cs).ConfigureAwait(true);
+                    int? major = await TryGetMajorVersionAsync(cs, _lifetime.Token)
+                        .ConfigureAwait(true);
                     ServerMajorVersion = major;
                 }
             }
@@ -387,7 +395,7 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
         }
     }
 
-    private static async Task<int?> TryGetMajorVersionAsync(string connectionString)
+    private static async Task<int?> TryGetMajorVersionAsync(string connectionString, CancellationToken ct)
     {
         try
         {
@@ -396,10 +404,10 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
                 ConnectTimeout = 5,
             };
             await using Microsoft.Data.SqlClient.SqlConnection cn = new(b.ConnectionString);
-            await cn.OpenAsync(CancellationToken.None).ConfigureAwait(false);
+            await cn.OpenAsync(ct).ConfigureAwait(false);
             await using Microsoft.Data.SqlClient.SqlCommand cmd = new(
                 "SELECT CAST(SERVERPROPERTY('ProductMajorVersion') AS INT);", cn);
-            object? result = await cmd.ExecuteScalarAsync(CancellationToken.None).ConfigureAwait(false);
+            object? result = await cmd.ExecuteScalarAsync(ct).ConfigureAwait(false);
             return result is int i ? i : null;
         }
         catch
@@ -429,10 +437,26 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
         _autoConnectCts?.Cancel();
         if (!IsAutoConnectEligible()) { return; }
 
-        CancellationTokenSource cts = new();
+        // Linked, not standalone: the debounce has two reasons to die — a newer
+        // edit, and the dialog closing.
+        var cts =
+            CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
         _autoConnectCts = cts;
         _ = AutoConnectAfterDelayAsync(cts.Token);
     }
+
+    /// <summary>
+    /// Stops everything this panel started. The dialog calls it once, on Closed.
+    /// </summary>
+    /// <remarks>
+    /// Cancelling the debounce alone was never enough: every SQL call here used
+    /// to pass <see cref="CancellationToken.None"/>, so up to ~20 s of work ran
+    /// against a server on behalf of a window that was already gone — and on the
+    /// success path <see cref="TryPersistCredentialsAsync"/> wrote, or DELETED,
+    /// a Credential Manager entry after the user had pressed «Annulla».
+    /// Idempotent; the panel is not reused after it.
+    /// </remarks>
+    public void CancelPendingWork() => _lifetime.Cancel();
 
     private async Task AutoConnectAfterDelayAsync(CancellationToken ct)
     {
@@ -626,7 +650,7 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
         try
         {
             string? blob = await _credentialStore
-                .GetSecretAsync(CredentialKey(serverName), CancellationToken.None)
+                .GetSecretAsync(CredentialKey(serverName), _lifetime.Token)
                 .ConfigureAwait(true);
             if (string.IsNullOrEmpty(blob)) { return; }
 
@@ -668,7 +692,7 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
     /// <see cref="RememberCredentials"/> is enabled; otherwise removes any
     /// existing entry so unchecking the flag actively forgets the secret.
     /// </summary>
-    private async Task TryPersistCredentialsAsync()
+    internal async Task TryPersistCredentialsAsync()
     {
         if (_credentialStore is null
             || !_credentialStore.IsAvailable
@@ -678,19 +702,23 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
             return;
         }
 
+        // Both branches write to the Credential Manager — the else-branch DELETES
+        // — so a closed dialog must not reach either.
+        _lifetime.Token.ThrowIfCancellationRequested();
+
         string key = CredentialKey(ServerName);
         try
         {
             if (RememberCredentials && !string.IsNullOrEmpty(Password))
             {
                 await _credentialStore
-                    .SetSecretAsync(key, $"{UserName}|{Password}", CancellationToken.None)
+                    .SetSecretAsync(key, $"{UserName}|{Password}", _lifetime.Token)
                     .ConfigureAwait(true);
             }
             else
             {
                 await _credentialStore
-                    .DeleteSecretAsync(key, CancellationToken.None)
+                    .DeleteSecretAsync(key, _lifetime.Token)
                     .ConfigureAwait(true);
             }
         }

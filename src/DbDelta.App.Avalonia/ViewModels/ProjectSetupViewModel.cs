@@ -15,6 +15,13 @@ public sealed partial class ProjectSetupViewModel : ObservableObject
 {
     public ProjectSetupViewModel() : this(credentialStore: null) { }
 
+    /// <summary>
+    /// Cancelled when the dialog closes, so the shared scan stops with it.
+    /// The panels carry one of their own — see
+    /// <see cref="ProjectEndpointPanelViewModel.CancelPendingWork"/>.
+    /// </summary>
+    private readonly CancellationTokenSource _lifetime = new();
+
     public ProjectSetupViewModel(ICredentialStore? credentialStore)
     {
         Source = new ProjectEndpointPanelViewModel("Source", isTarget: false, credentialStore);
@@ -68,7 +75,7 @@ public sealed partial class ProjectSetupViewModel : ObservableObject
         try
         {
             IReadOnlyList<DiscoveredServer> list =
-                await SqlServerDiscovery.EnumerateServersAsync(CancellationToken.None)
+                await SqlServerDiscovery.EnumerateServersAsync(_lifetime.Token)
                                         .ConfigureAwait(true);
             // Both panels always get the populated list, regardless of initiator.
             Source.ApplyScanResults(list);
@@ -108,6 +115,17 @@ public sealed partial class ProjectSetupViewModel : ObservableObject
     }
 
     private bool CanScanServers() => !IsScanningServers;
+
+    /// <summary>
+    /// Stops every network and credential-store call this dialog started — the
+    /// shared scan and both panels. The dialog calls it once, on Closed.
+    /// </summary>
+    public void CancelPendingWork()
+    {
+        _lifetime.Cancel();
+        Source.CancelPendingWork();
+        Target.CancelPendingWork();
+    }
 
     /// <summary>
     /// Seeds both panels' suggestion lists with the "Usati di recente" section

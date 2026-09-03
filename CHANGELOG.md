@@ -32,6 +32,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   comparison reads. All four copies of that code — the setup panel, the setup
   dialog, the connection manager and the project-reopen path — now go through
   `SqlConnectionStringBuilder`, which owns the quoting rules.
+- **Closing the setup dialog now stops what it started.** The dialog had one
+  lifecycle hook and it was `Opened`, so nothing cancelled the debounced
+  auto-connect, the network scan, or a database load already under way — and
+  every SQL call ran on a token that could not be cancelled at all. Up to ~20
+  seconds of work went on against a server on behalf of a window the user had
+  already dismissed, and on the success path a Windows Credential Manager entry
+  was written, or deleted, after **Annulla**.
 
 ## [1.1.0] — 2026-09-02 — the deploy stops writing statements that mean something else
 

@@ -28,6 +28,15 @@ public partial class ProjectSetupDialog : Window
                 _ = vm.ScanForCommand.ExecuteAsync(null);
             }
         };
+
+        // The other half of Opened, and it was missing entirely: this was the
+        // dialog's only lifecycle hook. Nothing cancelled the debounced
+        // auto-connect, the scan, or the load, so up to ~20 s of work ran
+        // against a server for a window the user had already dismissed — and on
+        // the success path a Credential Manager entry was written, or deleted,
+        // after «Annulla». Closed rather than Closing: by then the answer is in,
+        // whichever button gave it, and OK has already read what it needed.
+        Closed += (_, _) => (DataContext as ProjectSetupViewModel)?.CancelPendingWork();
     }
 
     // ── Database chevron clicks ───────────────────────────────────────────────
