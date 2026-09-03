@@ -79,6 +79,39 @@ public class PasswordBoxTests
         value!.Value.Should().Be("•••••••");
     }
 
+    /// <summary>
+    /// The masked field has to actually render. A TextBox subclass looks its
+    /// ControlTheme up by its own type unless it says otherwise, and FluentTheme
+    /// keys the TextBox theme on <c>{x:Type TextBox}</c> — so without a style-key
+    /// override the control gets no template at all and is not on screen.
+    /// </summary>
+    [AvaloniaFact]
+    public void The_masked_field_gets_a_template_and_a_size()
+    {
+        PasswordBox sut = new();
+        Window host = new() { Content = sut, Width = 300, Height = 60 };
+        host.Show();
+
+        TextBox inner = sut.FindControl<TextBox>("PART_PasswordBox")!;
+
+        inner.Template.Should().NotBeNull("a field with no ControlTheme renders nothing");
+        inner.Bounds.Height.Should().BeGreaterThan(0, "an untemplated control measures to zero");
+        inner.MinHeight.Should().Be(32, "CLAUDE.md rule #2 — one height for every single-line control");
+    }
+
+    /// <summary>Control: a stock TextBox in the same host, to prove the probe
+    /// measures the field and not the harness.</summary>
+    [AvaloniaFact]
+    public void Control_a_plain_TextBox_gets_a_template_in_the_same_host()
+    {
+        TextBox plain = new();
+        Window host = new() { Content = plain, Width = 300, Height = 60 };
+        host.Show();
+
+        plain.Template.Should().NotBeNull();
+        plain.Bounds.Height.Should().BeGreaterThan(0);
+    }
+
     private static TextBox InnerTextBox(PasswordBox sut)
     {
         // Force template / content application so PART_PasswordBox is reachable.

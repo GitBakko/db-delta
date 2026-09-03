@@ -1,6 +1,9 @@
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless.XUnit;
 using Avalonia.Media;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Xunit;
 using FluentAssertions;
 
@@ -64,6 +67,35 @@ public class UiInvariantTests
         Realised(new ComboBox()).MinHeight.Should().Be(32);
         Realised(new AutoCompleteBox()).MinHeight.Should().Be(32);
         Realised(new CheckBox { Content = "x" }).MinHeight.Should().Be(32);
+    }
+
+    [AvaloniaFact]
+    public void Every_control_the_user_can_see_actually_has_a_template()
+    {
+        // Rule #0, which nobody had written down because nobody thought a
+        // control could simply fail to exist. A templated control looks its
+        // ControlTheme up by its style key, which defaults to its own type, and
+        // FluentTheme keys the TextBox theme on {x:Type TextBox}. So
+        // MaskedTextBox : TextBox matched nothing: no theme, no template, and no
+        // MinHeight from AppStyles either — it measured to zero. The password
+        // field of the setup modal was NOT ON SCREEN in v1.0.2 and v1.1.0,
+        // reported from the installed build and then reproduced here.
+        foreach (Window dialog in DialogKeyboardTests.AllDialogs())
+        {
+            dialog.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            string[] invisible =
+            [.. dialog.GetVisualDescendants()
+                      .OfType<TemplatedControl>()
+                      .Where(c => c.IsEffectivelyVisible && c.Template is null)
+                      .Select(c => c.GetType().Name)
+                      .Distinct()];
+
+            invisible.Should().BeEmpty(
+                dialog.GetType().Name + " has to render every control it shows");
+            dialog.Close();
+        }
     }
 
     [AvaloniaFact]

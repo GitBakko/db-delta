@@ -25,6 +25,23 @@ namespace DbDelta.App.Views.Controls;
 /// </remarks>
 internal sealed class MaskedTextBox : TextBox
 {
+    /// <summary>
+    /// Style key of the base type, not of this one.
+    /// </summary>
+    /// <remarks>
+    /// A templated control resolves its <c>ControlTheme</c> — and with it its
+    /// template — by its style key, which defaults to its own type; style
+    /// SELECTORS match on the same key. FluentTheme keys the TextBox theme on
+    /// <c>{x:Type TextBox}</c> and <c>Styles/AppStyles.axaml</c> keys the 32-px
+    /// monoline height on the same name, so the default key matched neither:
+    /// no template and no MinHeight, i.e. a password field that is not on
+    /// screen at all. Measured, not deduced, on 2026-09-03 from the installed
+    /// v1.1.0: with the default key <c>Template</c> is <see langword="null"/>
+    /// and <c>MinHeight</c> is 0 once the control is in a shown Window; a plain
+    /// TextBox in the same host is the control that says the harness is fine.
+    /// </remarks>
+    protected override Type StyleKeyOverride => typeof(TextBox);
+
     protected override AutomationPeer OnCreateAutomationPeer() => new MaskedPeer(this);
 
     private sealed class MaskedPeer(TextBox owner) : TextBoxAutomationPeer(owner), IValueProvider

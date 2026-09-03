@@ -23,7 +23,7 @@ public class DialogKeyboardTests
     /// purpose: these assertions are about the markup, and a binding that
     /// resolves to nothing still leaves the buttons in the tree.
     /// </summary>
-    private static IEnumerable<Window> AllDialogs() =>
+    internal static IEnumerable<Window> AllDialogs() =>
     [
         new ConfirmDialog(),
         new ConfirmExecuteDialog(),

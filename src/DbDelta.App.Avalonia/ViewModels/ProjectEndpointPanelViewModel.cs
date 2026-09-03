@@ -146,18 +146,30 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
 
     partial void OnDatabaseNameChanged(string value) => OnPropertyChanged(nameof(IsValid));
 
+    // A credential being TYPED is never a signal that it is finished. Both
+    // fields commit per keystroke (Avalonia's UpdateSourceTrigger.Default is
+    // PropertyChanged), so scheduling the auto-connect from here sent a real
+    // login with whatever prefix had been typed as soon as the user paused
+    // longer than the 450 ms debounce — reaching for a symbol is enough. The
+    // reply is "Login failed for user 'sa'." in the modal, for a connection
+    // nobody asked for, and every further pause fires another: that is what an
+    // account-lockout policy counts. Reported from the installed v1.1.0 on
+    // 2026-09-03, alongside the password field that was not on screen at all.
+    //
+    // The auto-connect is NOT removed — it is re-armed where the credentials
+    // really are complete: TryAutoFillCredentialsAsync, which puts back what
+    // DPAPI stored for THIS server. Anything the user types waits for
+    // «Connetti», which is always on screen.
     partial void OnUserNameChanged(string value)
     {
         OnPropertyChanged(nameof(IsValid));
         LoadDatabasesCommand.NotifyCanExecuteChanged();
-        ScheduleAutoConnect();
     }
 
     partial void OnPasswordChanged(string value)
     {
         OnPropertyChanged(nameof(IsValid));
         LoadDatabasesCommand.NotifyCanExecuteChanged();
-        ScheduleAutoConnect();
     }
 
     partial void OnIsScanningServersChanged(bool value) =>
@@ -638,6 +650,13 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
             if (!string.IsNullOrWhiteSpace(user)) { UserName = user; }
             Password = pwd;
             RememberCredentials = true;
+
+            // The one place a credential pair is known-complete: we put it
+            // there. The field setters no longer arm the auto-connect — see the
+            // comment on OnUserNameChanged — so it is armed here instead, which
+            // keeps "pick a remembered server and it connects itself" working
+            // without ever sending a half-typed secret.
+            ScheduleAutoConnect();
         }
         catch
         {

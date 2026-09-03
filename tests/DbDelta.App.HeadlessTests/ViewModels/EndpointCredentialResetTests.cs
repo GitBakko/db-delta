@@ -58,6 +58,34 @@ public class EndpointCredentialResetTests
     }
 
     [Fact]
+    public async Task Typing_a_credential_never_fires_a_login_on_its_own()
+    {
+        // The other half of the same rule. Clearing the fields stops the OLD
+        // server's login reaching the new host; this stops a HALF-TYPED one
+        // reaching any host. Both fields commit per keystroke, so the 450 ms
+        // debounce turned an ordinary pause mid-secret into a real login with
+        // the prefix typed so far — "Errore: Login failed for user 'sa'." in
+        // the modal, for a connection nobody asked for, repeated at every
+        // further pause. Reported from the installed v1.1.0 on 2026-09-03.
+        // Order matters and the initialiser preserves it: naming the server
+        // clears the credentials, so they land after it, exactly as a user
+        // types them. ".invalid" cannot resolve, so an attempt that DID start
+        // is guaranteed to leave a trace in ConnectionStatusMessage.
+        ProjectEndpointPanelViewModel vm = new("Sorgente", isTarget: false)
+        {
+            ServerName = "dbdelta-nonesistente.invalid",
+            UserName = "sa",
+            Password = "p4ss",
+        };
+
+        // Twice the 450 ms debounce, and then some.
+        await Task.Delay(900, TestContext.Current.CancellationToken);
+
+        vm.IsLoadingDatabases.Should().BeFalse("nothing may be sent while the user is still typing");
+        vm.ConnectionStatusMessage.Should().BeNull("no attempt means no failure to report");
+    }
+
+    [Fact]
     public void Windows_authentication_is_unaffected()
     {
         // The negative control. There are no credentials to leak under

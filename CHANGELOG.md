@@ -6,6 +6,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed
+
+- **The password field is on screen again.** In `1.0.2` and `1.1.0` the field
+  was not hidden — it did not exist. `MaskedTextBox`, added in `1.0.2` to keep
+  the password out of the UI Automation tree, subclasses `TextBox` without
+  declaring a style key, and a templated control resolves its theme — and the
+  app's 32-px monoline height — by that key. It matched neither, so it had no
+  template and measured to zero. Both dialogs that ask for a password were
+  affected: **Nuovo progetto** and **Modifica connessione**.
+- **Typing a password no longer fires a login.** The panel armed its 450-ms
+  auto-connect on every keystroke of the user and password fields, so any pause
+  longer than half a second sent a real login with the half-typed secret and
+  answered with "Login failed" in the dialog — and every further pause sent
+  another, which is what an account-lockout policy counts. Auto-connect is kept
+  where the credentials really are complete: the ones DPAPI had stored for that
+  server. Anything typed waits for **Connetti**.
+
 ## [1.1.0] — 2026-09-02 — the deploy stops writing statements that mean something else
 
 Eighty-nine commits since `1.0.2`, and one theme runs through nearly all of
