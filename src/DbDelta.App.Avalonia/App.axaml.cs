@@ -115,26 +115,18 @@ public partial class App : Application
         base.OnFrameworkInitializationCompleted();
     }
 
-    private static string BuildConnectionString(ProjectEndpoint endpoint)
-    {
-        string server = endpoint.Connection.ServerName;
-        string db = endpoint.Connection.DatabaseName;
-        bool trust = endpoint.Authentication.TrustServerCertificate;
-        bool encrypt = endpoint.Authentication.Encrypt;
-
-        if (endpoint.Authentication.Mode == AuthenticationMode.WindowsIntegrated)
-        {
-            return $"Server={server};Database={db};Integrated Security=True;"
-                   + $"Encrypt={encrypt};TrustServerCertificate={trust}";
-        }
-
-        string user = endpoint.Authentication.UserName ?? "";
-        // Password is not stored in ProjectEndpoint — user will need to enter it.
-        // We emit an empty-password string; the comparison will fail with a clear
-        // SQL auth error, which is the correct UX path to the credential-edit flow.
-        return $"Server={server};Database={db};User Id={user};Password=;"
-               + $"Encrypt={encrypt};TrustServerCertificate={trust}";
-    }
+    private static string BuildConnectionString(ProjectEndpoint endpoint) =>
+        EndpointConnectionString.Build(
+            endpoint.Connection.ServerName,
+            endpoint.Connection.DatabaseName,
+            endpoint.Authentication.Mode,
+            endpoint.Authentication.UserName,
+            // Password is not stored in ProjectEndpoint — user will need to enter
+            // it. The empty one here is deliberate: the comparison fails with a
+            // clear SQL auth error, which is the path to the credential-edit flow.
+            password: "",
+            endpoint.Authentication.TrustServerCertificate,
+            endpoint.Authentication.Encrypt);
 
     /// <summary>
     /// Last resort for an exception that escapes an <c>async void</c> handler or

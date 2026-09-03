@@ -22,6 +22,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   another, which is what an account-lockout policy counts. Auto-connect is kept
   where the credentials really are complete: the ones DPAPI had stored for that
   server. Anything typed waits for **Connetti**.
+- **A password containing `;` or `=` can connect.** Every connection string the
+  app built for a modal was assembled by interpolating the raw fields into a
+  format that uses those two characters as its own delimiters, so such a
+  password produced a string that no longer parses — and the error names the
+  initialization string, never the password. The damage outlived the failed
+  connection: nothing required a successful one, so **OK** stayed enabled and
+  the broken string was carried into the application state that every later
+  comparison reads. All four copies of that code — the setup panel, the setup
+  dialog, the connection manager and the project-reopen path — now go through
+  `SqlConnectionStringBuilder`, which owns the quoting rules.
 
 ## [1.1.0] — 2026-09-02 — the deploy stops writing statements that mean something else
 

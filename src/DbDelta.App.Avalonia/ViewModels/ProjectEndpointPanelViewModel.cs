@@ -468,21 +468,15 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private string BuildConnectionString(bool includeDatabase = false)
-    {
-        string db = includeDatabase && !string.IsNullOrWhiteSpace(DatabaseName)
-            ? $"Database={DatabaseName};"
-            : "";
-        return AuthMode switch
-        {
-            AuthenticationMode.WindowsIntegrated =>
-                $"Server={ServerName};{db}Integrated Security=True;"
-                + $"Encrypt={Encrypt};TrustServerCertificate={TrustServerCertificate}",
-            AuthenticationMode.SqlServer or _ =>
-                $"Server={ServerName};{db}User Id={UserName};Password={Password};"
-                + $"Encrypt={Encrypt};TrustServerCertificate={TrustServerCertificate}",
-        };
-    }
+    internal string BuildConnectionString(bool includeDatabase = false) =>
+        EndpointConnectionString.Build(
+            ServerName,
+            includeDatabase ? DatabaseName : null,
+            AuthMode,
+            UserName,
+            Password,
+            TrustServerCertificate,
+            Encrypt);
 
     // ── Materialisation ───────────────────────────────────────────────────────
 

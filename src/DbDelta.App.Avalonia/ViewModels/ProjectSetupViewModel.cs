@@ -283,24 +283,12 @@ public sealed partial class ProjectSetupViewModel : ObservableObject
     /// <c>App.OnFrameworkInitializationCompleted</c> to seed <c>AppState</c>
     /// without re-asking the user for credentials.
     /// </summary>
-    public string BuildSourceConnectionString() => BuildConnectionString(Source);
+    public string BuildSourceConnectionString() => Source.BuildConnectionString(includeDatabase: true);
 
     /// <summary>
     /// Materialises the target connection string using the live VM password.
     /// </summary>
-    public string BuildTargetConnectionString() => BuildConnectionString(Target);
-
-    private static string BuildConnectionString(ProjectEndpointPanelViewModel p)
-    {
-        string baseCs = $"Server={p.ServerName};Database={p.DatabaseName};"
-            + $"Encrypt={p.Encrypt};TrustServerCertificate={p.TrustServerCertificate}";
-        return p.AuthMode switch
-        {
-            AuthenticationMode.WindowsIntegrated => $"{baseCs};Integrated Security=True",
-            AuthenticationMode.SqlServer => $"{baseCs};User Id={p.UserName};Password={p.Password}",
-            _ => $"{baseCs};User Id={p.UserName};Password={p.Password}",
-        };
-    }
+    public string BuildTargetConnectionString() => Target.BuildConnectionString(includeDatabase: true);
 
     private static void CopyEndpoint(
         ProjectEndpointPanelViewModel from,

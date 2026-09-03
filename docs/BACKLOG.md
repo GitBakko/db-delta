@@ -5,7 +5,7 @@
 contenuto. Chi chiude una voce la depenna QUI, nello stesso commit del codice —
 vedi «Manutenzione» in fondo.
 
-## Stato — 2026-09-02
+## Stato — 2026-09-03
 
 - **v1.1.0 pubblicata** (2026-09-02) dal tag `v1.1.0` su `1d4581c`, «Latest»,
   MSI **non firmata** allegata con il suo `.sha256` e un'attestazione di
@@ -17,22 +17,26 @@ vedi «Manutenzione» in fondo.
   installazione vero** — installa, verifica app, CLI e PATH di macchina,
   disinstalla, verifica che sia sparito. La v1.0.2 (2026-08-13) resta la
   precedente.
-- **1024 test verdi** nei sette progetti che girano senza Docker (Core 630,
-  Headless 214, Persistence.Unit 88, Golden 68, Property 12, Architecture 6,
-  Shared 6) — ricontati il 2026-09-03, non incrementati a mente. I quattro
-  nuovi stanno tutti in Headless e sono la chiusura della segnalazione del
-  2026-09-03, sezione più sotto. **Due** dei tre DB-backed vanno **rossi**, non skipped, con Docker
+- **1033 test verdi** nei sette progetti che girano senza Docker (Core 630,
+  Headless 223, Persistence.Unit 88, Golden 68, Property 12, Architecture 6,
+  Shared 6) — ricontati il 2026-09-03, non incrementati a mente. I tredici
+  nuovi stanno tutti in Headless: quattro sono la chiusura della segnalazione
+  del 2026-09-03 e nove la P1 della stringa di connessione, sezioni più sotto.
+  **Con Docker acceso girano anche i tre DB-backed** e il totale è **1174**
+  (LiveDb 105, Cli acceptance 29, Persistence integration 7) — misurato il
+  2026-09-03, tutti verdi. **Due** dei tre vanno **rossi**, non skipped, con Docker
   spento — LiveDb e Cli acceptance, che costruiscono il container in un
   inizializzatore di campo senza rete. Davanti a quel muro la prima domanda è
   `docker version`, che deve mostrare la sezione `Server:` — **`docker ps` non
   serve**: stampa l'intestazione anche a daemon morto. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **10 voci aperte** — **P1 3 · P2 3 · P3 1 · P4 2** · P5 1 — più **23** in
-  «Deciso — NON riaprire». **Le nove nuove le ha aperte tutte la stessa
+- **9 voci aperte** — **P1 2 · P2 3 · P3 1 · P4 2** · P5 1 — più **23** in
+  «Deciso — NON riaprire». **Le otto nuove le ha aperte tutte la stessa
   segnalazione**, quella del 2026-09-03 dal build installato: sezione dedicata
-  più sotto, con le due bloccanti già chiuse dal commit che porta questa riga.
-  Una delle nove — il ripristino della maschera dopo «tieni premuto per
+  più sotto, con le due bloccanti chiuse da `f3f6e29` e la P1 della stringa di
+  connessione chiusa dal commit che porta questa riga.
+  Una delle otto — il ripristino della maschera dopo «tieni premuto per
   mostrare» — è l'unica del backlog **dichiarata non verificata**: lo sweep è
   stato fermato prima del suo verdetto, e la sua riga lo dice.
   **Le 4 critiche restano chiuse.** Per origine:
@@ -62,8 +66,8 @@ vedi «Manutenzione» in fondo.
   `dbdelta script --no-transaction`, **verificata dal vivo** lo stesso giorno.
   **Quella riga diceva «nessuna voce aperta descrive un difetto», ed è durata
   un giorno**: il 2026-09-03 il proprietario ha installato la v1.1.0 e la
-  modale di nuovo progetto era inservibile. **Otto voci aperte su nove
-  descrivono un difetto**, e nessuna delle nove l'ha trovata un test — le prime
+  modale di nuovo progetto era inservibile. **Sette voci aperte su otto
+  descrivono un difetto**, e nessuna delle otto l'ha trovata un test — le prime
   due un utente sul build installato, le altre lo sweep partito da quelle. L'estrazione di `DeployPreflight` — aperta il 2026-09-01 solo
   perché `CLAUDE.md` impone di aprire una voce invece di far crescere un file in
   silenzio, e mai un difetto — è **chiusa il 2026-09-02**, e anche lei aveva
@@ -240,7 +244,7 @@ errore di connessione che non aveva chiesto. Due difetti distinti, entrambi
 | Voce chiusa | Come | Prova |
 |---|---|---|
 | **Il campo password non era sullo schermo, in due dialog** | `MaskedTextBox : TextBox` (introdotta il 2026-08-20 per togliere la password dall'automation tree) non dichiarava `StyleKeyOverride`. In Avalonia un controllo templated risolve il suo `ControlTheme` **dalla style key, che di default è il proprio tipo**, e i selettori di stile matchano sulla **stessa** key: FluentTheme registra il tema su `{x:Type TextBox}` e `Styles/AppStyles.axaml:14-16` registra lì l'altezza monoline di 32 px, quindi la sottoclasse non trovava **né** il template **né** il `MinHeight`. Non nascosto: **inesistente**, misurato a zero. Rimedio: `protected override Type StyleKeyOverride => typeof(TextBox);` — una riga, perché ogni input password dell'app passa da quell'unico controllo | `src/DbDelta.App.Avalonia/Views/Controls/MaskedTextBox.cs:43`. `PasswordBoxTests.The_masked_field_gets_a_template_and_a_size` — con il **controllo in negativo accanto** (`Control_a_plain_TextBox_gets_a_template_in_the_same_host`), che è ciò che ha salvato la diagnosi: la **prima** sonda dava `Template == null` anche per un `TextBox` normale, perché misurava un controllo staccato da qualunque radice visuale — misurava l'harness, non il bug. Con `Window.Show()` la sonda diventa valida. **Sonda di mutazione fatta, due volte**: senza l'override `Template` è `null` **e** `MinHeight` è 0. Il guard durevole è `UiInvariantTests.Every_control_the_user_can_see_actually_has_a_template`, che percorre l'albero visuale di **tutti e nove** i dialog e nomina i controlli senza template — sotto mutazione stampa `MaskedTextBox` e **`ConnectionEditDialog`**, che è come si è saputo che i dialog colpiti erano due |
-| **L'auto-connect partiva mentre l'utente digitava la password** | È l'errore grigio della segnalazione. `OnPasswordChanged` e `OnUserNameChanged` armavano il debounce da 450 ms, e i due campi committano **a ogni tasto** (in Avalonia `UpdateSourceTrigger.Default` è `PropertyChanged`): qualunque pausa più lunga di mezzo secondo — cercare un simbolo, guardare la tastiera — mandava un login **vero** con il prefisso digitato fino a lì. `IsAutoConnectEligible` chiedeva solo che il campo non fosse vuoto, e «non vuoto» non è «finito». Ogni pausa successiva ne mandava un altro: è ciò che una policy di lockout conta. L'auto-connect **non è stato tolto** — è riarmato dove le credenziali sono davvero complete, cioè in `TryAutoFillCredentialsAsync`, che rimette ciò che DPAPI aveva salvato per QUEL server. Quello che l'utente digita aspetta «Connetti», che è sempre a schermo | `ViewModels/ProjectEndpointPanelViewModel.cs:149-173` (le due `partial` senza più `ScheduleAutoConnect`) e `:654-659` (il riarmo). `EndpointCredentialResetTests.Typing_a_credential_never_fires_a_login_on_its_own` — il server è `dbdelta-nonesistente.invalid`, che non può risolvere, quindi un tentativo partito **lascia traccia** in `ConnectionStatusMessage` anche se fallisce subito. **Sonda di mutazione fatta**: rimesso `ScheduleAutoConnect()` in `OnPasswordChanged`, `IsLoadingDatabases` è `True` dopo 900 ms e il test cade |
+| **L'auto-connect partiva mentre l'utente digitava la password** | È l'errore grigio della segnalazione. `OnPasswordChanged` e `OnUserNameChanged` armavano il debounce da 450 ms, e i due campi committano **a ogni tasto** (in Avalonia `UpdateSourceTrigger.Default` è `PropertyChanged`): qualunque pausa più lunga di mezzo secondo — cercare un simbolo, guardare la tastiera — mandava un login **vero** con il prefisso digitato fino a lì. `IsAutoConnectEligible` chiedeva solo che il campo non fosse vuoto, e «non vuoto» non è «finito». Ogni pausa successiva ne mandava un altro: è ciò che una policy di lockout conta. L'auto-connect **non è stato tolto** — è riarmato dove le credenziali sono davvero complete, cioè in `TryAutoFillCredentialsAsync`, che rimette ciò che DPAPI aveva salvato per QUEL server. Quello che l'utente digita aspetta «Connetti», che è sempre a schermo | `ViewModels/ProjectEndpointPanelViewModel.cs:149-173` (le due `partial` senza più `ScheduleAutoConnect`) e `:648-653` (il riarmo). `EndpointCredentialResetTests.Typing_a_credential_never_fires_a_login_on_its_own` — il server è `dbdelta-nonesistente.invalid`, che non può risolvere, quindi un tentativo partito **lascia traccia** in `ConnectionStatusMessage` anche se fallisce subito. **Sonda di mutazione fatta**: rimesso `ScheduleAutoConnect()` in `OnPasswordChanged`, `IsLoadingDatabases` è `True` dopo 900 ms e il test cade |
 
 **Perché nessun test li vedeva.** `PasswordBoxTests` esisteva dal 2026-08-20 e
 raggiungeva `PART_PasswordBox` **per nome**: un controllo senza template è
@@ -254,8 +258,9 @@ ha rifiutati 15 alla verifica adversariale e ne ha lasciati **11 in piedi**, di
 cui uno mai verificato perché lo sweep è stato fermato. Due di quelli in piedi
 descrivono lo **stesso** difetto — l'auto-connect a metà password — e sono il
 secondo chiuso qui sopra; i restanti **nove** stanno nelle tabelle delle
-rispettive priorità e **nessuno è stato toccato**: sono di taglia e di rischio
-diversi dalla segnalazione, e la segnalazione era bloccante.
+rispettive priorità. **Una delle nove è chiusa** — la stringa di connessione
+costruita per concatenazione, prima P1, il 2026-09-03 su decisione del
+proprietario di allargare l'ambito della 1.1.1 alle P1. Restano **otto**.
 
 ---
 
@@ -306,11 +311,15 @@ due senza test.
 Le due che restavano sono chiuse il 2026-09-01, da una sola decisione
 del proprietario: preflight diagnostico che nomina il legante, non un rifiuto
 della famiglia `Unscriptable*`. **Tre voci nuove il 2026-09-03**, tutte
-sollevate dallo sweep sulla modale e tutte sopravvissute alla refutazione:
+sollevate dallo sweep sulla modale e tutte sopravvissute alla refutazione;
+**la prima è chiusa lo stesso giorno**, dal commit che porta la sua riga:
+
+| Voce chiusa | Come | Prova |
+|---|---|---|
+| Una password che contiene `;` o `=` non poteva connettersi, e la modale si chiudeva lo stesso sulla stringa rotta | Tutto passa da `ViewModels/EndpointConnectionString.cs`, che assegna a `.DataSource` / `.InitialCatalog` / `.UserID` / `.Password` di `SqlConnectionStringBuilder` invece di interpolare in un formato i cui delimitatori sono proprio `;` e `=`. **Le copie erano QUATTRO, non due**, e la voce ne contava due: il pannello, il dialogo di setup, il **connection manager** e il percorso di riapertura di un progetto in `App.axaml.cs`. La quarta e la terza non erano nella voce, e quella del connection manager era stata **archiviata come irraggiungibile** dalla review del 2026-08-14 — verdetto ribaltato dal 2026-08-20, quando il proprietario ha rimesso il pulsante che apre quel dialogo. Correggerne due su quattro avrebbe lasciato vivo lo stesso difetto in due punti, ed è anche la regola DRY #3 di `src/DbDelta.App.Avalonia/CLAUDE.md` — la logica di view-model ripetuta si estrae. **`Encrypt` è un `bool?` e non un `bool`, di proposito**: il connection manager non ha mai scritto quella chiave e lascia decidere il default di SqlClient, quindi scriverla sarebbe stato un cambio di comportamento nascosto dentro una deduplicazione. `ProjectSetupViewModel` perde la sua copia intera e scende da 318 a 306 righe; `ProjectEndpointPanelViewModel` da 708 a 702 | `EndpointConnectionStringTests` — 9 test headless (la `[Theory]` conta due casi), di cui **quattro controlli in negativo**: una password ordinaria porta ancora ogni campo, l'auth Windows non scrive nessuna credenziale, il database resta fuori quando non è richiesto, e il connection manager non scrive alcun `Encrypt`. I tre che asseriscono la password fallivano prima con `System.ArgumentException: Parola chiave non supportata: 'b'` e passano dopo. **Sonda di mutazione, e la prima è SOPRAVVISSUTA**: invertire `Encrypt` lasciava verdi tutti e 220 i test headless — nessuno asseriva quel flag, e non è cosmetico (il pannello lo default a `false` mentre il default di SqlClient 6 è Mandatory, quindi un valore ribaltato romperebbe ogni server senza TLS). Buco chiuso con `The_panels_encrypt_flag_reaches_the_string_with_the_value_it_has`, che ora la uccide in entrambe le direzioni. Una seconda sonda è stata buttata: `&& false` orfana la variabile e dà `IDE0059` come errore, cioè una sonda che non gira |
 
 | Voce | Reg. | Sforzo | Stato reale |
 |---|---|---|---|
-| **La stringa di connessione della modale è costruita per concatenazione: una password che contiene `;` non può connettersi, e la modale si chiude lo stesso su una stringa rotta.** `$"Server={ServerName};{db}User Id={UserName};Password={Password};…"` interpola i valori grezzi in un formato delimitato da `;` e `=`, senza quoting. `SqlConnectionStringBuilder` lancia, e il messaggio che l'utente legge parla della stringa di inizializzazione, mai della password — nessun modo di capire cosa c'è che non va. **Il danno vero è dopo**: `IsValid` non pretende una connessione riuscita, quindi OK resta abilitato, e la **stessa** concatenazione in `ProjectSetupViewModel.BuildConnectionString` è ciò che finisce in `AppState.SourceConnectionString`. Ogni confronto successivo eredita il difetto. Il rimedio è la classe che questo file già usa 100 righe più giù: assegnare a `.DataSource` / `.UserID` / `.Password` / `.InitialCatalog`, che possiede le regole di quoting. `CLAUDE.md`: «Validate input at system boundaries» — è questo il confine | 2026-09-03 | S | `ViewModels/ProjectEndpointPanelViewModel.cs:482` e `ViewModels/ProjectSetupViewModel.cs:300`; la forma giusta è già in uso a `ProjectEndpointPanelViewModel.cs:394`. Nessun test copre una password con `;` |
 | **Toccare il nome del server — o sceglierlo dal menu della scansione — svuota Utente e Password senza dire niente.** `OnServerNameChanged` azzera i due campi, e il commit è **a ogni tasto**: chi torna indietro per aggiungere `\SQLSTERI` perde ciò che aveva appena scritto, senza messaggio. Il percorso che gli utenti incontrano davvero è l'altro: la modale scansiona all'apertura, i risultati arrivano dopo qualche secondo, e il gesto naturale — riempire le credenziali e poi pescare il server da «Risultati scansione» quando compare — passa dallo stesso setter e le cancella. L'azzeramento è **deliberato** e la ragione è buona (impedire che le credenziali del server precedente partano verso un host imparato da una risposta UDP non autenticata, voce P0 chiusa il 2026-08-18): ma `IsAutoConnectEligible` rilegge comunque i campi al momento dello sparo, quindi l'obiettivo di sicurezza **non richiede** di distruggere ciò che l'utente ha digitato. Attenuazione parziale già presente: `TryAutoFillCredentialsAsync` rimette la coppia se DPAPI l'aveva salvata per quel server — non aiuta su credenziali appena digitate né su un server visto per la prima volta, che è il caso segnalato | 2026-09-03 | M | `ViewModels/ProjectEndpointPanelViewModel.cs:126-127`, commento che difende la scelta a `:118-128`; il percorso dal menu è `Views/Controls/ServerPicker.axaml.cs:98`. `EndpointCredentialResetTests` pinna l'azzeramento: cambiarlo significa riscrivere quei tre test, ed è lì che va scritto perché |
 | **Chiudere la modale non annulla niente: la connessione e la scrittura della credenziale sopravvivono ad «Annulla».** `ProjectSetupDialog` ha un solo aggancio di ciclo di vita, `Opened`; non c'è `Closing`/`Closed` e nessuno dei due view-model implementa `Dispose`, quindi `_autoConnectCts.Cancel()` non viene chiamato allo smontaggio. Il `Task.Delay(450, ct)` riprende sul dispatcher dell'applicazione, `IsAutoConnectEligible` legge solo campi che la chiusura non tocca, e **anche cancellare il token non basterebbe**: `LoadDatabasesAsync` passa `CancellationToken.None` a tutte e tre le chiamate SQL. Fino a ~20 s di lavoro contro un server per una finestra già chiusa e, sul ramo di successo, `TryPersistCredentialsAsync` **scrive o CANCELLA** una voce del Credential Manager di Windows dopo che l'utente ha detto di no. La scansione all'apertura ha la stessa forma. **Non** è un leak di `CancellationTokenSource`: senza `CancelAfter` quelle abbandonate sono spazzatura ordinaria, non timer appesi | 2026-09-03 | M | `ViewModels/ProjectEndpointPanelViewModel.cs:335` (`CancellationToken.None`), `:361`, `:399`, la persistenza a `:347`; `ViewModels/ProjectSetupViewModel.cs:71`; l'unico aggancio è `Views/ProjectSetupDialog.axaml.cs:23`. `DpapiCredentialStore.cs:34` / `:50` sono le scritture vere |
 

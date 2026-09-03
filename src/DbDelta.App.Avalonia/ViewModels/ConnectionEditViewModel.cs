@@ -169,13 +169,14 @@ public sealed partial class ConnectionEditViewModel : ObservableObject
         && !string.IsNullOrWhiteSpace(UserName)
         && !string.IsNullOrWhiteSpace(Password);
 
-    private string BuildConnectionString(bool includeDatabase)
-    {
-        string db = includeDatabase && !string.IsNullOrWhiteSpace(DatabaseName)
-            ? $"Database={DatabaseName};"
-            : "";
-        return $"Server={ServerName};{db}User Id={UserName};Password={Password};TrustServerCertificate=True";
-    }
+    internal string BuildConnectionString(bool includeDatabase) =>
+        EndpointConnectionString.Build(
+            ServerName,
+            includeDatabase ? DatabaseName : null,
+            AuthenticationMode.SqlServer,
+            UserName,
+            Password,
+            trustServerCertificate: true);
 
     public ConnectionEntry ToEntry()
     {
