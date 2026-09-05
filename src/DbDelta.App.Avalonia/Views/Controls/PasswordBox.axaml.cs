@@ -39,17 +39,26 @@ public partial class PasswordBox : UserControl
         Button reveal = this.FindControl<Button>("PART_RevealButton")!;
         reveal.AddHandler(PointerPressedEvent, OnRevealPressed, RoutingStrategies.Tunnel);
         reveal.AddHandler(PointerReleasedEvent, OnRevealReleased, RoutingStrategies.Tunnel);
+
+        // A press does not always end in a release. Alt+Tab, a notification
+        // stealing activation, a touch or pen contact the system cancels — all
+        // take the capture away and no PointerReleased ever arrives, which used
+        // to leave the password on screen in clear with nobody holding anything.
+        // Measured, not assumed: see PasswordRevealCaptureTests.
+        //
+        // Direct, NOT Tunnel: PointerCaptureLost is registered as a direct
+        // routed event, so a tunnelling handler is never invoked and the fix
+        // would look applied while doing nothing.
+        reveal.AddHandler(PointerCaptureLostEvent, OnRevealCaptureLost, RoutingStrategies.Direct);
     }
 
-    private void OnRevealPressed(object? sender, PointerPressedEventArgs e)
-    {
-        TextBox box = this.FindControl<TextBox>("PART_PasswordBox")!;
-        box.PasswordChar = '\0';
-    }
+    private void OnRevealPressed(object? sender, PointerPressedEventArgs e) => Reveal();
 
-    private void OnRevealReleased(object? sender, PointerReleasedEventArgs e)
-    {
-        TextBox box = this.FindControl<TextBox>("PART_PasswordBox")!;
-        box.PasswordChar = '•';
-    }
+    private void OnRevealReleased(object? sender, PointerReleasedEventArgs e) => Mask();
+
+    private void OnRevealCaptureLost(object? sender, PointerCaptureLostEventArgs e) => Mask();
+
+    private void Reveal() => this.FindControl<TextBox>("PART_PasswordBox")!.PasswordChar = '\0';
+
+    private void Mask() => this.FindControl<TextBox>("PART_PasswordBox")!.PasswordChar = '•';
 }

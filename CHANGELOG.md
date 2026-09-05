@@ -49,6 +49,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   filed under the server currently named. Nothing is sent until **Connetti**.
   The chosen database is cleared in their place, since a catalog does belong to
   its server.
+- **Hold-to-reveal always re-masks the password.** It re-masked when you let go
+  and only then, so a press that ended any other way — Alt+Tab, a notification
+  stealing focus, a touch or pen contact the system cancels — took the pointer
+  capture away without ever sending a release, and the password stayed on screen
+  in clear for the rest of the dialog's life with nobody holding anything.
 
 ## [1.1.0] — 2026-09-02 — the deploy stops writing statements that mean something else
 

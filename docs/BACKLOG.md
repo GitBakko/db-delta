@@ -17,14 +17,16 @@ vedi «Manutenzione» in fondo.
   installazione vero** — installa, verifica app, CLI e PATH di macchina,
   disinstalla, verifica che sia sparito. La v1.0.2 (2026-08-13) resta la
   precedente.
-- **1042 test verdi** nei sette progetti che girano senza Docker (Core 630,
-  Headless 232, Persistence.Unit 88, Golden 68, Property 12, Architecture 6,
-  Shared 6) — ricontati il 2026-09-05, non incrementati a mente. I ventidue
+- **1044 test verdi** nei sette progetti che girano senza Docker (Core 630,
+  Headless 234, Persistence.Unit 88, Golden 68, Property 12, Architecture 6,
+  Shared 6) — ricontati il 2026-09-05, non incrementati a mente. I ventiquattro
   nuovi stanno tutti in Headless: quattro sono la chiusura della segnalazione
   del 2026-09-03, nove la P1 della stringa di connessione, sette quella del
-  ciclo di vita della modale, e l'azzeramento delle credenziali ne aggiunge due
-  netti riscrivendo i quattro di `EndpointCredentialResetTests` in sei.
-  **Con Docker acceso girano anche i tre DB-backed** e il totale è **1183**
+  ciclo di vita della modale, l'azzeramento delle credenziali ne aggiunge due
+  netti riscrivendo i quattro di `EndpointCredentialResetTests` in sei, e la
+  P2 del «tieni premuto per mostrare» ne porta due, di cui uno è il controllo
+  in negativo.
+  **Con Docker acceso girano anche i tre DB-backed** e il totale è **1185**
   (LiveDb 105, Cli acceptance 29, Persistence integration 7) — misurato il
   2026-09-05, tutti verdi. **Due** dei tre vanno **rossi**, non skipped, con Docker
   spento — LiveDb e Cli acceptance, che costruiscono il container in un
@@ -33,19 +35,19 @@ vedi «Manutenzione» in fondo.
   serve**: stampa l'intestazione anche a daemon morto. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **8 voci aperte** — **P1 0 · P2 3 · P3 1 · P4 3** · P5 1 — più **23** in
+- **7 voci aperte** — **P1 0 · P2 2 · P3 1 · P4 3** · P5 1 — più **23** in
   «Deciso — NON riaprire». **P1 è vuota**: le tre voci che la segnalazione del
   2026-09-03 aveva aperto sono chiuse tutte, `e9821a7` (stringa di connessione),
   `85f5d4c` (ciclo di vita della modale) e il commit che porta questa riga
   (azzeramento delle credenziali) — scelta del proprietario di allargare
   l'ambito della 1.1.1 alle P1 invece di rilasciare le sole due bloccanti.
-  **Sei delle otto restanti le ha aperte quella stessa segnalazione**; la
+  **Cinque delle sette restanti le ha aperte quella stessa segnalazione**; la
   settima è d'igiene e l'ha aperta `85f5d4c` (`ProjectEndpointPanelViewModel` è
   cresciuto, e `CLAUDE.md` vuole una voce invece del silenzio); l'ottava è del
   proprietario, sulla selezione oggetti da CLI, ferma dal 2026-09-02.
-  Una delle otto — il ripristino della maschera dopo «tieni premuto per
-  mostrare» — è l'unica del backlog **dichiarata non verificata**: lo sweep è
-  stato fermato prima del suo verdetto, e la sua riga lo dice.
+  **Il backlog non ha più alcuna voce dichiarata non verificata**: l'ultima —
+  il ripristino della maschera dopo «tieni premuto per mostrare» — è stata
+  riprodotta il 2026-09-05 e chiusa, e il meccanismo era quello ipotizzato.
   **Le 4 critiche restano chiuse.** Per origine:
   delle **sei** aperte dall'audit di parità Redgate **non ne resta nessuna** —
   l'ultima, il gate d'errore di batch, è stata rimisurata e decisa il
@@ -73,8 +75,8 @@ vedi «Manutenzione» in fondo.
   `dbdelta script --no-transaction`, **verificata dal vivo** lo stesso giorno.
   **Quella riga diceva «nessuna voce aperta descrive un difetto», ed è durata
   un giorno**: il 2026-09-03 il proprietario ha installato la v1.1.0 e la
-  modale di nuovo progetto era inservibile. **Sei voci aperte su otto
-  descrivono un difetto**, e nessuna delle otto l'ha trovata un test — le prime
+  modale di nuovo progetto era inservibile. **Cinque voci aperte su sette
+  descrivono un difetto**, e nessuna delle sette l'ha trovata un test — le prime
   due un utente sul build installato, le altre lo sweep partito da quelle. L'estrazione di `DeployPreflight` — aperta il 2026-09-01 solo
   perché `CLAUDE.md` impone di aprire una voce invece di far crescere un file in
   silenzio, e mai un difetto — è **chiusa il 2026-09-02**, e anche lei aveva
@@ -262,14 +264,14 @@ chiedere al peer invece che al pixel — presa dal verso opposto.
 
 **Lo sweep che è partito da qui** ha sollevato 26 finding su cinque lenti, ne
 ha rifiutati 15 alla verifica adversariale e ne ha lasciati **11 in piedi**, di
-cui uno mai verificato perché lo sweep è stato fermato. Due di quelli in piedi
+cui uno mai verificato perché lo sweep è stato fermato — riprodotto e chiuso il 2026-09-05, e il meccanismo era quello che la voce ipotizzava. Due di quelli in piedi
 descrivono lo **stesso** difetto — l'auto-connect a metà password — e sono il
 secondo chiuso qui sopra; i restanti **nove** stanno nelle tabelle delle
 rispettive priorità. **Tre delle nove sono chiuse** — le tre P1, su decisione
 del proprietario di allargare l'ambito della 1.1.1 oltre le sole due
 bloccanti: la stringa di connessione per concatenazione (`e9821a7`), la modale
 che non annullava niente alla chiusura (`85f5d4c`) e l'azzeramento delle
-credenziali al cambio di server. Restano **sei**, tutte P2 o più basse.
+credenziali al cambio di server. Restano **cinque**, tutte P2 o più basse.
 
 ---
 
@@ -333,8 +335,10 @@ due il 2026-09-03, la terza il 2026-09-05. **P1 non ha più voci aperte**:
 
 ## P2 — Valore alto, sforzo contenuto: da fare per prime a parità di gravità
 
-Sei voci chiuse il 2026-08-20, una il 2026-09-01 e **due il 2026-09-02**, queste
-ultime aperte dallo smoke dal vivo e chiuse dal commit che porta le loro righe:
+Sei voci chiuse il 2026-08-20, una il 2026-09-01, **due il 2026-09-02** —
+queste aperte dallo smoke dal vivo e chiuse dal commit che porta le loro righe —
+e **una il 2026-09-05**, l'ultima voce del backlog che era rimasta senza
+verdetto:
 
 | Voce chiusa | Come | Prova |
 |---|---|---|
@@ -346,16 +350,18 @@ ultime aperte dallo smoke dal vivo e chiuse dal commit che porta le loro righe:
 | Il pannello diff non emetteva MAI `COLLATE` | **La voce aveva ragione sul difetto e torto sulla taglia: XS erano i buchi che conosceva, i buchi erano SEI.** Misurata la superficie prima di scrivere, colonna per colonna, contro i reader veri: `ReadSingleTableAsync` e `ReadIndexesForObjectAsync` erano **copie invecchiate** di `TableReader` e `IndexReader`. Mancavano `Column.Collation`, `Table.DataCompression`, `TableIndex.DataCompression`, `TableIndex.TypeDesc`, l'ordinamento `ic.index_column_id` dell'INCLUDE — e la query indici portava ancora `AND i.type IN (1, 2)`, **il filtro che le remarks di `IndexReader.cs:12-18` chiamano «silent destruction»** e che quel reader aveva già tolto: un columnstore era assente da ENTRAMBI i pannelli mentre il modello confrontato ce l'aveva. **Il filtro e `TypeDesc` sono un fix solo**: toglierlo senza portare il tipo avrebbe reso un columnstore come un `CREATE INDEX` normale, che è una bugia peggiore del nasconderlo. Le altre quattro forme misurate NON sono difetti e sono state lasciate stare: `is_ms_shipped` e il filtro `is_fixed_role` sui membri di ruolo sono **irraggiungibili** (il pannello è chiamato per nome, e i nomi vengono dai reader che già filtrano), `ModifyDate` non è referenziato da nulla sotto `ScriptGen/`, e il `LEFT JOIN sys.types` del resolver è più sicuro dell'`INNER` del reader, non meno | `ObjectBodyPaneParityTests` — 3 test su container reale. Il primo è **un'uguaglianza sola**: il corpo del pannello deve essere byte per byte quello che `GenerateFullTableBody` produce dal modello confrontato, quindi un settimo buco che nessuno ha ancora pensato lo fa cadere lo stesso. **Sonde di mutazione: sei, cinque uccise** (COLLATE, compressione tabella, compressione indice, `TypeDesc`, filtro sul tipo). **La sesta è sopravvissuta e va detto**: togliere il tiebreak `ic.index_column_id` lascia i test verdi — l'ordine dell'INCLUDE è allineato a `IndexReader` per costruzione, non dimostrato da un test, perché il motore quell'ordine lo restituisce comunque quando gli va. Due delle sei mutazioni erano rotte alla prima passata — aggiungevano una colonna e spostavano gli ordinali, così il codice continuava a leggere quella vera: rifatte affamando la subquery invece di spostarla |
 | Nessun dialogo rispondeva a Invio/Esc | `IsCancel` su ogni pulsante di uscita (nove dialoghi) e `IsDefault` su quello che conferma, dove confermare non distrugge niente. **`ConfirmDialog` e `ConfirmExecuteDialog` restano senza `IsDefault` di proposito**: uscire da una conferma è gratis, entrarci la esegue. I due gestori scritti a mano sono cancellati — quello di `ConfirmDialog` intercettava Esc nel costruttore, quello di `SaveProjectDialog` rispondeva solo mentre la casella di testo aveva il fuoco | `DialogKeyboardTests` — 5 test headless: l'invariante su TUTTI e nove i dialoghi, due controlli in negativo (nessun doppio default, niente default sulle due conferme distruttive) e due funzionali. **Due sonde di mutazione:** togliendo `IsCancel` cade l'Esc, togliendo `IsDefault` cade l'Invio — ed è quest'ultima a provare che a rispondere è l'attributo e non un resto del gestore cancellato |
 | Il rifiuto sull'utente orfano attribuiva la causa sbagliata | **Il rifiuto resta, cambiano le parole — e la ragione per cui resta è stata misurata, non assunta.** Non esiste istruzione che riproduca un utente orfano: `CREATE USER … WITHOUT LOGIN` atterra su `authentication_type` NONE dove la sorgente ha INSTANCE, quindi non convergerebbe nemmeno. Il modello aveva **un bit per due stati**; ora `DatabaseUser.LoginIsOrphaned` li separa con l'unico predicato che può separarli — `HAS_PERMS_BY_NAME(NULL, NULL, 'VIEW ANY DEFINITION')`: se la connessione **avrebbe visto** il login, allora quel NULL è un'assenza, non un velo. Nel caso ambiguo resta la lettura conservativa. Corretti tutti e **quattro** i testi che dicevano la cosa sbagliata: il messaggio dell'eccezione, la rimediazione della CLI, quella della GUI e il testo del pannello diff. **La CLI smette di nominare un'azione che non ha**: non può escludere un oggetto, quindi non lo suggerisce più — dice di ricreare il login o eliminare l'utente orfano, che sul server si può fare davvero. La GUI tiene «togli l'utente dalla selezione» perché lì è possibile. **La query aveva due copie** (`UserReader` e `LiveDbObjectBodyResolver`), la forma che il pannello diff aveva già pagato una volta: toccate entrambe nello stesso commit | `CatalogVisibilityTests.An_orphaned_login_is_told_apart_from_one_merely_hidden` — **il controllo è dentro il test**: lo STESSO utente orfano letto due volte, da un account con `VIEW ANY DEFINITION` e da uno senza. Entrambi vedono `LoginNameIsHidden` true — il verdetto non si muove — e solo `LoginIsOrphaned` li separa. **Sonda di mutazione: una, uccisa** — tolto il predicato, cade l'asserzione della sonda a privilegio minimo. Più 3 unit in `HiddenLoginNameTests`, fra cui il controllo che un orfano **non** diventa Different |
+| «Tieni premuto per mostrare la password» non rimascherava se la pressione finiva senza un `PointerReleased` | **Riprodotta prima di correggere, ed è vera.** La sonda preme con input headless **reale** (`Window.MouseDown` / `MouseUp` di `Avalonia.Headless`, non un evento sintetizzato), poi toglie la cattura con `e.Pointer.Capture(null)` invece di rilasciare: `PasswordChar` restava `'\0'`, cioè la password in chiaro sullo schermo con nessuno che tiene premuto nulla, per il resto della vita del dialogo. Rimedio: un handler di `PointerCaptureLost` che rimaschera, e i due percorsi condividono ora un `Mask()` solo. **`RoutingStrategies.Direct` e NON `Tunnel`, e non è stile**: `PointerCaptureLost` è registrato come evento diretto, quindi un handler in tunnel non viene mai invocato — il fix sembrerebbe applicato e non farebbe niente. Misurato, non dedotto: è la sonda di mutazione qui accanto | `PasswordRevealCaptureTests` — 2 test, e **il primo è il controllo in negativo, scritto per primo di proposito**: una pressione rivela davvero e un rilascio rimaschera davvero. Senza di lui una sonda la cui pressione non atterra «dimostrerebbe» qualunque conclusione — è la lezione della sonda del 2026-09-03 sul template, presa dal verso della cattura. Il test della cattura persa **falliva prima** del rimedio con `Expected PasswordChar to be •, but found` (il carattere nullo) e passa dopo. **Sonda di mutazione: `Direct` → `Tunnel`, uccide il test e lascia verde il controllo**, che è esattamente la firma di un rimedio inerte |
 | `rolledBack` non distingueva i due casi per cui esiste | **Chiusa nominando l'esito invece di lasciarlo dedurre.** `apply` emette ora `targetState`: `applied`, `unchanged` (rollback eseguito e confermato), `partial` (nessuna transazione, i batch prima del fallimento restano) e `unknown` — e `unknown` è il punto: dove il client **non può sapere**, il campo non prende in prestito la risposta del vicino. Il campo è **additivo**, nessun consumatore esistente si rompe. `docfx/articles/cli.md` ha ora una sezione che dice a chiare lettere cosa `rolledBack` **non** promette, con la misura del 2026-09-02 in tabella: stesso script, stesso `Msg 208`, `false` in entrambi i casi, **0** oggetti rimasti con l'envelope e **1599** senza. Il campo `rolledBack` resta invariato nel significato e nel valore: la retrocompatibilità non si tocca, si aggiunge ciò che mancava | `ApplyCommandTests` — i tre esiti, uno per test, e **il terzo scritto perché lo smoke ci è finito dentro**: `A_self_managed_script_that_fails_reports_an_outcome_it_cannot_confirm` asserisce `"transaction": "script"`, `"rolledBack": false`, `"targetState": "unknown"` **e** che l'oggetto del primo batch non c'è più — cioè esattamente la ragione per cui `false` non va letto come «il bersaglio ha tenuto». Gli altri due sono asserzioni aggiunte ai test che già coprivano `client` e `none` |
 
-**Tre voci nuove il 2026-09-03**, dallo sweep sulla modale — di cui una,
-l'ultima, **dichiarata non verificata**:
+**Tre voci nuove il 2026-09-03**, dallo sweep sulla modale. La terza era
+**l'unica voce del backlog dichiarata non verificata**; il 2026-09-05 è stata
+riprodotta e **chiusa**, dal commit che porta la sua riga qui sotto. Ne restano
+due aperte:
 
 | Voce | Reg. | Sforzo | Stato reale |
 |---|---|---|---|
 | **L'errore di connessione non va a capo e non è troncato con puntini: viene tagliato a metà parola e niente lo segnala.** Il testo tipico — «A network-related or instance-specific error occurred… (provider: TCP Provider, error: 0 - No such host is known.)», ~280 caratteri — sta su **una** riga da 11 px dentro un pannello largo metà finestra (~557 px, ~417 px a `MinWidth="900"`). L'utente legge il preambolo generico e **mai** la clausola finale, che è l'unica che nomina la causa. I quattro TextBlock di stato non impostano né `TextWrapping` né `TextTrimming`, Avalonia parte da `NoWrap`/`None`, e i due `ScrollViewer` che li contengono lasciano `HorizontalScrollBarVisibility` al default `Disabled`: il testo è tagliato, non scorrevole. Il controllo che esiste per questo lo fa giusto — `NoticeBand.axaml` mette `TextWrapping="Wrap"` — e la didascalia del database, in questo stesso file, si prende la briga di `TextTrimming="CharacterEllipsis"`. Un attributo per elemento | 2026-09-03 | S | `Views/ProjectSetupDialog.axaml:105`, `:169`, `:197`, `:260`; i due `ScrollViewer` a `:87` e `:180`. Il testo legato è l'eccezione intera: `ViewModels/ProjectEndpointPanelViewModel.cs:381-382`, e `ConnectionStringRedactor` maschera solo `password=`/`pwd=` |
 | **Un fallimento di «Carica» dentro la modale viene riportato con le parole del salvataggio: «Il progetto non è stato salvato; riprova o scegli un altro nome.»** `App.ReportUnhandled` è l'unico formattatore di ultima istanza e cabla parole da salvataggio, ma `OnLoadClick` è `async void` e la sua `store.LoadAsync` non ha alcun `try`/`catch`: l'eccezione viene ripostata sul dispatcher e finisce lì. All'utente viene detto che il progetto non è stato salvato — mentre non stava salvando nulla — e di scegliere un altro nome, che non gli era stato chiesto. Le parole giuste per lo **stesso** fallimento esistono già nel repo per il percorso MRU, che quella chiamata la incapsula. Fattispecie reali: XML corrotto o estraneo, documento senza radice, file bloccato o illeggibile, parse legacy v1 fallito — non «file assente», che l'MRU pota già con `File.Exists`. **Aggravante**: la banda che mostra il testo sta in `MainWindow`, cioè **dietro** la modale ancora aperta | 2026-09-03 | S | `App.axaml.cs:190`; `Views/ProjectSetupDialog.axaml.cs:114` (`async void`) e `:131` (la `LoadAsync` nuda). Le parole giuste sono a `ViewModels/MainWindowViewModel.cs:455`. La banda è `Views/MainWindow.axaml:301` |
-| **NON VERIFICATA.** «Tieni premuto per mostrare la password» potrebbe non rimascherare mai, se la pressione finisce senza un `PointerReleased`: Alt+Tab, una notifica che ruba l'attivazione, un contatto touch/penna annullato. `OnRevealPressed` mette `PasswordChar = '\0'` e solo `OnRevealReleased` lo rimette: se la cattura del puntatore si perde, Avalonia alza `PointerCaptureLost`, non `PointerReleased`, e la password resterebbe **in chiaro** per il resto della vita del dialogo, senza che nulla lo dica. È la stessa superficie che `MaskedTextBox` è stata scritta per proteggere. **Lo sweep è stato fermato prima del verdetto adversariale su questa voce: il meccanismo è plausibile e le righe citate sono reali, ma nessuno ha ancora misurato che Avalonia si comporti così.** Prima riga di lavoro: riprodurre, non correggere | 2026-09-03 | S | `Views/Controls/PasswordBox.axaml.cs:41` (l'unico handler che rimaschera), `:47` e `:53` (i due assegnamenti di `PasswordChar`). Nessun handler di `PointerCaptureLost` in tutto il file |
 
 
 ---
