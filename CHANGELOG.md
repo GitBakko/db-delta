@@ -39,6 +39,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   seconds of work went on against a server on behalf of a window the user had
   already dismissed, and on the success path a Windows Credential Manager entry
   was written, or deleted, after **Annulla**.
+- **Changing the server name no longer wipes the credentials you just typed.**
+  It cleared both fields on every keystroke, so going back to append
+  `\SQLSTERI` — or filling the credentials while the scan was still running and
+  then picking the server from **Risultati scansione** when it appeared — lost
+  the secret with no message. What had to be prevented was the *auto-connect*
+  sending one server's login to another, and that is now refused at its own
+  door: it arms under SQL authentication only for a pair the credential store
+  filed under the server currently named. Nothing is sent until **Connetti**.
+  The chosen database is cleared in their place, since a catalog does belong to
+  its server.
 
 ## [1.1.0] — 2026-09-02 — the deploy stops writing statements that mean something else
 

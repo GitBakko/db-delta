@@ -122,23 +122,42 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
         HasDatabases = false;
         AvailableDatabases.Clear();
 
-        // …and forget the credentials with them. They belong to the server that
-        // was named a moment ago, not to this one. Left in place they were sent
-        // onward by ScheduleAutoConnect below, which opens the connection 450 ms
-        // later — to a host that may well have arrived from the scan, i.e. from
-        // an unauthenticated UDP reply, over a string that carries
-        // TrustServerCertificate from the panel. Clearing them is also what
-        // makes IsAutoConnectEligible say no until the user has re-entered them:
-        // under SQL auth it requires both fields.
-        UserName = string.Empty;
-        Password = string.Empty;
+        // …and the chosen one with them. A database name is the one field that
+        // provably belongs to the server: keeping it would leave OK enabled
+        // against a catalog nobody has confirmed exists on the host just named.
+        // Measured before writing: all six call sites that assign both fields
+        // write DatabaseName AFTER ServerName, so none of them loses a value it
+        // was about to set.
+        DatabaseName = string.Empty;
 
-        // Refresh IP from suggestions list (if any) and try DPAPI auto-fill —
-        // which puts back the credentials stored for THIS server, if any.
+        // The credentials, by contrast, STAY. Wiping them here was the 2026-08-18
+        // answer to a real problem — a login typed for the previous server being
+        // sent 450 ms later to a host that may have arrived from an
+        // unauthenticated UDP scan reply — but it solved it by destroying what
+        // the user had just typed, per keystroke, with no message. Someone who
+        // goes back to append "\SQLSTERI" loses the secret they were halfway
+        // through; someone who fills the credentials while the scan is still
+        // running and then picks the server from "Risultati scansione" — the
+        // ordinary gesture — loses them too. The security goal never needed
+        // that: what must not happen is the AUTO-CONNECT firing with a pair that
+        // belongs to another server, and that is now denied in
+        // ScheduleAutoConnect itself. Pressing «Connetti» with the server name
+        // on screen stays the user's own explicit act.
+
+        // Refresh IP from suggestions list (if any).
         ServerIpAddress = ServerSuggestions
             .FirstOrDefault(s => string.Equals(s.Name, value, StringComparison.OrdinalIgnoreCase))?.IpAddress;
-        _ = TryAutoFillCredentialsAsync(value);
+
+        // These two are in this order and it is not cosmetic. This call cancels
+        // whatever the previous server had armed, and re-arms only under Windows
+        // auth; the auto-fill below then gets the last word, because it is the
+        // one caller allowed to arm with a real credential pair. Written the
+        // other way round — as it was until 2026-09-03, when clearing the fields
+        // made the difference invisible — this call would CANCEL the arm the
+        // auto-fill had just made and refuse to replace it, and "pick a
+        // remembered server and it connects itself" would quietly stop working.
         ScheduleAutoConnect();
+        _ = TryAutoFillCredentialsAsync(value);
     }
 
     partial void OnAuthModeChanged(AuthenticationMode value)
@@ -432,9 +451,30 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
     /// previous pending attempt — a single connection is fired per quiescent
     /// burst of edits.
     /// </summary>
-    private void ScheduleAutoConnect()
+    /// <param name="credentialsAreKnownForThisServer">
+    /// Passed true by exactly one caller, <see cref="TryAutoFillCredentialsAsync"/>,
+    /// which has just put back the pair the credential store had filed under the
+    /// server now named. Everywhere else the pair in the boxes may still belong
+    /// to the server named a moment ago, and under SQL auth sending it onward
+    /// unasked is credential disclosure — the host may have come from an
+    /// unauthenticated UDP scan reply, over a string that carries this panel's
+    /// TrustServerCertificate. This one guard replaces wiping the two fields on
+    /// every server-name keystroke: it denies the same thing without destroying
+    /// what the user typed. Windows auth has no secret to send and is exempt.
+    /// </param>
+    private void ScheduleAutoConnect(bool credentialsAreKnownForThisServer = false)
     {
+        // Unconditional, and it must stay above the guard below: a pending
+        // attempt re-reads ServerName when it fires, so one left running would
+        // aim the previous server's login at the host just named.
         _autoConnectCts?.Cancel();
+
+        if (AuthMode != AuthenticationMode.WindowsIntegrated
+            && !credentialsAreKnownForThisServer)
+        {
+            return;
+        }
+
         if (!IsAutoConnectEligible()) { return; }
 
         // Linked, not standalone: the debounce has two reasons to die — a newer
@@ -669,12 +709,14 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
             Password = pwd;
             RememberCredentials = true;
 
-            // The one place a credential pair is known-complete: we put it
-            // there. The field setters no longer arm the auto-connect — see the
-            // comment on OnUserNameChanged — so it is armed here instead, which
-            // keeps "pick a remembered server and it connects itself" working
-            // without ever sending a half-typed secret.
-            ScheduleAutoConnect();
+            // The one place a credential pair is known-complete AND known to
+            // belong to the server now named: we put it there, from the store's
+            // entry for this very server. The field setters no longer arm the
+            // auto-connect — see the comment on OnUserNameChanged — so it is
+            // armed here instead, which keeps "pick a remembered server and it
+            // connects itself" working without ever sending a half-typed secret,
+            // or one that belongs to a different host.
+            ScheduleAutoConnect(credentialsAreKnownForThisServer: true);
         }
         catch
         {
