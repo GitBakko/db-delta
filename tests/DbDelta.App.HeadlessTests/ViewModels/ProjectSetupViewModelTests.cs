@@ -140,6 +140,25 @@ public class ProjectSetupViewModelTests
         vm.Target.RememberCredentials.Should().BeTrue();
     }
 
+    [AvaloniaFact]
+    public void CloneSourceToTarget_lands_the_database_after_the_server_that_clears_it()
+    {
+        // Naming a server clears the catalog (2026-09-05), so every bulk copy
+        // must write DatabaseName after ServerName. Swap, FromProject and
+        // LoadFrom were pinned by the tests around this one; «Clona» was the
+        // sixth call site and had no test at all.
+        ProjectSetupViewModel vm = new();
+        FillEndpoint(vm.Source, "srv-src", "db-src");
+        FillEndpoint(vm.Target, "srv-old", "db-old");
+
+        vm.CloneSourceToTargetCommand.Execute(null);
+
+        vm.Target.ServerName.Should().Be("srv-src");
+        vm.Target.DatabaseName.Should().Be("db-src");
+        vm.Target.Password.Should().Be("p4ssw0rd");
+        vm.IsValid.Should().BeTrue();
+    }
+
     // ── Test 4: Build_produces_DbDeltaProject_with_both_endpoints ────────────
 
     [AvaloniaFact]

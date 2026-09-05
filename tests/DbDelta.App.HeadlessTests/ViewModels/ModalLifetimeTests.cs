@@ -173,10 +173,51 @@ public class ModalLifetimeTests
     }
 
     [Fact]
+    public async Task Closing_the_dialog_stops_a_load_already_in_flight()
+    {
+        // The headline of the fix — "every SQL call ran on a token that could
+        // not be cancelled" — and the 2026-09-05 review found it pinned by
+        // nothing: against .invalid a load never reaches the persist whether the
+        // token is honoured or not, so the test above stays green with
+        // CancellationToken.None put back. This one starts the load, waits until
+        // it is in flight, then closes: only an honoured token brings it back
+        // within the deadline, instead of ~10 s later at ConnectTimeout.
+        // Its own password on purpose: the physical attempt outlives the
+        // cancellation and fails ~10 s later, and SqlClient then blocks that
+        // pool for 5 s — a pool is keyed on the whole string, so sharing the
+        // control's pair would make the control's outcome depend on the clock.
+        RecordingCredentialStore store = new();
+        ProjectEndpointPanelViewModel vm = new("Sorgente", isTarget: false, store)
+        {
+            ServerName = Server,
+            UserName = "sa",
+            Password = "in-flight-and-then-closed",
+            RememberCredentials = true,
+        };
+
+        Task load = vm.LoadDatabasesCommand.ExecuteAsync(null);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
+        vm.IsLoadingDatabases.Should().BeTrue("the control: the load is in flight against .invalid");
+
+        vm.CancelPendingWork();
+        await load.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+
+        vm.IsLoadingDatabases.Should().BeFalse();
+        vm.ConnectionStatusMessage.Should().BeNull("a load stopped by the close is not an error");
+        store.Writes.Should().BeEmpty();
+        store.Deletes.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Closing_the_dialog_stops_both_panels_and_the_shared_scan()
     {
         // The parent's own token plus both children, in one call — the dialog
-        // has exactly one hook to make it from.
+        // has exactly one hook to make it from. IsLoadingDatabases is the
+        // assertion that discriminates: at 900 ms an auto-connect that DID fire
+        // is still in flight with a null message (see the control above), so
+        // asserting the message alone passed with the panel fan-out deleted.
+        // The scan half is not exercised here — it would broadcast on UDP — and
+        // is declared uncovered.
         RecordingCredentialStore store = new();
         ProjectSetupViewModel vm = new(store);
         store.Stored = "sa|p4ss";
@@ -186,6 +227,8 @@ public class ModalLifetimeTests
         vm.CancelPendingWork();
         await Task.Delay(900, TestContext.Current.CancellationToken);
 
+        vm.Source.IsLoadingDatabases.Should().BeFalse();
+        vm.Target.IsLoadingDatabases.Should().BeFalse();
         vm.Source.ConnectionStatusMessage.Should().BeNull();
         vm.Target.ConnectionStatusMessage.Should().BeNull();
     }

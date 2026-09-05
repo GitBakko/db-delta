@@ -16,6 +16,7 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
     private readonly ICredentialStore? _credentialStore;
     private bool _autoFillFromCredentialsInFlight;
     private CancellationTokenSource? _autoConnectCts;
+    private CancellationTokenSource? _loadCts;
     private const int AutoConnectDebounceMs = 450;
 
     /// <summary>
@@ -121,6 +122,15 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
         // auto-connect heuristic doesn't skip the new connection.
         HasDatabases = false;
         AvailableDatabases.Clear();
+
+        // …and abandon a load still in flight, which belongs to the server just
+        // left: it would list THAT host's catalogs under this name, and on its
+        // success path persist the pair now in the boxes — which survives this
+        // setter, see below — under a key it never authenticated against. That
+        // entry would then be trusted by the one caller allowed to arm the
+        // auto-connect, and the store would launder exactly the disclosure the
+        // guard in ScheduleAutoConnect denies. Found by the 2026-09-05 review.
+        _loadCts?.Cancel();
 
         // …and the chosen one with them. A database name is the one field that
         // provably belongs to the server: keeping it would leave OK enabled
@@ -350,6 +360,18 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanLoadDatabases))]
     public async Task LoadDatabasesAsync()
     {
+        // The load runs on its own token, linked to the dialog's lifetime, so
+        // it dies for two reasons: the window closing, and a different server
+        // being named while it is in flight (OnServerNameChanged cancels it).
+        // Everything after the await below is keyed on the LIVE ServerName —
+        // the list, the credential persist — and must not land under a host
+        // this connection never spoke to.
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _loadCts = cts;
+        CancellationToken ct = cts.Token;
+
         IsLoadingDatabases = true;
         HasDatabases = false;
         AvailableDatabases.Clear();
@@ -358,8 +380,9 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
         {
             string cs = BuildConnectionString(includeDatabase: false);
             IReadOnlyList<string> dbs =
-                await SqlServerDiscovery.ListDatabasesAsync(cs, _lifetime.Token)
+                await SqlServerDiscovery.ListDatabasesAsync(cs, ct)
                                         .ConfigureAwait(true);
+            ct.ThrowIfCancellationRequested();
             foreach (string db in dbs)
             {
                 AvailableDatabases.Add(db);
@@ -384,7 +407,7 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
             try
             {
                 string? version = await SqlServerDiscovery
-                    .GetServerVersionAsync(cs, _lifetime.Token)
+                    .GetServerVersionAsync(cs, ct)
                     .ConfigureAwait(true);
                 ServerVersion = version;
                 if (version is not null)
@@ -393,7 +416,7 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
                     // We re-query SERVERPROPERTY via the same connection string, but
                     // the version string itself starts with the product year — extract major
                     // from the connection (the method already succeeded so the server is reachable).
-                    int? major = await TryGetMajorVersionAsync(cs, _lifetime.Token)
+                    int? major = await TryGetMajorVersionAsync(cs, ct)
                         .ConfigureAwait(true);
                     ServerMajorVersion = major;
                 }
@@ -405,8 +428,15 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            ConnectionStatusMessage =
-                $"Errore: {Persistence.Util.ConnectionStringRedactor.Redact(ex.Message)}";
+            // A load that was cancelled — superseded by a newer server name, or
+            // the dialog gone — is not an error anybody asked about, and SqlClient
+            // may surface the cancellation as a SqlException rather than an
+            // OperationCanceledException, hence the token and not the type.
+            if (!ct.IsCancellationRequested)
+            {
+                ConnectionStatusMessage =
+                    $"Errore: {Persistence.Util.ConnectionStringRedactor.Redact(ex.Message)}";
+            }
         }
         finally
         {
@@ -466,8 +496,12 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
     {
         // Unconditional, and it must stay above the guard below: a pending
         // attempt re-reads ServerName when it fires, so one left running would
-        // aim the previous server's login at the host just named.
+        // aim the previous server's login at the host just named. Disposed as
+        // well as cancelled: a linked source holds a registration on _lifetime
+        // that only Dispose releases, and this runs once per keystroke.
         _autoConnectCts?.Cancel();
+        _autoConnectCts?.Dispose();
+        _autoConnectCts = null;
 
         if (AuthMode != AuthenticationMode.WindowsIntegrated
             && !credentialsAreKnownForThisServer)
@@ -602,6 +636,15 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
     public void LoadFromEndpoint(ProjectEndpoint? endpoint)
     {
         if (endpoint is null) { return; }
+
+        // A project carries no password, and the one in the box belongs to
+        // whatever server was named before «Carica…». Since naming a server no
+        // longer wipes the credentials, leaving it here made the loaded panel
+        // valid with the previous server's secret behind the dots — one OK away
+        // from a login to the project's host with a password entered for
+        // another. Cleared BEFORE the server name, so the auto-fill that the
+        // setter runs can put back what the store holds for THIS server.
+        Password = string.Empty;
 
         ServerName = endpoint.Connection.ServerName;
         DatabaseName = endpoint.Connection.DatabaseName;

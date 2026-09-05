@@ -17,16 +17,18 @@ vedi «Manutenzione» in fondo.
   installazione vero** — installa, verifica app, CLI e PATH di macchina,
   disinstalla, verifica che sia sparito. La v1.0.2 (2026-08-13) resta la
   precedente.
-- **1044 test verdi** nei sette progetti che girano senza Docker (Core 630,
-  Headless 234, Persistence.Unit 88, Golden 68, Property 12, Architecture 6,
-  Shared 6) — ricontati il 2026-09-05, non incrementati a mente. I ventiquattro
-  nuovi stanno tutti in Headless: quattro sono la chiusura della segnalazione
-  del 2026-09-03, nove la P1 della stringa di connessione, sette quella del
+- **1057 test verdi** nei sette progetti che girano senza Docker (Core 630,
+  Headless 244, Persistence.Unit 91, Golden 68, Property 12, Architecture 6,
+  Shared 6) — ricontati il 2026-09-05, non incrementati a mente. I
+  trentaquattro nuovi di Headless dal 2026-09-03: quattro sono la chiusura
+  della segnalazione, nove la P1 della stringa di connessione, sette quella del
   ciclo di vita della modale, l'azzeramento delle credenziali ne aggiunge due
-  netti riscrivendo i quattro di `EndpointCredentialResetTests` in sei, e la
-  P2 del «tieni premuto per mostrare» ne porta due, di cui uno è il controllo
-  in negativo.
-  **Con Docker acceso girano anche i tre DB-backed** e il totale è **1185**
+  netti riscrivendo i quattro di `EndpointCredentialResetTests` in sei, la P2
+  del «tieni premuto per mostrare» ne porta due, di cui uno è il controllo in
+  negativo, e la review adversariale della 1.1.1 ne porta **dieci** — sei per
+  le lacune che ha trovato, quattro per i difetti che ha chiuso. I tre di
+  Persistence.Unit sono il redactor, stessa review.
+  **Con Docker acceso girano anche i tre DB-backed** e il totale è **1198**
   (LiveDb 105, Cli acceptance 29, Persistence integration 7) — misurato il
   2026-09-05, tutti verdi. **Due** dei tre vanno **rossi**, non skipped, con Docker
   spento — LiveDb e Cli acceptance, che costruiscono il container in un
@@ -35,19 +37,32 @@ vedi «Manutenzione» in fondo.
   serve**: stampa l'intestazione anche a daemon morto. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **7 voci aperte** — **P1 0 · P2 2 · P3 1 · P4 3** · P5 1 — più **23** in
+- **9 voci aperte** — **P1 0 · P2 2 · P3 2 · P4 4** · P5 1 — più **23** in
   «Deciso — NON riaprire». **P1 è vuota**: le tre voci che la segnalazione del
   2026-09-03 aveva aperto sono chiuse tutte, `e9821a7` (stringa di connessione),
-  `85f5d4c` (ciclo di vita della modale) e il commit che porta questa riga
-  (azzeramento delle credenziali) — scelta del proprietario di allargare
-  l'ambito della 1.1.1 alle P1 invece di rilasciare le sole due bloccanti.
-  **Cinque delle sette restanti le ha aperte quella stessa segnalazione**; la
-  settima è d'igiene e l'ha aperta `85f5d4c` (`ProjectEndpointPanelViewModel` è
-  cresciuto, e `CLAUDE.md` vuole una voce invece del silenzio); l'ottava è del
-  proprietario, sulla selezione oggetti da CLI, ferma dal 2026-09-02.
+  `85f5d4c` (ciclo di vita della modale) e `cb01e7a` (azzeramento delle
+  credenziali) — scelta del proprietario di allargare l'ambito della 1.1.1
+  alle P1 invece di rilasciare le sole due bloccanti. **Cinque delle nove le ha
+  aperte quella stessa segnalazione**; una è d'igiene e l'ha aperta `85f5d4c`
+  (`ProjectEndpointPanelViewModel` è cresciuto, e `CLAUDE.md` vuole una voce
+  invece del silenzio); **due le ha aperte la review adversariale del
+  2026-09-05** sui quattro commit della 1.1.1 — un riarmo che muore al cambio
+  di `AuthMode` (P3) e una scrittura di credenziale scartata a OK (P4),
+  entrambe attrito e non disclosure; la nona è del proprietario, sulla
+  selezione oggetti da CLI, ferma dal 2026-09-02.
   **Il backlog non ha più alcuna voce dichiarata non verificata**: l'ultima —
   il ripristino della maschera dopo «tieni premuto per mostrare» — è stata
-  riprodotta il 2026-09-05 e chiusa, e il meccanismo era quello ipotizzato.
+  riprodotta il 2026-09-05 e chiusa (`e9abc18`), e il meccanismo era quello
+  ipotizzato.
+- **La review adversariale della 1.1.1 è stata eseguita il 2026-09-05** sui
+  quattro commit `273be43..e9abc18`, con **7 agenti a conteggio fisso** — cinque
+  lenti, un solo verificatore che ha ricevuto l'intera lista, un critico di
+  completezza — dopo che quella lanciata la mattina era stata uccisa a metà
+  senza un verdetto. **24 finding, 10 refutati, 14 in piedi più 3 del
+  critico.** Sezione «Review adversariale della 1.1.1» qui sotto: i difetti
+  veri sono chiusi dal commit che porta quelle righe, due voci sono aperte
+  (P3 e P4), sette erano lacune di test ora colmate, e una era **una riga di
+  questo file che diceva il falso** sui `CancellationToken.None` rimasti.
   **Le 4 critiche restano chiuse.** Per origine:
   delle **sei** aperte dall'audit di parità Redgate **non ne resta nessuna** —
   l'ultima, il gate d'errore di batch, è stata rimisurata e decisa il
@@ -75,9 +90,10 @@ vedi «Manutenzione» in fondo.
   `dbdelta script --no-transaction`, **verificata dal vivo** lo stesso giorno.
   **Quella riga diceva «nessuna voce aperta descrive un difetto», ed è durata
   un giorno**: il 2026-09-03 il proprietario ha installato la v1.1.0 e la
-  modale di nuovo progetto era inservibile. **Cinque voci aperte su sette
-  descrivono un difetto**, e nessuna delle sette l'ha trovata un test — le prime
-  due un utente sul build installato, le altre lo sweep partito da quelle. L'estrazione di `DeployPreflight` — aperta il 2026-09-01 solo
+  modale di nuovo progetto era inservibile. **Sette voci aperte su nove
+  descrivono un difetto**, e nessuna delle nove l'ha trovata un test — le prime
+  due un utente sul build installato, le altre lo sweep partito da quelle e la
+  review adversariale del 2026-09-05. L'estrazione di `DeployPreflight` — aperta il 2026-09-01 solo
   perché `CLAUDE.md` impone di aprire una voce invece di far crescere un file in
   silenzio, e mai un difetto — è **chiusa il 2026-09-02**, e anche lei aveva
   ragione sul problema e torto sul rimedio: la forma di `BackfillPreflight` che
@@ -101,17 +117,16 @@ vedi «Manutenzione» in fondo.
   non passava `dropDependencies`, quindi lo scenario 18 misurava il fallback
   invece del risolutore. Tutto in `docs/parity/redgate-2026-08-31.md`; per
   rigenerare l'artefatto DbDelta serve `DBDELTA_PARITY_DUMP=<percorso>`.
-- **CI verde su `1d4581c`**, la punta di `origin/main`, entrambi i job, il
-  2026-09-02: run `33622205347` (ci) e `33622205430` (docs), più `33622223661`
-  (release, sul tag `v1.1.0`). È il primo run che ha visto l'ondata del
-  2026-09-02 per intero: l'opzione `--no-transaction`, lo smoke dal vivo e le
-  due P2 che lo smoke ha aperto e chiuso. `git ls-remote` ha risposto subito: la
-  trappola di rete del 2026-09-01, `github.com:443` irraggiungibile mentre
-  `api.github.com` rispondeva, non si è ripetuta. I DB-backed
+- **CI verde su `cb01e7a`**, la punta di `origin/main`, entrambi i job, il
+  2026-09-05: run `33952958114` (ci) e `33952958111` (docs), più `33953339253`
+  (ci, rilanciato). Sono le tre P1 della 1.1.1 viste dalla CI; il fix P2 del
+  «tieni premuto» (`e9abc18`) è **locale, non pushato**, e la sua CI non
+  esiste ancora. Il run precedente verde è `33622205347` su `1d4581c`
+  (2026-09-02), con `33622223661` (release, sul tag `v1.1.0`). I DB-backed
   aggiungono **141** test ai locali della riga sopra: LiveDb 105, Cli acceptance
-  29, Persistence integration 7 — **1161 in tutto**. Misurati il 2026-09-02 su Windows con
-  Docker acceso, dove i 7 passano tutti; senza Docker 3 dei 7 si skippano da sé.
-  L'exit code di `script` e la forma JSON di `compare` girano solo lì.
+  29, Persistence integration 7 — il **1198** della riga sopra. Senza Docker 3
+  dei 7 di Persistence integration si skippano da sé. L'exit code di `script`
+  e la forma JSON di `compare` girano solo lì.
 - **La guardia dello skip Testcontainers deve avvolgere `Build()`**, non solo
   `StartAsync()`: `Validate()` alza `ArgumentException` quando il runner non ha
   proprio un endpoint Docker, e il job Windows andava rosso a intermittenza su
@@ -275,6 +290,84 @@ credenziali al cambio di server. Restano **cinque**, tutte P2 o più basse.
 
 ---
 
+## Review adversariale della 1.1.1 — 2026-09-05, `273be43..e9abc18`
+
+Quattro commit sotto esame — le tre P1 e la P2 del «tieni premuto» — con
+**7 agenti a conteggio fisso**: cinque lenti (regressione, sicurezza,
+concorrenza e ciclo di vita, stringa di connessione, qualità dei test), **un
+solo verificatore** che ha ricevuto tutti i finding e li ha confutati in un
+passaggio, un critico di completezza. La stessa review lanciata la mattina
+con tre scettici per finding era stata uccisa a metà senza un verdetto:
+resta la lezione in memoria, non qui. **24 finding, 10 refutati, 14 in piedi,
+più 3 del critico.** I dieci refutati: tre duplicati; tre pre-esistenti (la
+risoluzione DNS senza token, i pannelli usa-e-getta di `FromProject` che
+armano un auto-connect che nessuno cancella, il template `{PASSWORD}` di
+`ConnectionEditViewModel`); uno irraggiungibile (l'auto-fill che gareggia col
+cambio di server: `DpapiCredentialStore` è sincrono, quindi l'auto-fill finisce
+dentro il setter); due speculativi (un wildcard DNS su `*.invalid`; la
+`PoolBlockingPeriod` di SqlClient — **che però ha mostrato la testa nella sonda
+05 qui sotto**, dove il mutante ha fatto cadere anche il controllo
+pre-esistente della stessa classe: i due test nuovi «in volo» hanno perciò una
+password propria, cioè una pool propria); uno non confermabile (la sonda
+`Pointer.Capture(null)` contro la perdita di cattura di piattaforma — la lente
+di sicurezza l'ha tracciata nel sorgente di Avalonia 12.0.3 da
+`WM_CAPTURECHANGED` fino a `PointerCaptureLost` sull'elemento catturato e sui
+suoi antenati, quindi il percorso è lo stesso; **resta non letta la penna**).
+
+Dei 17 in piedi: **cinque difetti chiusi** dal commit che porta queste righe,
+**due aperti** come voci (P3 e P4, nelle loro tabelle), **otto lacune di test
+colmate**, una riga di questo file corretta (la P1 del ciclo di vita, qui
+sopra), e un rilievo di processo — il `CHANGELOG` porta ancora `[Unreleased]`
+sopra le voci della 1.1.1, e ogni release precedente ha avuto il suo commit di
+taglio prima del tag. **Dodici sonde di mutazione, dodici uccise**, una per
+rimedio e una per test nuovo; nessuna ha lasciato verde il test che doveva
+far cadere.
+
+| Voce chiusa | Come | Prova |
+|---|---|---|
+| «Carica…» teneva la password del server precedente sotto il server del progetto caricato, e OK avviava il confronto con quella | **Regressione di `cb01e7a`**, e della classe della P0 del 2026-08-18 — un segreto entrato per un server mandato a un altro — anche se qui la destinazione è il server del progetto e l'utente preme OK: prima l'azzeramento nel setter di `ServerName` lasciava OK spento finché non si digitava una password per QUEL server; con i campi che sopravvivono, `LoadFromEndpoint` — che non tocca mai `Password`, perché un progetto non la porta — lasciava il segreto di prima dietro i pallini su un modulo ora valido. `LoadFromEndpoint` azzera `Password` **prima** di assegnare `ServerName`, così l'auto-fill che il setter esegue rimette ciò che lo store ha per il server caricato | `EndpointCredentialResetTests.Loading_a_project_does_not_carry_the_previous_servers_password_along` e il controllo in negativo `Control_loading_a_project_whose_server_the_store_remembers_fills_that_pair`. **Due sonde, due uccise**: tolto l'azzeramento cade il primo; spostato **dopo** `ServerName` cade il controllo, che è il motivo per cui il controllo esiste |
+| Un caricamento in volo finiva sotto il server nominato nel frattempo: la lista dell'host A sotto il nome di B e — con «Ricorda credenziali» — la coppia che aveva autenticato A **salvata sotto la chiave di B**, dove l'auto-fill l'avrebbe garantita al prossimo giro | **Regressione di `cb01e7a`, ed è la più seria delle cinque**: lo store diventava il canale che ricicla esattamente la disclosure che la guardia in `ScheduleAutoConnect` nega. Prima l'azzeramento faceva finire lo stesso incrocio nel ramo `else` — la cancellazione della voce di B, sbagliata anche lei, ma non una scrittura incrociata. Il caricamento gira ora su un token proprio (`_loadCts`), collegato alla vita del dialogo e **cancellato da `OnServerNameChanged`**; dopo l'await c'è un `ThrowIfCancellationRequested`, e un caricamento cancellato non scrive «Errore:» — SqlClient può riportare la cancellazione come `SqlException`, quindi si guarda il token e non il tipo | `EndpointCredentialResetTests.Naming_a_different_server_abandons_the_load_still_in_flight` — osserva l'**abbandono**, che è ciò che impedisce la scrittura: il caricamento torna entro 2 s invece dei ~10 s del `ConnectTimeout`. **La scrittura sotto la chiave sbagliata in sé non è riproducibile in headless** — serve un caricamento che RIESCA, cioè un server che risponda — ed è dichiarato; sta nella lista di smoke qui sotto. **Sonda: tolto il `Cancel` nel setter, cade** |
+| Il redactor lasciava in chiaro la coda di una password quotata: `Password="a;b=c"` usciva come `Password=***;b=c"` nella striscia d'intestazione e nel dialogo di conferma | **Aperto da `e9821a7`**, che ha reso connettibili le password con `;` senza aggiornare chi le maschera: prima quella stringa non superava il parse e il confronto non partiva mai, quindi il dialogo di conferma era irraggiungibile. La regex capisce ora le tre forme di `DbConnectionStringBuilder` — doppi apici con `""` interno, apici singoli, valore nudo. Riprodotto dalla review con una sonda contro gli assembly, non dedotto | `ConnectionStringRedactorTests` — 3 test nuovi, uno per forma. **Sonda: regex vecchia, cadono tutti e tre** |
+| Spazi attorno a login e catalogo arrivavano al server verbatim: `" sa"` incollato da una chat diventava un login chiamato `" sa"` | Il vecchio formato non quotato veniva riletto da SqlClient, che toglie il padding a un valore nudo; il builder quota un valore con padding e il parser lo conserva. `Trim()` su `UserID` e `InitialCatalog` in `EndpointConnectionString.Build`; **la password no**, portarla byte per byte è il punto della classe | `EndpointConnectionStringTests.Padding_around_the_login_and_the_catalog_is_trimmed_and_the_password_is_not`. **Sonda: tolto il `Trim`, cade** |
+| Ogni arm del debounce lasciava una registrazione su `_lifetime.Token` fino alla chiusura del dialogo | La `CreateLinkedTokenSource` di `85f5d4c` registra un callback sul token padre che solo `Dispose` rilascia, e `ScheduleAutoConnect` cancellava senza mai disporre — una per tasto sotto auth Windows. `Dispose()` dopo `Cancel()` e campo azzerato, per il debounce e per il token del caricamento. Memoria sola, limitata alla vita del dialogo, nessun handle | Nessun test, e sarebbe finto: non è osservabile dall'esterno. Dichiarato |
+| **Otto lacune di test**, sei delle quali su invarianti che i commit dichiaravano portanti | (1) `Closing_the_dialog_stops_both_panels_and_the_shared_scan` asseriva solo `ConnectionStatusMessage`, che a 900 ms è nullo **anche** con un auto-connect in volo: ora asserisce `IsLoadingDatabases` su entrambi i pannelli; la metà «scansione» resta scoperta e lo dice. (2) Il token in `ListDatabasesAsync` non aveva un test che lo distinguesse da `CancellationToken.None`, perché contro `.invalid` il persist non si raggiunge in nessun caso: `Closing_the_dialog_stops_a_load_already_in_flight` chiude a caricamento in volo e pretende il ritorno entro 2 s. (3) L'esenzione Windows nella guardia non era pinnata da nulla — `Windows_authentication_is_unaffected` asseriva il valore appena assegnato: ora aspetta e pretende il caricamento in volo. (4) «Il `Cancel` sta sopra la guardia e deve restarci» non aveva un test: `A_pair_the_store_vouched_for_is_not_carried_to_the_server_named_next` arma per A e rinomina in B dentro la finestra. (5) `TrustServerCertificate` era asserito solo al suo default, lo stesso buco chiuso per `Encrypt`: theory a due valori. (6) `CloneSourceToTarget` era il sesto call site dell'ordine `ServerName`→`DatabaseName` e non aveva alcun test. (7) La via OK del dialogo — `OnOkClick` che legge le due stringhe **prima** di chiudere, da cui `App` semina `AppState` — non era percorsa da nessun test: `The_dialogs_OK_captures_both_strings_with_the_live_password` preme il pulsante `IsDefault`. (8) Un commento in `EndpointConnectionStringTests` descriveva l'azzeramento delle credenziali che `cb01e7a` ha tolto: corretto. **Resta senza test, e dichiarato, `App.BuildConnectionString`** — il builder di riapertura con password vuota, privato e statico | **Sette sonde, sette uccise**, una per test nuovo: fan-out dei pannelli tolto da `ProjectSetupViewModel.CancelPendingWork` (cade 1, e con lei il test del cablaggio `Closed`); `CancellationToken.None` rimesso su `ListDatabasesAsync` (cade 2 — **e cade anche il controllo pre-esistente `Control_without_the_close`**, per la `PoolBlockingPeriod`: il tentativo fisico del test precedente fallisce ~10 s dopo e blocca la pool condivisa per 5 s; da qui le password proprie dei test in volo); esenzione Windows tolta (cade 3); `Cancel` spostato sotto la guardia (cade 4); `trustServerCertificate: true` cablato nel pannello (cade il caso `false` di 5); `ServerName` scritto dopo `DatabaseName` in `Clona` (cade 6); le due assegnazioni tolte da `OnOkClick` (cade 7) |
+
+**Smoke dal vivo prima del tag — del proprietario**, sui server della
+segnalazione o su `.243`/`.242`, con la MSI prodotta dalla build e non con
+`dotnet run`. In ordine di ciò che nessun test headless può vedere:
+
+1. Login SQL con password `a;b=c` → Connetti elenca i database; OK → il
+   confronto parte; striscia d'intestazione e dialogo di Esegui mostrano
+   `Password=***` **senza** coda `b=c"`.
+2. Server scelto da «Usati di recente» che DPAPI ricorda (lo store vero, non
+   il finto) → utente e password si riempiono e la lista compare da sola
+   entro ~1 s, senza clic.
+3. Utente e password digitati mentre la scansione d'apertura gira, poi il
+   server scelto da «Risultati scansione» → i campi restano, nessun errore
+   grigio da solo; Connetti carica.
+4. `\ISTANZA` aggiunto al nome del server dopo aver digitato la password →
+   la password c'è ancora e non parte nulla.
+5. Server A ricordato scelto, poi **subito** B dalla stessa lista mentre la
+   lista di A sta caricando → la lista sotto B è vuota, non quella di A;
+   `cmdkey /list | findstr dbdelta` non ha una voce nuova per B.
+6. Pannello in auth Windows, server ricordato scelto, ComboBox su SQL → la
+   lista **non** si carica da sola (è la P3 aperta: il proprietario decide se
+   vale la 1.1.1).
+7. Connetti verso un host irraggiungibile (`10.255.255.1`), Annulla entro
+   10 s → nessuna banda in `MainWindow`, `cmdkey` invariato, nessun tentativo
+   residuo ~20 s dopo.
+8. Occhio tenuto premuto, Alt+Tab e ritorno → password mascherata; idem con
+   il tasto Win e con un toast; **penna e touch se c'è l'hardware**, che è la
+   parte non letta nel sorgente di Avalonia.
+9. Password digitata per il server A, poi «Carica…» di un progetto per B
+   (auth SQL) → OK resta **spento** finché non si digita la password di B.
+10. Riavvio dell'app con un ultimo progetto (la via di riapertura con password
+    vuota) → un errore di autenticazione SQL leggibile, non un errore di parse.
+11. Scambia con entrambi i pannelli pieni → entrambi i nomi di database
+    sopravvivono **nella UI** (l'`AutoCompleteBox`, non solo il view-model).
+
+---
+
 ## P1 — Alte: risultato o script sbagliato
 
 Tre voci chiuse il 2026-08-31 e quattro il 2026-09-01, ognuna dal commit che
@@ -329,7 +422,7 @@ due il 2026-09-03, la terza il 2026-09-05. **P1 non ha più voci aperte**:
 | Voce chiusa | Come | Prova |
 |---|---|---|
 | Una password che contiene `;` o `=` non poteva connettersi, e la modale si chiudeva lo stesso sulla stringa rotta | Tutto passa da `ViewModels/EndpointConnectionString.cs`, che assegna a `.DataSource` / `.InitialCatalog` / `.UserID` / `.Password` di `SqlConnectionStringBuilder` invece di interpolare in un formato i cui delimitatori sono proprio `;` e `=`. **Le copie erano QUATTRO, non due**, e la voce ne contava due: il pannello, il dialogo di setup, il **connection manager** e il percorso di riapertura di un progetto in `App.axaml.cs`. La quarta e la terza non erano nella voce, e quella del connection manager era stata **archiviata come irraggiungibile** dalla review del 2026-08-14 — verdetto ribaltato dal 2026-08-20, quando il proprietario ha rimesso il pulsante che apre quel dialogo. Correggerne due su quattro avrebbe lasciato vivo lo stesso difetto in due punti, ed è anche la regola DRY #3 di `src/DbDelta.App.Avalonia/CLAUDE.md` — la logica di view-model ripetuta si estrae. **`Encrypt` è un `bool?` e non un `bool`, di proposito**: il connection manager non ha mai scritto quella chiave e lascia decidere il default di SqlClient, quindi scriverla sarebbe stato un cambio di comportamento nascosto dentro una deduplicazione. `ProjectSetupViewModel` perde la sua copia intera e scende da 318 a 306 righe; `ProjectEndpointPanelViewModel` da 708 a 702 | `EndpointConnectionStringTests` — 9 test headless (la `[Theory]` conta due casi), di cui **quattro controlli in negativo**: una password ordinaria porta ancora ogni campo, l'auth Windows non scrive nessuna credenziale, il database resta fuori quando non è richiesto, e il connection manager non scrive alcun `Encrypt`. I tre che asseriscono la password fallivano prima con `System.ArgumentException: Parola chiave non supportata: 'b'` e passano dopo. **Sonda di mutazione, e la prima è SOPRAVVISSUTA**: invertire `Encrypt` lasciava verdi tutti e 220 i test headless — nessuno asseriva quel flag, e non è cosmetico (il pannello lo default a `false` mentre il default di SqlClient 6 è Mandatory, quindi un valore ribaltato romperebbe ogni server senza TLS). Buco chiuso con `The_panels_encrypt_flag_reaches_the_string_with_the_value_it_has`, che ora la uccide in entrambe le direzioni. Una seconda sonda è stata buttata: `&& false` orfana la variabile e dà `IDE0059` come errore, cioè una sonda che non gira |
-| Chiudere la modale non annullava niente: la connessione e la scrittura della credenziale sopravvivevano ad «Annulla» | Una `CancellationTokenSource` di **vita** per view-model, cancellata dall'unico gancio che mancava — `Closed` su `ProjectSetupDialog` — e filata in ogni chiamata di rete e di credential store. Il debounce dell'auto-connect diventa una `CreateLinkedTokenSource` su quella vita, così muore per due ragioni invece di una: un'edizione più recente, e la finestra che si chiude. **La misura che ha deciso la forma, e non era deducibile**: `DpapiCredentialStore` **ignora il token** che riceve — entrambe le sue scritture sono sincrone e incondizionate (`SetSecretAsync`/`DeleteSecretAsync` chiamano `CredentialManager` e ritornano `Task.CompletedTask`). Filare il token in quelle chiamate quindi **non ferma niente**: è il `ThrowIfCancellationRequested()` esplicito prima di esse a fermarle, e la voce diceva solo «filare i token». `Closed` e non `Closing`, perché a quel punto la risposta è già data — da qualunque pulsante — e OK ha già letto ciò che gli serviva. **Le `CancellationToken.None` che restano in `ProjectSetupDialog.axaml.cs` sono volute e dichiarate**: sono salvataggio del progetto su disco, MRU e caricamento, tutte dietro una modale annidata, quindi la finestra non può chiudersi sotto di loro. `TryGetMajorVersionAsync` prende ora un `ct` invece di cablare `None` | `ModalLifetimeTests` — 7 test headless, di cui **tre controlli in negativo**. **Il controllo in negativo ha fatto il suo mestiere al primo colpo**: la prima versione asseriva `ConnectionStatusMessage` non nullo e **falliva**, perché `ListDatabasesAsync` imposta `ConnectTimeout = 10` e a 900 ms il tentativo è ancora **in volo** — il segnale osservabile è `IsLoadingDatabases`, non l'errore. Senza quel controllo i tre test «cancellato» sarebbero stati verdi per il motivo sbagliato, su un auto-connect che non era mai partito. **Tre sonde di mutazione, tre uccise**, una per metà del rimedio: neutralizzata la guardia esplicita cade il test sulla scrittura di credenziale; scollegata la `CreateLinkedTokenSource` ne cadono due; **cancellato il gancio `Closed` cade `The_dialog_itself_cancels_its_view_model_when_it_closes`**, che è il solo test del cablaggio — senza di lui la riga si poteva togliere e tutti gli altri restavano verdi. Un quarto tentativo di sonda è stato scartato perché non discrimina: spostare il gancio da `Closed` a `Opened` lascia comunque il view-model cancellato al momento dell'asserzione |
+| Chiudere la modale non annullava niente: la connessione e la scrittura della credenziale sopravvivevano ad «Annulla» | Una `CancellationTokenSource` di **vita** per view-model, cancellata dall'unico gancio che mancava — `Closed` su `ProjectSetupDialog` — e filata in ogni chiamata di rete e di credential store. Il debounce dell'auto-connect diventa una `CreateLinkedTokenSource` su quella vita, così muore per due ragioni invece di una: un'edizione più recente, e la finestra che si chiude. **La misura che ha deciso la forma, e non era deducibile**: `DpapiCredentialStore` **ignora il token** che riceve — entrambe le sue scritture sono sincrone e incondizionate (`SetSecretAsync`/`DeleteSecretAsync` chiamano `CredentialManager` e ritornano `Task.CompletedTask`). Filare il token in quelle chiamate quindi **non ferma niente**: è il `ThrowIfCancellationRequested()` esplicito prima di esse a fermarle, e la voce diceva solo «filare i token». `Closed` e non `Closing`, perché a quel punto la risposta è già data — da qualunque pulsante — e OK ha già letto ciò che gli serviva. **Le quattro `CancellationToken.None` che restano in `ProjectSetupDialog.axaml.cs` sono volute, e questa riga diceva il falso sul perché** — corretta dalla review del 2026-09-05: diceva «tutte dietro una modale annidata, quindi la finestra non può chiudersi sotto di loro», mentre nel file nessuna delle quattro sta dentro lo `ShowDialog` annidato — la lettura dell'MRU viene **prima** che il dialogo di caricamento si apra, la `LoadAsync` del progetto e le due scritture del salvataggio vengono **dopo** che il dialogo annidato è tornato — e nessun commento le dichiara. Restano `None` per una ragione vera e più semplice: sono I/O locale su file, millisecondi, e `LoadFrom` su un view-model già cancellato è un no-op. `TryGetMajorVersionAsync` prende ora un `ct` invece di cablare `None` | `ModalLifetimeTests` — 7 test headless, di cui **tre controlli in negativo**. **Il controllo in negativo ha fatto il suo mestiere al primo colpo**: la prima versione asseriva `ConnectionStatusMessage` non nullo e **falliva**, perché `ListDatabasesAsync` imposta `ConnectTimeout = 10` e a 900 ms il tentativo è ancora **in volo** — il segnale osservabile è `IsLoadingDatabases`, non l'errore. Senza quel controllo i tre test «cancellato» sarebbero stati verdi per il motivo sbagliato, su un auto-connect che non era mai partito. **Tre sonde di mutazione, tre uccise**, una per metà del rimedio: neutralizzata la guardia esplicita cade il test sulla scrittura di credenziale; scollegata la `CreateLinkedTokenSource` ne cadono due; **cancellato il gancio `Closed` cade `The_dialog_itself_cancels_its_view_model_when_it_closes`**, che è il solo test del cablaggio — senza di lui la riga si poteva togliere e tutti gli altri restavano verdi. Un quarto tentativo di sonda è stato scartato perché non discrimina: spostare il gancio da `Closed` a `Opened` lascia comunque il view-model cancellato al momento dell'asserzione |
 | Toccare il nome del server — o sceglierlo dal menu della scansione — svuotava Utente e Password senza dire niente | **I campi restano; a essere negato è l'AUTO-CONNECT, che era la cosa da negare fin dall'inizio.** `ScheduleAutoConnect` prende un `credentialsAreKnownForThisServer` e sotto auth SQL rifiuta di armarsi se non è vero; **un solo chiamante su tre lo passa**, `TryAutoFillCredentialsAsync`, che ha appena rimesso la coppia che il credential store aveva archiviata sotto il server ora nominato. L'auth Windows è esente perché non ha segreti da mandare. La P0 del 2026-08-18 resta chiusa e la sua proprietà intatta — nulla parte da solo verso un host imparato da una risposta UDP non autenticata — ma non la si paga più distruggendo ciò che l'utente sta digitando. `Connetti`, con il nome del server a schermo, resta un atto esplicito. **Il `_autoConnectCts?.Cancel()` sta SOPRA la guardia e deve restarci**: un tentativo già in volo rilegge `ServerName` quando spara, quindi lasciarlo correre punterebbe il login del server precedente sull'host appena nominato — la guardia da sola non basta. **Al posto delle credenziali si azzera `DatabaseName`**, e non è uno scambio di fastidi: un catalogo appartiene dimostrabilmente al server, la lista accanto veniva già svuotata due righe sopra, ed è ciò che impedisce a OK di accendersi su un bersaglio che nessuno ha confermato — proprietà che l'azzeramento delle credenziali forniva per caso. **Misurato prima di scrivere**: tutti e sei i call site che assegnano entrambi i campi scrivono `DatabaseName` **dopo** `ServerName`, quindi nessuno perde un valore che stava per impostare | `EndpointCredentialResetTests`, **riscritto**: pinnava il comportamento opposto dal 2026-08-18 e il perché del ribaltamento sta nel suo doc-comment, non solo qui. 6 test, di cui **due controlli in negativo**. **Il controllo in negativo ha trovato un difetto introdotto dalla correzione stessa**: `A_remembered_pair_still_connects_the_moment_its_server_is_picked` falliva, perché il `ScheduleAutoConnect()` in coda a `OnServerNameChanged` **cancellava** ciò che l'auto-fill aveva appena armato e poi si rifiutava di riarmare — cioè la guardia aveva ucciso la funzione «scegli un server ricordato e si connette da solo» invece del solo abuso. Le due chiamate sono ora in ordine inverso e il commento dice perché. Senza quel controllo sarebbe partita una guardia che non arma mai, con quattro test verdi sopra. **Tre sonde di mutazione, tre uccise**: tolta la guardia cade il test che nega l'invio al nuovo server; rimesso l'ordine sbagliato cade il controllo in negativo; tolto l'azzeramento di `DatabaseName` ne cadono due |
 ---
 
@@ -398,10 +491,12 @@ Una voce chiusa il 2026-08-20 dal commit che porta questa riga:
 
 L'unica voce precedente, l'estrazione di `DeployPreflight`, è chiusa il
 2026-09-02 dal commit che porta la sua riga qui sopra. **Una voce nuova il
-2026-09-03**, dallo sweep sulla modale:
+2026-09-03**, dallo sweep sulla modale, e **una il 2026-09-05**, dalla review
+adversariale della 1.1.1:
 
 | Voce | Reg. | Sforzo | Stato reale |
 |---|---|---|---|
+| **Il riarmo garantito dallo store muore al cambio di `AuthMode` che lo segue, in ogni percorso che assegna i campi in blocco.** `ScheduleAutoConnect` cancella incondizionatamente e sotto auth SQL riarma solo se `credentialsAreKnownForThisServer`; `OnAuthModeChanged` lo chiama col default `false`. Quando il pannello era in auth Windows e l'endpoint caricato, scambiato o clonato è SQL, l'assegnazione di `AuthMode` — che in `LoadFromEndpoint`, `SwapEndpoints`, `CopyEndpoint` e `CloneSourceToTarget` viene subito dopo `ServerName` — cancella l'arm che l'auto-fill aveva appena fatto e non lo rimpiazza: i campi si riempiono con la coppia ricordata, la lista resta vuota finché non si preme «Connetti». Stessa cosa a mano: server ricordato scelto in modalità Windows, poi la ComboBox su SQL. Prima di `cb01e7a` la guardia non c'era e il setter riarmava. **Misurato dalla review del 2026-09-05** con una sonda contro gli assembly compilati: `LoadFromEndpoint` da pannello già SqlServer → `loading=True`; da pannello WindowsIntegrated → `loading=False`; `Scambia` con sorgente Windows → `loading=False`. Non è disclosure — non parte nulla — è attrito, e solo nella transizione Windows→SQL; per questo non è entrata nella 1.1.1. Rimedio abbozzato: ricordare il server per cui lo store ha garantito la coppia (azzerato dai setter di utente e password e dal cambio di server) e far passare la guardia quando coincide con `ServerName`, così `OnAuthModeChanged` riarma; **il controllo in negativo esiste già**, `A_remembered_pair_still_connects_the_moment_its_server_is_picked` | 2026-09-05 | S | `ViewModels/ProjectEndpointPanelViewModel.cs` — `OnAuthModeChanged` e la guardia in `ScheduleAutoConnect` (cerca `credentialsAreKnownForThisServer`); i quattro call site sono `LoadFromEndpoint` nello stesso file e `SwapEndpoints`, `CopyEndpoint`, `CloneSourceToTarget` in `ViewModels/ProjectSetupViewModel.cs` |
 | **I due pannelli della modale di setup sono un copia-incolla verbatim di ~85 righe, che la regola UI #3 vieta.** Misurato meccanicamente, non a occhio: normalizzando i token interi (`Src*`/`Tgt*`, `Binding Source`/`Target`, `ScanCommandParameter source`/`target`, `Grid.Column` 0/2) e togliendo commenti e indentazione, i due blocchi sono **75 righe identiche** e differiscono su **una** riga sola — il gestore `Click` del chevron dei database — più due commenti presenti solo nella copia Provenienza. Gli input per istanza sono cinque: `DataContext`, `Grid.Column`, i due `x:Name`, `ScanCommandParameter`, e quel gestore. La soglia delle due occorrenze è già applicata **in questo stesso file** a `PasswordBox`, con tanto di commento «DRY — CLAUDE.md UI rule #3» su entrambe le chiamate. Nessun impatto per l'utente oggi; il costo è che **ogni** correzione di markup fra quelle aperte il 2026-09-03 va applicata due volte, e le copie hanno già cominciato a divergere. **Trappola nell'estrazione, misurata**: `SrcServerPicker` **non** è un nome morto — un test headless lo risolve per nome sul dialogo, quindi spostare il controllo dentro un `UserControl` ne cambia il namescope e rompe quel test; o si espone il picker, o il test si ripunta | 2026-09-03 | M | `Views/ProjectSetupDialog.axaml:87-174` e `:180-265`, la riga che differisce è `:158` contro `:250`. Il precedente DRY nello stesso file è `:124` e `:216`. Il test che si aggancia al nome è `tests/DbDelta.App.HeadlessTests/Controls/ServerPickerTests.cs:33` |
 
 ---
@@ -429,13 +524,14 @@ chiuse entrambe il 2026-09-02, dai commit che portano le loro righe qui sopra.
 **Due voci nuove il 2026-09-03** dallo sweep sulla modale, **più una terza**
 aperta lo stesso giorno dalla chiusura della P1 sul ciclo di vita, perché
 `CLAUDE.md` vuole una voce e non il silenzio quando uno dei sei file grandi
-cresce:
+cresce, **più una quarta il 2026-09-05** dalla review adversariale della 1.1.1:
 
 | Voce | Reg. | Sforzo | Stato reale |
 |---|---|---|---|
+| **`Closed` non distingue OK da Annulla: una scrittura «Ricorda credenziali» dietro un caricamento ancora in volo al momento di OK viene scartata.** OK è abilitato da `IsValid`, e il nome del database si può digitare a mano mentre la lista sta ancora caricando (fino ai 10 s di `ConnectTimeout`): premere OK in quella finestra chiude, `Closed` cancella la vita del pannello, il caricamento muore prima di `TryPersistCredentialsAsync` e la coppia non viene salvata — il confronto parte con la password digitata, la volta dopo non si riempie nulla. Prima di `85f5d4c` il persist completava a finestra chiusa. Corsa stretta, forse un compromesso accettabile, ma il commit e la riga di P1 qui sopra nominano solo il caso Annulla: **non è dichiarato come tale** | 2026-09-05 | XS | `Views/ProjectSetupDialog.axaml.cs` (il gancio `Closed`), `ViewModels/ProjectEndpointPanelViewModel.cs` (`LoadDatabasesAsync`, il persist sul percorso di successo) |
 | **La scansione dichiara sempre di aver trovato dei server, e il suggerimento «SQL Browser potrebbe essere disabilitato» è codice morto.** `EnumerateServersAsync` semina il dizionario con tre alias locali — `(local)`, `localhost`, `127.0.0.1` — **prima** di spedire un solo pacchetto UDP, e restituisce il dizionario intero: non può tornare con meno di 3 voci. I consumatori trattano quel valore come output puro della scansione — `ApplyScanResults` marchia ogni riga con la sezione «Risultati scansione» e sceglie il messaggio diagnostico su `list.Count == 0`, condizione che il metodo **non può produrre**. Su una rete dove nessuno risponde, l'utente vede quindi un'intestazione «Risultati scansione» sopra tre congetture locali, sceglie, sbatte contro un errore di connessione, e l'unico messaggio che gli avrebbe spiegato la rete vuota non compare mai. Il gemello lo rende esplicito: `ConnectionEditViewModel` scrive «Trovati {list.Count} server», che non può stampare meno di 3 | 2026-09-03 | S | `src/DbDelta.Persistence/Sql/SqlServerDiscovery.cs:56-61` (la semina) e `:135-140`, `return` a `:141` (il ritorno). Il ramo morto è `ViewModels/ProjectEndpointPanelViewModel.cs:273-275`, la vista che lo renderebbe è `Views/ProjectSetupDialog.axaml:105-107`, il gemello è `ViewModels/ConnectionEditViewModel.cs:110-112` |
 | **«(N trovati)» conta come server i separatori di sezione, che non si possono selezionare.** `ServerSuggestions` è una collezione piatta che porta anche le sentinelle `IsHeaderOnly` — una inserita da `ApplyScanResults` per «Risultati scansione», un'altra da `SeedRecentServers` per «Usati di recente» — e lo stile del ComboBox le disabilita esplicitamente, cioè sono disegnate come strisce divisorie e **non** sono scegliibili. `Count` le include lo stesso: il contatore supera di uno le righe pescabili con una sezione presente, di due con entrambe. A zero suggerimenti non si vede alcun numero sbagliato, perché il TextBlock è nascosto da `HasServerSuggestions`. `DatabaseCountText` non è toccato: `AvailableDatabases` non porta sentinelle | 2026-09-03 | S | `ViewModels/ProjectEndpointPanelViewModel.cs:100`; le sentinelle sono inserite a `:259-264` e `:316-321`; lo stile che le disabilita è `Views/Controls/ServerPicker.axaml:27-29`; il contatore è legato a `Views/ProjectSetupDialog.axaml:94` e `:187` |
-| **`ProjectEndpointPanelViewModel` è passato da 702 a 772 righe chiudendo le tre P1.** `CLAUDE.md` elenca sei file già oltre le 500 righe e vieta di farli crescere senza aprire una voce: questa è quella voce, non un difetto. Le 70 righe sono la `CancellationTokenSource` di vita, `CancelPendingWork` con il suo doc-comment, la guardia esplicita prima della scrittura di credenziale, il parametro `credentialsAreKnownForThisServer` con la sua motivazione, e i commenti che dicono perché — **la metà buona è commento, e nessuno di quei commenti è ornamentale**: due di essi registrano un ordine di chiamate e una posizione di riga che, invertiti, reintroducono un difetto misurato. **La forma dell'estrazione è però già decisa da un'altra voce e va fatta insieme a quella**: la P3 sui due pannelli copia-incolla della modale tocca gli stessi confini, e separare la logica di endpoint (scan, load, credenziali, ciclo di vita) da quella di presentazione è l'unico taglio che riduce entrambe. Farla da sola qui varrebbe un file in più e nessuna riga in meno altrove | 2026-09-03 | M | `src/DbDelta.App.Avalonia/ViewModels/ProjectEndpointPanelViewModel.cs`, `wc -l` = 772 il 2026-09-05. I numeri di `CLAUDE.md` sono del 2026-09-02 e ne dava 689: **rimisurare prima di citarli**, come dice la regola stessa |
+| **`ProjectEndpointPanelViewModel` è passato da 702 a 772 righe chiudendo le tre P1, e a 815 chiudendo ciò che la review del 2026-09-05 ha trovato in quelle chiusure** (il token del caricamento in volo con i suoi commenti, il `Dispose` del debounce, l'azzeramento della password in `LoadFromEndpoint`). `CLAUDE.md` elenca sei file già oltre le 500 righe e vieta di farli crescere senza aprire una voce: questa è quella voce, non un difetto. Le prime 70 righe sono la `CancellationTokenSource` di vita, `CancelPendingWork` con il suo doc-comment, la guardia esplicita prima della scrittura di credenziale, il parametro `credentialsAreKnownForThisServer` con la sua motivazione, e i commenti che dicono perché — **la metà buona è commento, e nessuno di quei commenti è ornamentale**: due di essi registrano un ordine di chiamate e una posizione di riga che, invertiti, reintroducono un difetto misurato. **La forma dell'estrazione è però già decisa da un'altra voce e va fatta insieme a quella**: la P3 sui due pannelli copia-incolla della modale tocca gli stessi confini, e separare la logica di endpoint (scan, load, credenziali, ciclo di vita) da quella di presentazione è l'unico taglio che riduce entrambe. Farla da sola qui varrebbe un file in più e nessuna riga in meno altrove | 2026-09-03 | M | `src/DbDelta.App.Avalonia/ViewModels/ProjectEndpointPanelViewModel.cs`, `wc -l` = 815 il 2026-09-05, dopo la review. I numeri di `CLAUDE.md` sono del 2026-09-02 e ne dava 689: **rimisurare prima di citarli**, come dice la regola stessa |
 
 ---
 

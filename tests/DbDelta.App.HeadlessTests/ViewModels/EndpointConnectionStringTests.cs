@@ -1,4 +1,10 @@
+using Avalonia.Controls;
+using Avalonia.Headless.XUnit;
+using Avalonia.Interactivity;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
 using DbDelta.App.ViewModels;
+using DbDelta.App.Views;
 using DbDelta.Core.Abstractions;
 using FluentAssertions;
 using Microsoft.Data.SqlClient;
@@ -34,7 +40,8 @@ public class EndpointConnectionStringTests
     private const string Server = "dbdelta-nonesistente.invalid\\INST";
 
     // Order matters and the initialiser preserves it: naming the server clears
-    // the credentials, so they land after it — exactly as a user types them.
+    // the DATABASE (the credentials survive since 2026-09-05), so the catalog
+    // lands after it — exactly as a user fills the form.
     private static ProjectEndpointPanelViewModel Panel(string password = AwkwardPassword) =>
         new("Sorgente", isTarget: false)
         {
@@ -143,6 +150,77 @@ public class EndpointConnectionStringTests
 
         new SqlConnectionStringBuilder(vm.BuildConnectionString(includeDatabase: true))
             .Encrypt.ToString().Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void The_panels_trust_server_certificate_flag_reaches_the_string_with_the_value_it_has(
+        bool trust)
+    {
+        // The same exposure the Encrypt theory above was written for, and the
+        // 2026-09-05 review found it open: the control asserted the flag only at
+        // its default (true), so a builder that ignored the parameter passed.
+        ProjectEndpointPanelViewModel vm = Panel();
+        vm.TrustServerCertificate = trust;
+
+        new SqlConnectionStringBuilder(vm.BuildConnectionString(includeDatabase: true))
+            .TrustServerCertificate.Should().Be(trust);
+    }
+
+    [Fact]
+    public void Padding_around_the_login_and_the_catalog_is_trimmed_and_the_password_is_not()
+    {
+        // The old unquoted format was re-parsed by SqlClient, which drops the
+        // padding of an unquoted value: a pasted " sa" logged in as "sa". The
+        // builder quotes a padded value and the parser then keeps it, so without
+        // a trim the same paste reached the server as a login called " sa".
+        // The password is the one field carried byte for byte on purpose.
+        ProjectEndpointPanelViewModel vm = new("Sorgente", isTarget: false)
+        {
+            ServerName = Server,
+            DatabaseName = " db ",
+            AuthMode = AuthenticationMode.SqlServer,
+            UserName = " sa ",
+            Password = " p ",
+        };
+
+        SqlConnectionStringBuilder parsed = new(vm.BuildConnectionString(includeDatabase: true));
+        parsed.UserID.Should().Be("sa");
+        parsed.InitialCatalog.Should().Be("db");
+        parsed.Password.Should().Be(" p ");
+    }
+
+    [AvaloniaFact]
+    public void The_dialogs_OK_captures_both_strings_with_the_live_password()
+    {
+        // The glue every test above stops short of: OnOkClick reads the two
+        // strings BEFORE closing, and App seeds AppState from them. A refactor
+        // that read them after Close, or a DataContext match that failed, would
+        // leave LastSourceConnectionString null and App fall back to the
+        // password-less builder — "Login failed" on OK with the password typed
+        // correctly, and every view-model test still green.
+        ProjectSetupViewModel vm = new();
+        foreach (ProjectEndpointPanelViewModel panel in new[] { vm.Source, vm.Target })
+        {
+            panel.ServerName = Server;
+            panel.DatabaseName = "db";
+            panel.UserName = "sa";
+            panel.Password = AwkwardPassword;
+        }
+
+        ProjectSetupDialog dialog = new() { DataContext = vm };
+        dialog.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        Button ok = dialog.GetVisualDescendants().OfType<Button>().Single(b => b.IsDefault);
+        ok.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
+
+        new SqlConnectionStringBuilder(dialog.LastSourceConnectionString!)
+            .Password.Should().Be(AwkwardPassword);
+        new SqlConnectionStringBuilder(dialog.LastTargetConnectionString!)
+            .InitialCatalog.Should().Be("db");
     }
 
     [Fact]

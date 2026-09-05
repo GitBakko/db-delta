@@ -28,8 +28,18 @@ internal static class EndpointConnectionString
     /// Windows auth writes <c>Integrated Security</c> and no credentials at all;
     /// every other value is treated as SQL auth.
     /// </param>
-    /// <param name="userName">Ignored under <see cref="AuthenticationMode.WindowsIntegrated"/>.</param>
-    /// <param name="password">Ignored under <see cref="AuthenticationMode.WindowsIntegrated"/>.</param>
+    /// <param name="userName">
+    /// Ignored under <see cref="AuthenticationMode.WindowsIntegrated"/>. Trimmed,
+    /// like <paramref name="databaseName"/>: the old unquoted format was re-parsed
+    /// by SqlClient, which drops the padding of an unquoted value, so a pasted
+    /// <c>" sa"</c> logged in as <c>sa</c>. The builder quotes a padded value and
+    /// the parser then keeps the padding, so without the trim the same paste now
+    /// reaches the server as a login called <c>" sa"</c>.
+    /// </param>
+    /// <param name="password">
+    /// Ignored under <see cref="AuthenticationMode.WindowsIntegrated"/>. NOT
+    /// trimmed — carrying it byte for byte is the point of this class.
+    /// </param>
     /// <param name="trustServerCertificate">Always written, as all four callers did.</param>
     /// <param name="encrypt">
     /// Left unset when null, so the string carries no <c>Encrypt</c> keyword and
@@ -52,7 +62,7 @@ internal static class EndpointConnectionString
             TrustServerCertificate = trustServerCertificate,
         };
 
-        if (!string.IsNullOrWhiteSpace(databaseName)) { builder.InitialCatalog = databaseName; }
+        if (!string.IsNullOrWhiteSpace(databaseName)) { builder.InitialCatalog = databaseName.Trim(); }
         if (encrypt is bool e) { builder.Encrypt = e; }
 
         if (authMode == AuthenticationMode.WindowsIntegrated)
@@ -61,7 +71,7 @@ internal static class EndpointConnectionString
         }
         else
         {
-            builder.UserID = userName ?? "";
+            builder.UserID = (userName ?? "").Trim();
             builder.Password = password ?? "";
         }
 

@@ -47,4 +47,32 @@ public class ConnectionStringRedactorTests
         const string s = "Server=x;Database=y;Integrated Security=True";
         ConnectionStringRedactor.Redact(s).Should().Be(s);
     }
+
+    // The three quoting forms SqlConnectionStringBuilder emits, now that the app
+    // builds every string through it (2026-09-03) and a password carrying ';'
+    // is connectable. Stopping at the first ';' left `Password=***;b=c"` on
+    // screen — the tail of the real password — found by the 2026-09-05 review.
+
+    [Fact]
+    public void A_double_quoted_password_is_redacted_whole()
+    {
+        ConnectionStringRedactor.Redact("Data Source=x;Password=\"a;b=c\";Encrypt=False")
+            .Should().Be("Data Source=x;Password=***;Encrypt=False");
+    }
+
+    [Fact]
+    public void A_single_quoted_password_is_redacted_whole()
+    {
+        // The builder switches to single quotes when the value holds a '"'.
+        ConnectionStringRedactor.Redact("Data Source=x;Password='a\"b;c';Encrypt=False")
+            .Should().Be("Data Source=x;Password=***;Encrypt=False");
+    }
+
+    [Fact]
+    public void A_doubled_inner_quote_does_not_end_the_value()
+    {
+        // Inside double quotes a literal '"' is written as '""'.
+        ConnectionStringRedactor.Redact("Data Source=x;Password=\"a\"\"b;c\";Encrypt=False")
+            .Should().Be("Data Source=x;Password=***;Encrypt=False");
+    }
 }

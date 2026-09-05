@@ -152,10 +152,13 @@ public class EndpointCredentialResetTests
     }
 
     [Fact]
-    public void Windows_authentication_is_unaffected()
+    public async Task Windows_authentication_is_unaffected()
     {
         // There are no credentials to leak under integrated auth, so "pick a
         // server and it connects itself" stays. Only the catalog is re-asked.
+        // The in-flight assertion is what pins the exemption in the guard: the
+        // 2026-09-05 review found that dropping it left every test green, which
+        // is the failure mode this file's own comment above warns about.
         ProjectEndpointPanelViewModel vm = new("Sorgente", isTarget: false)
         {
             ServerName = "sql-a",
@@ -163,9 +166,114 @@ public class EndpointCredentialResetTests
             AuthMode = AuthenticationMode.WindowsIntegrated,
         };
 
-        vm.ServerName = "sql-b";
-
+        vm.ServerName = "dbdelta-nonesistente.invalid";
         vm.DatabaseName.Should().BeEmpty();
-        vm.ServerName.Should().Be("sql-b");
+
+        await Task.Delay(900, TestContext.Current.CancellationToken);
+
+        vm.IsLoadingDatabases.Should().BeTrue(
+            "under Windows auth there is no secret to send, so naming a server still connects by itself");
+    }
+
+    [Fact]
+    public async Task A_pair_the_store_vouched_for_is_not_carried_to_the_server_named_next()
+    {
+        // The invariant the code comments on: the cancel in ScheduleAutoConnect
+        // sits ABOVE the guard, because a pending attempt re-reads ServerName
+        // when it fires. Store fills and arms for sql-a; the user edits the
+        // name inside the 450 ms window; the pair stays in the boxes on purpose
+        // — and the arm made for sql-a must die with the name. Reordering the
+        // two lines re-opened the 2026-08-18 disclosure with every test green.
+        StoreWithOneRememberedServer store = new() { RememberedFor = "sql-a" };
+        ProjectEndpointPanelViewModel vm =
+            new("Sorgente", isTarget: false, store) { ServerName = "sql-a.invalid" };
+        vm.Password.Should().Be("stored-pass", "the control: the store filled the pair for sql-a");
+
+        vm.ServerName = "sql-b.invalid";
+        await Task.Delay(900, TestContext.Current.CancellationToken);
+
+        vm.Password.Should().Be("stored-pass", "the pair survives in the boxes");
+        vm.IsLoadingDatabases.Should().BeFalse("but the arm made for sql-a must not fire at sql-b");
+        vm.ConnectionStatusMessage.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Naming_a_different_server_abandons_the_load_still_in_flight()
+    {
+        // The other way the previous server's pair reaches the next one, and it
+        // goes through the STORE: a load started for A runs on the dialog's
+        // lifetime, so picking B while it is in flight used to let it finish —
+        // list A's catalogs under B's name, and on the success path persist the
+        // pair (which survives the server change) under B's key, where the
+        // auto-fill would trust it next time. Only a real server can succeed,
+        // so what is observable here is the abandonment: an honoured token
+        // brings the load back within the deadline, ~10 s early. Its own
+        // password on purpose: the physical attempt outlives the cancellation,
+        // fails ~10 s later, and SqlClient then blocks that pool for 5 s — a
+        // pool is keyed on the whole string, so sharing a pair with a test
+        // that expects to be in flight would tie its outcome to the clock.
+        ProjectEndpointPanelViewModel vm = new("Sorgente", isTarget: false)
+        {
+            ServerName = "dbdelta-nonesistente.invalid",
+            UserName = "sa",
+            Password = "in-flight-and-then-renamed",
+        };
+
+        Task load = vm.LoadDatabasesCommand.ExecuteAsync(null);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
+        vm.IsLoadingDatabases.Should().BeTrue("the control: the load is in flight against .invalid");
+
+        vm.ServerName = "dbdelta-altro.invalid";
+        await load.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+
+        vm.IsLoadingDatabases.Should().BeFalse();
+        vm.ConnectionStatusMessage.Should().BeNull("a load abandoned on purpose is not an error");
+        vm.Password.Should().Be("in-flight-and-then-renamed", "the pair itself still survives the server change");
+    }
+
+    private static ProjectEndpoint Endpoint(string server, string database, string user) => new(
+        new ProjectConnectionRef(Guid.NewGuid(), $"{server}.{database}", server, database, "Dev", "#0054BD"),
+        new ProjectAuthentication(AuthenticationMode.SqlServer, user, false, false, true));
+
+    [Fact]
+    public void Loading_a_project_does_not_carry_the_previous_servers_password_along()
+    {
+        // A project stores no password. Before 2026-09-05 naming its server
+        // wiped the field, so OK waited for a password typed for THAT host;
+        // with the fields surviving, «Carica…» left the previous server's
+        // secret behind the dots on a valid form — one click from a login to
+        // the project's host with a password entered for another.
+        ProjectEndpointPanelViewModel vm = new("Sorgente", isTarget: false)
+        {
+            ServerName = "sql-a",
+            UserName = "sa",
+            Password = "password-for-sql-a",
+        };
+
+        vm.LoadFromEndpoint(Endpoint("sql-b", "db", "sa"));
+
+        vm.Password.Should().BeEmpty();
+        vm.IsValid.Should().BeFalse("OK must wait for a password entered for sql-b");
+        vm.UserName.Should().Be("sa");
+        vm.DatabaseName.Should().Be("db");
+    }
+
+    [Fact]
+    public void Control_loading_a_project_whose_server_the_store_remembers_fills_that_pair()
+    {
+        // Without this, a LoadFromEndpoint that cleared the password AFTER
+        // naming the server would pass the test above and kill the auto-fill.
+        StoreWithOneRememberedServer store = new() { RememberedFor = "sql-b" };
+        ProjectEndpointPanelViewModel vm = new("Sorgente", isTarget: false, store)
+        {
+            ServerName = "sql-a",
+            UserName = "sa",
+            Password = "password-for-sql-a",
+        };
+
+        vm.LoadFromEndpoint(Endpoint("sql-b", "db", "sa"));
+
+        vm.Password.Should().Be("stored-pass");
+        vm.IsValid.Should().BeTrue();
     }
 }

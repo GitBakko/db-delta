@@ -54,6 +54,28 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   stealing focus, a touch or pen contact the system cancels — took the pointer
   capture away without ever sending a release, and the password stayed on screen
   in clear for the rest of the dialog's life with nobody holding anything.
+- **«Carica…» no longer keeps the previous server's password.** A project
+  stores no password, and once naming a server stopped wiping the credentials
+  the one already in the box stayed behind the dots on a form that was now
+  valid — one **OK** away from a login to the project's server with a password
+  entered for another. The field is cleared on load; what the credential store
+  holds for the loaded server is put back, as before.
+- **A load abandoned by a server change no longer finishes under the new name.**
+  Picking another server while the database list was still loading let the
+  first load complete: its catalogs appeared under the server now named, and
+  with «Ricorda credenziali» on, the pair that had authenticated against the
+  first server was saved under the second one's key — where the next pick would
+  trust it and connect with it. The load now dies with the name it was started
+  for.
+- **The redacted connection string no longer shows the tail of a quoted
+  password.** A password containing `;` is written in quotes, and the redactor
+  stopped at the first `;` inside them: the header strip and the confirm dialog
+  showed `Password=***;b=c"` for the password `a;b=c`. It now masks the whole
+  quoted value, in both quoting forms.
+- **Padding around the login and the catalog is trimmed again.** The old
+  unquoted format lost it on parsing; the quoting builder preserved it, so a
+  pasted ` sa` reached the server as a login called ` sa`. The password is the
+  one field still carried byte for byte.
 
 ## [1.1.0] — 2026-09-02 — the deploy stops writing statements that mean something else
 
