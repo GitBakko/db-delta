@@ -5,18 +5,18 @@
 contenuto. Chi chiude una voce la depenna QUI, nello stesso commit del codice —
 vedi «Manutenzione» in fondo.
 
-## Stato — 2026-09-05
+## Stato — 2026-09-17
 
-- **v1.1.0 pubblicata** (2026-09-02) dal tag `v1.1.0` su `1d4581c`, «Latest»,
+- **v1.1.1 pubblicata** (2026-09-17) dal tag `v1.1.1` su `2d84db6`, «Latest»,
   MSI **non firmata** allegata con il suo `.sha256` e un'attestazione di
-  provenienza. Misurata, non stimata: `DbDelta-1.1.0-win-x64.msi` è di
-  **99.270.792 byte**, cioè **94,7 MiB** — che è lo stesso numero che il
-  backlog chiama «94 MB» in «Deciso», scritto in MiB. Il workflow `release` è
-  guidato dal tag e la versione viene da lì: non esiste nessun file di versione
-  da bumpare. Tutti e undici i suoi step verdi, **incluso lo smoke di
-  installazione vero** — installa, verifica app, CLI e PATH di macchina,
-  disinstalla, verifica che sia sparito. La v1.0.2 (2026-08-13) resta la
-  precedente.
+  provenienza. Misurata, non stimata: `DbDelta-1.1.1-win-x64.msi` è di
+  **99.389.576 byte**, cioè **94,8 MiB** — il «94 MB» di «Deciso», scritto in
+  MiB. Sedici commit dalla 1.1.0, **tutti fix sulla modale di nuovo
+  progetto**, nessuna aggiunta: patch. Il workflow `release` è guidato dal tag
+  e la versione viene da lì: non esiste nessun file di versione da bumpare.
+  Tutti e undici i suoi step verdi, **incluso lo smoke di installazione
+  vero** — installa, verifica app, CLI e PATH di macchina, disinstalla,
+  verifica che sia sparito. La v1.1.0 (2026-09-02) resta la precedente.
 - **1070 test verdi** nei sette progetti che girano senza Docker (Core 630,
   Headless 256, Persistence.Unit 92, Golden 68, Property 12, Architecture 6,
   Shared 6) — ricontati il 2026-09-17, non incrementati a mente. I due di
@@ -146,16 +146,16 @@ vedi «Manutenzione» in fondo.
   non passava `dropDependencies`, quindi lo scenario 18 misurava il fallback
   invece del risolutore. Tutto in `docs/parity/redgate-2026-08-31.md`; per
   rigenerare l'artefatto DbDelta serve `DBDELTA_PARITY_DUMP=<percorso>`.
-- **CI verde su `a8fb905`**, la punta di `origin/main`, entrambi i job, il
-  2026-09-05: run `33956931040` (ci) e `33956931033` (docs). Sono le tre P1,
-  la P2 del «tieni premuto» e le chiusure della review viste dalla CI; il
-  commit che porta questa riga (il riarmo P3) viene pushato subito dopo e la
-  sua CI va letta con `gh run list`, non qui. Prima: `33952958114` e
-  `33953339253` (ci) con `33952958111` (docs) su `cb01e7a`, lo stesso giorno;
-  `33622205347` su `1d4581c` (2026-09-02), con `33622223661` (release, sul
-  tag `v1.1.0`). I DB-backed aggiungono **141** test ai locali della riga
-  sopra: LiveDb 105, Cli acceptance 29, Persistence integration 7 — il
-  **1203** della riga sopra. Senza Docker 3
+- **CI verde su `2d84db6`**, la punta di `origin/main` e il commit del tag
+  `v1.1.1`, il 2026-09-17: run `35211099993` (ci), `35211099069` (docs) e
+  `35211098838` (release). Gli otto commit del giorno prima del taglio sono
+  ciascuno verde sulla propria CI, letta con `gh run list` volta per volta;
+  il commit che porta questa riga viene pushato subito dopo e la sua CI va
+  letta lì, non qui. Prima: `33956931040` (ci) e `33956931033` (docs) su
+  `a8fb905` (2026-09-05); `33622205347` su `1d4581c` (2026-09-02), con
+  `33622223661` (release, sul tag `v1.1.0`). I DB-backed aggiungono **141**
+  test ai locali della riga sopra: LiveDb 105, Cli acceptance 29, Persistence
+  integration 7 — il **1211** della riga sopra. Senza Docker 3
   dei 7 di Persistence integration si skippano da sé. L'exit code di `script`
   e la forma JSON di `compare` girano solo lì.
 - **La guardia dello skip Testcontainers deve avvolgere `Build()`**, non solo
