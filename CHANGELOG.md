@@ -6,6 +6,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+<a id="v1.1.1"></a>
+## [1.1.1] — 2026-09-17 — the setup dialog works from the installed build
+
+Sixteen commits since `1.1.0`, and every one of them is about the **Nuovo
+progetto** dialog. On 2026-09-03 the owner installed `1.1.0` and found the
+dialog unusable: the password field was not on screen at all, typing a
+password fired a login at every pause, and a password containing `;` or `=`
+could not connect. Fixing those three opened the rest — what closing the
+dialog left running, what changing the server threw away, what «Carica…» kept
+or lost — and an adversarial review of the fixes, plus a live smoke of the
+installed MSI on 2026-09-17, closed what the fixes themselves had opened.
+
+`1.1.1` and not `1.2.0`: nothing is added — no option, no output field, no
+exit code. Every entry below is a defect that `1.1.0` shipped with.
+
 ### Fixed
 
 - **The password field is on screen again.** In `1.0.2` and `1.1.0` the field

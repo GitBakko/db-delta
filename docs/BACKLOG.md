@@ -291,8 +291,11 @@ database c'è.
 ## Smoke dal vivo — 2026-09-17, MSI `1.1.1-smoke` installata, del proprietario
 
 I 14 gesti — gli 11 della review adversariale della 1.1.1 più tre per i fix
-del giorno — sull'installato, non su `dotnet run`. **In corso**: i verdetti
-arrivano uno alla volta e questa tabella li registra come arrivano.
+del giorno — sull'installato, non su `dotnet run`, su tre MSI di fila
+(`smoke`, `smoke2`, `smoke3`) man mano che i fix entravano. **Chiuso il
+2026-09-17**: tre difetti trovati e chiusi lo stesso giorno (righe qui sotto e
+in P4), uno dichiarato sanato dal proprietario al secondo giro senza che nessuna
+sonda l'abbia riprodotto — registrato come tale, non come chiuso.
 
 | Gesto | Esito |
 |---|---|
@@ -300,7 +303,17 @@ arrivano uno alla volta e questa tabella li registra come arrivano.
 | 3 · coppia digitata durante la scansione, poi server dai risultati | ✅ |
 | 5 · A ricordato poi subito B, lista di A in volo → lista sotto B vuota, `cmdkey` invariato | ✅ |
 | 6 · pannello Windows, server ricordato, ComboBox → SQL; e «Carica…» SQL su pannello Windows | ✅ |
-| 1 · password `a;b=c` | ❌ letto come: server scelto a mano (coppia riempita), poi «Carica…» di una configurazione per **lo stesso** server → casella password vuota. **Riprodotto in headless e chiuso**, riga qui sotto. Il gesto 1 in sé (`a;b=c` fino a Esegui) resta da rifare |
+| 1 · password `a;b=c` → Connetti, OK, `Password=***` senza coda (smoke3) | ✅ |
+| 7 · Connetti verso `10.255.255.1`, Annulla entro 10 s → niente banda, `cmdkey` invariato, nessun residuo | ✅ |
+| 8 · occhio premuto, Alt+Tab / Win / toast → rimascherata | ✅ (penna e touch: hardware assente, restano non letti) |
+| 9 · password per A, «Carica…» di un progetto per B → OK spento finché non si digita B | ✅ |
+| 10 · riavvio con ultimo progetto → errore di autenticazione leggibile | ✅ |
+| 12 · «Ricorda» + nome DB a mano a lista in volo + OK → `cmdkey` ha la voce, riapre riempito | ✅ |
+| 13 · `pippo.invalid` → l'errore va a capo, «No such host is known» leggibile | ✅ |
+| 14 · `.dbd` corrotto → banda dentro la modale, parole di caricamento, niente dietro | ✅ |
+| 4-bis (smoke3) · A ricordato, poi B dalla scansione → password vuota; B ricordato → coppia di B da sola | ✅ |
+| 11 · Scambia con entrambi i pannelli pieni, da «Usati di recente», liste caricate | ❌ **al primo giro**: in Provenienza (ora B) utente presente, pallini assenti, lista caricata — quindi la password c'era allo sparo dell'auto-connect ed è sparita dopo il successo; un secondo Scambia non la riportava. **Non riprodotto**: sonda headless col dialogo vero in tre varianti (B ricordato, B digitato, e il flusso esatto contro un container SQL vero con entrambe le liste caricate e ricaricate dopo lo scambio) — VM e casella corrette in tutte. Rifatto dal proprietario da capo: **sanato**, nessun ❌ al secondo giro. Resta senza spiegazione e senza voce: se ricompare, la prima misura è Connetti attivo o spento subito dopo lo scambio (VM contro casella) |
+| 1 (smoke) · password `a;b=c` | ❌ letto come: server scelto a mano (coppia riempita), poi «Carica…» di una configurazione per **lo stesso** server → casella password vuota. **Riprodotto in headless e chiuso**, riga qui sotto. Il gesto 1 in sé (`a;b=c` fino a Esegui) resta da rifare |
 | 4-bis · scansione senza congetture, scelto `PC-SVIL-STE-22\DICIANNOVE` (MSI `smoke2`) | ✅ la lista; ❌ **la password del server precedente resta nella casella**, Connetti la manda al nuovo host → login sbagliato. Era la coppia che lo **store** aveva messo per il server prima, non una digitata: la regola del 2026-09-05 le trattava uguali. **Chiusa, riga qui sotto** |
 | 4 · `\ISTANZA` appeso | ❌ letto come: Connetti verso `(local)`, `localhost`, `127.0.0.1` → la lista non si aggiorna. **Misurato**: nessuna istanza di default su questo PC (`Get-Service MSSQL*` dà `DICIANNOVE` e `VENTIDUE`, nominate), `localhost` nudo muore dopo 15,4 s dalla CLI con l'errore di rete; sotto auth Windows il testo rosso **compare** a ~10 s (confermato dal proprietario), sotto SQL senza coppia Connetti è spento per costruzione. Non un difetto del caricamento: è la P4 «tre congetture seminate» con un costo misurato, **chiusa lo stesso giorno** — riga in P4. Il gesto 4 in sé (`\ISTANZA` appeso) resta da rifare |
 
