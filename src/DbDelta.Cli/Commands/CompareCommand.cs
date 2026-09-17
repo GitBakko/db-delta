@@ -32,11 +32,14 @@ internal static class CompareCommand
             DefaultValueFactory = _ => "text"
         };
 
+        Option<string[]> exclude = ExcludeOption.Create();
+
         Command command = new("compare", "Compare two databases and print the differences")
         {
             source,
             target,
-            format
+            format,
+            exclude
         };
 
         command.SetAction(async (parseResult, ct) =>
@@ -62,8 +65,9 @@ internal static class CompareCommand
                 return CliErrorMapper.MapErrorToExitCode(tgtResult.Error!);
             }
 
-            ComparisonResult comparison = new ComparisonEngine()
-                .Compare(srcResult.Value!, tgtResult.Value!, ComparisonOptions.Default);
+            ComparisonResult comparison = ExcludeOption.Apply(
+                new ComparisonEngine().Compare(srcResult.Value!, tgtResult.Value!, ComparisonOptions.Default),
+                parseResult.GetValue(exclude));
 
             string output = fmt.Equals("json", StringComparison.OrdinalIgnoreCase)
                 ? JsonFormatter.Format(comparison)

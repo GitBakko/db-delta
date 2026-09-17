@@ -47,13 +47,16 @@ internal static class ScriptCommand
                 + "and re-generate, never re-run the script."
         };
 
+        Option<string[]> exclude = ExcludeOption.Create();
+
         Command command = new("script", "Generate a T-SQL deployment script from source to target")
         {
             source,
             target,
             outPath,
             includePermissions,
-            noTransaction
+            noTransaction,
+            exclude
         };
 
         command.SetAction(async (parseResult, ct) =>
@@ -105,9 +108,13 @@ internal static class ScriptCommand
             // the reason would be two lines apart.
             ComparisonResult comparison = new ComparisonEngine()
                 .Compare(srcResult.Value!, tgtResult.Value!, opts);
+            // The excluded pairs leave the SELECTION, not the result: the generator
+            // wants the whole comparison for what it reshapes around a pair (schemas,
+            // rebuild holders) and the selection for what to emit — the GUI's call.
+            ComparisonResult selected = ExcludeOption.Apply(comparison, parseResult.GetValue(exclude));
             string script = new ScriptGenerator().Generate(
                 comparison,
-                selection: null,
+                selection: selected.Differences,
                 options: opts,
                 dependencies: srcResult.Value!.Dependencies,
                 dropDependencies: tgtResult.Value!.Dependencies);
@@ -131,7 +138,7 @@ internal static class ScriptCommand
             // script is empty because the two are aligned" from "the script
             // carries work". This verb used to return 0 either way, so a
             // CI step that trusted it never saw a pending difference.
-            bool hasDifferences = comparison.Differences
+            bool hasDifferences = selected.Differences
                 .Any(d => d.Status is DifferenceStatus.Different
                                    or DifferenceStatus.OnlyInA
                                    or DifferenceStatus.OnlyInB);

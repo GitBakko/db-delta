@@ -6,6 +6,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added
+
+- **`--exclude <pattern>` on `compare`, `report` and `script`.** The GUI's
+  per-object selection, for the command line: `schema.name` with `*` and `?`,
+  case-insensitive, repeatable; a pattern with no dot matches the name alone,
+  so `*pcrm_ro*` takes an orphaned user together with what was granted to it.
+  One object the operator cannot fix on the server — that user, a view over a
+  database the target does not have — used to block the whole verb, and
+  «re-compare and re-generate» never advanced. Excluded objects leave the
+  verdict and the exit code on `compare`/`report`, and the selection on
+  `script`; a pattern that matches nothing is named on stderr.
+
 ### Fixed
 
 - **«(N trovati)» next to the server list counts servers.** The list also

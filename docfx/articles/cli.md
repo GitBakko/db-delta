@@ -14,6 +14,7 @@ Computes the diff and prints it.
 | `--source` | yes | Source SQL Server connection string. |
 | `--target` | yes | Target SQL Server connection string. |
 | `--format` | no | Output format: `text` (default) or `json`. |
+| `--exclude` | no | Leave an object out: `schema.name`, `*` and `?` as wildcards, case-insensitive; a pattern with no dot matches the name alone. Repeatable. See [Leaving an object out](#leaving-an-object-out). |
 
 ```bash
 dbdelta compare --source "..." --target "..." --format json
@@ -30,10 +31,39 @@ Generates a dependency-ordered T-SQL deployment script.
 | `--out` | no | Output file path, or `-` for stdout. |
 | `--include-permissions` | no | Emit `GRANT`/`REVOKE` statements (off by default — Redgate-parity). |
 | `--no-transaction` | no | Emit a script that opens no transaction of its own and declares it with `-- dbdelta:transaction=none` on its first line, so `apply` does not add one either. A failure halfway leaves the target halfway: re-compare and re-generate, never re-run the script. |
+| `--exclude` | no | Leave an object out: `schema.name`, `*` and `?` as wildcards, case-insensitive; a pattern with no dot matches the name alone. Repeatable. See [Leaving an object out](#leaving-an-object-out). |
 
 ```bash
 dbdelta script --source "..." --target "..." --out deploy.sql
 ```
+
+### Leaving an object out
+
+One object the operator cannot fix on the server used to block a whole verb:
+a user whose login is gone makes `script` exit 30 with no file, a view over a
+database that does not exist on the target fails `apply` at the same batch
+every time — and «re-compare and re-generate» then never advances. The GUI
+has always had a per-object selection; `--exclude` is that selection for the
+command line, on `compare`, `report` and `script` (not on `apply`, which runs
+a file and compares nothing).
+
+```bash
+dbdelta script --source "..." --target "..." --out deploy.sql \
+  --exclude "dbo.VwMigrazione*" --exclude "*pcrm_ro*"
+```
+
+- A pattern is matched against `schema.name`, case-insensitively, with `*`
+  for any run of characters and `?` for one.
+- A pattern with **no dot** is matched against the name alone. A user or a
+  role has no schema, and a permission carries its grantee inside its name,
+  so `*pcrm_ro*` takes the principal together with everything granted to it.
+- On `compare` and `report` the excluded pairs leave the verdict: they are
+  not listed, not counted, and the exit code is the one without them. On
+  `script` they leave the *selection*: the script is generated from the full
+  comparison, as the GUI does, and simply does not emit them. What was not
+  examined (the census caveat) is unchanged either way.
+- A pattern that matches nothing is named on stderr and changes nothing: a
+  typo that quietly excluded nothing would read as a clean verdict.
 
 ## `apply`
 
@@ -204,6 +234,7 @@ Produces a self-contained diff report.
 | `--target` | yes | Target connection string. |
 | `--html` | no | Output path for the self-contained HTML report. |
 | `--json` | no | Output path for the JSON report. |
+| `--exclude` | no | Leave an object out: `schema.name`, `*` and `?` as wildcards, case-insensitive; a pattern with no dot matches the name alone. Repeatable. See [Leaving an object out](#leaving-an-object-out). |
 
 ```bash
 dbdelta report --source "..." --target "..." --html diff.html

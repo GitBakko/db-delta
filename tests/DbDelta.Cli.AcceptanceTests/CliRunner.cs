@@ -43,6 +43,16 @@ internal static class CliRunner
     /// </summary>
     public static async Task<(int ExitCode, string StdOut)> RunCapturing(string[] args, CancellationToken ct)
     {
+        (int exit, string stdout, _) = await RunCapturingBoth(args, ct);
+        return (exit, stdout);
+    }
+
+    /// <summary>
+    /// And stderr too, for what the CLI says beside the outcome — an
+    /// <c>--exclude</c> that matched nothing is a warning there, not a failure.
+    /// </summary>
+    public static async Task<(int ExitCode, string StdOut, string StdErr)> RunCapturingBoth(string[] args, CancellationToken ct)
+    {
         // AppContext.BaseDirectory => <repo>/tests/DbDelta.Cli.AcceptanceTests/bin/<Config>/net10.0/
         // Walk up to repo root, then locate the CLI DLL under the SAME configuration.
         string testBin = AppContext.BaseDirectory;
@@ -75,7 +85,6 @@ internal static class CliRunner
         Task<string> stdout = p.StandardOutput.ReadToEndAsync(ct);
         Task<string> stderr = p.StandardError.ReadToEndAsync(ct);
         await p.WaitForExitAsync(ct);
-        await stderr;
-        return (p.ExitCode, await stdout);
+        return (p.ExitCode, await stdout, await stderr);
     }
 }

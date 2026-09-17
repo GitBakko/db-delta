@@ -17,7 +17,7 @@ vedi «Manutenzione» in fondo.
   Tutti e undici i suoi step verdi, **incluso lo smoke di installazione
   vero** — installa, verifica app, CLI e PATH di macchina, disinstalla,
   verifica che sia sparito. La v1.1.0 (2026-09-02) resta la precedente.
-- **1072 test verdi** nei sette progetti che girano senza Docker (Core 630,
+- **1078 test verdi** nei sette progetti che girano senza Docker (Core 636,
   Headless 258, Persistence.Unit 92, Golden 68, Property 12, Architecture 6,
   Shared 6) — ricontati il 2026-09-17, non incrementati a mente. I due di
   Headless del 2026-09-17 chiudono la P4 dell'OK premuto a caricamento in volo,
@@ -56,8 +56,8 @@ vedi «Manutenzione» in fondo.
   giri della suite intera non è misurato, e il tetto da 30 s è il soffitto
   dichiarato, non un'asserzione sul tempo. Sonda: tolto il riarmo in
   `OnAuthModeChanged`, i due positivi cadono per `TimeoutException`.
-  **Con Docker acceso girano anche i tre DB-backed** e il totale è **1213**
-  (LiveDb 105, Cli acceptance 29, Persistence integration 7) — misurato il
+  **Con Docker acceso girano anche i tre DB-backed** e il totale è **1222**
+  (LiveDb 105, Cli acceptance 32, Persistence integration 7) — misurato il
   2026-09-17, tutti verdi. **Due** dei tre vanno **rossi**, non skipped, con Docker
   spento — LiveDb e Cli acceptance, che costruiscono il container in un
   inizializzatore di campo senza rete. Davanti a quel muro la prima domanda è
@@ -65,7 +65,7 @@ vedi «Manutenzione» in fondo.
   serve**: stampa l'intestazione anche a daemon morto. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **1 voce aperta** — **P1 0 · P2 0 · P3 0 · P4 0** · P5 1 — più **23** in
+- **0 voci aperte** — **P1 0 · P2 0 · P3 0 · P4 0 · P5 0** — più **23** in
   «Deciso — NON riaprire». **P1 è vuota**: le tre voci che la segnalazione del
   2026-09-03 aveva aperto sono chiuse tutte, `e9821a7` (stringa di connessione),
   `85f5d4c` (ciclo di vita della modale) e `cb01e7a` (azzeramento delle
@@ -78,9 +78,9 @@ vedi «Manutenzione» in fondo.
   quattro commit della 1.1.1 non resta nulla: la scrittura di credenziale
   scartata a OK (P4) è **chiusa il 2026-09-17** per decisione del proprietario
   — fix XS, non compromesso dichiarato — e la P3 del riarmo che muore al cambio
-  di `AuthMode` **è entrata nella 1.1.1** ed è chiusa da `89842f5`; l'unica
-  è del proprietario, sulla selezione oggetti da CLI, ferma dal 2026-09-02 e
-  **decisa il 2026-09-17: `--exclude <pattern>`**, da fare dopo il tag della 1.1.1.
+  di `AuthMode` **è entrata nella 1.1.1** ed è chiusa da `89842f5`; l'ultima,
+  del proprietario — la selezione oggetti da CLI, ferma dal 2026-09-02 — è
+  **chiusa il 2026-09-17 come `--exclude <pattern>`**, la forma che ha scelto lui.
   **Il backlog non ha più alcuna voce dichiarata non verificata**: l'ultima —
   il ripristino della maschera dopo «tieni premuto per mostrare» — è stata
   riprodotta il 2026-09-05 e chiusa (`e9abc18`), e il meccanismo era quello
@@ -122,8 +122,8 @@ vedi «Manutenzione» in fondo.
   `dbdelta script --no-transaction`, **verificata dal vivo** lo stesso giorno.
   **Quella riga diceva «nessuna voce aperta descrive un difetto», ed è durata
   un giorno**: il 2026-09-03 il proprietario ha installato la v1.1.0 e la
-  modale di nuovo progetto era inservibile. **L'unica voce aperta
-  descrive un difetto**, e non l'ha trovata un test — le prime
+  modale di nuovo progetto era inservibile. **Nessuna voce aperta**: l'ultima descriveva un difetto, e non l'aveva trovata
+  un test — le prime
   due un utente sul build installato, le altre lo sweep partito da quelle.
   L'estrazione di `DeployPreflight` — aperta il 2026-09-01 solo
   perché `CLAUDE.md` impone di aprire una voce invece di far crescere un file in
@@ -156,9 +156,9 @@ vedi «Manutenzione» in fondo.
   il commit che porta questa riga viene pushato subito dopo e la sua CI va
   letta lì, non qui. Prima: `33956931040` (ci) e `33956931033` (docs) su
   `a8fb905` (2026-09-05); `33622205347` su `1d4581c` (2026-09-02), con
-  `33622223661` (release, sul tag `v1.1.0`). I DB-backed aggiungono **141**
-  test ai locali della riga sopra: LiveDb 105, Cli acceptance 29, Persistence
-  integration 7 — il **1213** della riga sopra. Senza Docker 3
+  `33622223661` (release, sul tag `v1.1.0`). I DB-backed aggiungono **144**
+  test ai locali della riga sopra: LiveDb 105, Cli acceptance 32, Persistence
+  integration 7 — il **1222** della riga sopra. Senza Docker 3
   dei 7 di Persistence integration si skippano da sé. L'exit code di `script`
   e la forma JSON di `compare` girano solo lì.
 - **La guardia dello skip Testcontainers deve avvolgere `Build()`**, non solo
@@ -614,20 +614,23 @@ riga qui sopra. **P4 è vuota.**
 
 ## P5 — Del proprietario o non verificabile da soli
 
-Due voci chiuse il 2026-09-01 e una il 2026-09-02, ognuna dal commit che porta
-la sua riga. **Le prime due hanno risposto il contrario di come erano poste**;
-la terza no, ed è la prima del backlog che aveva ragione su tutt'e tre —
-difetto, taglia e rimedio:
+Due voci chiuse il 2026-09-01, una il 2026-09-02 e una il 2026-09-17, ognuna
+dal commit che porta la sua riga. **Le prime due hanno risposto il contrario di
+come erano poste**; la terza no, ed è la prima del backlog che aveva ragione su
+tutt'e tre — difetto, taglia e rimedio; la quarta, l'ultima voce aperta del
+backlog, ha avuto ragione su difetto e taglia e la forma l'ha scelta il
+proprietario fra le tre che la voce elencava. **P5 è vuota, e il backlog con
+lei.**
 
 | Voce chiusa | Come | Prova |
 |---|---|---|
 | L'annullamento di una lettura in volo non era mai stato visto | **La voce, e il commento nel codice, dicevano una cosa falsa.** Diceva: «il driver riporta una lettura interrotta come `SqlException -2`, che `LiveDbSource` trasforma in un `CannotConnect` *Result*», e da lì la riga `ct.ThrowIfCancellationRequested()` in `AppStateViewModel` che lo raddrizza. Misurato: **cancellare SOLLEVA**. `Microsoft.Data.SqlClient` onora il token su `ReadAsync` e alza `TaskCanceledException`, che esce da `TableReader` e vola fuori da `LoadAsync` passando accanto a ogni filtro `SqlException`. Il `-2` è ciò che dà un **timeout**: le due cose erano confuse. La riga nel ViewModel **resta**, ma per la corsa che il vecchio commento descriveva per caso — un timeout che scade mentre l'utente preme Annulla torna davvero come `CannotConnect`, e senza quella riga la banda rossa incolperebbe la rete di ciò che l'utente ha appena chiesto. Commento corretto in **due** punti, incluso quello che avevo scritto io nel test prima di misurare | `LargeCatalogTests` — 3 test su container. Il primo semina il catalogo che rende la finestra possibile; senza volume non c'è nulla da interrompere |
 | I 300 s non erano mai stati misurati | **Misurati, e la voce guardava la leva sbagliata.** Non è la DIMENSIONE a raggiungere il tetto: 2000 tabelle, 30.000 colonne, 6000 indici e 500 viste si leggono in **~3 s**, e nessun singolo comando arriva vicino al secondo — due ordini di grandezza di margine. Alle 300 tabelle del test committato sono **341 ms**. Ciò che raggiunge il tetto è **una lettura bloccata dietro il lock di qualcun altro**, che è esattamente ciò che il doc-comment di `ConnectionFactory` ha sempre detto — «a read blocked behind someone else's schema lock has to end by itself, because nothing else would end it» — e che nessuno aveva mai esercitato. Le due candidate che la voce nominava (lettura colonne e lettura indici) non sforano né a quella scala né vicino | Un'altra sessione tiene Sch-M su una tabella, la lettura si blocca e il tetto la chiude: `CannotConnect`, con la rimedizione che nomina `Command Timeout`. **Due sonde di mutazione, due uccise**: tolto il filtro `-2` e tolto il nome del rimedio dal testo. Il tetto è spinto a 1 s nel test perché 300 s in CI sarebbero cinque minuti di attesa per la stessa porta |
 | `NoTransactions` non era richiedibile da nessun front end | **Decisione del proprietario, 2026-09-02: esporla, non cancellarla.** `dbdelta script --no-transaction` mette il flag, e lo script esce col marker `-- dbdelta:transaction=none` in **prima riga**, che `apply` già onorava dal commit del mattino. È **additiva**: nessuna opzione esistente cambia comportamento, la 1.0.2 pubblicata non si rompe. **Questa voce aveva ragione su tutt'e tre** — difetto, taglia (S: la sola opzione è **+21/−1** in `ScriptCommand.cs`, più 43 righe di acceptance) e rimedio, esattamente la `Option<bool>` su `script` che nominava — ed è la prima dopo **nove** di fila che ne sbagliavano almeno una. Due cose che però non vedeva, entrambe **misurate**: le due opzioni **omonime** ora vivono su due verbi e fanno cose diverse — `script --no-transaction` scrive la dichiarazione, `apply --no-transaction` toglie la transazione del client, e uno script che dichiara non ha bisogno del flag su `apply` (scritto in `cli.md`); e un'opzione sconosciuta fa uscire System.CommandLine con **exit 1**, cioè lo stesso `SuccessDifferencesFound`, quindi nell'acceptance l'asserzione sull'exit code **non discrimina** quel fallimento — a reggere è quella sul contenuto, ed è per questo che il RED è stato letto sulla riga giusta e non sul codice di uscita. Il ramo `=none` resta coperto **due volte**, e non per ridondanza: la unit di wiring è l'unica copertura nei job **senza** Docker, l'acceptance è l'unica che passa dal processo | `src/DbDelta.Cli/Commands/ScriptCommand.cs` (`noTransaction`, `opts \|= ComparisonOptions.NoTransactions`); acceptance `ScriptCommandTests.Writes_a_script_that_declares_no_transaction_when_the_flag_is_passed` — RED misurato prima dell'implementazione: nessuno script scritto, perché l'opzione non esisteva; unit `DeploymentScriptWriterTests.NoTransactions_reaches_the_writer_and_comes_out_as_the_marker`; `docfx/articles/cli.md`, tabella di `script` e sezione «Who owns the transaction» |
+| Nessun modo di escludere un oggetto da una corsa della CLI: un solo oggetto non scrivibile o non costruibile bloccava il verbo intero e la procedura di ripresa non avanzava | **Decisione del proprietario, 2026-09-17: `--exclude <pattern>`**, non `--continue-on-error` (lascerebbe il target a metà per scelta) e non la sola documentazione. **La selezione per oggetto che la GUI ha sempre avuto, sulla riga di comando**: `schema.nome` con `*` e `?`, senza distinzione di maiuscole come gli identificatori che nomina, ripetibile; un pattern **senza punto** confronta il solo nome — un utente o un ruolo non ha schema, e un permesso porta il grantee dentro il nome, quindi `*pcrm_ro*` prende il principale che il 2026-09-02 bloccava tutto **insieme a ciò che gli era concesso**. Su `compare` e `report` le coppie escluse lasciano il verdetto ed exit code; su `script` lasciano la **selezione**, con il risultato intero al generatore — la stessa chiamata della GUI. Il censimento del non esaminato non cambia: escludere restringe il verdetto, non ciò che è stato guardato. **Non su `apply`**, che esegue un file e non confronta. Un pattern che non prende nulla è nominato su stderr: un refuso che esclude in silenzio leggerebbe come verdetto pulito. La logica sta in `Core/Diff/ObjectExclusion` (una copia, riusabile dalla GUI), l'opzione in `Cli/Commands/ExcludeOption` (una copia per tre verbi). Documentato in `docfx/articles/cli.md`, sezione «Leaving an object out» | `ObjectExclusionTests` — 6 unit in Core: `schema.nome` esatto, glob, senza punto su utente e GRANT, maiuscole, pattern senza match riportato, controllo con zero pattern (nulla cambia, censimento compreso); **RED per tipo assente prima del codice**. Tre acceptance **attraverso il processo**: `script --exclude dbo.vLeft*` scrive la tabella e non la vista con exit 1; `compare --exclude dbo.vReport` con l'unica differenza esclusa esce **0** senza nominarla; `--exclude dbo.vTypo` esce 1, elenca la vista e nomina il refuso **su stderr** — `CliRunner.RunCapturingBoth` restituisce anche stderr, per questo. RED su tutte e tre: opzione sconosciuta, e **come già registrato** exit 1 non discrimina da `SuccessDifferencesFound`, a reggere sono le asserzioni sul contenuto |
 
 | Voce | Reg. | Sforzo | Stato reale |
 |---|---|---|---|
-| **Nessun modo di escludere un oggetto da una corsa della CLI, quindi un solo oggetto non scrivibile o non costruibile blocca il verbo intero e la procedura di ripresa non avanza.** Trovata dallo smoke del 2026-09-02 e **misurata due volte, in due forme diverse**. (1) *Non scrivibile*: l'utente orfano `pcrm_ro` fa uscire `script` con **30** e senza file — l'intero catalogo di 845 oggetti è irraggiungibile per via di un principale. (2) *Non costruibile*: `PcrmV2Pl_Badii` ha **tre viste** (`VwAppuntamentiRiprogrammatiNexi`, `VwMigrazioneOdsNexi`, `VwMigrazioneRitiriNexi`) che referenziano `PartnerCrmNexi`, database **assente da `.243`**. La regola documentata «dopo un fallimento si ri-confronta e si rigenera, mai si riesegue» è stata applicata alla lettera per **quattro giri**: ogni giro muore al **batch 5** sulla stessa vista e il censimento non si muove di un oggetto — 160 Identical / 303 Different / 354 OnlyInA, identico ogni volta. **657 oggetti restano pendenti per sempre.** La GUI ha la selezione per oggetto e può passare oltre; la CLI no. **Non è un difetto del generatore** — nessuno strumento può creare una vista su un database che non c'è — ma è l'unica superficie da cui un operatore CLI non ha via d'uscita, ed è **del proprietario** perché ogni rimedio tocca superficie pubblica: una `Option` di esclusione (`--exclude`), oppure un `--continue-on-error`, oppure dichiarare che per queste forme si usa la GUI e dirlo in `cli.md` | 2026-09-02 | M | **Forma decisa dal proprietario il 2026-09-17: `--exclude <pattern>`** (`schema.nome` o glob) su `script`, `apply` e `compare` — la selezione per oggetto della GUI ripetuta dalla CLI; non `--continue-on-error`, che lascerebbe il target a metà per scelta, e non la sola documentazione. Da fare **dopo** il tag della 1.1.1. Riproduzione in `scripts/smoke/` (git-ignored) del 2026-09-02; `src/DbDelta.Cli/Commands/ScriptCommand.cs` (cinque `Option<>`, nessuna di selezione); `docfx/articles/cli.md`, la regola «re-compare and re-generate, never re-run» |
 
 ---
 

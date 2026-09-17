@@ -289,6 +289,51 @@ public class CompareCommandTests(CliFixture fixture)
         exit.Should().Be(ExpectedExitCodes.SuccessDifferencesFound);
     }
 
+    [Fact]
+    public async Task An_exclude_that_covers_every_difference_exits_0_and_names_nothing()
+    {
+        // The verdict narrows to what was not excluded — the exit code too, so
+        // a pipeline can gate on it with the objects it cannot fix left out.
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        const string srcDb = "DbDeltaExclAllSrc";
+        const string tgtDb = "DbDeltaExclAllTgt";
+        await CreateDb(srcDb, ct);
+        await CreateDb(tgtDb, ct);
+        await CreateViewSrcOnly(srcDb, ct);
+
+        (int exit, string stdout) = await CliRunner.RunCapturing(["compare",
+            "--source", ConnectionFor(srcDb),
+            "--target", ConnectionFor(tgtDb),
+            "--format", "text",
+            "--exclude", "dbo.vReport"], ct);
+
+        exit.Should().Be(ExpectedExitCodes.SuccessNoDifferences);
+        stdout.Should().NotContain("vReport");
+    }
+
+    [Fact]
+    public async Task An_exclude_that_matches_nothing_is_said_on_stderr_and_changes_nothing()
+    {
+        // A typo that quietly excludes nothing is the silent failure this
+        // project refuses elsewhere: it is named on stderr, and the verdict is
+        // the one without it.
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        const string srcDb = "DbDeltaExclTypoSrc";
+        const string tgtDb = "DbDeltaExclTypoTgt";
+        await CreateDb(srcDb, ct);
+        await CreateDb(tgtDb, ct);
+        await CreateViewSrcOnly(srcDb, ct);
+
+        (int exit, string stdout, string stderr) = await CliRunner.RunCapturingBoth(["compare",
+            "--source", ConnectionFor(srcDb),
+            "--target", ConnectionFor(tgtDb),
+            "--format", "text",
+            "--exclude", "dbo.vTypo"], ct);
+
+        exit.Should().Be(ExpectedExitCodes.SuccessDifferencesFound);
+        stdout.Should().Contain("vReport");
+        stderr.Should().Contain("dbo.vTypo");
+    }
     private async Task CreateViewSrcOnly(string db, CancellationToken ct)
     {
         await using SqlConnection c = new(ConnectionFor(db));

@@ -37,12 +37,15 @@ internal static class ReportCommand
             Description = "Output path for the JSON report"
         };
 
+        Option<string[]> exclude = ExcludeOption.Create();
+
         Command command = new("report", "Run a comparison and write an HTML and/or JSON report to disk")
         {
             source,
             target,
             htmlPath,
-            jsonPath
+            jsonPath,
+            exclude
         };
 
         command.SetAction(async (parseResult, ct) =>
@@ -75,8 +78,9 @@ internal static class ReportCommand
                 return CliErrorMapper.MapErrorToExitCode(tgtResult.Error!);
             }
 
-            ComparisonResult comparison = new ComparisonEngine()
-                .Compare(srcResult.Value!, tgtResult.Value!, ComparisonOptions.Default);
+            ComparisonResult comparison = ExcludeOption.Apply(
+                new ComparisonEngine().Compare(srcResult.Value!, tgtResult.Value!, ComparisonOptions.Default),
+                parseResult.GetValue(exclude));
 
             if (!string.IsNullOrWhiteSpace(html))
             {

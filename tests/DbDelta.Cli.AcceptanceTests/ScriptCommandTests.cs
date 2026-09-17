@@ -343,6 +343,37 @@ public class ScriptCommandTests(CliFixture fixture)
             "and it still has to be a deploy script");
     }
 
+    /// <summary>
+    /// <c>--exclude</c>: the GUI's per-object selection, for the CLI. From the
+    /// live smoke of 2026-09-02, where one view over a database that was not
+    /// there blocked the whole verb and the documented recovery could not
+    /// advance; the owner chose this over <c>--continue-on-error</c> on
+    /// 2026-09-17. The excluded pair leaves the SELECTION, not the result, which
+    /// is exactly how the GUI calls the generator.
+    /// </summary>
+    [Fact]
+    public async Task Leaves_an_excluded_object_out_of_the_script_and_keeps_the_rest()
+    {
+        CancellationToken ct = TestContext.Current.CancellationToken;
+        const string srcDb = "DbDeltaScriptExclSrc";
+        const string tgtDb = "DbDeltaScriptExclTgt";
+        await CreateDb(srcDb, ct);
+        await CreateDb(tgtDb, ct);
+        await CreateCustomerTable(srcDb, ct);
+        await Exec(srcDb, "IF OBJECT_ID('dbo.vLeftOut') IS NULL EXEC('CREATE VIEW dbo.vLeftOut AS SELECT 1 AS Id;');", ct);
+
+        using var sqlOut = TempFile.Sql();
+        int exit = await RunCli(["script",
+            "--source", ConnectionFor(srcDb),
+            "--target", ConnectionFor(tgtDb),
+            "--out", sqlOut.Path,
+            "--exclude", "dbo.vLeft*"], ct);
+
+        exit.Should().Be(ExpectedExitCodes.SuccessDifferencesFound, "the table is still pending");
+        string content = await File.ReadAllTextAsync(sqlOut.Path, ct);
+        content.Should().Contain("CREATE TABLE [dbo].[Customer]");
+        content.Should().NotContain("vLeftOut", "the excluded view is not scripted");
+    }
     private async Task Exec(string db, string sql, CancellationToken ct)
     {
         await using SqlConnection c = new(ConnectionFor(db));
