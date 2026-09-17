@@ -52,13 +52,14 @@ public static class SqlServerDiscovery
     {
         TimeSpan window = timeout ?? s_defaultTimeout;
         // Captured server name → IP (last write wins, but multiple NICs will
-        // typically return identical results so this is fine).
-        Dictionary<string, string?> seen = new(StringComparer.OrdinalIgnoreCase)
-        {
-            ["(local)"] = null,
-            ["localhost"] = null,
-            ["127.0.0.1"] = null,
-        };
+        // typically return identical results so this is fine). Nothing is
+        // seeded: (local), localhost and 127.0.0.1 used to be put in before a
+        // single packet went out, so the list never came back empty, every
+        // "nessun server" message downstream was unreachable, and the three
+        // guesses sat under «Risultati scansione» as if something had answered
+        // — on a machine with only NAMED instances they cannot connect, while
+        // the local Browser, queried on loopback below, reports the real names.
+        Dictionary<string, string?> seen = new(StringComparer.OrdinalIgnoreCase);
 
         // Best-effort send + collect. Each task owns its own UdpClient
         // because UDP is connectionless and concurrent sends from a
@@ -131,12 +132,9 @@ public static class SqlServerDiscovery
             try { await Task.WhenAll(sendTasks).ConfigureAwait(false); } catch { /* swallow */ }
         }
 
-        // Stable order: localhost-like aliases first, then alphabetical.
-        List<DiscoveredServer> ordered = [.. seen.OrderBy(kv =>
-            kv.Key.Equals("(local)", StringComparison.OrdinalIgnoreCase) ? 0 :
-            kv.Key.Equals("localhost", StringComparison.OrdinalIgnoreCase) ? 1 :
-            kv.Key.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase) ? 2 : 3)
-            .ThenBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
+        // Stable order: alphabetical.
+        List<DiscoveredServer> ordered = [.. seen
+            .OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
             .Select(kv => new DiscoveredServer(kv.Key, kv.Value))];
         return ordered;
     }

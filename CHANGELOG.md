@@ -108,6 +108,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   naming the server put back what the credential store holds — which never
   ran when the name did not change, so the box stayed empty for the one
   server you had just picked.
+- **The server scan lists only servers that answered.** `(local)`,
+  `localhost` and `127.0.0.1` were put into the list before a single packet
+  went out, so the scan could never come back empty, «Nessun server rilevato»
+  could never be shown, and three guesses sat under **Risultati scansione** as
+  if something had replied — on a machine with only named instances they
+  cannot connect, while the local SQL Browser had already reported the real
+  names. Type `localhost\ISTANZA` by hand if the Browser is off.
 
 ## [1.1.0] — 2026-09-02 — the deploy stops writing statements that mean something else
 

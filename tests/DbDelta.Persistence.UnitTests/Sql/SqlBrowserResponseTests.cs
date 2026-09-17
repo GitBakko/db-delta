@@ -92,4 +92,22 @@ public class SqlBrowserResponseTests
         SqlServerDiscovery.ParseSqlBrowserResponse(Packet(Block("sql-prod.corp.local", "APP_1$")))
             .Should().Equal("sql-prod.corp.local\\APP_1$");
     }
+
+    [Fact]
+    public async Task A_scan_nobody_answered_produces_nothing_not_three_guesses()
+    {
+        // The list used to be seeded with (local), localhost and 127.0.0.1
+        // before a single packet went out, so it could never come back with
+        // fewer than three rows: every consumer that says "nessun server" on
+        // an empty list was dead code, and the three names were shown under
+        // «Risultati scansione» as if something had answered. On 2026-09-17 the
+        // owner picked one on a machine with two NAMED instances and no
+        // default one — it cannot work there, and the Browser had already
+        // reported both real names. A cancelled token reads no datagram, so
+        // whatever comes back is what the scan invents on its own.
+        IReadOnlyList<DiscoveredServer> list =
+            await SqlServerDiscovery.EnumerateServersAsync(new CancellationToken(canceled: true));
+
+        list.Should().BeEmpty();
+    }
 }
