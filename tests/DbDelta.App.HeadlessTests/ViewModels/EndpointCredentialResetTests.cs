@@ -84,6 +84,25 @@ public class EndpointCredentialResetTests
     }
 
     [Fact]
+    public void A_pair_the_store_filled_for_one_server_does_not_stay_in_the_boxes_for_the_next()
+    {
+        // The owner's smoke of 2026-09-17: pick a remembered server, then pick
+        // another from the scan — the first one's password sat in the box, and
+        // «Connetti» sent it to the second: wrong login. The 2026-09-03 rule
+        // above spares what the USER typed; this pair the store put in, for
+        // sql-a, and nobody typed a character of it. It follows its server:
+        // out of the box when the name moves, back in if the new name is
+        // remembered too — the auto-fill runs right after. Retyping either
+        // field makes the pair the user's, and the rule above applies.
+        StoreWithOneRememberedServer store = new() { RememberedFor = "sql-a" };
+        ProjectEndpointPanelViewModel vm = new("Sorgente", isTarget: false, store) { ServerName = "sql-a" };
+        vm.Password.Should().Be("stored-pass", "the control: the store filled the pair for sql-a");
+
+        vm.ServerName = "sql-b";
+
+        vm.Password.Should().BeEmpty("the store's pair for sql-a is not sql-b's, and none of it was typed");
+    }
+    [Fact]
     public async Task But_they_are_not_sent_to_the_new_server_on_their_own()
     {
         // The half that matters, and the reason the fields could be spared:
@@ -194,9 +213,12 @@ public class EndpointCredentialResetTests
         // The invariant the code comments on: the cancel in ScheduleAutoConnect
         // sits ABOVE the guard, because a pending attempt re-reads ServerName
         // when it fires. Store fills and arms for sql-a; the user edits the
-        // name inside the 450 ms window; the pair stays in the boxes on purpose
-        // — and the arm made for sql-a must die with the name. Reordering the
-        // two lines re-opened the 2026-08-18 disclosure with every test green.
+        // name inside the 450 ms window — and the arm made for sql-a must die
+        // with the name. Reordering the two lines re-opened the 2026-08-18
+        // disclosure with every test green. Since 2026-09-17 the store's pair
+        // leaves the boxes too (see the test above); the arm is still the
+        // half that matters, because a debounce already armed re-reads nothing
+        // but ServerName.
         StoreWithOneRememberedServer store = new() { RememberedFor = "sql-a" };
         ProjectEndpointPanelViewModel vm =
             new("Sorgente", isTarget: false, store) { ServerName = "sql-a.invalid" };
@@ -206,8 +228,8 @@ public class EndpointCredentialResetTests
         vm.ServerName = "sql-b.invalid";
         await Task.Delay(900, TestContext.Current.CancellationToken);
 
-        vm.Password.Should().Be("stored-pass", "the pair survives in the boxes");
-        started().Should().BeFalse("but the arm made for sql-a must not fire at sql-b");
+        vm.Password.Should().BeEmpty("the store's pair for sql-a follows sql-a");
+        started().Should().BeFalse("and the arm made for sql-a must not fire at sql-b");
         vm.ConnectionStatusMessage.Should().BeNull();
     }
 

@@ -152,19 +152,28 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
         // was about to set.
         DatabaseName = string.Empty;
 
-        // The credentials, by contrast, STAY. Wiping them here was the 2026-08-18
-        // answer to a real problem — a login typed for the previous server being
-        // sent 450 ms later to a host that may have arrived from an
-        // unauthenticated UDP scan reply — but it solved it by destroying what
-        // the user had just typed, per keystroke, with no message. Someone who
-        // goes back to append "\SQLSTERI" loses the secret they were halfway
-        // through; someone who fills the credentials while the scan is still
-        // running and then picks the server from "Risultati scansione" — the
-        // ordinary gesture — loses them too. The security goal never needed
-        // that: what must not happen is the AUTO-CONNECT firing with a pair that
-        // belongs to another server, and that is now denied in
-        // ScheduleAutoConnect itself. Pressing «Connetti» with the server name
-        // on screen stays the user's own explicit act.
+        // The credentials the user TYPED, by contrast, stay. Wiping them here
+        // was the 2026-08-18 answer to a real problem — a login typed for the
+        // previous server being sent 450 ms later to a host that may have
+        // arrived from an unauthenticated UDP scan reply — but it solved it by
+        // destroying what the user had just typed, per keystroke, with no
+        // message. Someone who goes back to append "\SQLSTERI" loses the
+        // secret they were halfway through; someone who fills the credentials
+        // while the scan is still running and then picks the server from
+        // "Risultati scansione" — the ordinary gesture — loses them too. The
+        // security goal never needed that: what must not happen is the
+        // AUTO-CONNECT firing with a pair that belongs to another server, and
+        // that is now denied in ScheduleAutoConnect itself. Pressing «Connetti»
+        // with the server name on screen stays the user's own explicit act.
+        //
+        // A pair the STORE put in is another matter: it was filed under the
+        // server just left, nobody typed a character of it, and left in the box
+        // it is exactly what «Connetti» then sends to the wrong host — the
+        // owner's smoke of 2026-09-17. It follows its server: cleared here, put
+        // back by the auto-fill below if the new name is remembered too. An
+        // edit to either field makes the pair the user's (the setters clear
+        // the vouching), and the rule above takes over.
+        if (_vouchedServer is not null) { Password = string.Empty; }
 
         // Refresh IP from suggestions list (if any).
         ServerIpAddress = ServerSuggestions

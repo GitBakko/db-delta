@@ -115,6 +115,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   if something had replied — on a machine with only named instances they
   cannot connect, while the local SQL Browser had already reported the real
   names. Type `localhost\ISTANZA` by hand if the Browser is off.
+- **A password the credential store filled for one server is not left in the
+  box for the next.** What you type survives a change of server, as above;
+  what the store put in was filed under the server you just left, and left
+  there it was exactly what **Connetti** sent to the new one. It now follows
+  its server, and the new server's own pair is put back if it is remembered.
 
 ## [1.1.0] — 2026-09-02 — the deploy stops writing statements that mean something else
 
