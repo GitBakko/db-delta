@@ -67,12 +67,16 @@ public partial class ProjectSetupDialog : Window
     /// <summary>Target connection string from the last successful OK.</summary>
     public string? LastTargetConnectionString { get; private set; }
 
-    private void OnOkClick(object? sender, RoutedEventArgs e)
+    // Awaited before Close, for the same reason as OnSaveClick below: Closed
+    // cancels the panels' lifetime, and a store that honoured its token would
+    // drop a write still in flight. OK is the user's own «yes, this pair».
+    private async void OnOkClick(object? sender, RoutedEventArgs e)
     {
         if (DataContext is ProjectSetupViewModel vm)
         {
             LastSourceConnectionString = vm.BuildSourceConnectionString();
             LastTargetConnectionString = vm.BuildTargetConnectionString();
+            await vm.PersistCredentialsAsync().ConfigureAwait(true);
             Close(vm.Build());
         }
     }

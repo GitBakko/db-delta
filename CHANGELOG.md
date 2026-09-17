@@ -85,6 +85,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   under that very server, and for no other pair — and that question is asked
   again when the connection is about to go out, so a remembered password you
   start retyping waits for **Connetti** like anything else you type.
+- **«Ricorda credenziali» is honoured when you press OK before the database
+  list has finished loading.** The pair was written only once a load
+  succeeded, and closing the dialog stops the load — so typing the database
+  name by hand and pressing OK while the list was still on its way kept the
+  pair for that comparison and forgot it for the next. OK now writes the pair
+  you confirmed itself; **Annulla** still writes nothing.
 
 ## [1.1.0] — 2026-09-02 — the deploy stops writing statements that mean something else
 

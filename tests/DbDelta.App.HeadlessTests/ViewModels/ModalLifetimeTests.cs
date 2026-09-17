@@ -1,5 +1,8 @@
+using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using DbDelta.App.ViewModels;
 using DbDelta.App.Views;
 using DbDelta.Core.Abstractions;
@@ -175,6 +178,67 @@ public class ModalLifetimeTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             setup.Source.TryPersistCredentialsAsync);
+    }
+
+    [AvaloniaFact]
+    public void OK_pressed_while_the_load_is_still_in_flight_still_remembers_the_pair()
+    {
+        // The P4 the 2026-09-05 review opened. OK is enabled by IsValid, and the
+        // database name can be typed by hand while the list is still loading —
+        // up to the 10 s of ConnectTimeout. Pressing OK in that window closed
+        // the dialog, Closed cancelled the load, and the persist on the load's
+        // success path never ran: the comparison went out with the typed
+        // password, and the next time nothing filled. OK is the user's own
+        // «yes, this pair»: it writes it itself, before the close.
+        RecordingCredentialStore store = new();
+        ProjectSetupViewModel setup = new(store);
+        ProjectSetupDialog dialog = ShownWithATypedPairAndALoadInFlight(setup);
+
+        Press(dialog, b => b.IsDefault);
+
+        store.Writes.Should().ContainSingle("the pair OK confirmed is the pair to remember");
+    }
+
+    [AvaloniaFact]
+    public void Control_Annulla_in_that_same_window_writes_nothing()
+    {
+        // Without this, the write above could be wired to Closed instead of to
+        // OK, and «Annulla» would remember a pair the user walked away from —
+        // the exact thing the hook exists to prevent.
+        RecordingCredentialStore store = new();
+        ProjectSetupViewModel setup = new(store);
+        ProjectSetupDialog dialog = ShownWithATypedPairAndALoadInFlight(setup);
+
+        Press(dialog, b => b.IsCancel);
+
+        store.Writes.Should().BeEmpty();
+        store.Deletes.Should().BeEmpty();
+    }
+
+    private static ProjectSetupDialog ShownWithATypedPairAndALoadInFlight(ProjectSetupViewModel setup)
+    {
+        // Its own password: the physical attempt outlives the close and blocks
+        // that pool for 5 s, see Closing_the_dialog_stops_a_load_already_in_flight.
+        setup.Source.ServerName = Server;
+        setup.Source.UserName = "sa";
+        setup.Source.Password = "typed-then-ok";
+        setup.Source.DatabaseName = "db";
+        setup.Source.RememberCredentials = true;
+
+        ProjectSetupDialog dialog = new() { DataContext = setup };
+        dialog.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        _ = setup.Source.LoadDatabasesCommand.ExecuteAsync(null);
+        setup.Source.IsLoadingDatabases.Should().BeTrue("the control: the load is in flight against .invalid");
+        return dialog;
+    }
+
+    private static void Press(ProjectSetupDialog dialog, Func<Button, bool> which)
+    {
+        dialog.GetVisualDescendants().OfType<Button>().Single(which)
+              .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Dispatcher.UIThread.RunJobs();
     }
 
     [Fact]

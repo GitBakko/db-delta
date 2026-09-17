@@ -128,6 +128,20 @@ public sealed partial class ProjectSetupViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Writes — or, with «Ricorda credenziali» off, forgets — both panels'
+    /// credentials as the user confirmed them. OK calls it before closing.
+    /// </summary>
+    /// <remarks>
+    /// The other persist runs on the success path of a load, which is exactly
+    /// what the close cancels — and the database name can be typed by hand while
+    /// the list is still loading, so an OK in that window used to lose the pair:
+    /// the comparison went out with the typed password and the next time
+    /// nothing filled. Found by the 2026-09-05 review.
+    /// </remarks>
+    public Task PersistCredentialsAsync() =>
+        Task.WhenAll(Source.TryPersistCredentialsAsync(), Target.TryPersistCredentialsAsync());
+
+    /// <summary>
     /// Seeds both panels' suggestion lists with the "Usati di recente" section
     /// derived from the connection store. Called once on dialog open before
     /// the auto-scan kicks in, so the picker is never empty.
