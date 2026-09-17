@@ -103,6 +103,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   who was saving nothing — shown in the main window, behind the dialog still
   open. The dialog now has a band of its own: «Impossibile caricare il
   progetto: …», the same words the recent-projects list already used.
+- **«Carica…» of a project for the server already on screen keeps the
+  remembered password.** Loading a project clears the password box and lets
+  naming the server put back what the credential store holds — which never
+  ran when the name did not change, so the box stayed empty for the one
+  server you had just picked.
 
 ## [1.1.0] — 2026-09-02 — the deploy stops writing statements that mean something else
 

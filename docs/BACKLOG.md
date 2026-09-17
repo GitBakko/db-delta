@@ -17,13 +17,13 @@ vedi «Manutenzione» in fondo.
   installazione vero** — installa, verifica app, CLI e PATH di macchina,
   disinstalla, verifica che sia sparito. La v1.0.2 (2026-08-13) resta la
   precedente.
-- **1067 test verdi** nei sette progetti che girano senza Docker (Core 630,
-  Headless 254, Persistence.Unit 91, Golden 68, Property 12, Architecture 6,
+- **1068 test verdi** nei sette progetti che girano senza Docker (Core 630,
+  Headless 255, Persistence.Unit 91, Golden 68, Property 12, Architecture 6,
   Shared 6) — ricontati il 2026-09-17, non incrementati a mente. I due di
   Headless del 2026-09-17 chiudono la P4 dell'OK premuto a caricamento in volo,
   uno è il controllo in negativo su Annulla; il terzo chiude la P2 dell'errore
   di connessione tagliato, il quarto e il quinto quella di «Carica» che parlava
-  di salvataggio. I
+  di salvataggio, il sesto il «Carica…» sullo stesso server trovato dallo smoke. I
   trentanove di Headless dal 2026-09-03 al 09-05: quattro sono la chiusura
   della segnalazione, nove la P1 della stringa di connessione, sette quella del
   ciclo di vita della modale, l'azzeramento delle credenziali ne aggiunge due
@@ -52,7 +52,7 @@ vedi «Manutenzione» in fondo.
   giri della suite intera non è misurato, e il tetto da 30 s è il soffitto
   dichiarato, non un'asserzione sul tempo. Sonda: tolto il riarmo in
   `OnAuthModeChanged`, i due positivi cadono per `TimeoutException`.
-  **Con Docker acceso girano anche i tre DB-backed** e il totale è **1208**
+  **Con Docker acceso girano anche i tre DB-backed** e il totale è **1209**
   (LiveDb 105, Cli acceptance 29, Persistence integration 7) — misurato il
   2026-09-17, tutti verdi. **Due** dei tre vanno **rossi**, non skipped, con Docker
   spento — LiveDb e Cli acceptance, che costruiscono il container in un
@@ -286,6 +286,26 @@ database c'è.
 
 ---
 
+## Smoke dal vivo — 2026-09-17, MSI `1.1.1-smoke` installata, del proprietario
+
+I 14 gesti — gli 11 della review adversariale della 1.1.1 più tre per i fix
+del giorno — sull'installato, non su `dotnet run`. **In corso**: i verdetti
+arrivano uno alla volta e questa tabella li registra come arrivano.
+
+| Gesto | Esito |
+|---|---|
+| 2 · server ricordato da «Usati di recente» → coppia e lista da sole | ✅ |
+| 3 · coppia digitata durante la scansione, poi server dai risultati | ✅ |
+| 5 · A ricordato poi subito B, lista di A in volo → lista sotto B vuota, `cmdkey` invariato | ✅ |
+| 6 · pannello Windows, server ricordato, ComboBox → SQL; e «Carica…» SQL su pannello Windows | ✅ |
+| 1 · password `a;b=c` | ❌ letto come: server scelto a mano (coppia riempita), poi «Carica…» di una configurazione per **lo stesso** server → casella password vuota. **Riprodotto in headless e chiuso**, riga qui sotto. Il gesto 1 in sé (`a;b=c` fino a Esegui) resta da rifare |
+| 4 · `\ISTANZA` appeso | ❌ letto come: Connetti verso `(local)`, `localhost`, `127.0.0.1` → nessun errore e **la lista non si aggiorna**. Aperto, sotto misura: l'ipotesi è `sys.databases` con `database_id > 4` vuoto e un successo che tace — `HasDatabases = false`, messaggio `null` |
+
+| Voce chiusa | Come | Prova |
+|---|---|---|
+| «Carica…» di un progetto per il server già a schermo svuotava la password e non la rimetteva | `LoadFromEndpoint` azzera `Password` e poi assegna `ServerName` contando sul setter per l'auto-fill dal store — **e un nome uguale non fa scattare il setter**. La chiusura del 2026-09-05 (`cb01e7a`, «naming a server stops wiping the credentials») era stata provata solo con un server diverso. Ora, a nome invariato, l'auto-fill è chiamato esplicitamente; e la lista dei database viene azzerata **prima** del nome, non dopo, perché l'arm dell'auto-connect che l'auto-fill fa pretende `!HasDatabases` — ordine che il setter già rispetta per il nome che cambia | `EndpointCredentialResetTests.Loading_a_project_for_the_server_already_named_still_fills_the_remembered_pair` — server scelto, coppia riempita (il controllo), `LoadFromEndpoint` per lo stesso server, password ancora lì; **RED misurato prima del codice** («"" has a length of 0»). Sonda: tolta la chiamata a nome invariato, cade. La sonda in scratchpad che l'ha trovata provava il dialogo vero con due caricamenti di fila: il **primo** riempiva, il **secondo** svuotava — la forma inversa di come l'ha raccontata lo smoke, stesso meccanismo |
+
+---
 ## Segnalazione dal build installato — 2026-09-03, v1.1.0
 
 Il proprietario installa l'MSI pubblicata il giorno prima, apre «Nuovo
@@ -568,7 +588,7 @@ cresce. La quarta, aperta il 2026-09-05 dalla review adversariale della
 |---|---|---|---|
 | **La scansione dichiara sempre di aver trovato dei server, e il suggerimento «SQL Browser potrebbe essere disabilitato» è codice morto.** `EnumerateServersAsync` semina il dizionario con tre alias locali — `(local)`, `localhost`, `127.0.0.1` — **prima** di spedire un solo pacchetto UDP, e restituisce il dizionario intero: non può tornare con meno di 3 voci. I consumatori trattano quel valore come output puro della scansione — `ApplyScanResults` marchia ogni riga con la sezione «Risultati scansione» e sceglie il messaggio diagnostico su `list.Count == 0`, condizione che il metodo **non può produrre**. Su una rete dove nessuno risponde, l'utente vede quindi un'intestazione «Risultati scansione» sopra tre congetture locali, sceglie, sbatte contro un errore di connessione, e l'unico messaggio che gli avrebbe spiegato la rete vuota non compare mai. Il gemello lo rende esplicito: `ConnectionEditViewModel` scrive «Trovati {list.Count} server», che non può stampare meno di 3 | 2026-09-03 | S | `src/DbDelta.Persistence/Sql/SqlServerDiscovery.cs:56-61` (la semina) e `:135-140`, `return` a `:141` (il ritorno). Il ramo morto è `ViewModels/ProjectEndpointPanelViewModel.cs:273-275`, la vista che lo renderebbe è `Views/ProjectSetupDialog.axaml:105-107`, il gemello è `ViewModels/ConnectionEditViewModel.cs:110-112` |
 | **«(N trovati)» conta come server i separatori di sezione, che non si possono selezionare.** `ServerSuggestions` è una collezione piatta che porta anche le sentinelle `IsHeaderOnly` — una inserita da `ApplyScanResults` per «Risultati scansione», un'altra da `SeedRecentServers` per «Usati di recente» — e lo stile del ComboBox le disabilita esplicitamente, cioè sono disegnate come strisce divisorie e **non** sono scegliibili. `Count` le include lo stesso: il contatore supera di uno le righe pescabili con una sezione presente, di due con entrambe. A zero suggerimenti non si vede alcun numero sbagliato, perché il TextBlock è nascosto da `HasServerSuggestions`. `DatabaseCountText` non è toccato: `AvailableDatabases` non porta sentinelle | 2026-09-03 | S | `ViewModels/ProjectEndpointPanelViewModel.cs:100`; le sentinelle sono inserite a `:259-264` e `:316-321`; lo stile che le disabilita è `Views/Controls/ServerPicker.axaml:27-29`; il contatore è legato a `Views/ProjectSetupDialog.axaml:94` e `:187` |
-| **`ProjectEndpointPanelViewModel` è passato da 702 a 772 righe chiudendo le tre P1, e a 865 chiudendo ciò che la review del 2026-09-05 ha trovato in quelle chiusure** (il token del caricamento in volo, il `Dispose` del debounce, l'azzeramento della password in `LoadFromEndpoint`, il server garantito dallo store per il riarmo — e i commenti che dicono perché). `CLAUDE.md` elenca sei file già oltre le 500 righe e vieta di farli crescere senza aprire una voce: questa è quella voce, non un difetto. Le prime 70 righe sono la `CancellationTokenSource` di vita, `CancelPendingWork` con il suo doc-comment, la guardia esplicita prima della scrittura di credenziale, il parametro `credentialsAreKnownForThisServer` con la sua motivazione, e i commenti che dicono perché — **la metà buona è commento, e nessuno di quei commenti è ornamentale**: due di essi registrano un ordine di chiamate e una posizione di riga che, invertiti, reintroducono un difetto misurato. **La forma dell'estrazione è però già decisa da un'altra voce e va fatta insieme a quella**: la P3 sui due pannelli copia-incolla della modale tocca gli stessi confini, e separare la logica di endpoint (scan, load, credenziali, ciclo di vita) da quella di presentazione è l'unico taglio che riduce entrambe. Farla da sola qui varrebbe un file in più e nessuna riga in meno altrove | 2026-09-03 | M | `src/DbDelta.App.Avalonia/ViewModels/ProjectEndpointPanelViewModel.cs`, `wc -l` = 865 il 2026-09-05, dopo la review. I numeri di `CLAUDE.md` sono del 2026-09-02 e ne dava 689: **rimisurare prima di citarli**, come dice la regola stessa |
+| **`ProjectEndpointPanelViewModel` è passato da 702 a 772 righe chiudendo le tre P1, a 865 chiudendo ciò che la review del 2026-09-05 ha trovato in quelle chiusure, e a 875 con il primo difetto dello smoke del 2026-09-17** (il token del caricamento in volo, il `Dispose` del debounce, l'azzeramento della password in `LoadFromEndpoint`, il server garantito dallo store per il riarmo — e i commenti che dicono perché). `CLAUDE.md` elenca sei file già oltre le 500 righe e vieta di farli crescere senza aprire una voce: questa è quella voce, non un difetto. Le prime 70 righe sono la `CancellationTokenSource` di vita, `CancelPendingWork` con il suo doc-comment, la guardia esplicita prima della scrittura di credenziale, il parametro `credentialsAreKnownForThisServer` con la sua motivazione, e i commenti che dicono perché — **la metà buona è commento, e nessuno di quei commenti è ornamentale**: due di essi registrano un ordine di chiamate e una posizione di riga che, invertiti, reintroducono un difetto misurato. **La forma dell'estrazione è però già decisa da un'altra voce e va fatta insieme a quella**: la P3 sui due pannelli copia-incolla della modale tocca gli stessi confini, e separare la logica di endpoint (scan, load, credenziali, ciclo di vita) da quella di presentazione è l'unico taglio che riduce entrambe. Farla da sola qui varrebbe un file in più e nessuna riga in meno altrove | 2026-09-03 | M | `src/DbDelta.App.Avalonia/ViewModels/ProjectEndpointPanelViewModel.cs`, `wc -l` = 875 il 2026-09-17: 865 dopo la review, più dieci — sei di commento — per il «Carica…» sullo stesso server che lo smoke del 2026-09-17 ha trovato. I numeri di `CLAUDE.md` sono del 2026-09-02 e ne dava 689: **rimisurare prima di citarli**, come dice la regola stessa |
 
 ---
 

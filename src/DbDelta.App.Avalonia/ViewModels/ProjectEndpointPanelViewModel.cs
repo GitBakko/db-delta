@@ -684,7 +684,19 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
         // setter runs can put back what the store holds for THIS server.
         Password = string.Empty;
 
+        // Runtime state first, not last: the auto-fill below arms the
+        // auto-connect only while no list is loaded, and the setter clears
+        // this anyway when the name changes.
+        AvailableDatabases.Clear();
+        HasDatabases = false;
+
+        // The setter does not run for an unchanged name — so a project for the
+        // server already on screen cleared the password above and nothing put
+        // it back. Found by the owner's smoke of 2026-09-17: pick a remembered
+        // server, «Carica…» a project for it, empty box.
+        bool sameServer = string.Equals(ServerName, endpoint.Connection.ServerName, StringComparison.Ordinal);
         ServerName = endpoint.Connection.ServerName;
+        if (sameServer) { _ = TryAutoFillCredentialsAsync(ServerName); }
         DatabaseName = endpoint.Connection.DatabaseName;
         AuthMode = endpoint.Authentication.Mode;
         UserName = endpoint.Authentication.UserName ?? "";
@@ -692,11 +704,9 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
         Encrypt = endpoint.Authentication.Encrypt;
         TrustServerCertificate = endpoint.Authentication.TrustServerCertificate;
 
-        // Clear runtime state — but NOT ServerSuggestions: those come from the
-        // network scan and the connection store, not from the project, and
-        // dropping them left the picker empty right after a load.
-        AvailableDatabases.Clear();
-        HasDatabases = false;
+        // The rest of the runtime state — but NOT ServerSuggestions: those come
+        // from the network scan and the connection store, not from the project,
+        // and dropping them left the picker empty right after a load.
         ServerVersion = null;
         ServerMajorVersion = null;
         ServerIpAddress = null;

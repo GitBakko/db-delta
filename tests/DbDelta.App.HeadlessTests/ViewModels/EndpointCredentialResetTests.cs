@@ -395,6 +395,24 @@ public class EndpointCredentialResetTests
     }
 
     [Fact]
+    public void Loading_a_project_for_the_server_already_named_still_fills_the_remembered_pair()
+    {
+        // Found by the owner's smoke of 2026-09-17: pick a remembered server by
+        // hand — the pair fills — then «Carica…» a project for that SAME server
+        // and the password box is empty. LoadFromEndpoint clears the password
+        // and then assigns ServerName, counting on the setter to run the
+        // auto-fill; an unchanged name does not run the setter. The test above
+        // never saw it because its project named a different server.
+        StoreWithOneRememberedServer store = new() { RememberedFor = "sql-b" };
+        ProjectEndpointPanelViewModel vm = new("Sorgente", isTarget: false, store) { ServerName = "sql-b" };
+        vm.Password.Should().Be("stored-pass", "the control: picking the server filled the pair");
+
+        vm.LoadFromEndpoint(Endpoint("sql-b", "db", "sa"));
+
+        vm.Password.Should().Be("stored-pass", "the store still remembers this very server");
+        vm.IsValid.Should().BeTrue();
+    }
+    [Fact]
     public void Control_loading_a_project_whose_server_the_store_remembers_fills_that_pair()
     {
         // Without this, a LoadFromEndpoint that cleared the password AFTER
