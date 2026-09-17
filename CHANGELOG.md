@@ -6,6 +6,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+<a id="v1.2.0"></a>
+## [1.2.0] — 2026-09-17 — the CLI can leave an object out
+
+Four commits since `1.1.1`, cut the same day. One of them is the reason
+this is a minor and not a patch: `--exclude`, the per-object selection the
+GUI has always had, now on the command line — so one object the operator
+cannot fix on the server no longer blocks the whole verb. The other two are
+a counter that said one too many and a refactor of the setup dialog that
+changes nothing on screen: its two panels are one control hosted twice, and
+its view model is three files instead of one.
+
+`1.2.0` and not `1.1.2`: a new option is additive and backward compatible,
+which is a MINOR under SemVer. Windows Installer compares the first three
+fields of `ProductVersion`, so `1.2.0` upgrades `1.1.1` in place.
+
 ### Added
 
 - **`--exclude <pattern>` on `compare`, `report` and `script`.** The GUI's
