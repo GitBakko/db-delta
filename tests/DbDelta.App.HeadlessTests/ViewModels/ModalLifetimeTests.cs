@@ -73,13 +73,14 @@ public class ModalLifetimeTests
     {
         RecordingCredentialStore store = new();
         ProjectEndpointPanelViewModel vm = PanelWithARememberedLogin(store);
+        Func<bool> started = PanelProbe.LoadStarted(vm);
 
         vm.CancelPendingWork();
 
         // Twice the 450 ms debounce, and then some.
         await Task.Delay(900, TestContext.Current.CancellationToken);
 
-        vm.IsLoadingDatabases.Should().BeFalse();
+        started().Should().BeFalse();
         vm.ConnectionStatusMessage.Should().BeNull("no attempt means no failure to report");
     }
 
@@ -91,14 +92,18 @@ public class ModalLifetimeTests
         // it for the wrong reason. It caught exactly that on the first run —
         // the first version asserted ConnectionStatusMessage and failed, because
         // ListDatabasesAsync sets ConnectTimeout = 10 and the attempt is still
-        // IN FLIGHT at 900 ms. In-flight is the signal, not the error.
+        // IN FLIGHT at 900 ms. In-flight is the signal, not the error — and
+        // the signal is AWAITED, not sampled at 900 ms: sampled, it lost once
+        // to a continuation that ran 12 s late under the full suite, and
+        // recording the start instead of sampling it lost again on 2026-09-17,
+        // at 17 s, because under a starved pool the test's own delay fires
+        // BEFORE the debounce it waits on — see PanelProbe.
         RecordingCredentialStore store = new();
         ProjectEndpointPanelViewModel vm = PanelWithARememberedLogin(store);
 
-        await Task.Delay(900, TestContext.Current.CancellationToken);
-
-        vm.IsLoadingDatabases.Should().BeTrue(
-            "the remembered credential arms the auto-connect, which is still waiting on .invalid");
+        // The remembered credential arms the auto-connect, which is still
+        // waiting on .invalid.
+        await PanelProbe.LoadStartedAsync(vm);
     }
 
     [Fact]
@@ -194,10 +199,11 @@ public class ModalLifetimeTests
             Password = "in-flight-and-then-closed",
             RememberCredentials = true,
         };
+        Func<bool> started = PanelProbe.LoadStarted(vm);
 
         Task load = vm.LoadDatabasesCommand.ExecuteAsync(null);
         await Task.Delay(150, TestContext.Current.CancellationToken);
-        vm.IsLoadingDatabases.Should().BeTrue("the control: the load is in flight against .invalid");
+        started().Should().BeTrue("the control: the load is in flight against .invalid");
 
         vm.CancelPendingWork();
         await load.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
@@ -220,6 +226,8 @@ public class ModalLifetimeTests
         // is declared uncovered.
         RecordingCredentialStore store = new();
         ProjectSetupViewModel vm = new(store);
+        Func<bool> sourceStarted = PanelProbe.LoadStarted(vm.Source);
+        Func<bool> targetStarted = PanelProbe.LoadStarted(vm.Target);
         store.Stored = "sa|p4ss";
         vm.Source.ServerName = Server;
         vm.Target.ServerName = Server;
@@ -227,8 +235,8 @@ public class ModalLifetimeTests
         vm.CancelPendingWork();
         await Task.Delay(900, TestContext.Current.CancellationToken);
 
-        vm.Source.IsLoadingDatabases.Should().BeFalse();
-        vm.Target.IsLoadingDatabases.Should().BeFalse();
+        sourceStarted().Should().BeFalse();
+        targetStarted().Should().BeFalse();
         vm.Source.ConnectionStatusMessage.Should().BeNull();
         vm.Target.ConnectionStatusMessage.Should().BeNull();
     }

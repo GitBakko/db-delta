@@ -76,6 +76,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   unquoted format lost it on parsing; the quoting builder preserved it, so a
   pasted ` sa` reached the server as a login called ` sa`. The password is the
   one field still carried byte for byte.
+- **A remembered server still connects by itself after a switch to SQL
+  authentication.** With the panel in Windows authentication, picking a server
+  the credential store remembers filled the login but never connected once
+  the mode was switched to SQL — by hand, or by «Carica…», «Scambia» and
+  «Clona», which all set the mode right after the server. The switch now
+  re-arms the connection when the pair on screen is the one the store filed
+  under that very server, and for no other pair — and that question is asked
+  again when the connection is about to go out, so a remembered password you
+  start retyping waits for **Connetti** like anything else you type.
 
 ## [1.1.0] — 2026-09-02 — the deploy stops writing statements that mean something else
 

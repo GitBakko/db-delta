@@ -20,6 +20,18 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
     private const int AutoConnectDebounceMs = 450;
 
     /// <summary>
+    /// The server whose stored pair is the one now in the boxes, or null when
+    /// nobody can say that: set by <see cref="TryAutoFillCredentialsAsync"/> right
+    /// after it puts the pair there, cleared by any edit to the user, the
+    /// password or the server name. It is the whole answer to "may this pair be
+    /// sent unasked" under SQL auth — asked when an arm is made and again when
+    /// it fires — and it is what lets an <see cref="AuthMode"/> change re-arm:
+    /// every bulk assignment makes that change right after the server name, and
+    /// it used to cancel the auto-fill's arm without replacing it.
+    /// </summary>
+    private string? _vouchedServer;
+
+    /// <summary>
     /// Cancelled when the dialog that owns this panel closes. Every network and
     /// credential-store call below runs on this token, so "the window is gone"
     /// actually stops the work instead of merely hiding it.
@@ -166,6 +178,7 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
         // made the difference invisible — this call would CANCEL the arm the
         // auto-fill had just made and refuse to replace it, and "pick a
         // remembered server and it connects itself" would quietly stop working.
+        _vouchedServer = null;
         ScheduleAutoConnect();
         _ = TryAutoFillCredentialsAsync(value);
     }
@@ -174,6 +187,12 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(IsValid));
         LoadDatabasesCommand.NotifyCanExecuteChanged();
+        // Cancels whatever was armed, and re-arms only if the pair in the boxes
+        // is one the store vouched for THIS server (see _vouchedServer). Every
+        // bulk assignment — load, swap, clone, copy — sets AuthMode right after
+        // ServerName, so without that a panel that was in Windows auth lost the
+        // arm the auto-fill had just made and never connected by itself. Found
+        // by the 2026-09-05 review.
         ScheduleAutoConnect();
     }
 
@@ -200,12 +219,17 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(IsValid));
         LoadDatabasesCommand.NotifyCanExecuteChanged();
+        // An edited pair is nobody's pair any more: whatever the store vouched
+        // for is void the moment either field changes. The auto-fill sets both
+        // fields through here too, and vouches only AFTER, so it is exempt.
+        _vouchedServer = null;
     }
 
     partial void OnPasswordChanged(string value)
     {
         OnPropertyChanged(nameof(IsValid));
         LoadDatabasesCommand.NotifyCanExecuteChanged();
+        _vouchedServer = null;
     }
 
     partial void OnIsScanningServersChanged(bool value) =>
@@ -481,18 +505,19 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
     /// previous pending attempt — a single connection is fired per quiescent
     /// burst of edits.
     /// </summary>
-    /// <param name="credentialsAreKnownForThisServer">
-    /// Passed true by exactly one caller, <see cref="TryAutoFillCredentialsAsync"/>,
-    /// which has just put back the pair the credential store had filed under the
-    /// server now named. Everywhere else the pair in the boxes may still belong
-    /// to the server named a moment ago, and under SQL auth sending it onward
-    /// unasked is credential disclosure — the host may have come from an
-    /// unauthenticated UDP scan reply, over a string that carries this panel's
-    /// TrustServerCertificate. This one guard replaces wiping the two fields on
-    /// every server-name keystroke: it denies the same thing without destroying
-    /// what the user typed. Windows auth has no secret to send and is exempt.
-    /// </param>
-    private void ScheduleAutoConnect(bool credentialsAreKnownForThisServer = false)
+    /// <remarks>
+    /// Under SQL auth it arms only when <see cref="MayAutoConnect"/> says the pair
+    /// in the boxes is the one the credential store filed under the server now
+    /// named — which only <see cref="TryAutoFillCredentialsAsync"/> can establish.
+    /// Anywhere else the pair may still belong to the server named a moment ago,
+    /// and sending it onward unasked is credential disclosure: the host may have
+    /// come from an unauthenticated UDP scan reply, over a string that carries
+    /// this panel's TrustServerCertificate. This one guard replaces wiping the two
+    /// fields on every server-name keystroke: it denies the same thing without
+    /// destroying what the user typed. The same predicate is asked again when the
+    /// debounce fires, because the boxes may have been edited in between.
+    /// </remarks>
+    private void ScheduleAutoConnect()
     {
         // Unconditional, and it must stay above the guard below: a pending
         // attempt re-reads ServerName when it fires, so one left running would
@@ -503,13 +528,7 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
         _autoConnectCts?.Dispose();
         _autoConnectCts = null;
 
-        if (AuthMode != AuthenticationMode.WindowsIntegrated
-            && !credentialsAreKnownForThisServer)
-        {
-            return;
-        }
-
-        if (!IsAutoConnectEligible()) { return; }
+        if (!MayAutoConnect() || !IsAutoConnectEligible()) { return; }
 
         // Linked, not standalone: the debounce has two reasons to die — a newer
         // edit, and the dialog closing.
@@ -543,7 +562,16 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
             return;
         }
 
-        if (ct.IsCancellationRequested || !IsAutoConnectEligible()) { return; }
+        // Asked again at fire time, not only at arm time: the user/password
+        // setters do not cancel a pending arm, so a remembered pair retyped
+        // within the 450 ms would otherwise go out as the prefix typed so far —
+        // the 2026-09-03 rule is that anything typed waits for «Connetti». It
+        // also closes a path only a store that answers late could open: an arm
+        // made for a name that has since moved. Found by the 2026-09-05 review.
+        if (ct.IsCancellationRequested || !MayAutoConnect() || !IsAutoConnectEligible())
+        {
+            return;
+        }
 
         // LoadDatabasesAsync already handles the IsLoadingDatabases flag and
         // surfaces errors via ConnectionStatusMessage, so we can fire-and-forget.
@@ -563,6 +591,16 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
         && !string.IsNullOrWhiteSpace(ServerName)
         && (AuthMode == AuthenticationMode.WindowsIntegrated
             || (!string.IsNullOrWhiteSpace(UserName) && !string.IsNullOrWhiteSpace(Password)));
+
+    // Windows auth has no secret to send and is exempt. Under SQL auth the pair
+    // in the boxes must be the store's pair for the server now named, with
+    // nobody having touched either since. Compared against the live ServerName
+    // on purpose: the setters clear the field anyway, but a compare that cannot
+    // be bypassed is one fewer thing to trust.
+    private bool MayAutoConnect() =>
+        AuthMode == AuthenticationMode.WindowsIntegrated
+        || (_vouchedServer is not null
+            && string.Equals(_vouchedServer, ServerName, StringComparison.Ordinal));
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -735,6 +773,14 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
             string? blob = await _credentialStore
                 .GetSecretAsync(CredentialKey(serverName), _lifetime.Token)
                 .ConfigureAwait(true);
+
+            // The shipped store answers synchronously, so this never trips
+            // today; a store that yields — the v2 Keychain and Secret Service
+            // ones, or a Task.Run wrapper — could answer for a name the user
+            // has already moved away from, and filling the boxes then would put
+            // one server's pair under another's name. Not ours to place.
+            if (!string.Equals(serverName, ServerName, StringComparison.Ordinal)) { return; }
+
             if (string.IsNullOrEmpty(blob)) { return; }
 
             // Format: "user|password" — '|' is forbidden in SQL Server logins so
@@ -758,8 +804,12 @@ public sealed partial class ProjectEndpointPanelViewModel : ObservableObject
             // auto-connect — see the comment on OnUserNameChanged — so it is
             // armed here instead, which keeps "pick a remembered server and it
             // connects itself" working without ever sending a half-typed secret,
-            // or one that belongs to a different host.
-            ScheduleAutoConnect(credentialsAreKnownForThisServer: true);
+            // or one that belongs to a different host. Vouched AFTER the two
+            // setters above, which clear the vouching as any edit does; the
+            // vouching is what lets ScheduleAutoConnect arm, here and again on
+            // an AuthMode change.
+            _vouchedServer = serverName;
+            ScheduleAutoConnect();
         }
         catch
         {

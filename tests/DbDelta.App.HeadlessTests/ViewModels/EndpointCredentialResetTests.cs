@@ -41,15 +41,27 @@ public class EndpointCredentialResetTests
     private sealed class StoreWithOneRememberedServer : ICredentialStore
     {
         public string? RememberedFor { get; init; }
+
+        // A test that expects to be IN FLIGHT gives itself a secret of its own:
+        // SqlClient pools on the whole connection string, and a physical attempt
+        // that fails ~10 s after another test started it blocks the shared pool
+        // for 5 s — which would tie this test's outcome to the clock.
+        public string Secret { get; init; } = "stored-user|stored-pass";
+
+        // When set, the answer is held back until the test releases it — the
+        // shipped DpapiCredentialStore answers synchronously, but the Keychain
+        // and Secret Service stores of a later version will not.
+        public TaskCompletionSource<string?>? Pending { get; init; }
+
         public bool IsAvailable => true;
 
         public Task SetSecretAsync(string key, string secret, CancellationToken ct) =>
             Task.CompletedTask;
 
         public Task<string?> GetSecretAsync(string key, CancellationToken ct) =>
-            Task.FromResult(
+            Pending?.Task ?? Task.FromResult(
                 RememberedFor is not null && key.Contains(RememberedFor, StringComparison.Ordinal)
-                    ? "stored-user|stored-pass"
+                    ? Secret
                     : null);
 
         public Task DeleteSecretAsync(string key, CancellationToken ct) => Task.CompletedTask;
@@ -76,19 +88,20 @@ public class EndpointCredentialResetTests
     {
         // The half that matters, and the reason the fields could be spared:
         // surviving in the boxes is not the same as being sent. ".invalid"
-        // cannot resolve, so an attempt that DID start leaves IsLoadingDatabases
-        // true for the ten seconds of ListDatabasesAsync's ConnectTimeout.
+        // cannot resolve, so an attempt that DID start is recorded by the
+        // probe the moment the load begins, however fast it then fails.
         ProjectEndpointPanelViewModel vm = new("Sorgente", isTarget: false)
         {
             ServerName = "sql-a",
             UserName = "sa",
             Password = "p4ssw0rd",
         };
+        Func<bool> started = PanelProbe.LoadStarted(vm);
 
         vm.ServerName = "dbdelta-nonesistente.invalid";
         await Task.Delay(900, TestContext.Current.CancellationToken);
 
-        vm.IsLoadingDatabases.Should().BeFalse("nothing may reach the new host unasked");
+        started().Should().BeFalse("nothing may reach the new host unasked");
         vm.ConnectionStatusMessage.Should().BeNull();
     }
 
@@ -120,13 +133,14 @@ public class EndpointCredentialResetTests
         // Without this, a guard that simply never armed would pass every test
         // above and quietly kill the feature.
         StoreWithOneRememberedServer store = new() { RememberedFor = "nonesistente" };
-        ProjectEndpointPanelViewModel vm =
-            new("Sorgente", isTarget: false, store) { ServerName = "dbdelta-nonesistente.invalid" };
+        ProjectEndpointPanelViewModel vm = new("Sorgente", isTarget: false, store);
+        Task started = PanelProbe.LoadStartedAsync(vm);
 
-        await Task.Delay(900, TestContext.Current.CancellationToken);
+        vm.ServerName = "dbdelta-nonesistente.invalid";
 
         vm.UserName.Should().Be("stored-user");
-        vm.IsLoadingDatabases.Should().BeTrue("a pair the store filed under THIS server may connect");
+        // A pair the store filed under THIS server may connect.
+        await started;
     }
 
     [Fact]
@@ -138,16 +152,15 @@ public class EndpointCredentialResetTests
         // with the prefix typed so far — "Errore: Login failed for user 'sa'."
         // in the modal, for a connection nobody asked for, repeated at every
         // further pause.
-        ProjectEndpointPanelViewModel vm = new("Sorgente", isTarget: false)
-        {
-            ServerName = "dbdelta-nonesistente.invalid",
-            UserName = "sa",
-            Password = "p4ss",
-        };
+        ProjectEndpointPanelViewModel vm = new("Sorgente", isTarget: false);
+        Func<bool> started = PanelProbe.LoadStarted(vm);
+        vm.ServerName = "dbdelta-nonesistente.invalid";
+        vm.UserName = "sa";
+        vm.Password = "p4ss";
 
         await Task.Delay(900, TestContext.Current.CancellationToken);
 
-        vm.IsLoadingDatabases.Should().BeFalse("nothing may be sent while the user is still typing");
+        started().Should().BeFalse("nothing may be sent while the user is still typing");
         vm.ConnectionStatusMessage.Should().BeNull("no attempt means no failure to report");
     }
 
@@ -165,14 +178,14 @@ public class EndpointCredentialResetTests
             DatabaseName = "AdventureWorks",
             AuthMode = AuthenticationMode.WindowsIntegrated,
         };
+        Task started = PanelProbe.LoadStartedAsync(vm);
 
         vm.ServerName = "dbdelta-nonesistente.invalid";
         vm.DatabaseName.Should().BeEmpty();
 
-        await Task.Delay(900, TestContext.Current.CancellationToken);
-
-        vm.IsLoadingDatabases.Should().BeTrue(
-            "under Windows auth there is no secret to send, so naming a server still connects by itself");
+        // Under Windows auth there is no secret to send, so naming a server
+        // still connects by itself.
+        await started;
     }
 
     [Fact]
@@ -188,12 +201,58 @@ public class EndpointCredentialResetTests
         ProjectEndpointPanelViewModel vm =
             new("Sorgente", isTarget: false, store) { ServerName = "sql-a.invalid" };
         vm.Password.Should().Be("stored-pass", "the control: the store filled the pair for sql-a");
+        Func<bool> started = PanelProbe.LoadStarted(vm);
 
         vm.ServerName = "sql-b.invalid";
         await Task.Delay(900, TestContext.Current.CancellationToken);
 
         vm.Password.Should().Be("stored-pass", "the pair survives in the boxes");
-        vm.IsLoadingDatabases.Should().BeFalse("but the arm made for sql-a must not fire at sql-b");
+        started().Should().BeFalse("but the arm made for sql-a must not fire at sql-b");
+        vm.ConnectionStatusMessage.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task A_store_that_answers_after_the_server_has_moved_places_nothing()
+    {
+        // The shipped store answers synchronously, so this cannot happen today;
+        // the Keychain and Secret Service stores of a later version will yield.
+        // The store is asked for sql-a, the user moves on to sql-b before it
+        // answers: the answer is sql-a's pair and must not land under sql-b —
+        // neither in the boxes nor, through the arm the auto-fill makes, on the
+        // wire. The 2026-09-05 review's single skeptic named this sequence.
+        TaskCompletionSource<string?> answer = new();
+        StoreWithOneRememberedServer store = new() { Pending = answer };
+        ProjectEndpointPanelViewModel vm =
+            new("Sorgente", isTarget: false, store) { ServerName = "sql-a.invalid" };
+        Func<bool> started = PanelProbe.LoadStarted(vm);
+
+        vm.ServerName = "sql-b.invalid";
+        answer.SetResult("stored-user|stored-pass-for-sql-a");
+        await Task.Delay(900, TestContext.Current.CancellationToken);
+
+        vm.Password.Should().BeEmpty("an answer for sql-a is not ours to place under sql-b");
+        started().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Retyping_the_password_over_a_remembered_one_waits_for_Connetti_too()
+    {
+        // The user/password setters do not cancel a pending arm, so the arm the
+        // auto-fill made would otherwise fire 450 ms later with whatever is in
+        // the boxes by then — a prefix, if the user started retyping a stale
+        // password. Same server, so not the 2026-08-18 disclosure, but the
+        // 2026-09-03 rule is that anything typed waits for «Connetti», and an
+        // account-lockout policy counts prefixes. Named by the review's skeptic.
+        StoreWithOneRememberedServer store = new() { RememberedFor = "nonesistente" };
+        ProjectEndpointPanelViewModel vm =
+            new("Sorgente", isTarget: false, store) { ServerName = "dbdelta-nonesistente.invalid" };
+        vm.Password.Should().Be("stored-pass", "the control: the store filled the pair");
+        Func<bool> started = PanelProbe.LoadStarted(vm);
+
+        vm.Password = "st";
+        await Task.Delay(900, TestContext.Current.CancellationToken);
+
+        started().Should().BeFalse("an edited pair is nobody's pair until «Connetti»");
         vm.ConnectionStatusMessage.Should().BeNull();
     }
 
@@ -218,10 +277,11 @@ public class EndpointCredentialResetTests
             UserName = "sa",
             Password = "in-flight-and-then-renamed",
         };
+        Func<bool> started = PanelProbe.LoadStarted(vm);
 
         Task load = vm.LoadDatabasesCommand.ExecuteAsync(null);
         await Task.Delay(150, TestContext.Current.CancellationToken);
-        vm.IsLoadingDatabases.Should().BeTrue("the control: the load is in flight against .invalid");
+        started().Should().BeTrue("the control: the load is in flight against .invalid");
 
         vm.ServerName = "dbdelta-altro.invalid";
         await load.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
@@ -229,6 +289,82 @@ public class EndpointCredentialResetTests
         vm.IsLoadingDatabases.Should().BeFalse();
         vm.ConnectionStatusMessage.Should().BeNull("a load abandoned on purpose is not an error");
         vm.Password.Should().Be("in-flight-and-then-renamed", "the pair itself still survives the server change");
+    }
+
+    [Fact]
+    public async Task A_remembered_pair_still_connects_when_the_auth_mode_is_switched_after_the_pick()
+    {
+        // The 2026-09-05 review's P3: the AuthMode setter calls
+        // ScheduleAutoConnect with the default, which cancelled the arm the
+        // auto-fill had just made and refused to replace it. A panel in Windows
+        // auth that picked a remembered server and was then switched to SQL —
+        // by hand, or by every bulk assignment, which sets AuthMode right after
+        // ServerName — filled the pair and never connected.
+        StoreWithOneRememberedServer store = new()
+        {
+            RememberedFor = "nonesistente",
+            Secret = "stored-user|stored-pass-after-the-switch",
+        };
+        ProjectEndpointPanelViewModel vm = new("Sorgente", isTarget: false, store)
+        {
+            AuthMode = AuthenticationMode.WindowsIntegrated,
+            ServerName = "dbdelta-nonesistente.invalid",
+        };
+        vm.Password.Should().Be("stored-pass-after-the-switch", "the control: the store filled the pair");
+        Task started = PanelProbe.LoadStartedAsync(vm);
+
+        vm.AuthMode = AuthenticationMode.SqlServer;
+
+        // The pair in the boxes is the store's pair for this very server, so
+        // the switch may re-arm.
+        await started;
+    }
+
+    [Fact]
+    public async Task Loading_a_sql_project_into_a_windows_panel_still_connects_with_the_remembered_pair()
+    {
+        // The same defect through «Carica…», which is how the review measured
+        // it: LoadFromEndpoint from a panel already in SQL auth fired, from one
+        // in Windows auth it did not.
+        StoreWithOneRememberedServer store = new()
+        {
+            RememberedFor = "nonesistente",
+            Secret = "stored-user|stored-pass-after-the-load",
+        };
+        ProjectEndpointPanelViewModel vm = new("Sorgente", isTarget: false, store)
+        {
+            AuthMode = AuthenticationMode.WindowsIntegrated,
+        };
+        Task started = PanelProbe.LoadStartedAsync(vm);
+
+        vm.LoadFromEndpoint(Endpoint("dbdelta-nonesistente.invalid", "db", "stored-user"));
+
+        vm.Password.Should().Be("stored-pass-after-the-load");
+        // A loaded SQL project whose server is remembered connects by itself.
+        await started;
+    }
+
+    [Fact]
+    public async Task Control_a_pair_the_user_has_edited_is_not_vouched_for_by_the_switch()
+    {
+        // Without this, "re-arm on AuthMode change" could be implemented as
+        // "always re-arm", which is the 2026-08-18 disclosure with a new face:
+        // the vouching must die with the first edit to either field.
+        StoreWithOneRememberedServer store = new() { RememberedFor = "nonesistente" };
+        ProjectEndpointPanelViewModel vm = new("Sorgente", isTarget: false, store)
+        {
+            AuthMode = AuthenticationMode.WindowsIntegrated,
+            ServerName = "dbdelta-nonesistente.invalid",
+            // Runs after the store has filled the pair: initialisers assign in order.
+            Password = "typed-over-the-stored-one",
+        };
+        Func<bool> started = PanelProbe.LoadStarted(vm);
+
+        vm.AuthMode = AuthenticationMode.SqlServer;
+        await Task.Delay(900, TestContext.Current.CancellationToken);
+
+        started().Should().BeFalse("an edited pair is nobody's pair, and nothing may send it unasked");
+        vm.ConnectionStatusMessage.Should().BeNull();
     }
 
     private static ProjectEndpoint Endpoint(string server, string database, string user) => new(
