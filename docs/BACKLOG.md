@@ -7,16 +7,20 @@ vedi «Manutenzione» in fondo.
 
 ## Stato — 2026-09-17
 
-- **v1.1.1 pubblicata** (2026-09-17) dal tag `v1.1.1` su `2d84db6`, «Latest»,
-  MSI **non firmata** allegata con il suo `.sha256` e un'attestazione di
-  provenienza. Misurata, non stimata: `DbDelta-1.1.1-win-x64.msi` è di
-  **99.389.576 byte**, cioè **94,8 MiB** — il «94 MB» di «Deciso», scritto in
-  MiB. Sedici commit dalla 1.1.0, **tutti fix sulla modale di nuovo
-  progetto**, nessuna aggiunta: patch. Il workflow `release` è guidato dal tag
-  e la versione viene da lì: non esiste nessun file di versione da bumpare.
-  Tutti e undici i suoi step verdi, **incluso lo smoke di installazione
-  vero** — installa, verifica app, CLI e PATH di macchina, disinstalla,
-  verifica che sia sparito. La v1.1.0 (2026-09-02) resta la precedente.
+- **v1.2.0 pubblicata** (2026-09-17, sera) dal tag `v1.2.0` su `d48f36c`,
+  «Latest», MSI **non firmata** allegata con il suo `.sha256` e
+  un'attestazione di provenienza. Misurata, non stimata:
+  `DbDelta-1.2.0-win-x64.msi` è di **99.410.056 byte**, cioè **94,8 MiB**.
+  Quattro commit dalla 1.1.1, tagliata lo stesso giorno: `--exclude` sulla
+  CLI (additivo → MINOR), il contatore «(N trovati)», il refactor della
+  modale. **Non smoked sull'installato prima del tag, per scelta del
+  proprietario**: i tre cambi sono coperti dal dialogo vero in headless e da
+  acceptance attraverso il processo; la MSI pubblicata resta da provare a
+  mano. Il workflow `release` è guidato dal tag e la versione viene da lì:
+  non esiste nessun file di versione da bumpare. Tutti e undici i suoi step
+  verdi, **incluso lo smoke di installazione vero**. La v1.1.1 (2026-09-17,
+  `2d84db6`, 99.389.576 byte, sedici fix sulla modale, smoked su tre MSI)
+  resta la precedente.
 - **1078 test verdi** nei sette progetti che girano senza Docker (Core 636,
   Headless 258, Persistence.Unit 92, Golden 68, Property 12, Architecture 6,
   Shared 6) — ricontati il 2026-09-17, non incrementati a mente. I due di
@@ -149,14 +153,15 @@ vedi «Manutenzione» in fondo.
   non passava `dropDependencies`, quindi lo scenario 18 misurava il fallback
   invece del risolutore. Tutto in `docs/parity/redgate-2026-08-31.md`; per
   rigenerare l'artefatto DbDelta serve `DBDELTA_PARITY_DUMP=<percorso>`.
-- **CI verde su `2d84db6`**, la punta di `origin/main` e il commit del tag
-  `v1.1.1`, il 2026-09-17: run `35211099993` (ci), `35211099069` (docs) e
-  `35211098838` (release). Gli otto commit del giorno prima del taglio sono
-  ciascuno verde sulla propria CI, letta con `gh run list` volta per volta;
-  il commit che porta questa riga viene pushato subito dopo e la sua CI va
-  letta lì, non qui. Prima: `33956931040` (ci) e `33956931033` (docs) su
-  `a8fb905` (2026-09-05); `33622205347` su `1d4581c` (2026-09-02), con
-  `33622223661` (release, sul tag `v1.1.0`). I DB-backed aggiungono **144**
+- **CI verde su `d48f36c`**, la punta di `origin/main` e il commit del tag
+  `v1.2.0`, il 2026-09-17: run `35223803951` (ci), `35223803986` (docs) e
+  `35223806984` (release). Ogni commit del giorno — quattordici prima della
+  1.1.1, quattro dopo — è verde sulla propria CI, letta con `gh run list`
+  volta per volta; il commit che porta questa riga viene pushato subito dopo
+  e la sua CI va letta lì, non qui. Prima: `35211099993` (ci), `35211099069`
+  (docs) e `35211098838` (release) su `2d84db6` (tag `v1.1.1`);
+  `33622205347` su `1d4581c` (2026-09-02), con `33622223661` (release, sul
+  tag `v1.1.0`). I DB-backed aggiungono **144**
   test ai locali della riga sopra: LiveDb 105, Cli acceptance 32, Persistence
   integration 7 — il **1222** della riga sopra. Senza Docker 3
   dei 7 di Persistence integration si skippano da sé. L'exit code di `script`
