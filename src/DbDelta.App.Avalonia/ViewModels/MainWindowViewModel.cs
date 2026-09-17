@@ -452,7 +452,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            AppState.LastError = $"Impossibile caricare il progetto: {ex.Message}";
+            AppState.LastError = ProjectSetupViewModel.CannotLoadProject(ex);
             return;
         }
 

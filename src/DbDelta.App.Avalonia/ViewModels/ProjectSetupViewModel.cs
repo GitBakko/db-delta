@@ -279,6 +279,36 @@ public sealed partial class ProjectSetupViewModel : ObservableObject
         Target.LoadFromEndpoint(project.Target);
     }
 
+    /// <summary>What the dialog's own band shows; null when there is nothing to say.</summary>
+    [ObservableProperty] private string? _lastError;
+
+    /// <summary>The one wording for a project that could not be read — the MRU path and «Carica…» share it.</summary>
+    internal static string CannotLoadProject(Exception ex) => $"Impossibile caricare il progetto: {ex.Message}";
+
+    /// <summary>
+    /// «Carica…»: reads the <c>.dbd</c> at <paramref name="path"/> into this
+    /// instance, and reports a file it cannot read in the dialog's own band.
+    /// </summary>
+    /// <remarks>
+    /// Found by the 2026-09-03 sweep: the read had no catch, so a corrupt or
+    /// foreign file reached the app's last-resort handler, which speaks for a
+    /// SAVE — «non è stato salvato; scegli un altro nome» — and shows it in
+    /// MainWindow, behind the modal still open.
+    /// </remarks>
+    public async Task LoadFromPathAsync(string path)
+    {
+        LastError = null;
+        Persistence.Xml.XmlProjectStore store = new();
+        try
+        {
+            LoadFrom(await store.LoadAsync(path, _lifetime.Token).ConfigureAwait(true));
+        }
+        catch (Exception ex)
+        {
+            LastError = CannotLoadProject(ex);
+        }
+    }
+
     /// <summary>
     /// Constructs a <see cref="ProjectSetupViewModel"/> pre-populated from an
     /// existing project.  Passing <see langword="null"/> returns a blank setup.

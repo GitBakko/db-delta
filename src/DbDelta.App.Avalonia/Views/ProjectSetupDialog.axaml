@@ -13,7 +13,7 @@
         CanResize="True"
         Background="{StaticResource BgBrush}">
 
-  <Grid RowDefinitions="*,Auto">
+  <Grid RowDefinitions="*,Auto,Auto">
 
     <!-- ── Body: data-sources content directly (no tabs) ─────────────────── -->
     <Grid Grid.Row="0" RowDefinitions="Auto,*">
@@ -268,13 +268,26 @@
 
     </Grid>
 
+    <!-- ── Error band: the dialog's own ───────────────────────────────────────
+         A failed «Carica…» used to reach App's last-resort band in MainWindow,
+         BEHIND this modal. Same control as there (CLAUDE.md UI rule #3), no
+         dismiss button: the next «Carica…» clears it. Auto row: zero height
+         while there is no error. -->
+    <c:NoticeBand Grid.Row="1"
+                  Accent="{StaticResource DangerBrush}"
+                  AccentSoft="{StaticResource DangerSoftBrush}"
+                  AccentForeground="{StaticResource DangerFgBrush}"
+                  IconPath="M 8,1 L 15,14 L 1,14 Z M 8,6 L 8,10 M 8,11.6 L 8,12.4"
+                  Message="{Binding LastError}"
+                  IsVisible="{Binding LastError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
     <!-- ── Action bar ─────────────────────────────────────────────────────── -->
     <!-- Three-zone footer (round-9 spec):
          LEFT  : persistence actions   (Salva, Carica)
          MID   : endpoint manipulation (Scambia, Clona)
          RIGHT : modal closure         (OK, Annulla)
          All buttons text-only with semantic colours per CLAUDE.md UI rule #1. -->
-    <Border Grid.Row="1"
+    <Border Grid.Row="2"
             Background="{StaticResource BgMutedBrush}"
             BorderBrush="{StaticResource BorderBrush}"
             BorderThickness="0,1,0,0"

@@ -4,6 +4,7 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using DbDelta.App.ViewModels;
 using DbDelta.App.Views;
+using DbDelta.App.Views.Controls;
 using FluentAssertions;
 
 namespace DbDelta.App.HeadlessTests.Controls;
@@ -53,5 +54,27 @@ public class SetupDialogStatusTextTests
             t.TextLayout.TextLines.Count.Should().BeGreaterThan(1,
                 "a message wider than the panel has to wrap, or its last clause — the one naming the cause — is never seen");
         }
+    }
+
+    [AvaloniaFact]
+    public void A_load_failure_is_shown_inside_the_dialog()
+    {
+        // The wiring for the other 2026-09-03 P2: a failed «Carica…» used to be
+        // reported by the app's last-resort band in MainWindow — BEHIND the
+        // modal still open, and in the words of a save. The dialog now has a
+        // band of its own, bound to LastError.
+        ProjectSetupViewModel setup = new() { IsScanningServers = true, LastError = "Impossibile caricare il progetto: prova" };
+        ProjectSetupDialog dialog = new() { DataContext = setup };
+        dialog.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        NoticeBand band = dialog.GetVisualDescendants().OfType<NoticeBand>()
+                                .Single(b => b.Message == setup.LastError);
+
+        band.IsEffectivelyVisible.Should().BeTrue();
+
+        setup.LastError = null;
+        Dispatcher.UIThread.RunJobs();
+        band.IsEffectivelyVisible.Should().BeFalse("no error, no band");
     }
 }

@@ -2,6 +2,7 @@ using Avalonia.Headless.XUnit;
 using DbDelta.App.ViewModels;
 using DbDelta.Core.Abstractions;
 using FluentAssertions;
+using Xunit;
 
 namespace DbDelta.App.HeadlessTests.ViewModels;
 
@@ -306,5 +307,27 @@ public class ProjectSetupViewModelTests
         string[] servers = [.. vm.Source.ServerSuggestions.Where(s => !s.IsHeaderOnly).Select(s => s.Name)];
         servers.Should().Equal("SRV-A", "SRV-B");
         vm.Target.ServerSuggestions.Should().NotBeEmpty("both panels share the picker");
+    }
+
+    // ── «Carica…» from inside the modal ─────────────────────────────────────
+
+    [Fact]
+    public async Task A_project_file_that_cannot_be_read_is_reported_in_the_words_of_a_load()
+    {
+        // From the 2026-09-03 sweep: the dialog's «Carica…» ran store.LoadAsync
+        // with no try/catch, so a corrupt or foreign .dbd reached the app's
+        // last-resort handler, whose words are the SAVE's — «Il progetto non è
+        // stato salvato; riprova o scegli un altro nome» — for a user who was
+        // saving nothing and had been asked for no name. The right words for
+        // the same failure already existed on the MRU path.
+        string path = Path.Combine(Path.GetTempPath(), $"dbdelta-{Guid.NewGuid():N}.dbd");
+        await File.WriteAllTextAsync(path, "<not-a-project>", TestContext.Current.CancellationToken);
+        ProjectSetupViewModel vm = new();
+
+        await vm.LoadFromPathAsync(path);
+
+        vm.LastError.Should().StartWith("Impossibile caricare il progetto");
+        vm.LastError.Should().NotContain("salvato", "nothing was being saved");
+        File.Delete(path);
     }
 }

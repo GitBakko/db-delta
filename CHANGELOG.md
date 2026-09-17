@@ -96,6 +96,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   window wide, cut mid-word with nothing to say so — the generic preamble was
   visible, the final clause naming the cause never was. The four status lines
   of **Nuovo progetto** now wrap.
+- **A project file that cannot be read is reported inside the dialog, as a
+  load.** «Carica…» in **Nuovo progetto** had no error handling of its own, so
+  a corrupt or foreign `.dbd` reached the app's last-resort message — «Il
+  progetto non è stato salvato; riprova o scegli un altro nome», for a user
+  who was saving nothing — shown in the main window, behind the dialog still
+  open. The dialog now has a band of its own: «Impossibile caricare il
+  progetto: …», the same words the recent-projects list already used.
 
 ## [1.1.0] — 2026-09-02 — the deploy stops writing statements that mean something else
 

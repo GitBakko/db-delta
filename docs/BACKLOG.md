@@ -17,12 +17,13 @@ vedi «Manutenzione» in fondo.
   installazione vero** — installa, verifica app, CLI e PATH di macchina,
   disinstalla, verifica che sia sparito. La v1.0.2 (2026-08-13) resta la
   precedente.
-- **1065 test verdi** nei sette progetti che girano senza Docker (Core 630,
-  Headless 252, Persistence.Unit 91, Golden 68, Property 12, Architecture 6,
+- **1067 test verdi** nei sette progetti che girano senza Docker (Core 630,
+  Headless 254, Persistence.Unit 91, Golden 68, Property 12, Architecture 6,
   Shared 6) — ricontati il 2026-09-17, non incrementati a mente. I due di
   Headless del 2026-09-17 chiudono la P4 dell'OK premuto a caricamento in volo,
   uno è il controllo in negativo su Annulla; il terzo chiude la P2 dell'errore
-  di connessione tagliato. I
+  di connessione tagliato, il quarto e il quinto quella di «Carica» che parlava
+  di salvataggio. I
   trentanove di Headless dal 2026-09-03 al 09-05: quattro sono la chiusura
   della segnalazione, nove la P1 della stringa di connessione, sette quella del
   ciclo di vita della modale, l'azzeramento delle credenziali ne aggiunge due
@@ -51,7 +52,7 @@ vedi «Manutenzione» in fondo.
   giri della suite intera non è misurato, e il tetto da 30 s è il soffitto
   dichiarato, non un'asserzione sul tempo. Sonda: tolto il riarmo in
   `OnAuthModeChanged`, i due positivi cadono per `TimeoutException`.
-  **Con Docker acceso girano anche i tre DB-backed** e il totale è **1206**
+  **Con Docker acceso girano anche i tre DB-backed** e il totale è **1208**
   (LiveDb 105, Cli acceptance 29, Persistence integration 7) — misurato il
   2026-09-17, tutti verdi. **Due** dei tre vanno **rossi**, non skipped, con Docker
   spento — LiveDb e Cli acceptance, che costruiscono il container in un
@@ -60,19 +61,19 @@ vedi «Manutenzione» in fondo.
   serve**: stampa l'intestazione anche a daemon morto. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **6 voci aperte** — **P1 0 · P2 1 · P3 1 · P4 3** · P5 1 — più **23** in
+- **5 voci aperte** — **P1 0 · P2 0 · P3 1 · P4 3** · P5 1 — più **23** in
   «Deciso — NON riaprire». **P1 è vuota**: le tre voci che la segnalazione del
   2026-09-03 aveva aperto sono chiuse tutte, `e9821a7` (stringa di connessione),
   `85f5d4c` (ciclo di vita della modale) e `cb01e7a` (azzeramento delle
   credenziali) — scelta del proprietario di allargare l'ambito della 1.1.1
-  alle P1 invece di rilasciare le sole due bloccanti. **Quattro delle sei le ha
+  alle P1 invece di rilasciare le sole due bloccanti. **Tre delle cinque le ha
   aperte quella stessa segnalazione**; una è d'igiene e l'ha aperta `85f5d4c`
   (`ProjectEndpointPanelViewModel` è cresciuto, e `CLAUDE.md` vuole una voce
   invece del silenzio); **della review adversariale del 2026-09-05** sui
   quattro commit della 1.1.1 non resta nulla: la scrittura di credenziale
   scartata a OK (P4) è **chiusa il 2026-09-17** per decisione del proprietario
   — fix XS, non compromesso dichiarato — e la P3 del riarmo che muore al cambio
-  di `AuthMode` **è entrata nella 1.1.1** ed è chiusa da `89842f5`; la sesta
+  di `AuthMode` **è entrata nella 1.1.1** ed è chiusa da `89842f5`; la quinta
   è del proprietario, sulla selezione oggetti da CLI, ferma dal 2026-09-02 e
   **decisa il 2026-09-17: `--exclude <pattern>`**, da fare dopo il tag della 1.1.1.
   **Il backlog non ha più alcuna voce dichiarata non verificata**: l'ultima —
@@ -116,8 +117,8 @@ vedi «Manutenzione» in fondo.
   `dbdelta script --no-transaction`, **verificata dal vivo** lo stesso giorno.
   **Quella riga diceva «nessuna voce aperta descrive un difetto», ed è durata
   un giorno**: il 2026-09-03 il proprietario ha installato la v1.1.0 e la
-  modale di nuovo progetto era inservibile. **Quattro voci aperte su sei
-  descrivono un difetto**, e nessuna delle sei l'ha trovata un test — le prime
+  modale di nuovo progetto era inservibile. **Tre voci aperte su cinque
+  descrivono un difetto**, e nessuna delle cinque l'ha trovata un test — le prime
   due un utente sul build installato, le altre lo sweep partito da quelle.
   L'estrazione di `DeployPreflight` — aperta il 2026-09-01 solo
   perché `CLAUDE.md` impone di aprire una voce invece di far crescere un file in
@@ -466,7 +467,7 @@ due il 2026-09-03, la terza il 2026-09-05. **P1 non ha più voci aperte**:
 Sei voci chiuse il 2026-08-20, una il 2026-09-01, **due il 2026-09-02** —
 queste aperte dallo smoke dal vivo e chiuse dal commit che porta le loro righe —
 **una il 2026-09-05**, l'ultima voce del backlog che era rimasta senza
-verdetto, e **una il 2026-09-17**, per decisione del proprietario dentro la
+verdetto, e **due il 2026-09-17**, per decisione del proprietario dentro la
 1.1.1:
 
 | Voce chiusa | Come | Prova |
@@ -482,16 +483,13 @@ verdetto, e **una il 2026-09-17**, per decisione del proprietario dentro la
 | «Tieni premuto per mostrare la password» non rimascherava se la pressione finiva senza un `PointerReleased` | **Riprodotta prima di correggere, ed è vera.** La sonda preme con input headless **reale** (`Window.MouseDown` / `MouseUp` di `Avalonia.Headless`, non un evento sintetizzato), poi toglie la cattura con `e.Pointer.Capture(null)` invece di rilasciare: `PasswordChar` restava `'\0'`, cioè la password in chiaro sullo schermo con nessuno che tiene premuto nulla, per il resto della vita del dialogo. Rimedio: un handler di `PointerCaptureLost` che rimaschera, e i due percorsi condividono ora un `Mask()` solo. **`RoutingStrategies.Direct` e NON `Tunnel`, e non è stile**: `PointerCaptureLost` è registrato come evento diretto, quindi un handler in tunnel non viene mai invocato — il fix sembrerebbe applicato e non farebbe niente. Misurato, non dedotto: è la sonda di mutazione qui accanto | `PasswordRevealCaptureTests` — 2 test, e **il primo è il controllo in negativo, scritto per primo di proposito**: una pressione rivela davvero e un rilascio rimaschera davvero. Senza di lui una sonda la cui pressione non atterra «dimostrerebbe» qualunque conclusione — è la lezione della sonda del 2026-09-03 sul template, presa dal verso della cattura. Il test della cattura persa **falliva prima** del rimedio con `Expected PasswordChar to be •, but found` (il carattere nullo) e passa dopo. **Sonda di mutazione: `Direct` → `Tunnel`, uccide il test e lascia verde il controllo**, che è esattamente la firma di un rimedio inerte |
 | `rolledBack` non distingueva i due casi per cui esiste | **Chiusa nominando l'esito invece di lasciarlo dedurre.** `apply` emette ora `targetState`: `applied`, `unchanged` (rollback eseguito e confermato), `partial` (nessuna transazione, i batch prima del fallimento restano) e `unknown` — e `unknown` è il punto: dove il client **non può sapere**, il campo non prende in prestito la risposta del vicino. Il campo è **additivo**, nessun consumatore esistente si rompe. `docfx/articles/cli.md` ha ora una sezione che dice a chiare lettere cosa `rolledBack` **non** promette, con la misura del 2026-09-02 in tabella: stesso script, stesso `Msg 208`, `false` in entrambi i casi, **0** oggetti rimasti con l'envelope e **1599** senza. Il campo `rolledBack` resta invariato nel significato e nel valore: la retrocompatibilità non si tocca, si aggiunge ciò che mancava | `ApplyCommandTests` — i tre esiti, uno per test, e **il terzo scritto perché lo smoke ci è finito dentro**: `A_self_managed_script_that_fails_reports_an_outcome_it_cannot_confirm` asserisce `"transaction": "script"`, `"rolledBack": false`, `"targetState": "unknown"` **e** che l'oggetto del primo batch non c'è più — cioè esattamente la ragione per cui `false` non va letto come «il bersaglio ha tenuto». Gli altri due sono asserzioni aggiunte ai test che già coprivano `client` e `none` |
 | L'errore di connessione non andava a capo: tagliato a metà parola, niente lo segnalava | **`TextWrapping="Wrap"` sui quattro TextBlock di stato — un attributo per elemento, come diceva la voce, e i due `ScrollViewer` non si toccano**: con lo scorrimento orizzontale disabilitato il pannello vincola la larghezza, e un testo che va a capo ci sta dentro da sé. Nessun `TextTrimming`: con i puntini la clausola finale — l'unica che nomina la causa — sparirebbe lo stesso, solo con più garbo. Stile condiviso non estratto di proposito: i due pannelli sono la copia-incolla della P3 aperta, e la quinta riga identica va via con quella, non prima | `SetupDialogStatusTextTests.A_long_status_message_is_laid_out_on_more_than_one_line` — headless, il dialogo vero con il messaggio SqlClient tipico (~280 caratteri) in tutte e quattro le righe di stato, e asserisce `TextLayout.TextLines.Count > 1` su ognuna: il fatto, non l'attributo. **RED misurato prima del codice** («found 1») e di nuovo dopo aver cambiato la fixture: la prima versione contava 2 righe invece di 4, perché `Opened` lancia la scansione che scrive «Scansione in corso…» sopra le due di scan — `IsScanningServers = true` prima di `Show` la tiene ferma. Il RED è la sonda: tolti i quattro attributi il test cade, e un attributo mancante su uno solo lo fa cadere lo stesso |
+| Un fallimento di «Carica» dentro la modale veniva riportato con le parole del salvataggio, in una banda dietro la modale | **Il caricamento e il suo fallimento stanno nel view model**: `ProjectSetupViewModel.LoadFromPathAsync` fa `store.LoadAsync` + `LoadFrom` dentro un `try`/`catch` e scrive `LastError` con le parole di un caricamento — `CannotLoadProject(ex)`, **una sola copia**, che ora usa anche `MainWindowViewModel:455` per l'MRU (era la stessa stringa interpolata due volte, regola UI #3). `OnLoadClick` resta `async void` ma non ha più nulla da lanciare: picker, poi la chiamata. **La banda è del dialogo**: una `NoticeBand` danger sopra il footer — lo stesso controllo di `MainWindow`, non una copia — legata a `LastError`, riga `Auto` che collassa a zero senza errore, senza pulsante di chiusura: il prossimo «Carica…» la azzera. `App.ReportUnhandled` non è toccato: le sue parole restano quelle del salvataggio, che è l'unico chiamante rimasto a raggiungerlo da questo dialogo | `ProjectSetupViewModelTests.A_project_file_that_cannot_be_read_is_reported_in_the_words_of_a_load` — un `.dbd` con `<not-a-project>` dentro, `LastError` inizia con «Impossibile caricare il progetto» e non contiene «salvato»; **RED misurato prima del codice** con lo scheletro senza `catch`: `XmlException` che scappa, cioè il difetto. `SetupDialogStatusTextTests.A_load_failure_is_shown_inside_the_dialog` è il cablaggio — il dialogo vero, la `NoticeBand` con quel messaggio è `IsEffectivelyVisible`, e collassa quando `LastError` torna null; RED: «Sequence contains no matching element». Il percorso click → picker → `LoadFromPathAsync` resta **coperto per ispezione**: il picker è una modale che l'headless non pilota |
 
-**Tre voci nuove il 2026-09-03**, dallo sweep sulla modale. La terza era
-**l'unica voce del backlog dichiarata non verificata**; il 2026-09-05 è stata
-riprodotta e **chiusa**, e la prima — l'errore tagliato — è chiusa il
-2026-09-17, entrambe dal commit che porta la loro riga qui sopra. Ne resta
-una aperta, **anche lei dentro la 1.1.1** per decisione del proprietario:
-
-| Voce | Reg. | Sforzo | Stato reale |
-|---|---|---|---|
-| **Un fallimento di «Carica» dentro la modale viene riportato con le parole del salvataggio: «Il progetto non è stato salvato; riprova o scegli un altro nome.»** `App.ReportUnhandled` è l'unico formattatore di ultima istanza e cabla parole da salvataggio, ma `OnLoadClick` è `async void` e la sua `store.LoadAsync` non ha alcun `try`/`catch`: l'eccezione viene ripostata sul dispatcher e finisce lì. All'utente viene detto che il progetto non è stato salvato — mentre non stava salvando nulla — e di scegliere un altro nome, che non gli era stato chiesto. Le parole giuste per lo **stesso** fallimento esistono già nel repo per il percorso MRU, che quella chiamata la incapsula. Fattispecie reali: XML corrotto o estraneo, documento senza radice, file bloccato o illeggibile, parse legacy v1 fallito — non «file assente», che l'MRU pota già con `File.Exists`. **Aggravante**: la banda che mostra il testo sta in `MainWindow`, cioè **dietro** la modale ancora aperta | 2026-09-03 | S | `App.axaml.cs:182`; `Views/ProjectSetupDialog.axaml.cs:127` (`async void`) e `:144` (la `LoadAsync` nuda). Le parole giuste sono a `ViewModels/MainWindowViewModel.cs:455`. La banda è `Views/MainWindow.axaml:301` |
+**Tre voci nuove il 2026-09-03**, dallo sweep sulla modale, **tutte chiuse**:
+la terza — l'unica voce del backlog dichiarata non verificata — riprodotta e
+chiusa il 2026-09-05, le prime due il 2026-09-17 per decisione del proprietario
+dentro la 1.1.1, ognuna dal commit che porta la sua riga qui sopra. **P2 è
+vuota.**
 
 
 ---

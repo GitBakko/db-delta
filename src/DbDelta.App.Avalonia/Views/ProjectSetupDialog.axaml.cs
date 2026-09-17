@@ -126,6 +126,8 @@ public partial class ProjectSetupDialog : Window
 
     private async void OnLoadClick(object? sender, RoutedEventArgs e)
     {
+        if (DataContext is not ProjectSetupViewModel vm) { return; }
+
         // Round-7 UX: show the MRU dialog (with browse-from-disk fallback)
         // instead of jumping straight into the OS file picker.
         var recents =
@@ -139,14 +141,9 @@ public partial class ProjectSetupDialog : Window
         string? pickedPath = await loadDialog.ShowDialog<string?>(this).ConfigureAwait(true);
         if (string.IsNullOrWhiteSpace(pickedPath)) { return; }
 
-        Persistence.Xml.XmlProjectStore store = new();
-        DbDeltaProject project =
-            await store.LoadAsync(pickedPath, CancellationToken.None)
-                       .ConfigureAwait(true);
-
-        if (DataContext is ProjectSetupViewModel vm)
-        {
-            vm.LoadFrom(project);
-        }
+        // The read and its failure both live in the view model: a file that
+        // cannot be read is reported in the dialog's own band, in the words of
+        // a load — not by App's last-resort handler, behind this window.
+        await vm.LoadFromPathAsync(pickedPath).ConfigureAwait(true);
     }
 }
