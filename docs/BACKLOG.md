@@ -15,8 +15,10 @@ vedi «Manutenzione» in fondo.
   CLI (additivo → MINOR), il contatore «(N trovati)», il refactor della
   modale. **Non smoked sull'installato prima del tag, per scelta del
   proprietario**: i tre cambi sono coperti dal dialogo vero in headless e da
-  acceptance attraverso il processo; la MSI pubblicata resta da provare a
-  mano. Il workflow `release` è guidato dal tag e la versione viene da lì:
+  acceptance attraverso il processo; **la MSI pubblicata è stata provata a
+  mano dal proprietario dopo la pubblicazione, la sera stessa: tutto a posto**
+  (Nuovo progetto, server, lista e contatore; `script --exclude`). Il
+  workflow `release` è guidato dal tag e la versione viene da lì:
   non esiste nessun file di versione da bumpare. Tutti e undici i suoi step
   verdi, **incluso lo smoke di installazione vero**. La v1.1.1 (2026-09-17,
   `2d84db6`, 99.389.576 byte, sedici fix sulla modale, smoked su tre MSI)
