@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using DbDelta.App.ViewModels;
 using DbDelta.App.Views;
 using DbDelta.App.Views.Controls;
@@ -30,7 +31,7 @@ public class ServerPickerTests
 
     private static (ServerPicker Picker, ComboBox List, TextBox Box) Parts(ProjectSetupDialog dlg)
     {
-        ServerPicker picker = dlg.FindControl<ServerPicker>("SrcServerPicker")!;
+        ServerPicker picker = dlg.GetVisualDescendants().OfType<ServerPicker>().First();
         return (picker,
                 picker.FindControl<ComboBox>("PART_ServerList")!,
                 picker.FindControl<TextBox>("PART_ServerName")!);

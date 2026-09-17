@@ -4,6 +4,9 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using DbDelta.App.ViewModels;
+using DbDelta.App.Views;
+using DbDelta.App.Views.Controls;
 using Xunit;
 using FluentAssertions;
 
@@ -108,5 +111,30 @@ public class UiInvariantTests
 
         swap.Width.Should().Be(36);
         swap.Height.Should().Be(36);
+    }
+
+    /// <summary>
+    /// Rule #3, on the one place it was broken by 85 lines: the two endpoint
+    /// panels of the setup dialog are ONE control, hosted twice. Measured on
+    /// 2026-09-03, the two copies differed on a single line and had already
+    /// started to drift; every fix of 2026-09-17 to those lines had to be made
+    /// twice. Without this test a third copy, or a second one put back, would
+    /// pass the whole suite.
+    /// </summary>
+    [AvaloniaFact]
+    public void The_setup_dialog_hosts_one_endpoint_panel_control_twice()
+    {
+        ProjectSetupViewModel setup = new() { IsScanningServers = true };
+        ProjectSetupDialog dialog = new() { DataContext = setup };
+        dialog.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        List<EndpointPanel> panels = [.. dialog.GetVisualDescendants().OfType<EndpointPanel>()];
+
+        panels.Should().HaveCount(2, "source and target, and nothing else draws those fields");
+        panels[0].DataContext.Should().BeSameAs(setup.Source);
+        panels[1].DataContext.Should().BeSameAs(setup.Target);
+        panels.Select(p => p.ScanCommandParameter).Should().Equal("source", "target");
+        dialog.GetVisualDescendants().OfType<ServerPicker>().Should().HaveCount(2, "one picker per panel, none inline");
     }
 }

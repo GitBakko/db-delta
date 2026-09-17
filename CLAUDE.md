@@ -8,13 +8,14 @@
 - NEVER save working files or tests to root — use `/src`, `/tests`, `/docs`, `/scripts`, `/bench`, `/docfx`
 - ALWAYS read a file before editing it
 - NEVER commit secrets, credentials, or .env files
-- Keep NEW files under 500 lines. Six existing ones are already over —
-  measured 2026-09-02, `wc -l`, not remembered: ScriptGenerator 1352,
-  MainWindowViewModel 1208, TableScriptEmitter 1004, LiveDbObjectBodyResolver
-  845, ComparisonEngine 741, ProjectEndpointPanelViewModel 689. Do not grow
-  them without opening an item in `docs/BACKLOG.md`. These numbers age like
-  any other: **four of the six drifted in one day** the last time they were
-  checked — re-measure before quoting them
+- Keep NEW files under 500 lines. Five existing ones are already over —
+  measured 2026-09-17, `wc -l`, not remembered: ScriptGenerator 1352,
+  MainWindowViewModel 1215, TableScriptEmitter 1004, LiveDbObjectBodyResolver
+  850, ComparisonEngine 741. `ProjectEndpointPanelViewModel` left the list
+  that day, split into three partial files (420/233/255) after growing to 884.
+  Do not grow them without opening an item in `docs/BACKLOG.md`. These
+  numbers age like any other: **four of the six drifted in one day** the
+  last time they were checked — re-measure before quoting them
 - Validate input at system boundaries
 
 ## Single source of truth — FUNDAMENTAL

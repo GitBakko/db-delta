@@ -192,7 +192,7 @@ public class ModalLifetimeTests
         // «yes, this pair»: it writes it itself, before the close.
         RecordingCredentialStore store = new();
         ProjectSetupViewModel setup = new(store);
-        ProjectSetupDialog dialog = ShownWithATypedPairAndALoadInFlight(setup);
+        ProjectSetupDialog dialog = ShownWithATypedPairAndALoadInFlight(setup, "typed-then-ok");
 
         Press(dialog, b => b.IsDefault);
 
@@ -207,7 +207,7 @@ public class ModalLifetimeTests
         // the exact thing the hook exists to prevent.
         RecordingCredentialStore store = new();
         ProjectSetupViewModel setup = new(store);
-        ProjectSetupDialog dialog = ShownWithATypedPairAndALoadInFlight(setup);
+        ProjectSetupDialog dialog = ShownWithATypedPairAndALoadInFlight(setup, "typed-then-annulla");
 
         Press(dialog, b => b.IsCancel);
 
@@ -215,13 +215,18 @@ public class ModalLifetimeTests
         store.Deletes.Should().BeEmpty();
     }
 
-    private static ProjectSetupDialog ShownWithATypedPairAndALoadInFlight(ProjectSetupViewModel setup)
+    private static ProjectSetupDialog ShownWithATypedPairAndALoadInFlight(ProjectSetupViewModel setup, string password)
     {
-        // Its own password: the physical attempt outlives the close and blocks
-        // that pool for 5 s, see Closing_the_dialog_stops_a_load_already_in_flight.
+        // A password of its own PER TEST, not per fixture: the physical attempt
+        // outlives the close, fails ~10 s later and blocks that pool for 5 s —
+        // and a pool is keyed on the whole string. With one password shared by
+        // the OK and the Annulla tests, the second one's OpenAsync failed at once
+        // inside the first one's blocking period, and «in flight» was false
+        // before the assertion: seen once under the full suite on 2026-09-17,
+        // never standalone. See Closing_the_dialog_stops_a_load_already_in_flight.
         setup.Source.ServerName = Server;
         setup.Source.UserName = "sa";
-        setup.Source.Password = "typed-then-ok";
+        setup.Source.Password = password;
         setup.Source.DatabaseName = "db";
         setup.Source.RememberCredentials = true;
 

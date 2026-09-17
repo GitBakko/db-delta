@@ -39,22 +39,6 @@ public partial class ProjectSetupDialog : Window
         Closed += (_, _) => (DataContext as ProjectSetupViewModel)?.CancelPendingWork();
     }
 
-    // ── Database chevron clicks ───────────────────────────────────────────────
-
-    private void OnSrcDatabaseDropToggleClick(object? sender, RoutedEventArgs e)
-        => ToggleDropdown("SrcDatabaseBox");
-
-    private void OnTgtDatabaseDropToggleClick(object? sender, RoutedEventArgs e)
-        => ToggleDropdown("TgtDatabaseBox");
-
-    private void ToggleDropdown(string boxName)
-    {
-        AutoCompleteBox? box = this.FindControl<AutoCompleteBox>(boxName);
-        if (box is null) { return; }
-        box.Focus();
-        box.IsDropDownOpen = !box.IsDropDownOpen;
-    }
-
     // ── Action bar ────────────────────────────────────────────────────────────
 
     private void OnCancelClick(object? sender, RoutedEventArgs e) => Close(null);
