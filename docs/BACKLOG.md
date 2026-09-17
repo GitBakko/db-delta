@@ -17,11 +17,12 @@ vedi «Manutenzione» in fondo.
   installazione vero** — installa, verifica app, CLI e PATH di macchina,
   disinstalla, verifica che sia sparito. La v1.0.2 (2026-08-13) resta la
   precedente.
-- **1064 test verdi** nei sette progetti che girano senza Docker (Core 630,
-  Headless 251, Persistence.Unit 91, Golden 68, Property 12, Architecture 6,
+- **1065 test verdi** nei sette progetti che girano senza Docker (Core 630,
+  Headless 252, Persistence.Unit 91, Golden 68, Property 12, Architecture 6,
   Shared 6) — ricontati il 2026-09-17, non incrementati a mente. I due di
   Headless del 2026-09-17 chiudono la P4 dell'OK premuto a caricamento in volo,
-  uno è il controllo in negativo su Annulla. I
+  uno è il controllo in negativo su Annulla; il terzo chiude la P2 dell'errore
+  di connessione tagliato. I
   trentanove di Headless dal 2026-09-03 al 09-05: quattro sono la chiusura
   della segnalazione, nove la P1 della stringa di connessione, sette quella del
   ciclo di vita della modale, l'azzeramento delle credenziali ne aggiunge due
@@ -50,7 +51,7 @@ vedi «Manutenzione» in fondo.
   giri della suite intera non è misurato, e il tetto da 30 s è il soffitto
   dichiarato, non un'asserzione sul tempo. Sonda: tolto il riarmo in
   `OnAuthModeChanged`, i due positivi cadono per `TimeoutException`.
-  **Con Docker acceso girano anche i tre DB-backed** e il totale è **1205**
+  **Con Docker acceso girano anche i tre DB-backed** e il totale è **1206**
   (LiveDb 105, Cli acceptance 29, Persistence integration 7) — misurato il
   2026-09-17, tutti verdi. **Due** dei tre vanno **rossi**, non skipped, con Docker
   spento — LiveDb e Cli acceptance, che costruiscono il container in un
@@ -59,20 +60,21 @@ vedi «Manutenzione» in fondo.
   serve**: stampa l'intestazione anche a daemon morto. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **7 voci aperte** — **P1 0 · P2 2 · P3 1 · P4 3** · P5 1 — più **23** in
+- **6 voci aperte** — **P1 0 · P2 1 · P3 1 · P4 3** · P5 1 — più **23** in
   «Deciso — NON riaprire». **P1 è vuota**: le tre voci che la segnalazione del
   2026-09-03 aveva aperto sono chiuse tutte, `e9821a7` (stringa di connessione),
   `85f5d4c` (ciclo di vita della modale) e `cb01e7a` (azzeramento delle
   credenziali) — scelta del proprietario di allargare l'ambito della 1.1.1
-  alle P1 invece di rilasciare le sole due bloccanti. **Cinque delle sette le ha
+  alle P1 invece di rilasciare le sole due bloccanti. **Quattro delle sei le ha
   aperte quella stessa segnalazione**; una è d'igiene e l'ha aperta `85f5d4c`
   (`ProjectEndpointPanelViewModel` è cresciuto, e `CLAUDE.md` vuole una voce
   invece del silenzio); **della review adversariale del 2026-09-05** sui
   quattro commit della 1.1.1 non resta nulla: la scrittura di credenziale
   scartata a OK (P4) è **chiusa il 2026-09-17** per decisione del proprietario
   — fix XS, non compromesso dichiarato — e la P3 del riarmo che muore al cambio
-  di `AuthMode` **è entrata nella 1.1.1** ed è chiusa da `89842f5`; la settima
-  è del proprietario, sulla selezione oggetti da CLI, ferma dal 2026-09-02.
+  di `AuthMode` **è entrata nella 1.1.1** ed è chiusa da `89842f5`; la sesta
+  è del proprietario, sulla selezione oggetti da CLI, ferma dal 2026-09-02 e
+  **decisa il 2026-09-17: `--exclude <pattern>`**, da fare dopo il tag della 1.1.1.
   **Il backlog non ha più alcuna voce dichiarata non verificata**: l'ultima —
   il ripristino della maschera dopo «tieni premuto per mostrare» — è stata
   riprodotta il 2026-09-05 e chiusa (`e9abc18`), e il meccanismo era quello
@@ -114,8 +116,8 @@ vedi «Manutenzione» in fondo.
   `dbdelta script --no-transaction`, **verificata dal vivo** lo stesso giorno.
   **Quella riga diceva «nessuna voce aperta descrive un difetto», ed è durata
   un giorno**: il 2026-09-03 il proprietario ha installato la v1.1.0 e la
-  modale di nuovo progetto era inservibile. **Cinque voci aperte su sette
-  descrivono un difetto**, e nessuna delle sette l'ha trovata un test — le prime
+  modale di nuovo progetto era inservibile. **Quattro voci aperte su sei
+  descrivono un difetto**, e nessuna delle sei l'ha trovata un test — le prime
   due un utente sul build installato, le altre lo sweep partito da quelle.
   L'estrazione di `DeployPreflight` — aperta il 2026-09-01 solo
   perché `CLAUDE.md` impone di aprire una voce invece di far crescere un file in
@@ -463,8 +465,9 @@ due il 2026-09-03, la terza il 2026-09-05. **P1 non ha più voci aperte**:
 
 Sei voci chiuse il 2026-08-20, una il 2026-09-01, **due il 2026-09-02** —
 queste aperte dallo smoke dal vivo e chiuse dal commit che porta le loro righe —
-e **una il 2026-09-05**, l'ultima voce del backlog che era rimasta senza
-verdetto:
+**una il 2026-09-05**, l'ultima voce del backlog che era rimasta senza
+verdetto, e **una il 2026-09-17**, per decisione del proprietario dentro la
+1.1.1:
 
 | Voce chiusa | Come | Prova |
 |---|---|---|
@@ -478,15 +481,16 @@ verdetto:
 | Il rifiuto sull'utente orfano attribuiva la causa sbagliata | **Il rifiuto resta, cambiano le parole — e la ragione per cui resta è stata misurata, non assunta.** Non esiste istruzione che riproduca un utente orfano: `CREATE USER … WITHOUT LOGIN` atterra su `authentication_type` NONE dove la sorgente ha INSTANCE, quindi non convergerebbe nemmeno. Il modello aveva **un bit per due stati**; ora `DatabaseUser.LoginIsOrphaned` li separa con l'unico predicato che può separarli — `HAS_PERMS_BY_NAME(NULL, NULL, 'VIEW ANY DEFINITION')`: se la connessione **avrebbe visto** il login, allora quel NULL è un'assenza, non un velo. Nel caso ambiguo resta la lettura conservativa. Corretti tutti e **quattro** i testi che dicevano la cosa sbagliata: il messaggio dell'eccezione, la rimediazione della CLI, quella della GUI e il testo del pannello diff. **La CLI smette di nominare un'azione che non ha**: non può escludere un oggetto, quindi non lo suggerisce più — dice di ricreare il login o eliminare l'utente orfano, che sul server si può fare davvero. La GUI tiene «togli l'utente dalla selezione» perché lì è possibile. **La query aveva due copie** (`UserReader` e `LiveDbObjectBodyResolver`), la forma che il pannello diff aveva già pagato una volta: toccate entrambe nello stesso commit | `CatalogVisibilityTests.An_orphaned_login_is_told_apart_from_one_merely_hidden` — **il controllo è dentro il test**: lo STESSO utente orfano letto due volte, da un account con `VIEW ANY DEFINITION` e da uno senza. Entrambi vedono `LoginNameIsHidden` true — il verdetto non si muove — e solo `LoginIsOrphaned` li separa. **Sonda di mutazione: una, uccisa** — tolto il predicato, cade l'asserzione della sonda a privilegio minimo. Più 3 unit in `HiddenLoginNameTests`, fra cui il controllo che un orfano **non** diventa Different |
 | «Tieni premuto per mostrare la password» non rimascherava se la pressione finiva senza un `PointerReleased` | **Riprodotta prima di correggere, ed è vera.** La sonda preme con input headless **reale** (`Window.MouseDown` / `MouseUp` di `Avalonia.Headless`, non un evento sintetizzato), poi toglie la cattura con `e.Pointer.Capture(null)` invece di rilasciare: `PasswordChar` restava `'\0'`, cioè la password in chiaro sullo schermo con nessuno che tiene premuto nulla, per il resto della vita del dialogo. Rimedio: un handler di `PointerCaptureLost` che rimaschera, e i due percorsi condividono ora un `Mask()` solo. **`RoutingStrategies.Direct` e NON `Tunnel`, e non è stile**: `PointerCaptureLost` è registrato come evento diretto, quindi un handler in tunnel non viene mai invocato — il fix sembrerebbe applicato e non farebbe niente. Misurato, non dedotto: è la sonda di mutazione qui accanto | `PasswordRevealCaptureTests` — 2 test, e **il primo è il controllo in negativo, scritto per primo di proposito**: una pressione rivela davvero e un rilascio rimaschera davvero. Senza di lui una sonda la cui pressione non atterra «dimostrerebbe» qualunque conclusione — è la lezione della sonda del 2026-09-03 sul template, presa dal verso della cattura. Il test della cattura persa **falliva prima** del rimedio con `Expected PasswordChar to be •, but found` (il carattere nullo) e passa dopo. **Sonda di mutazione: `Direct` → `Tunnel`, uccide il test e lascia verde il controllo**, che è esattamente la firma di un rimedio inerte |
 | `rolledBack` non distingueva i due casi per cui esiste | **Chiusa nominando l'esito invece di lasciarlo dedurre.** `apply` emette ora `targetState`: `applied`, `unchanged` (rollback eseguito e confermato), `partial` (nessuna transazione, i batch prima del fallimento restano) e `unknown` — e `unknown` è il punto: dove il client **non può sapere**, il campo non prende in prestito la risposta del vicino. Il campo è **additivo**, nessun consumatore esistente si rompe. `docfx/articles/cli.md` ha ora una sezione che dice a chiare lettere cosa `rolledBack` **non** promette, con la misura del 2026-09-02 in tabella: stesso script, stesso `Msg 208`, `false` in entrambi i casi, **0** oggetti rimasti con l'envelope e **1599** senza. Il campo `rolledBack` resta invariato nel significato e nel valore: la retrocompatibilità non si tocca, si aggiunge ciò che mancava | `ApplyCommandTests` — i tre esiti, uno per test, e **il terzo scritto perché lo smoke ci è finito dentro**: `A_self_managed_script_that_fails_reports_an_outcome_it_cannot_confirm` asserisce `"transaction": "script"`, `"rolledBack": false`, `"targetState": "unknown"` **e** che l'oggetto del primo batch non c'è più — cioè esattamente la ragione per cui `false` non va letto come «il bersaglio ha tenuto». Gli altri due sono asserzioni aggiunte ai test che già coprivano `client` e `none` |
+| L'errore di connessione non andava a capo: tagliato a metà parola, niente lo segnalava | **`TextWrapping="Wrap"` sui quattro TextBlock di stato — un attributo per elemento, come diceva la voce, e i due `ScrollViewer` non si toccano**: con lo scorrimento orizzontale disabilitato il pannello vincola la larghezza, e un testo che va a capo ci sta dentro da sé. Nessun `TextTrimming`: con i puntini la clausola finale — l'unica che nomina la causa — sparirebbe lo stesso, solo con più garbo. Stile condiviso non estratto di proposito: i due pannelli sono la copia-incolla della P3 aperta, e la quinta riga identica va via con quella, non prima | `SetupDialogStatusTextTests.A_long_status_message_is_laid_out_on_more_than_one_line` — headless, il dialogo vero con il messaggio SqlClient tipico (~280 caratteri) in tutte e quattro le righe di stato, e asserisce `TextLayout.TextLines.Count > 1` su ognuna: il fatto, non l'attributo. **RED misurato prima del codice** («found 1») e di nuovo dopo aver cambiato la fixture: la prima versione contava 2 righe invece di 4, perché `Opened` lancia la scansione che scrive «Scansione in corso…» sopra le due di scan — `IsScanningServers = true` prima di `Show` la tiene ferma. Il RED è la sonda: tolti i quattro attributi il test cade, e un attributo mancante su uno solo lo fa cadere lo stesso |
 
 **Tre voci nuove il 2026-09-03**, dallo sweep sulla modale. La terza era
 **l'unica voce del backlog dichiarata non verificata**; il 2026-09-05 è stata
-riprodotta e **chiusa**, dal commit che porta la sua riga qui sotto. Ne restano
-due aperte:
+riprodotta e **chiusa**, e la prima — l'errore tagliato — è chiusa il
+2026-09-17, entrambe dal commit che porta la loro riga qui sopra. Ne resta
+una aperta, **anche lei dentro la 1.1.1** per decisione del proprietario:
 
 | Voce | Reg. | Sforzo | Stato reale |
 |---|---|---|---|
-| **L'errore di connessione non va a capo e non è troncato con puntini: viene tagliato a metà parola e niente lo segnala.** Il testo tipico — «A network-related or instance-specific error occurred… (provider: TCP Provider, error: 0 - No such host is known.)», ~280 caratteri — sta su **una** riga da 11 px dentro un pannello largo metà finestra (~557 px, ~417 px a `MinWidth="900"`). L'utente legge il preambolo generico e **mai** la clausola finale, che è l'unica che nomina la causa. I quattro TextBlock di stato non impostano né `TextWrapping` né `TextTrimming`, Avalonia parte da `NoWrap`/`None`, e i due `ScrollViewer` che li contengono lasciano `HorizontalScrollBarVisibility` al default `Disabled`: il testo è tagliato, non scorrevole. Il controllo che esiste per questo lo fa giusto — `NoticeBand.axaml` mette `TextWrapping="Wrap"` — e la didascalia del database, in questo stesso file, si prende la briga di `TextTrimming="CharacterEllipsis"`. Un attributo per elemento | 2026-09-03 | S | `Views/ProjectSetupDialog.axaml:105`, `:169`, `:197`, `:260`; i due `ScrollViewer` a `:87` e `:180`. Il testo legato è l'eccezione intera: `ViewModels/ProjectEndpointPanelViewModel.cs:381-382`, e `ConnectionStringRedactor` maschera solo `password=`/`pwd=` |
 | **Un fallimento di «Carica» dentro la modale viene riportato con le parole del salvataggio: «Il progetto non è stato salvato; riprova o scegli un altro nome.»** `App.ReportUnhandled` è l'unico formattatore di ultima istanza e cabla parole da salvataggio, ma `OnLoadClick` è `async void` e la sua `store.LoadAsync` non ha alcun `try`/`catch`: l'eccezione viene ripostata sul dispatcher e finisce lì. All'utente viene detto che il progetto non è stato salvato — mentre non stava salvando nulla — e di scegliere un altro nome, che non gli era stato chiesto. Le parole giuste per lo **stesso** fallimento esistono già nel repo per il percorso MRU, che quella chiamata la incapsula. Fattispecie reali: XML corrotto o estraneo, documento senza radice, file bloccato o illeggibile, parse legacy v1 fallito — non «file assente», che l'MRU pota già con `File.Exists`. **Aggravante**: la banda che mostra il testo sta in `MainWindow`, cioè **dietro** la modale ancora aperta | 2026-09-03 | S | `App.axaml.cs:182`; `Views/ProjectSetupDialog.axaml.cs:127` (`async void`) e `:144` (la `LoadAsync` nuda). Le parole giuste sono a `ViewModels/MainWindowViewModel.cs:455`. La banda è `Views/MainWindow.axaml:301` |
 
 
@@ -585,7 +589,7 @@ difetto, taglia e rimedio:
 
 | Voce | Reg. | Sforzo | Stato reale |
 |---|---|---|---|
-| **Nessun modo di escludere un oggetto da una corsa della CLI, quindi un solo oggetto non scrivibile o non costruibile blocca il verbo intero e la procedura di ripresa non avanza.** Trovata dallo smoke del 2026-09-02 e **misurata due volte, in due forme diverse**. (1) *Non scrivibile*: l'utente orfano `pcrm_ro` fa uscire `script` con **30** e senza file — l'intero catalogo di 845 oggetti è irraggiungibile per via di un principale. (2) *Non costruibile*: `PcrmV2Pl_Badii` ha **tre viste** (`VwAppuntamentiRiprogrammatiNexi`, `VwMigrazioneOdsNexi`, `VwMigrazioneRitiriNexi`) che referenziano `PartnerCrmNexi`, database **assente da `.243`**. La regola documentata «dopo un fallimento si ri-confronta e si rigenera, mai si riesegue» è stata applicata alla lettera per **quattro giri**: ogni giro muore al **batch 5** sulla stessa vista e il censimento non si muove di un oggetto — 160 Identical / 303 Different / 354 OnlyInA, identico ogni volta. **657 oggetti restano pendenti per sempre.** La GUI ha la selezione per oggetto e può passare oltre; la CLI no. **Non è un difetto del generatore** — nessuno strumento può creare una vista su un database che non c'è — ma è l'unica superficie da cui un operatore CLI non ha via d'uscita, ed è **del proprietario** perché ogni rimedio tocca superficie pubblica: una `Option` di esclusione (`--exclude`), oppure un `--continue-on-error`, oppure dichiarare che per queste forme si usa la GUI e dirlo in `cli.md` | 2026-09-02 | M | Riproduzione in `scripts/smoke/` (git-ignored) del 2026-09-02; `src/DbDelta.Cli/Commands/ScriptCommand.cs` (cinque `Option<>`, nessuna di selezione); `docfx/articles/cli.md`, la regola «re-compare and re-generate, never re-run» |
+| **Nessun modo di escludere un oggetto da una corsa della CLI, quindi un solo oggetto non scrivibile o non costruibile blocca il verbo intero e la procedura di ripresa non avanza.** Trovata dallo smoke del 2026-09-02 e **misurata due volte, in due forme diverse**. (1) *Non scrivibile*: l'utente orfano `pcrm_ro` fa uscire `script` con **30** e senza file — l'intero catalogo di 845 oggetti è irraggiungibile per via di un principale. (2) *Non costruibile*: `PcrmV2Pl_Badii` ha **tre viste** (`VwAppuntamentiRiprogrammatiNexi`, `VwMigrazioneOdsNexi`, `VwMigrazioneRitiriNexi`) che referenziano `PartnerCrmNexi`, database **assente da `.243`**. La regola documentata «dopo un fallimento si ri-confronta e si rigenera, mai si riesegue» è stata applicata alla lettera per **quattro giri**: ogni giro muore al **batch 5** sulla stessa vista e il censimento non si muove di un oggetto — 160 Identical / 303 Different / 354 OnlyInA, identico ogni volta. **657 oggetti restano pendenti per sempre.** La GUI ha la selezione per oggetto e può passare oltre; la CLI no. **Non è un difetto del generatore** — nessuno strumento può creare una vista su un database che non c'è — ma è l'unica superficie da cui un operatore CLI non ha via d'uscita, ed è **del proprietario** perché ogni rimedio tocca superficie pubblica: una `Option` di esclusione (`--exclude`), oppure un `--continue-on-error`, oppure dichiarare che per queste forme si usa la GUI e dirlo in `cli.md` | 2026-09-02 | M | **Forma decisa dal proprietario il 2026-09-17: `--exclude <pattern>`** (`schema.nome` o glob) su `script`, `apply` e `compare` — la selezione per oggetto della GUI ripetuta dalla CLI; non `--continue-on-error`, che lascerebbe il target a metà per scelta, e non la sola documentazione. Da fare **dopo** il tag della 1.1.1. Riproduzione in `scripts/smoke/` (git-ignored) del 2026-09-02; `src/DbDelta.Cli/Commands/ScriptCommand.cs` (cinque `Option<>`, nessuna di selezione); `docfx/articles/cli.md`, la regola «re-compare and re-generate, never re-run» |
 
 ---
 

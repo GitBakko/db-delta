@@ -102,7 +102,7 @@
                             ScanCommand="{Binding $parent[Window].((vm:ProjectSetupViewModel)DataContext).ScanForCommand}"
                             ScanCommandParameter="source" />
             <!-- Error-only scan status (counter is inline above) -->
-            <TextBlock Text="{Binding ScanStatusMessage}" FontSize="11"
+            <TextBlock Text="{Binding ScanStatusMessage}" FontSize="11" TextWrapping="Wrap"
                        Foreground="{StaticResource FgMutedBrush}"
                        IsVisible="{Binding ScanStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
@@ -166,7 +166,7 @@
             <TextBox Text="{Binding DatabaseName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                      PlaceholderText="Nome database…" IsVisible="{Binding !HasDatabases}" />
             <!-- Error-only connection status (success is implied by the populated combo above) -->
-            <TextBlock Text="{Binding ConnectionStatusMessage}" FontSize="11"
+            <TextBlock Text="{Binding ConnectionStatusMessage}" FontSize="11" TextWrapping="Wrap"
                        Foreground="{StaticResource FgMutedBrush}"
                        IsVisible="{Binding ConnectionStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
@@ -194,7 +194,7 @@
                             IsScanning="{Binding IsScanningServers}"
                             ScanCommand="{Binding $parent[Window].((vm:ProjectSetupViewModel)DataContext).ScanForCommand}"
                             ScanCommandParameter="target" />
-            <TextBlock Text="{Binding ScanStatusMessage}" FontSize="11"
+            <TextBlock Text="{Binding ScanStatusMessage}" FontSize="11" TextWrapping="Wrap"
                        Foreground="{StaticResource FgMutedBrush}"
                        IsVisible="{Binding ScanStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
@@ -257,7 +257,7 @@
             </Grid>
             <TextBox Text="{Binding DatabaseName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                      PlaceholderText="Nome database…" IsVisible="{Binding !HasDatabases}" />
-            <TextBlock Text="{Binding ConnectionStatusMessage}" FontSize="11"
+            <TextBlock Text="{Binding ConnectionStatusMessage}" FontSize="11" TextWrapping="Wrap"
                        Foreground="{StaticResource FgMutedBrush}"
                        IsVisible="{Binding ConnectionStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 

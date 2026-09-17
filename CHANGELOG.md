@@ -91,6 +91,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   name by hand and pressing OK while the list was still on its way kept the
   pair for that comparison and forgot it for the next. OK now writes the pair
   you confirmed itself; **Annulla** still writes nothing.
+- **A connection error is shown whole.** The typical SqlClient message is
+  about 280 characters and sat on a single line inside a panel half the
+  window wide, cut mid-word with nothing to say so — the generic preamble was
+  visible, the final clause naming the cause never was. The four status lines
+  of **Nuovo progetto** now wrap.
 
 ## [1.1.0] — 2026-09-02 — the deploy stops writing statements that mean something else
 
