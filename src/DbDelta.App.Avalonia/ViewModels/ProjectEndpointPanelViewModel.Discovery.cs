@@ -39,7 +39,10 @@ public sealed partial class ProjectEndpointPanelViewModel
             : $"{ServerName}  ({ServerIpAddress})");
 
     /// <summary>Inline counter text shown next to the "Server" section label.</summary>
-    public string ServerCountText => $"({ServerSuggestions.Count} trovati)";
+    // Rows that can be picked: the list also carries the IsHeaderOnly
+    // sentinels that draw the section dividers, and counting them said one
+    // more than the user could choose, two with both sections on screen.
+    public string ServerCountText => $"({ServerSuggestions.Count(s => !s.IsHeaderOnly)} trovati)";
 
     /// <summary>Inline counter text shown next to the "Database" section label.</summary>
     public string DatabaseCountText => $"({AvailableDatabases.Count} trovati)";

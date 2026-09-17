@@ -238,6 +238,23 @@ public class ProjectSetupViewModelTests
     }
 
     [AvaloniaFact]
+    public void ServerCountText_does_not_count_the_section_dividers()
+    {
+        // The 2026-09-03 sweep's P4: ServerSuggestions is one flat list that
+        // also carries the IsHeaderOnly sentinels — «Usati di recente» from
+        // SeedRecentServers, «Risultati scansione» from ApplyScanResults — drawn
+        // as divider strips and disabled in the picker. Count included them,
+        // so «(N trovati)» was one too many with a section on screen and two
+        // with both. The test above never saw it: it adds servers by hand,
+        // without a section.
+        ProjectEndpointPanelViewModel ep = new("Source", isTarget: false);
+        ep.SeedRecentServers([("SRV-RECENT", null)]);
+        ep.ApplyScanResults([new Persistence.Sql.DiscoveredServer("SRV1", null), new Persistence.Sql.DiscoveredServer("SRV2", "10.0.0.1")]);
+
+        ep.ServerSuggestions.Count(s => s.IsHeaderOnly).Should().Be(2, "the control: both sections are on screen");
+        ep.ServerCountText.Should().Be("(3 trovati)", "three rows can be picked, the two dividers cannot");
+    }
+    [AvaloniaFact]
     public void DatabaseCountText_reflects_available_databases_count()
     {
         ProjectEndpointPanelViewModel ep = new("Target", isTarget: true);

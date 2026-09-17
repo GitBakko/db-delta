@@ -6,6 +6,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed
+
+- **«(N trovati)» next to the server list counts servers.** The list also
+  carries the two section dividers — «Usati di recente», «Risultati
+  scansione» — drawn as strips you cannot pick, and the counter counted them:
+  one too many with a section on screen, two with both.
+
 <a id="v1.1.1"></a>
 ## [1.1.1] — 2026-09-17 — the setup dialog works from the installed build
 

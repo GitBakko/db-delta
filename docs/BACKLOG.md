@@ -17,15 +17,16 @@ vedi «Manutenzione» in fondo.
   Tutti e undici i suoi step verdi, **incluso lo smoke di installazione
   vero** — installa, verifica app, CLI e PATH di macchina, disinstalla,
   verifica che sia sparito. La v1.1.0 (2026-09-02) resta la precedente.
-- **1071 test verdi** nei sette progetti che girano senza Docker (Core 630,
-  Headless 257, Persistence.Unit 92, Golden 68, Property 12, Architecture 6,
+- **1072 test verdi** nei sette progetti che girano senza Docker (Core 630,
+  Headless 258, Persistence.Unit 92, Golden 68, Property 12, Architecture 6,
   Shared 6) — ricontati il 2026-09-17, non incrementati a mente. I due di
   Headless del 2026-09-17 chiudono la P4 dell'OK premuto a caricamento in volo,
   uno è il controllo in negativo su Annulla; il terzo chiude la P2 dell'errore
   di connessione tagliato, il quarto e il quinto quella di «Carica» che parlava
   di salvataggio, il sesto il «Carica…» sullo stesso server e il settimo la coppia dello store
   che segue il suo server, entrambi dallo smoke; l'ottavo è l'invariante DRY
-  della modale, un `EndpointPanel` ospitato due volte. I
+  della modale, un `EndpointPanel` ospitato due volte, il nono il contatore
+  «(N trovati)» che non conta più i separatori. I
   trentanove di Headless dal 2026-09-03 al 09-05: quattro sono la chiusura
   della segnalazione, nove la P1 della stringa di connessione, sette quella del
   ciclo di vita della modale, l'azzeramento delle credenziali ne aggiunge due
@@ -55,7 +56,7 @@ vedi «Manutenzione» in fondo.
   giri della suite intera non è misurato, e il tetto da 30 s è il soffitto
   dichiarato, non un'asserzione sul tempo. Sonda: tolto il riarmo in
   `OnAuthModeChanged`, i due positivi cadono per `TimeoutException`.
-  **Con Docker acceso girano anche i tre DB-backed** e il totale è **1212**
+  **Con Docker acceso girano anche i tre DB-backed** e il totale è **1213**
   (LiveDb 105, Cli acceptance 29, Persistence integration 7) — misurato il
   2026-09-17, tutti verdi. **Due** dei tre vanno **rossi**, non skipped, con Docker
   spento — LiveDb e Cli acceptance, che costruiscono il container in un
@@ -64,19 +65,20 @@ vedi «Manutenzione» in fondo.
   serve**: stampa l'intestazione anche a daemon morto. Persistence integration invece **skippa da sé** da `f8df44a`
   (`SqlExecutorTests.cs:27-45` e `:74`), ed è per questo che gira anche nel job
   Windows. `dotnet format --verify-no-changes` esce 0.
-- **2 voci aperte** — **P1 0 · P2 0 · P3 0 · P4 1** · P5 1 — più **23** in
+- **1 voce aperta** — **P1 0 · P2 0 · P3 0 · P4 0** · P5 1 — più **23** in
   «Deciso — NON riaprire». **P1 è vuota**: le tre voci che la segnalazione del
   2026-09-03 aveva aperto sono chiuse tutte, `e9821a7` (stringa di connessione),
   `85f5d4c` (ciclo di vita della modale) e `cb01e7a` (azzeramento delle
   credenziali) — scelta del proprietario di allargare l'ambito della 1.1.1
-  alle P1 invece di rilasciare le sole due bloccanti. **Una delle due l'ha
-  aperta quella stessa segnalazione**; la voce d'igiene aperta da `85f5d4c`
+  alle P1 invece di rilasciare le sole due bloccanti. **Nessuna l'ha aperta quella
+  segnalazione: le sue ultime due — «(N trovati)» e i pannelli copia-incolla —
+  sono chiuse il 2026-09-17**; la voce d'igiene aperta da `85f5d4c`
   (`ProjectEndpointPanelViewModel` cresciuto) e la P3 dei pannelli copia-incolla
   sono chiuse insieme il 2026-09-17, in tre partial e un `UserControl`; **della review adversariale del 2026-09-05** sui
   quattro commit della 1.1.1 non resta nulla: la scrittura di credenziale
   scartata a OK (P4) è **chiusa il 2026-09-17** per decisione del proprietario
   — fix XS, non compromesso dichiarato — e la P3 del riarmo che muore al cambio
-  di `AuthMode` **è entrata nella 1.1.1** ed è chiusa da `89842f5`; la seconda
+  di `AuthMode` **è entrata nella 1.1.1** ed è chiusa da `89842f5`; l'unica
   è del proprietario, sulla selezione oggetti da CLI, ferma dal 2026-09-02 e
   **decisa il 2026-09-17: `--exclude <pattern>`**, da fare dopo il tag della 1.1.1.
   **Il backlog non ha più alcuna voce dichiarata non verificata**: l'ultima —
@@ -120,8 +122,8 @@ vedi «Manutenzione» in fondo.
   `dbdelta script --no-transaction`, **verificata dal vivo** lo stesso giorno.
   **Quella riga diceva «nessuna voce aperta descrive un difetto», ed è durata
   un giorno**: il 2026-09-03 il proprietario ha installato la v1.1.0 e la
-  modale di nuovo progetto era inservibile. **Entrambe le voci aperte
-  descrivono un difetto**, e nessuna delle due l'ha trovata un test — le prime
+  modale di nuovo progetto era inservibile. **L'unica voce aperta
+  descrive un difetto**, e non l'ha trovata un test — le prime
   due un utente sul build installato, le altre lo sweep partito da quelle.
   L'estrazione di `DeployPreflight` — aperta il 2026-09-01 solo
   perché `CLAUDE.md` impone di aprire una voce invece di far crescere un file in
@@ -156,7 +158,7 @@ vedi «Manutenzione» in fondo.
   `a8fb905` (2026-09-05); `33622205347` su `1d4581c` (2026-09-02), con
   `33622223661` (release, sul tag `v1.1.0`). I DB-backed aggiungono **141**
   test ai locali della riga sopra: LiveDb 105, Cli acceptance 29, Persistence
-  integration 7 — il **1212** della riga sopra. Senza Docker 3
+  integration 7 — il **1213** della riga sopra. Senza Docker 3
   dei 7 di Persistence integration si skippano da sé. L'exit code di `script`
   e la forma JSON di `compare` girano solo lì.
 - **La guardia dello skip Testcontainers deve avvolgere `Build()`**, non solo
@@ -577,7 +579,7 @@ porta la sua riga qui sopra. **P3 è vuota.**
 ## P4 — Igiene
 
 Sette voci chiuse il 2026-08-20, una il 2026-09-01, **due** il 2026-09-02 e
-**tre** il 2026-09-17, ognuna dal commit che porta la sua riga. (Diceva «una» mentre ne elencava sette: ricontate il 2026-09-01.)
+**quattro** il 2026-09-17, ognuna dal commit che porta la sua riga. (Diceva «una» mentre ne elencava sette: ricontate il 2026-09-01.)
 
 | Voce chiusa | Come | Prova |
 |---|---|---|
@@ -594,6 +596,7 @@ Sette voci chiuse il 2026-08-20, una il 2026-09-01, **due** il 2026-09-02 e
 | `Closed` non distingueva OK da Annulla: una scrittura «Ricorda credenziali» dietro un caricamento ancora in volo al momento di OK veniva scartata | **Decisione del proprietario, 2026-09-17: fix XS, non compromesso dichiarato.** OK è abilitato da `IsValid` e il nome del database si digita a mano mentre la lista carica ancora (fino ai 10 s di `ConnectTimeout`): premuto in quella finestra chiudeva, `Closed` cancellava la vita del pannello, il caricamento moriva prima del persist sul suo percorso di successo e la coppia non veniva salvata — il confronto partiva con la password digitata, la volta dopo non si riempiva nulla. Ora **OK scrive da sé**, `ProjectSetupViewModel.PersistCredentialsAsync` su entrambi i pannelli, **attesa prima di `Close`** e non fire-and-forget: `Closed` cancella la vita, e uno store che onorasse il token (DPAPI non lo fa, i v2 lo faranno) perderebbe una scrittura ancora in volo. `OnOkClick` diventa `async void` con la stessa copertura di `OnSaveClick`. La semantica cambia di un grado, ed è scritta qui perché sia una scelta: prima si ricordava solo una coppia che **aveva autenticato**, ora quella che l'utente **ha confermato** con OK — una password sbagliata confermata viene ricordata e riproposta, fallisce al primo auto-connect e va corretta. Con «Ricorda» spento OK **dimentica**, come già faceva il caricamento riuscito | `ModalLifetimeTests.OK_pressed_while_the_load_is_still_in_flight_still_remembers_the_pair` — headless, preme il pulsante `IsDefault` del dialogo vero con un caricamento in volo contro `.invalid`; RED misurato prima del codice («the collection is empty»). Più il controllo in negativo `Control_Annulla_in_that_same_window_writes_nothing`, che preme `IsCancel` nella stessa finestra. **Sonda di mutazione uccisa dal controllo**: scrittura spostata su `Closed` invece che su OK, il positivo resta verde e Annulla cade con la chiave scritta. Una prima sonda **non compilava** (`IDE0390`, `async` senza await) e il `--no-build` mostrava il verde dell'assembly di prima — la trappola già registrata in P4, pagata di nuovo |
 | La scansione dichiarava sempre di aver trovato dei server, e il suggerimento «SQL Browser potrebbe essere disabilitato» era codice morto | **Semina tolta**: `EnumerateServersAsync` non mette più `(local)`, `localhost` e `127.0.0.1` prima di spedire un pacchetto, e l'ordinamento speciale che li teneva in cima se n'è andato con loro — restano solo i nomi di chi risponde, in ordine alfabetico. I tre consumatori (`ApplyScanResults`, il gemello in `ConnectionEditViewModel`, il messaggio di `ProjectSetupViewModel`) gestivano già la lista vuota: il ramo «Nessun server rilevato» diventa raggiungibile senza toccarli. **Entrata nella 1.1.1 dallo smoke del 2026-09-17, decisione del proprietario**: su un PC con due istanze **nominate** (`DICIANNOVE`, `VENTIDUE`) e nessuna di default, il proprietario ha scelto una congettura dalla lista e non poteva funzionare — mentre il Browser locale, interrogato su loopback, aveva già risposto con i due nomi veri, misurato con un datagramma a mano. Chi vuole il locale a mano digita `localhost\ISTANZA` | `SqlBrowserResponseTests.A_scan_nobody_answered_produces_nothing_not_three_guesses` — token già cancellato, nessun datagramma letto, la lista deve essere vuota; **RED misurato prima del codice** («found at least one item»). È deterministico anche su una LAN piena di Browser: a token cancellato il ciclo di ricezione non parte, quindi ciò che torna è solo ciò che la scansione inventa da sé |
 | `ProjectEndpointPanelViewModel` era passato da 702 a 884 righe chiudendo le P1, la review del 2026-09-05 e lo smoke del 2026-09-17 | **Tre file partial, 420 / 233 / 255 righe, lungo la linea che la voce nominava**: `ProjectEndpointPanelViewModel.cs` tiene l'endpoint (identità, campi, setter, validità, `LoadDatabasesAsync`, stringa di connessione, `ToEndpoint`/`FromEndpoint`/`LoadFromEndpoint`); `.Discovery.cs` il mondo del picker (scansione, suggerimenti e sezioni, recenti, `PickServer`, banda e contatori, DNS); `.Credentials.cs` la coppia (store, vouching, auto-fill, persist, auto-connect). **Spostamenti verbatim, misurati e non dichiarati**: 650 righe di corpo del file di `HEAD` ritrovate tutte identiche nei tre file — 0 mancanti, 8 aggiunte, che sono i due commenti di testa richiesti. Nessun membro riscritto, nessun test toccato: i commenti che registrano un ordine di chiamate viaggiano con i loro membri. La voce diceva «da fare insieme alla P3»: fatta insieme, nello stesso commit. `CLAUDE.md` scende a cinque file oltre soglia, rimisurati il 2026-09-17 | `git show HEAD:…ProjectEndpointPanelViewModel.cs` contro i tre file, riga per riga, ignorando using/namespace/graffe (script in scratchpad, esito in questa riga). 257 headless verdi ×2 standalone e nella suite intera; `wc -l` di ciascuno sotto 500 |
+| «(N trovati)» contava come server i separatori di sezione, che non si possono selezionare | `ServerCountText` conta le righe con `!IsHeaderOnly`: le due sentinelle — «Usati di recente» da `SeedRecentServers`, «Risultati scansione» da `ApplyScanResults` — sono strisce disegnate e disabilitate dallo stile del picker, non scelte. Il gemello `ConnectionEditViewModel` («Trovati {list.Count} server») conta la lista grezza della scansione, che sentinelle non ne ha: giusto com'è. `DatabaseCountText` non toccato, `AvailableDatabases` non porta sentinelle | `ProjectSetupViewModelTests.ServerCountText_does_not_count_the_section_dividers` — recenti seminati e risultati applicati, due sentinelle a schermo (il controllo), «(3 trovati)» per tre righe scegliibili; **RED prima del codice**: «(5 trovati)». Il test preesistente `ServerCountText_reflects_suggestions_count` non lo vedeva perché aggiunge server a mano, senza sezioni, e resta verde |
 
 Le due voci aperte il 2026-09-01 misurando il gate d'errore sono
 chiuse entrambe il 2026-09-02, dai commit che portano le loro righe qui sopra.
@@ -603,12 +606,9 @@ aperta lo stesso giorno dalla chiusura della P1 sul ciclo di vita, perché
 cresce. La quarta, aperta il 2026-09-05 dalla review adversariale della
 1.1.1, la prima del 2026-09-03 — la scansione che «trova» sempre tre
 server, colpita dallo smoke — e la terza, la crescita del view model, chiusa
-insieme alla P3, sono chiuse il 2026-09-17, ognuna dal commit che porta la
-sua riga qui sopra. Ne resta una:
-
-| Voce | Reg. | Sforzo | Stato reale |
-|---|---|---|---|
-| **«(N trovati)» conta come server i separatori di sezione, che non si possono selezionare.** `ServerSuggestions` è una collezione piatta che porta anche le sentinelle `IsHeaderOnly` — una inserita da `ApplyScanResults` per «Risultati scansione», un'altra da `SeedRecentServers` per «Usati di recente» — e lo stile del ComboBox le disabilita esplicitamente, cioè sono disegnate come strisce divisorie e **non** sono scegliibili. `Count` le include lo stesso: il contatore supera di uno le righe pescabili con una sezione presente, di due con entrambe. A zero suggerimenti non si vede alcun numero sbagliato, perché il TextBlock è nascosto da `HasServerSuggestions`. `DatabaseCountText` non è toccato: `AvailableDatabases` non porta sentinelle | 2026-09-03 | S | `ViewModels/ProjectEndpointPanelViewModel.Discovery.cs:42`; le sentinelle sono inserite a `:105-110` e `:162-167` (rimisurate il 2026-09-17 dopo lo split in partial); lo stile che le disabilita è `Views/Controls/ServerPicker.axaml:27-29`; il contatore è legato a `Views/Controls/EndpointPanel.axaml:20`, una volta sola ora che il pannello è un controllo |
+insieme alla P3, e la seconda del 2026-09-03 — «(N trovati)» che contava i
+separatori — sono chiuse il 2026-09-17, ognuna dal commit che porta la sua
+riga qui sopra. **P4 è vuota.**
 
 ---
 
